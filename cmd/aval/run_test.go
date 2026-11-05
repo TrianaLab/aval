@@ -412,3 +412,22 @@ func TestRunPushThenReuse(t *testing.T) {
 		t.Fatalf("reuse: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }
+
+// Reasons can carry attacker-chosen text from an untrusted attestation. Every
+// line aval prints stays one line with control characters escaped, so such
+// text cannot start a line of its own (a CI log command, a terminal escape).
+func TestUntrustedTextCannotStartALine(t *testing.T) {
+	forged := &evidence.VerificationError{Reason: "bad\n::error::forged\r\x1b[31m"}
+	fakeCandidates(t, nil, map[string]candidate{"sha256:aa": {verifyErr: forged}, "sha256:bb": {verifyErr: forged}})
+	argv, _ := marker(t, 0)
+	dir := t.TempDir()
+	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", argv...), "--registry", "r", "--policy", "p.yaml", "--result", filepath.Join(dir, "result.json"))
+	if code != ExitVerificationFailed {
+		t.Fatalf("exit %d, want %d", code, ExitVerificationFailed)
+	}
+	for _, out := range []string{stdout, stderr} {
+		if strings.Contains(out, "\n::") || strings.ContainsAny(out, "\r\x1b") || !strings.Contains(out, `bad\n::error::forged\r\x1b[31m`) {
+			t.Fatalf("untrusted text not escaped: %q", out)
+		}
+	}
+}

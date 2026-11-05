@@ -466,15 +466,22 @@ func TestReleaseWorkflowVerifiesBeforePublishing(t *testing.T) {
 	if job.If != "startsWith(github.ref, 'refs/tags/v')" {
 		t.Errorf("release job runs on %q, want tags only", job.If)
 	}
-	verified, published := false, false
+	verified, published, e2e := false, false, false
 	for _, s := range job.Steps {
 		switch {
+		// #28: no release without a verified e2e attestation for the commit,
+		// under the main policy.
+		case strings.Contains(s.Run, "aval verify -f aval.e2e.yaml") && strings.Contains(s.Run, "--policy .github/aval/main.yaml"):
+			e2e = true
 		case strings.Contains(s.Run, "./tests/release/") && s.Env[envTag] != "" && s.Env[envDist] != "":
 			verified = true
 		case strings.Contains(s.Run, "gh release create"):
 			published = true
 			if !verified {
 				t.Error("release job publishes before tests/release verifies the tagged dist/")
+			}
+			if !e2e {
+				t.Error("release job publishes without verifying the e2e attestation (aval.e2e.yaml) for the commit")
 			}
 			checkPublishedFiles(t, s.Run)
 		}

@@ -209,6 +209,12 @@ failure.
 `runner.command` starts: the code under test cannot use it to sign results as
 the workload identity.
 
+Reasons can carry text from an untrusted attestation, so the text output
+and stderr escape it with Go string escapes (newlines, control and other
+non-printable characters, quotes and backslashes): such text never
+starts a line of its own (a CI log command, a terminal escape). The JSON
+report keeps the reason as is.
+
 `--shadow` verifies and runs the test anyway. If a verified result disagrees
 with the real run, that is a false hit: `aval run` prints `aval: FALSE HIT:
 ...` on stderr and exits 1. If they agree, it says reuse would have been

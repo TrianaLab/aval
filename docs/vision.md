@@ -171,6 +171,12 @@ These formats are provisional until milestone 5 makes them stable.
    The release pipeline for signed `aval` binaries (checksums, SBOMs, SLSA
    provenance) is in place and dry-runs on every PR; no release is published
    yet, so the example still builds `aval` from source.
+   Aval also dogfoods itself (#28): `ci-e2e` runs the heavy suite
+   (`aval.e2e.yaml`) through `aval run` and reuses a verified result,
+   `dogfood-shadow` runs the unit suite (`aval.yaml`) with `--shadow`, and on
+   `main` `dogfood-publish` signs and pushes both results to
+   `ghcr.io/trianalab/aval-attestations`. A release requires a verified e2e
+   attestation for its commit. See [CONTRIBUTING.md](../CONTRIBUTING.md#ci-quality-gates).
 4. **False-hit suite.** Exit criterion: an automated suite that applies every
    known kind of relevant change (source, dependency, toolchain, env var,
    exec bit, contract edit, symlink, file rename) and asserts that none of

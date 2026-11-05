@@ -1,6 +1,9 @@
 # Aval dogfooding: the engine unit suite. tests/architecture is deliberately
 # out of scope (it reads .agents/ and .claude/, which hold symlinks) and
-# always runs.
+# always runs. The scope is every file the suite reads (invariant 2):
+# testdata, the CLI reference cmd/aval checks, and the contracts the contract
+# fuzz target seeds from. tests/architecture/dogfood_test.go fails if a suite
+# reads a repository file outside its contract's scope.
 apiVersion: aval.dev/v1alpha1
 kind: Test
 metadata:
@@ -8,8 +11,16 @@ metadata:
 runner:
   command: ["go", "test", "-race", "./cmd/...", "./internal/...", "./pkg/..."]
 scope:
-  source: ["cmd/**/*.go", "internal/**/*.go", "pkg/**/*.go"]
+  source:
+    - "cmd/**"
+    - "internal/**"
+    - "pkg/**"
+    - "docs/cli-reference.md"
+    - "aval.yaml"
+    - "examples/go-compose/aval.yaml"
+  # Results and reports that `aval run` writes; git ignores them.
+  exclude: ["**/.aval/**"]
   dependencies: [go.mod, go.sum]
 environment:
-  toolchain: {go: "1.25"}
+  toolchain: {go: "1.27"}
 cacheability: hermetic

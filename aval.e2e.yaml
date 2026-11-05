@@ -1,0 +1,26 @@
+# Aval dogfooding: the heavy suite, levels 2 (tests/integration: in-process
+# registry) and 4 (tests/acceptance: run, push and verify through the CLI,
+# with signing). `make ci-e2e` runs it through `aval run`; in CI a verified
+# result for the same inputs is reused (#28). The scope is every file the
+# suite builds or reads, including the Makefile targets runner.command calls.
+apiVersion: aval.dev/v1alpha1
+kind: Test
+metadata:
+  name: aval-e2e
+runner:
+  command: ["make", "test-integration", "test-acceptance"]
+scope:
+  source:
+    - "cmd/**"
+    - "internal/**"
+    - "pkg/**"
+    - "tests/integration/**"
+    - "tests/acceptance/**"
+    - "examples/go-compose/**"
+  # Results and reports that `aval run` writes; git ignores them.
+  exclude: ["**/.aval/**"]
+  dependencies: [go.mod, go.sum, Makefile]
+environment:
+  toolchain: {go: "1.27"}
+  env: [GOFLAGS, GOEXPERIMENT, CGO_ENABLED]
+cacheability: hermetic

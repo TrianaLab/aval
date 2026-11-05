@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -72,7 +73,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	root.SetErr(stderr)
 	err := root.Execute()
 	if err != nil {
-		fmt.Fprintln(stderr, "aval:", err)
+		fmt.Fprintln(stderr, "aval:", oneLine(err.Error()))
 	}
 	return exitCode(err)
 }
@@ -273,7 +274,7 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 		}
 		unknown = unknown || !errors.Is(err, evidence.ErrVerification)
 		rejected = append(rejected, evidence.Rejection{Reference: d.Reference(), Outcome: outcomeOf(err), Reason: err.Error()})
-		fmt.Fprintf(warn, "aval: warning: rejected attestation %s: %v\n", d.Reference(), err)
+		fmt.Fprintf(warn, "aval: warning: rejected attestation %s: %s\n", d.Reference(), oneLine(err.Error()))
 	}
 	if best == nil || unknown {
 		return nil, failRef, rejected, failErr
@@ -306,10 +307,19 @@ func writeReport(w io.Writer, format string, r evidence.Report) error {
 	}
 	fmt.Fprintf(w, "%s %s %s\n", r.Outcome, r.TestID, r.Fingerprint)
 	if r.Reason != "" {
-		fmt.Fprintf(w, "reason: %s\n", r.Reason)
+		fmt.Fprintf(w, "reason: %s\n", oneLine(r.Reason))
 	}
 	for _, rj := range r.Rejected {
-		fmt.Fprintf(w, "rejected: %s %s: %s\n", rj.Reference, rj.Outcome, rj.Reason)
+		fmt.Fprintf(w, "rejected: %s %s: %s\n", rj.Reference, rj.Outcome, oneLine(rj.Reason))
 	}
 	return nil
+}
+
+// oneLine applies Go string literal escapes, without the surrounding quotes:
+// newlines, control and non-printable characters, quotes and backslashes. Reasons can carry text from an untrusted
+// attestation; escaped, it cannot start a line of its own in a log, where a
+// CI system might read it as a command, or move a terminal cursor.
+func oneLine(s string) string {
+	q := strconv.Quote(s)
+	return q[1 : len(q)-1]
 }
