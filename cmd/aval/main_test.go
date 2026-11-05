@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -98,13 +99,15 @@ func TestCLI(t *testing.T) {
 		{"bad flag", []string{"--bogus"}, ExitUsage, "", "aval: unknown flag"},
 		{"fingerprint only", []string{"run", "-f", hermetic, "--fingerprint-only"}, ExitOK, "sha256:", ""},
 		{"explain", []string{"run", "-f", hermetic, "--explain", "--fingerprint-only"}, ExitOK, "aval-fingerprint/v1\n", ""},
-		{"run stub", []string{"run", "-f", hermetic}, ExitNotImplemented, "test unit fingerprint sha256:", "not implemented"},
-		{"non-deterministic", []string{"run", "-f", nondet}, ExitNotImplemented, "cacheability non-deterministic: not reusable by default", ""},
+		{"explain then run", []string{"run", "-f", hermetic, "--explain", "--result", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "ran unit: passed", ""},
+		{"run without registry runs the test", []string{"run", "-f", hermetic, "--result", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "miss unit sha256:", ""},
+		{"non-deterministic", []string{"run", "-f", nondet, "--result", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "cacheability non-deterministic: not reusable by default", ""},
 		{"missing contract", []string{"run", "-f", missing}, ExitUsage, "", "aval:"},
-		{"unprovable inputs", []string{"run", "-f", noSource}, ExitError, "", "matched no files"},
+		{"unprovable inputs", []string{"run", "-f", noSource, "--fingerprint-only"}, ExitError, "", "matched no files"},
+		{"unprovable inputs explained", []string{"run", "-f", noSource, "--explain"}, ExitError, "", "matched no files"},
 		{"push no registry", []string{"push", "-f", hermetic}, ExitUsage, "", "--registry is required"},
 		{"push missing contract", []string{"push", "-f", missing, "--registry", "r"}, ExitUsage, "", "aval:"},
-		{"push stub", []string{"push", "-f", hermetic, "--registry", "r"}, ExitNotImplemented, "", "not implemented"},
+		{"push without a recorded result", []string{"push", "-f", hermetic, "--registry", "r", "--result", filepath.Join(t.TempDir(), "none.json")}, ExitError, "", "recorded by 'aval run'"},
 		{"verify bad output", []string{"verify", "-o", "yaml"}, ExitUsage, "", "--output must be text or json"},
 		{"verify no registry", []string{"verify", "-f", hermetic}, ExitUsage, "", "--registry is required"},
 		{"verify missing contract", []string{"verify", "-f", missing, "--registry", "r"}, ExitUsage, "", "aval:"},
@@ -143,7 +146,8 @@ func fakeVerify(t *testing.T, lookupErr, fetchErr, verifyErr error) {
 type candidate struct {
 	fetchErr, verifyErr error
 	trust               evidence.TrustLevel
-	failed              bool // verifies with result failed instead of passed
+	failed              bool   // verifies with result failed instead of passed
+	cacheability        string // signed class; default hermetic
 }
 
 // fakeCandidates makes lookup return the given candidates, sorted by digest,
@@ -175,7 +179,7 @@ func fakeCandidates(t *testing.T, lookupErr error, cands map[string]candidate) {
 		if c.verifyErr != nil {
 			return nil, c.verifyErr
 		}
-		p := &evidence.Predicate{Test: evidence.Test{ID: o.ExpectedTestID}, Result: evidence.ResultPassed}
+		p := &evidence.Predicate{Test: evidence.Test{ID: o.ExpectedTestID, Cacheability: cmp.Or(c.cacheability, "hermetic")}, Result: evidence.ResultPassed}
 		if c.failed {
 			p.Result = evidence.ResultFailed
 		}

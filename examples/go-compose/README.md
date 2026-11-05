@@ -47,10 +47,10 @@ echo >> examples/go-compose/counter/counter.go;     c=$(fp); [ "$b" != "$c" ] &&
 `aval.yaml` itself (including `runner.command`) and the executable bit of any
 scoped file.
 
-Plain `aval run` without `--fingerprint-only` prints the fingerprint and then
-exits 6 (not implemented): lookup, execution and publishing land in milestone 2.
+Plain `aval run` without a registry prints the fingerprint, reports a miss
+and runs `runner.command`.
 
-## Target UX (milestone 2+, not implemented)
+## Reuse through a registry
 
 ```sh
 # CI runner with a verifiable identity: run once, sign, publish.
@@ -61,9 +61,10 @@ aval run -f aval.yaml --registry ghcr.io/acme/counter-aval --policy policy.yaml
 aval verify -f aval.yaml --registry ghcr.io/acme/counter-aval --output json
 ```
 
-`aval run` would look up `sha256-<fingerprint>` in the repository, verify the
-signed attestation against the trust policy and reuse it (exit 0), or run
-`runner.command` on a miss. `aval verify` exits 0 when verified, 4 on a miss
+`aval run` looks up `sha256-<fingerprint>` in the repository, verifies the
+signed attestation against the trust policy and reuses it (exit 0 for a
+passing result, 3 for a failing one), or runs `runner.command` on a miss.
+A verification failure runs the test and exits 5. `aval verify` exits 0 when verified, 4 on a miss
 and 5 when an attestation exists but fails signature or policy checks. With no
 policy, nothing is trusted and the test always runs.
 

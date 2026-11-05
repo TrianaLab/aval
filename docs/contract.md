@@ -117,8 +117,9 @@ renaming a test produces a new fingerprint.
 is still reused only if a valid, signed attestation exists and the trust
 policy accepts its signer (see [trust-model.md](trust-model.md#policy)).
 Without a policy nothing is accepted.
-Today `aval run` prints `cacheability <class>: not reusable by default` for
-the last two classes.
+`aval run` prints `cacheability <class>: not reusable by default` for the
+last two classes. A `non-deterministic` test is never looked up: it always
+runs.
 
 ## What goes into the fingerprint
 
@@ -180,7 +181,9 @@ same executable file fingerprint differently.
 ### Fail-closed errors
 
 If equivalence of inputs cannot be proven, fingerprinting fails and the
-test must run. `aval run` exits with code 1 in these cases:
+test must run. `aval run` reports the reason (outcome `error`) and runs the
+test without recording it; `aval run --fingerprint-only`, `--explain`,
+`aval verify` and `aval push` exit with code 1. The cases:
 
 - `scope.source matched no files` (after applying `exclude`).
 - `dependency glob "<glob>" matched no files`: every `dependencies` glob

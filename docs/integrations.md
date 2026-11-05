@@ -1,9 +1,8 @@
 # Integrations
 
 Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
-Lookup, fetch, signature verification and the policy file are implemented
-and used by `aval verify`; `aval run` and `aval push` are still stubs that
-exit with code 6 (milestone 2). The consumption contract is scheduled to be declared stable in milestone 5. All
+Milestone 2 (sign, push, verify, `aval run` reuse or execute) is
+implemented. The consumption contract is scheduled to be declared stable in milestone 5. All
 media types, the predicate type and the report version are **provisional**
 until then.
 
