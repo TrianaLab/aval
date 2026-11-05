@@ -17,6 +17,16 @@ on:
 permissions:
   contents: read
 
+# The aval release that jobs using Aval as a user would (the demo and the
+# dogfood shadow and publish jobs) install with .github/aval/install.sh,
+# verified before use. The sha256 is that of aval_<version>_linux_amd64.tar.gz
+# as checksums.txt lists it, so a re-tagged release cannot change what runs.
+# Jobs that test the PR's code build from source (CONTRIBUTING.md "Which aval
+# a CI job runs").
+env:
+  AVAL_VERSION: 0.1.0
+  AVAL_SHA256: 1128344383f48cd7dd8e46b21cbe838dd6e7b075f45a0365f9784c1b71f6e67a
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -259,36 +269,40 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Build aval and log in to GHCR
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Install the pinned aval release (verified)
+        run: .github/aval/install.sh
+      - name: Log in to GHCR
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          make build
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           echo "| step | outcome |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
       - name: Publish (runs and pushes unless a verified result exists)
         run: |
-          ./bin/aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report publish.json
+          aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report publish.json
           if [ "$(jq -r .outcome publish.json)" != "verified" ]; then
             # The Actions OIDC token for Fulcio, fetched after the test so a
             # slow test cannot outlive it. aval push reads SIGSTORE_ID_TOKEN.
             SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
               "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
             export SIGSTORE_ID_TOKEN
-            ./bin/aval push -f "$CONTRACT" --registry "$REPO"
+            aval push -f "$CONTRACT" --registry "$REPO"
           fi
           echo "| publish | \`$(jq -r .outcome publish.json)\` |" >> "$GITHUB_STEP_SUMMARY"
       - name: Unchanged scope reuses (hit)
         run: |
-          ./bin/aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report hit.json
+          aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report hit.json
           jq -e '.outcome == "verified"' hit.json
           echo "| unchanged scope | \`$(jq -r .outcome hit.json)\` (reused, test not run) |" >> "$GITHUB_STEP_SUMMARY"
       - name: Changed scope re-runs (miss)
         run: |
           # Unique per run, so this fingerprint was never published.
           echo "// demo change $GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$SCOPED"
-          ./bin/aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report miss.json
+          aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report miss.json
           git checkout -- "$SCOPED"
           jq -e '.outcome == "miss"' miss.json
           echo "| changed scope | \`$(jq -r .outcome miss.json)\` (test ran) |" >> "$GITHUB_STEP_SUMMARY"
@@ -298,13 +312,13 @@ jobs:
           # as anyone with write access to the repository could. Published
           # once; later runs find it already there.
           echo "// demo: published with an untrusted key" >> "$SCOPED"
-          code=0; ./bin/aval verify -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" || code=$?
+          code=0; aval verify -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" || code=$?
           if [ "$code" -eq 4 ]; then
             openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$RUNNER_TEMP/untrusted.key"
-            ./bin/aval run -f "$CONTRACT" --no-reuse
-            ./bin/aval push -f "$CONTRACT" --registry "$REPO" --key "$RUNNER_TEMP/untrusted.key"
+            aval run -f "$CONTRACT" --no-reuse
+            aval push -f "$CONTRACT" --registry "$REPO" --key "$RUNNER_TEMP/untrusted.key"
           fi
-          code=0; ./bin/aval verify -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" -o json > untrusted.json || code=$?
+          code=0; aval verify -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" -o json > untrusted.json || code=$?
           git checkout -- "$SCOPED"
           cat untrusted.json
           test "$code" -eq 5 || { echo "::error::untrusted attestation: exit $code, want 5"; exit 1; }
@@ -392,10 +406,14 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Install the pinned aval release (verified)
+        run: .github/aval/install.sh
       - name: Shadow run of the engine unit suite
         run: |
-          make build
-          ./bin/aval run --shadow -f aval.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
+          aval run --shadow -f aval.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
             --result .aval/engine-result.json --report .aval/engine-report.json
       - name: Summary
         if: always()
@@ -438,11 +456,15 @@ jobs:
           pattern: aval-*
           path: results
           merge-multiple: true
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Install the pinned aval release (verified)
+        run: .github/aval/install.sh
       - name: Sign and push results that were not reused
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          make build
           export DOCKER_CONFIG="$RUNNER_TEMP/docker"
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           for pair in aval.yaml:engine aval.e2e.yaml:e2e; do
@@ -455,7 +477,7 @@ jobs:
             SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
               "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
             export SIGSTORE_ID_TOKEN
-            ./bin/aval push -f "$contract" --registry "$AVAL_REGISTRY" --result "results/$name-result.json"
+            aval push -f "$contract" --registry "$AVAL_REGISTRY" --result "results/$name-result.json"
           done
 
   # Conventional commit PR title (CONTRIBUTING.md "Commits"). Squash merges

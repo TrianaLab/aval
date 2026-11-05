@@ -169,8 +169,9 @@ These formats are provisional until milestone 5 makes them stable.
    runs this story for `examples/go-compose` in this repository on every
    push to `main` (see [its README](../examples/go-compose/README.md)).
    The release pipeline for signed `aval` binaries (checksums, SBOMs, SLSA
-   provenance) is in place and dry-runs on every PR; no release is published
-   yet, so the example still builds `aval` from source.
+   provenance) is in place and dry-runs on every PR. The example and the
+   dogfood shadow and publish jobs install the pinned v0.1.0 release,
+   verified before use.
    Aval also dogfoods itself (#28): `ci-e2e` runs the heavy suite
    (`aval.e2e.yaml`) through `aval run` and reuses a verified result,
    `dogfood-shadow` runs the unit suite (`aval.yaml`) with `--shadow`, and on
