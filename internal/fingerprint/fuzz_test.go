@@ -81,7 +81,7 @@ func FuzzManifestDistinguishesTrees(f *testing.F) {
 	f.Fuzz(func(t *testing.T, a, b []byte) {
 		ta, tb := decodeTree(a), decodeTree(b)
 		if len(ta) == 0 || len(tb) == 0 {
-			return // empty scope fails closed, covered by TestFailClosed
+			return // empty scope fails closed, covered by TestFalseHitCorpus
 		}
 		ma, mb := manifestOf(t, ta), manifestOf(t, tb)
 		if same := maps.Equal(ta, tb); same != (ma == mb) {

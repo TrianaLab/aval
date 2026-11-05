@@ -228,18 +228,24 @@ func Match(glob, name string) bool {
 	if slices.ContainsFunc(segs, func(s string) bool { return s == "" || s == "." || s == ".." }) {
 		return false
 	}
-	return matchSegs(strings.Split(glob, "/"), segs)
+	return matchSegs(strings.Split(glob, "/"), segs, false)
 }
 
-func matchSegs(p, n []string) bool {
+// MatchContents is Match, except that a trailing `**` matches one or more
+// segments: `dir/**` matches the files under dir, never a file named dir.
+func MatchContents(glob, name string) bool {
+	return Match(glob, name) && matchSegs(strings.Split(glob, "/"), strings.Split(name, "/"), true)
+}
+
+func matchSegs(p, n []string, contents bool) bool {
 	for len(p) > 0 {
 		if p[0] == "**" {
 			p = p[1:]
 			if len(p) == 0 {
-				return true
+				return !contents || len(n) > 0
 			}
 			for i := 0; i <= len(n); i++ {
-				if matchSegs(p, n[i:]) {
+				if matchSegs(p, n[i:], contents) {
 					return true
 				}
 			}

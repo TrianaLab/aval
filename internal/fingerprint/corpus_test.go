@@ -1,0 +1,361 @@
+package fingerprint
+
+import (
+	"maps"
+	"net"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/TrianaLab/aval/internal/contract"
+)
+
+// The false-hit corpus (#14): every known kind of change, applied to one
+// base project, with the outcome it must have.
+//
+//   - differ: a relevant change. Same fingerprint here is a false hit.
+//   - same: an irrelevant change. A different fingerprint is a needless miss.
+//   - failClosed: equivalence cannot be proven, so Compute must error.
+//   - gap: a relevant change that Aval cannot see by design (undeclared
+//     input). The row asserts the fingerprint stays the same, so the gap is
+//     documented here and in docs/contract.md, not hidden. If a future
+//     change closes a gap, flip the row to differ.
+//
+// A new manifest section needs a differ row: TestFalseHitCorpus fails if a
+// section of the base manifest is changed by no differ row. A new attribute
+// inside an existing section, or a new contract field, is not detected: add
+// its row by hand.
+type outcome int
+
+const (
+	differ outcome = iota
+	same
+	failClosed
+	gap
+)
+
+// corpusYAML parses to exactly testContract(), with comments, odd
+// formatting, shuffled keys and unsorted, duplicated set-like lists.
+const corpusYAML = `
+# comments and key order do not matter
+cacheability: controlled-environment
+environment:
+  env: [MODE, DB_IMAGE, MODE]
+  toolchain:
+    docker: "27"
+    go: "1.25"
+scope:
+  dependencies: [go.sum]
+  exclude:   ["vendor/**"]
+  source:
+    - compose.yaml
+    - "**/*.go"
+    - "**/*.go"
+runner: {command: [go, test, ./...]}
+metadata: {name: it}
+kind: Test
+apiVersion: aval.dev/v1alpha1
+`
+
+// fixture is one project checkout: a tree, its contract and its environment.
+type fixture struct {
+	t   *testing.T
+	dir string
+	c   *contract.Contract
+	env map[string]string
+}
+
+func newFixture(t *testing.T) *fixture {
+	t.Helper()
+	// A short root, not t.TempDir(): Unix socket paths are limited to ~104 bytes.
+	dir, err := os.MkdirTemp("", "fh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	f := &fixture{t: t, dir: dir, c: testContract(), env: map[string]string{"DB_IMAGE": "postgres:16"}}
+	for name, body := range baseFiles {
+		f.write(name, body)
+	}
+	return f
+}
+
+func (f *fixture) path(name string) string { return filepath.Join(f.dir, filepath.FromSlash(name)) }
+
+func (f *fixture) write(name, body string) {
+	f.t.Helper()
+	if err := os.MkdirAll(filepath.Dir(f.path(name)), 0o755); err != nil {
+		f.t.Fatal(err)
+	}
+	if err := os.WriteFile(f.path(name), []byte(body), 0o644); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+func (f *fixture) do(err error) {
+	f.t.Helper()
+	if err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+func (f *fixture) remove(name string) { f.t.Helper(); f.do(os.Remove(f.path(name))) }
+func (f *fixture) rename(from, to string) {
+	f.t.Helper()
+	f.do(os.MkdirAll(filepath.Dir(f.path(to)), 0o755))
+	f.do(os.Rename(f.path(from), f.path(to)))
+}
+func (f *fixture) chmod(name string, m os.FileMode) { f.t.Helper(); f.do(os.Chmod(f.path(name), m)) }
+func (f *fixture) symlink(target, name string)      { f.t.Helper(); f.do(os.Symlink(target, f.path(name))) }
+
+func (f *fixture) parse(yaml string) {
+	f.t.Helper()
+	c, err := contract.Parse([]byte(yaml))
+	f.do(err)
+	f.c = c
+}
+
+func (f *fixture) compute() (Fingerprint, error) {
+	return Compute(f.dir, f.c, func(k string) (string, bool) { v, ok := f.env[k]; return v, ok })
+}
+
+type corpusCase struct {
+	name   string
+	setup  func(*fixture) // optional, applied before the base fingerprint
+	change func(*fixture)
+	want   outcome
+}
+
+var corpus = []corpusCase{
+	// Files: content, rename, add, delete, mode.
+	{name: "source content", change: func(f *fixture) { f.write("main.go", "package main // changed\n") }, want: differ},
+	{name: "nested source content", change: func(f *fixture) { f.write("pkg/a/a.go", "package a2\n") }, want: differ},
+	{name: "non-code source content", change: func(f *fixture) { f.write("compose.yaml", "services: {db: {}}\n") }, want: differ},
+	{name: "lockfile content", change: func(f *fixture) { f.write("go.sum", "example.com/x v1.0.1 h1:def\n") }, want: differ},
+	{name: "single byte appended", change: func(f *fixture) { f.write("main.go", baseFiles["main.go"]+"\n") }, want: differ},
+	{name: "content emptied", change: func(f *fixture) { f.write("main.go", "") }, want: differ},
+	{name: "rename in directory", change: func(f *fixture) { f.rename("pkg/a/a.go", "pkg/a/renamed.go") }, want: differ},
+	{name: "move to another directory", change: func(f *fixture) { f.rename("pkg/a/a.go", "pkg/b/a.go") }, want: differ},
+	{name: "case-only rename", change: func(f *fixture) { f.rename("pkg/a/a.go", "pkg/a/A.go") }, want: differ},
+	{name: "swap contents of two files", change: func(f *fixture) {
+		f.write("main.go", baseFiles["pkg/a/a.go"])
+		f.write("pkg/a/a.go", baseFiles["main.go"])
+	}, want: differ},
+	{name: "source file added", change: func(f *fixture) { f.write("pkg/b/b.go", "package b\n") }, want: differ},
+	{name: "empty source file added", change: func(f *fixture) { f.write("pkg/b/b.go", "") }, want: differ},
+	{name: "dotfile added", change: func(f *fixture) { f.write(".hidden.go", "package main\n") }, want: differ},
+	{name: "file in dot-directory added", change: func(f *fixture) { f.write(".gen/x.go", "package gen\n") }, want: differ},
+	{name: "source file deleted", change: func(f *fixture) { f.remove("pkg/a/a.go") }, want: differ},
+	{name: "exec bit set", change: func(f *fixture) { f.chmod("main.go", 0o755) }, want: differ},
+	{name: "group exec bit only", change: func(f *fixture) { f.chmod("main.go", 0o654) }, want: differ},
+	{name: "exec bit cleared", setup: func(f *fixture) { f.chmod("main.go", 0o755) }, change: func(f *fixture) { f.chmod("main.go", 0o644) }, want: differ},
+	{name: "unicode NFC to NFD rename", setup: func(f *fixture) { f.write("caf\u00e9.go", "package main\n") }, change: func(f *fixture) {
+		// Paths are hashed as the bytes the filesystem returns, never
+		// normalized: NFC and NFD spellings of a name are different inputs.
+		f.rename("caf\u00e9.go", "cafe\u0301.go")
+	}, want: differ},
+	{name: "dependency under an excluded path", setup: func(f *fixture) {
+		f.c.Scope.Dependencies = append(f.c.Scope.Dependencies, "vendor/modules.txt")
+		f.write("vendor/modules.txt", "a\n")
+	}, change: func(f *fixture) { f.write("vendor/modules.txt", "b\n") }, want: differ},
+	{name: "excluded file re-included", change: func(f *fixture) { f.c.Scope.Exclude = nil }, want: differ},
+
+	// Declared environment: toolchain and env vars.
+	{name: "toolchain value", change: func(f *fixture) { f.c.Environment.Toolchain["go"] = "1.26" }, want: differ},
+	{name: "toolchain key added", change: func(f *fixture) { f.c.Environment.Toolchain["node"] = "22" }, want: differ},
+	{name: "toolchain key removed", change: func(f *fixture) { delete(f.c.Environment.Toolchain, "docker") }, want: differ},
+	{name: "toolchain value with an embedded newline", change: func(f *fixture) {
+		f.c.Environment.Toolchain["go"] = "1.25\nsource " + sum([]byte("x")) + " - x.go"
+	}, want: differ},
+	{name: "env value", change: func(f *fixture) { f.env["DB_IMAGE"] = "postgres:17" }, want: differ},
+	{name: "env unset to set", change: func(f *fixture) { f.env["MODE"] = "fast" }, want: differ},
+	{name: "env set to unset", change: func(f *fixture) { delete(f.env, "DB_IMAGE") }, want: differ},
+	{name: "env unset to set-but-empty", change: func(f *fixture) { f.env["MODE"] = "" }, want: differ},
+	{name: "env set-but-empty to unset", setup: func(f *fixture) { f.env["MODE"] = "" }, change: func(f *fixture) { delete(f.env, "MODE") }, want: differ},
+	{name: "env name declared", change: func(f *fixture) { f.c.Environment.Env = append(f.c.Environment.Env, "CGO_ENABLED") }, want: differ},
+	{name: "env name undeclared", change: func(f *fixture) { f.c.Environment.Env = []string{"DB_IMAGE"} }, want: differ},
+
+	// Command and contract fields.
+	{name: "command argument changed", change: func(f *fixture) { f.c.Runner.Command = []string{"go", "test", "./pkg/..."} }, want: differ},
+	{name: "command argument added", change: func(f *fixture) { f.c.Runner.Command = []string{"go", "test", "-race", "./..."} }, want: differ},
+	{name: "command argv reordered", change: func(f *fixture) { f.c.Runner.Command = []string{"go", "./...", "test"} }, want: differ},
+	{name: "command argv joined", change: func(f *fixture) { f.c.Runner.Command = []string{"go", "test ./..."} }, want: differ},
+	{name: "metadata.name", change: func(f *fixture) { f.c.Metadata.Name = "other" }, want: differ},
+	{name: "cacheability", change: func(f *fixture) { f.c.Cacheability = contract.Hermetic }, want: differ},
+	{name: "scope.source glob added", change: func(f *fixture) { f.c.Scope.Source = append(f.c.Scope.Source, "main.go") }, want: differ},
+	{name: "scope.exclude glob added", change: func(f *fixture) { f.c.Scope.Exclude = append(f.c.Scope.Exclude, "none/**") }, want: differ},
+	{name: "scope.dependencies glob added", change: func(f *fixture) { f.c.Scope.Dependencies = append(f.c.Scope.Dependencies, "compose.yaml") }, want: differ},
+
+	// Irrelevant changes.
+	{name: "out-of-scope file edited", change: func(f *fixture) { f.write("README.md", "edited\n") }, want: same},
+	{name: "out-of-scope file added", change: func(f *fixture) { f.write("docs/new.md", "new\n") }, want: same},
+	{name: "excluded file edited", change: func(f *fixture) { f.write("vendor/v/v.go", "package v // edited\n") }, want: same},
+	{name: "nested excluded file added", change: func(f *fixture) { f.write("vendor/a/b/c.go", "package c\n") }, want: same},
+	{name: "exclude beats an explicit source glob", setup: func(f *fixture) {
+		f.c.Scope.Source = append(f.c.Scope.Source, "vendor/v/v.go")
+	}, change: func(f *fixture) { f.write("vendor/v/v.go", "package v // edited\n") }, want: same},
+	{name: "file excluded by name and by a directory glob", setup: func(f *fixture) {
+		f.c.Scope.Source = append(f.c.Scope.Source, "build")
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "build", "build/**")
+		f.write("build", "#!/bin/sh\necho a\n")
+	}, change: func(f *fixture) { f.write("build", "#!/bin/sh\necho b\n") }, want: same},
+	{name: "file under .git added", change: func(f *fixture) { f.write(".git/objects/x.go", "package x\n") }, want: same},
+	{name: "checkout path", change: func(f *fixture) {
+		to := filepath.Join(f.t.TempDir(), "elsewhere")
+		f.do(os.Rename(f.dir, to))
+		f.dir = to
+	}, want: same},
+	{name: "file recreation order", change: func(f *fixture) {
+		names := slices.Sorted(maps.Keys(baseFiles))
+		slices.Reverse(names)
+		for _, n := range names {
+			f.remove(n)
+			f.write(n, baseFiles[n])
+		}
+	}, want: same},
+	{name: "timestamps", change: func(f *fixture) {
+		f.do(os.Chtimes(f.path("main.go"), time.Unix(0, 0), time.Unix(0, 0)))
+	}, want: same},
+	{name: "non-exec permission bits", change: func(f *fixture) { f.chmod("main.go", 0o600); f.chmod("go.sum", 0o444) }, want: same},
+	{name: "exec bit variants", setup: func(f *fixture) { f.chmod("main.go", 0o755) }, change: func(f *fixture) { f.chmod("main.go", 0o711) }, want: same},
+	{name: "glob order", change: func(f *fixture) { f.c.Scope.Source = []string{"compose.yaml", "**/*.go"} }, want: same},
+	{name: "duplicate globs", change: func(f *fixture) { f.c.Scope.Source = append(f.c.Scope.Source, "**/*.go") }, want: same},
+	{name: "env name order", change: func(f *fixture) { f.c.Environment.Env = []string{"MODE", "DB_IMAGE"} }, want: same},
+	{name: "duplicate env names", change: func(f *fixture) { f.c.Environment.Env = append(f.c.Environment.Env, "MODE") }, want: same},
+	{name: "empty lists and maps as omitted", setup: func(f *fixture) {
+		f.c.Scope.Exclude, f.c.Environment.Toolchain = nil, nil
+	}, change: func(f *fixture) {
+		f.c.Scope.Exclude, f.c.Environment.Toolchain = []string{}, map[string]string{}
+	}, want: same},
+	{name: "aval.yaml comments, formatting and key order", change: func(f *fixture) { f.parse(corpusYAML) }, want: same},
+
+	// Fail closed.
+	{name: "dependency deleted", change: func(f *fixture) { f.remove("go.sum") }, want: failClosed},
+	{name: "every source deleted", change: func(f *fixture) {
+		for _, n := range []string{"main.go", "pkg/a/a.go", "compose.yaml"} {
+			f.remove(n)
+		}
+	}, want: failClosed},
+	{name: "every source excluded", change: func(f *fixture) { f.c.Scope.Exclude = append(f.c.Scope.Exclude, "**") }, want: failClosed},
+	{name: "symlink to file inside root", change: func(f *fixture) { f.symlink(f.path("main.go"), "link.go") }, want: failClosed},
+	{name: "symlink to file outside root", change: func(f *fixture) {
+		out := filepath.Join(f.t.TempDir(), "x.go")
+		f.do(os.WriteFile(out, []byte("package x\n"), 0o644))
+		f.symlink(out, "link.go")
+	}, want: failClosed},
+	{name: "symlink to directory", change: func(f *fixture) { f.symlink(f.path("pkg"), "dir.go") }, want: failClosed},
+	{name: "source replaced by symlink", change: func(f *fixture) {
+		f.rename("main.go", "real.txt")
+		f.symlink("real.txt", "main.go")
+	}, want: failClosed},
+	{name: "socket in scope", change: func(f *fixture) {
+		// FIFOs and devices take the same !IsRegular path; a socket is the
+		// one special file every platform can create without privileges.
+		l, err := net.Listen("unix", f.path("s.go"))
+		f.do(err)
+		f.t.Cleanup(func() { _ = l.Close() })
+	}, want: failClosed},
+	{name: "newline in path", change: func(f *fixture) {
+		f.write("x\nsource "+sum([]byte("c"))+" - y.go", "c")
+	}, want: failClosed},
+	{name: "source glob matches no file", change: func(f *fixture) { f.c.Scope.Source = append(f.c.Scope.Source, "mian.go") }, want: failClosed},
+	{name: "literal source glob differs from the file name by case", setup: func(f *fixture) {
+		f.write("makefile", "all:\n")
+	}, change: func(f *fixture) {
+		// The walk returns "makefile" on case-sensitive and case-insensitive
+		// filesystems alike, so "Makefile" matches nothing.
+		f.c.Scope.Source = append(f.c.Scope.Source, "Makefile")
+	}, want: failClosed},
+	{name: "file named like an excluded directory", setup: func(f *fixture) {
+		f.c.Scope.Source = append(f.c.Scope.Source, "build")
+		f.write("build", "#!/bin/sh\necho a\n")
+	}, change: func(f *fixture) {
+		// "build/**" declares the files under build/, not a file named build.
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "build/**")
+	}, want: failClosed},
+	{name: "carriage return in path", change: func(f *fixture) { f.write("x\r.go", "c") }, want: failClosed},
+
+	// Known gaps: relevant to the test, invisible to the fingerprint by
+	// design (invariant 2). See docs/contract.md, "Known gaps".
+	{name: "gap: undeclared file the test reads", change: func(f *fixture) { f.write("testdata/fixture.json", "{}") }, want: gap},
+	{name: "gap: undeclared env var the test reads", change: func(f *fixture) { f.env["GOFLAGS"] = "-tags=slow" }, want: gap},
+}
+
+func TestFalseHitCorpus(t *testing.T) {
+	sections := map[string]bool{} // manifest sections some differ row changed
+	ran := 0
+	for _, tc := range corpus {
+		t.Run(tc.name, func(t *testing.T) {
+			ran++
+			f := newFixture(t)
+			if tc.setup != nil {
+				tc.setup(f)
+			}
+			before, err := f.compute()
+			if err != nil {
+				t.Fatalf("base: %v", err)
+			}
+			tc.change(f)
+			after, err := f.compute()
+			switch {
+			case tc.want == failClosed:
+				if err == nil {
+					t.Fatalf("want an error (fail closed), got %s", after.Digest)
+				}
+				return
+			case err != nil:
+				t.Fatal(err)
+			case tc.want == differ && after.Digest == before.Digest:
+				t.Fatalf("false hit: relevant change kept %s\n%s", after.Digest, after.Manifest)
+			case tc.want != differ && after.Digest != before.Digest:
+				t.Fatalf("irrelevant change altered the fingerprint\n--- before\n%s--- after\n%s", before.Manifest, after.Manifest)
+			}
+			if tc.want == differ {
+				for _, s := range changedSections(before.Manifest, after.Manifest) {
+					sections[s] = true
+				}
+			}
+		})
+	}
+	if ran == len(corpus) { // -run or -skip may select some rows only
+		checkSectionsCovered(t, sections)
+	}
+}
+
+// checkSectionsCovered fails for each section of the base manifest that no
+// differ row changed.
+func checkSectionsCovered(t *testing.T, covered map[string]bool) {
+	t.Helper()
+	base, err := newFixture(t).compute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range sectionsOf(base.Manifest) {
+		if !covered[s] {
+			t.Errorf("manifest section %q is changed by no differ row: add corpus cases for it", s)
+		}
+	}
+}
+
+func sectionsOf(manifest string) []string {
+	var out []string
+	for _, l := range strings.Split(strings.TrimSuffix(manifest, "\n"), "\n")[1:] { // [0] is the version header
+		out = append(out, strings.SplitN(l, " ", 2)[0])
+	}
+	return slices.Compact(out)
+}
+
+// changedSections lists the sections of lines present in only one manifest.
+func changedSections(a, b string) []string {
+	la, lb := strings.Split(a, "\n"), strings.Split(b, "\n")
+	var out []string
+	for _, l := range append(la, lb...) {
+		if slices.Contains(la, l) != slices.Contains(lb, l) {
+			out = append(out, strings.SplitN(l, " ", 2)[0])
+		}
+	}
+	return out
+}

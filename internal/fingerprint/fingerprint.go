@@ -67,7 +67,7 @@ func Compute(dir string, c *contract.Contract, env LookupEnv) (Fingerprint, erro
 	var lines []string
 	lines = append(lines, Version, "contract "+sum(canon))
 
-	src, err := hashMatching(dir, files, "source", c.Scope.Source, c.Scope.Exclude, false)
+	src, err := hashMatching(dir, files, "source", c.Scope.Source, c.Scope.Exclude)
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -76,7 +76,7 @@ func Compute(dir string, c *contract.Contract, env LookupEnv) (Fingerprint, erro
 	}
 	lines = append(lines, src...)
 
-	deps, err := hashMatching(dir, files, "dependency", c.Scope.Dependencies, nil, true)
+	deps, err := hashMatching(dir, files, "dependency", c.Scope.Dependencies, nil)
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -155,8 +155,10 @@ func listFiles(dir string) ([]string, error) {
 }
 
 // hashMatching hashes every file matching any include glob and no exclude
-// glob. With requireEach, every include glob must match at least one file.
-func hashMatching(dir string, files []string, kind string, include, exclude []string, requireEach bool) ([]string, error) {
+// glob. Every include glob must match at least one file (before exclude): a
+// glob that matches nothing is a typo or a name that differs on disk (case,
+// Unicode form), and ignoring it would silently drop a declared input.
+func hashMatching(dir string, files []string, kind string, include, exclude []string) ([]string, error) {
 	var lines []string
 	for _, g := range include {
 		n := 0
@@ -165,12 +167,21 @@ func hashMatching(dir string, files []string, kind string, include, exclude []st
 				n++
 			}
 		}
-		if requireEach && n == 0 {
+		if n == 0 {
 			return nil, fmt.Errorf("%s glob %q matched no files", kind, g)
 		}
 	}
 	for _, f := range files {
-		if !matchesAny(include, f) || matchesAny(exclude, f) {
+		if !matchesAny(include, f) {
+			continue
+		}
+		if matchesAny(exclude, f) {
+			// `dir/**` also matches a file named dir (** matches zero
+			// segments). Excluding that file would drop an input the glob
+			// does not declare, so it must be excluded by another glob.
+			if !slices.ContainsFunc(exclude, func(g string) bool { return contract.MatchContents(g, f) }) {
+				return nil, fmt.Errorf("%s %q is excluded only by a trailing \"**\", which means the files under it: exclude it by name or narrow the glob", kind, f)
+			}
 			continue
 		}
 		// Paths go into a line-oriented manifest unescaped; a newline in a

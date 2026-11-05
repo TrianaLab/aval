@@ -50,6 +50,11 @@ func TestParseInvalid(t *testing.T) {
 		"no class":       {"cacheability: controlled-environment", "", "cacheability: required"},
 		"empty glob":     {`["go.sum"]`, `[""]`, "empty glob"},
 		"malformed glob": {`["go.sum"]`, `["go.[sum"]`, "syntax error"},
+		"backslash glob": {`["go.sum"]`, `["a\\\\b"]`, "slash-separated"},
+		"trailing slash": {`["go.sum"]`, `["dir/"]`, "segments"},
+		"dot segment":    {`["go.sum"]`, `["./go.sum"]`, "segments"},
+		"empty segment":  {`["go.sum"]`, `["a//b"]`, "segments"},
+		"inner ..":       {`["go.sum"]`, `["a/../../b"]`, "segments"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -81,6 +86,14 @@ func TestMatch(t *testing.T) {
 		{"cmd/*/main.go", "cmd/a/b/main.go", false},
 		{"a/**/z", "a/z", true},
 		{"a/**/z", "a/b/c/z", true},
+		{"**", "a/b/c", true},
+		{"**/z", "z", true},
+		{"a/**", "a", true}, // ** matches zero segments; exclude refuses this (MatchContents)
+		{"a/**", "a/b", true},
+		{"**/*.go", ".hidden.go", true},
+		{"**/*.go", ".gen/x.go", true},
+		{"*.go", "a/x.go", false},
+		{"A.go", "a.go", false},
 		// Names that are not clean relative paths never match.
 		{"**", "../secrets", false},
 		{"*/x", "../x", false},
@@ -92,6 +105,27 @@ func TestMatch(t *testing.T) {
 	for _, tc := range cases {
 		if got := Match(tc.glob, tc.name); got != tc.want {
 			t.Errorf("Match(%q, %q) = %v, want %v", tc.glob, tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestMatchContents(t *testing.T) {
+	cases := []struct {
+		glob, name string
+		want       bool
+	}{
+		{"a/**", "a", false}, // a file named a is not under a/
+		{"a/**", "a/b", true},
+		{"**/build/**", "build/build", true},
+		{"**/build/**", "x/build", false},
+		{"a/**/z", "a/z", true}, // only a trailing ** needs a segment
+		{"**", "a", true},
+		{"a/**", "../a/b", false},
+		{"*.go", "x.txt", false},
+	}
+	for _, tc := range cases {
+		if got := MatchContents(tc.glob, tc.name); got != tc.want {
+			t.Errorf("MatchContents(%q, %q) = %v, want %v", tc.glob, tc.name, got, tc.want)
 		}
 	}
 }

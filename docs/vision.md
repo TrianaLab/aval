@@ -182,6 +182,10 @@ These formats are provisional until milestone 5 makes them stable.
    known kind of relevant change (source, dependency, toolchain, env var,
    exec bit, contract edit, symlink, file rename) and asserts that none of
    them can reuse a previous execution.
+   *In progress:* the table-driven corpus in
+   `internal/fingerprint/corpus_test.go` covers these kinds and pins the
+   known gaps (see [contract.md](contract.md#known-gaps)); running it as a
+   dedicated CI gate is #15.
 5. **Stable consumption contract for external integrations.** Exit criterion:
    the predicate type, media types, predicate fields, `pkg/evidence` API and
    `aval verify --output json` report are declared stable and versioned,
