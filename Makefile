@@ -1,5 +1,5 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
-	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-e2e ci-release ci-fuzz ci-security \
+	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-false-hit ci-e2e ci-release ci-fuzz ci-security \
 	docs-lint docs-cli ci-docs
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
@@ -137,11 +137,17 @@ example:
 # `make ci` is the gate CI runs and the one agents and humans run before
 # pushing. Each ci-* leg is one job in .github/workflows/ci.yaml, aggregated by
 # the `required` job (tests/architecture/ci_test.go enforces both).
-ci: ci-static ci-gates ci-engine ci-e2e ci-release ci-fuzz ci-security ci-docs
+ci: ci-static ci-gates ci-engine ci-false-hit ci-e2e ci-release ci-fuzz ci-security ci-docs
 
 ci-static: fmt-check lint
 ci-gates: test-architecture
 ci-engine: coverage-check example
+# The false-hit suite (#15) as its own gate, never cached: the corpus of
+# relevant and irrelevant changes (TestFalseHitCorpus), the manifest golden
+# that fails on a manifest change without a fingerprint.Version bump
+# (TestManifestGolden), the glob tables and the fuzz seeds.
+ci-false-hit:
+	go test -count=1 ./internal/fingerprint/... ./internal/contract/...
 # Levels 2 and 4, the heavy suite, through `aval run` with the contract
 # aval.e2e.yaml. Locally (no AVAL_REGISTRY, AVAL_POLICY) it always runs. CI
 # sets both, so a verified passing result for the same inputs is reused and

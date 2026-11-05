@@ -229,6 +229,14 @@ a manifest section is changed by no differ row, so a new section must come
 with corpus cases; a new attribute in an existing section or a new contract
 field needs its row added by review.
 
+`TestManifestGolden` pins the manifest of a fixed tree
+(`internal/fingerprint/testdata/golden/tree`) per manifest version, in
+`testdata/golden/aval-fingerprint-vN.manifest`. Any change to which bytes
+are hashed or how they are laid out (including the canonical contract JSON) fails
+it unless the header version is bumped too, so an old fingerprint can never
+mean different inputs. The `ci-false-hit` CI job (`make ci-false-hit`) runs
+both tests and the glob tables on every code change.
+
 ### Fail-closed errors
 
 If equivalence of inputs cannot be proven, fingerprinting fails and the

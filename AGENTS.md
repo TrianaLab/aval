@@ -65,6 +65,7 @@ A change that breaks one of these is wrong, even if tests pass.
 | `make ci-static` | gofmt check, `go vet`, golangci-lint |
 | `make ci-gates` | level 3: architecture/invariant tests (`make test-architecture`) |
 | `make ci-engine` | level 1: unit tests with `-race` and the 100% coverage gate (`make coverage-check`), the example modules (`examples/go-compose`, `examples/evidence-consumer`) |
+| `make ci-false-hit` | false-hit suite: `internal/fingerprint` and `internal/contract` tests, uncached (corpus, manifest golden per `aval-fingerprint/vN`, glob tables) |
 | `make ci-e2e` | levels 2 and 4 (`make test-integration test-acceptance`) through `bin/aval run -f aval.e2e.yaml`; reuses a verified result only when `AVAL_REGISTRY` and `AVAL_POLICY` are set (CI) |
 | `make ci-release` | level 5: release dry-run (GoReleaser snapshot of `.goreleaser.yaml`, needs syft) checked by `tests/release` (`make test-release`) |
 | `make ci-fuzz` | every `Fuzz*` target for `FUZZTIME` (default 10s) each (`make fuzz`); crashers land in `testdata/fuzz/` |

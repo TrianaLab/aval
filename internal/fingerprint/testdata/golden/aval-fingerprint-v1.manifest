@@ -1,0 +1,11 @@
+aval-fingerprint/v1
+contract 9af09960ee11326648d1fc83f5f150cf9609c3854a7d0df97494716c17bfc984
+source 09adc4c5ee6ca5c861d92ad7f4a41e6186c035f3ce7725261d9c345fa0217ea5 - contract.yaml
+source df1d036cbbf3df46e2045071e082245ece204c7f53ecf0a4e022bff9bb228f47 - main.go
+source 7b39baa38a2ec2b8d111bbbd8e448e80226477ab40105d9d2123d4dc18067438 - pkg/a/a.go
+source cfee5be6eb223196f1c04685b86c63410a2dc6d0d7c53185152b82953346c5b6 x run.sh
+dependency d4e972075031dd5d2bb756563d9fd6043ae8bb5210214b70436f0a3fde885cd7 - go.sum
+toolchain docker=27
+toolchain go=1.25
+env DB_IMAGE 59ab5ab3c94d2f5bf4f2895b2c7d1ee62ccb27127ac7f9da36862593d17ed34e
+env MODE unset

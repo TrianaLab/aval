@@ -1,0 +1,16 @@
+# Fixed contract for TestManifestGolden. Any edit to this tree changes the
+# golden manifest: make one only together with a fingerprint.Version bump.
+apiVersion: aval.dev/v1alpha1
+kind: Test
+metadata:
+  name: golden
+runner:
+  command: ["./run.sh", "-v"]
+scope:
+  source: ["**/*.go", "run.sh", "contract.yaml"]
+  exclude: ["vendor/**"]
+  dependencies: [go.sum]
+environment:
+  toolchain: {go: "1.25", docker: "27"}
+  env: [DB_IMAGE, MODE]
+cacheability: hermetic

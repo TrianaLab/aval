@@ -101,6 +101,19 @@ jobs:
           files: coverage.gate.out
           fail_ci_if_error: false
 
+  # The false-hit suite (#15): fails on any false hit in the corpus and on
+  # a manifest change without a fingerprint.Version bump.
+  ci-false-hit:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: make ci-false-hit
+
   # Dogfooding M3 (#28): the heavy suite (levels 2 and 4, aval.e2e.yaml)
   # through `aval run`. A verified passing result for the same inputs is
   # reused instead of running it; anything unproven runs it (invariant 3). A
@@ -516,6 +529,7 @@ jobs:
       - ci-static
       - ci-gates
       - ci-engine
+      - ci-false-hit
       - ci-e2e
       - ci-release
       - ci-fuzz

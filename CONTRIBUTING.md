@@ -59,6 +59,7 @@ Two more rules once you have picked:
 | `ci-static` | gofmt, `go vet`, golangci-lint |
 | `ci-gates` | level 3 |
 | `ci-engine` | level 1 with `-race`, the `examples/go-compose` module |
+| `ci-false-hit` | the false-hit corpus, glob tables and the manifest golden: a manifest change fails unless `fingerprint.Version` is bumped |
 | `ci-e2e` | levels 2 and 4, run through `aval run -f aval.e2e.yaml` (reused in CI on a verified hit) |
 | `ci-release` | level 5 against a snapshot dry-run of the release build |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
@@ -213,7 +214,7 @@ Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 - **Miss is not verification failure.** No attestation is exit 4 (`ErrNotFound`); an attestation that fails signature or policy is exit 5 (`ErrVerification`), a security event. Keep them separate in code, output and exit codes, and never hide the second.
 - **No Pacto dependency.** Aval does not import Pacto or model its concepts. Integrations consume Aval through `pkg/evidence` and `aval verify --output json`; adapters live in the consumer's repo.
 - **`pkg/evidence` is public API.** Breaking changes (rename, removal, type or meaning change) to exported identifiers, the predicate or the verify report JSON need a version bump (`PredicateType`, `ReportVersion`) and a note in `docs/artifact-format.md`; additive changes do not. The rules are in `docs/artifact-format.md` ("Versioning and compatibility"); golden files in `pkg/evidence/testdata` guard the JSON shape.
-- **Fingerprint changes bump the manifest version** (`aval-fingerprint/v1`) so old and new fingerprints never collide.
+- **Fingerprint changes bump the manifest version** (`aval-fingerprint/v1`) so old and new fingerprints never collide. `TestManifestGolden` (`ci-false-hit`) enforces it: it pins the manifest of `internal/fingerprint/testdata/golden/tree` per version and fails on any byte change under the same version. After a bump, `go test ./internal/fingerprint -run TestManifestGolden -update` writes the golden of the new version.
 
 ## Unfinished work
 
