@@ -1,5 +1,5 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
-	lint fmt fmt-check example ci ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release
+	lint fmt fmt-check example fuzz ci ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
 UNIT_PKGS = $(shell go list ./... | grep -v /tests/)
@@ -45,6 +45,20 @@ test-acceptance:
 test-release:
 	go test -count=1 ./tests/release/...
 
+# Go native fuzzing: every Fuzz* target in the unit packages, one at a time
+# (go test -fuzz takes one target per run), FUZZTIME each. A crasher is
+# written to the package's testdata/fuzz/<Target>/ and from then on runs as a
+# regression case in plain `go test`; commit it with the fix.
+FUZZTIME ?= 10s
+
+fuzz:
+	@set -e; for pkg in $(UNIT_PKGS); do \
+		for t in $$(go test -list '^Fuzz' $$pkg | grep '^Fuzz'); do \
+			echo "fuzz $$pkg $$t ($(FUZZTIME))"; \
+			go test -run '^$$' -fuzz "^$$t$$" -fuzztime $(FUZZTIME) $$pkg; \
+		done; \
+	done
+
 # One golangci-lint version for local runs and CI (ci.yaml installs the same
 # one; tests/architecture enforces it).
 GOLANGCI_LINT_VERSION := v2.13.0
@@ -67,7 +81,7 @@ example:
 # `make ci` is the gate CI runs and the one agents and humans run before
 # pushing. Each ci-* leg is one job in .github/workflows/ci.yaml, aggregated by
 # the `required` job (tests/architecture/ci_test.go enforces both).
-ci: ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release
+ci: ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz
 
 ci-static: fmt-check lint
 ci-gates: test-architecture
@@ -75,3 +89,4 @@ ci-engine: coverage-check example
 ci-integration: test-integration
 ci-acceptance: test-acceptance
 ci-release: test-release
+ci-fuzz: fuzz

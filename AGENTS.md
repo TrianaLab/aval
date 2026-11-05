@@ -68,6 +68,7 @@ A change that breaks one of these is wrong, even if tests pass.
 | `make ci-integration` | level 2: `tests/integration` (`make test-integration`) |
 | `make ci-acceptance` | level 4: `tests/acceptance`, through the built CLI (`make test-acceptance`) |
 | `make ci-release` | level 5: `tests/release` (`make test-release`) |
+| `make ci-fuzz` | every `Fuzz*` target for `FUZZTIME` (default 10s) each (`make fuzz`); crashers land in `testdata/fuzz/` |
 | `make coverage` | unit tests plus an HTML report in `coverage.html` |
 | `make build` | `bin/aval` |
 

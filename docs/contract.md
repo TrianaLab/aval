@@ -80,7 +80,8 @@ the same rules.
 - Slash-separated, relative to the directory that contains the contract file.
   That directory is the fingerprint root. Backslashes are rejected.
 - No leading `/`. No empty, `.` or `..` segments (`a//b`, `./a`, `../a` are
-  rejected), so a glob cannot escape the root.
+  rejected), so a glob cannot escape the root. Likewise, a path with a
+  leading `/` or such segments never matches any glob, not even `**`.
 - Each segment is matched with Go's `path.Match` (`*`, `?`, `[...]`). `*`
   does not cross `/`. A malformed pattern (e.g. `[a-`) is rejected.
 - `**` is only allowed as a whole segment and matches zero or more segments.
