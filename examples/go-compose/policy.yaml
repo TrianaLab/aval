@@ -1,0 +1,11 @@
+# Trust policy for the GitHub Actions demo (the example-go-compose job in
+# .github/workflows/ci.yaml): reuse only results signed keyless by that
+# workflow on main. Anything else that sits under the fingerprint, such as a
+# result signed with some key, is a verification failure (exit 5).
+apiVersion: aval.dev/v1alpha1   # provisional
+kind: Policy
+minTrustLevel: runner
+identities:
+  - issuer: https://token.actions.githubusercontent.com
+    subjectRegexp: https://github\.com/TrianaLab/aval/\.github/workflows/ci\.yaml@refs/heads/main
+    trustLevel: runner
