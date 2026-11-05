@@ -220,3 +220,55 @@ func TestEmptyEqualsOmitted(t *testing.T) {
 		t.Fatal("explicitly empty lists/maps must hash like omitted ones")
 	}
 }
+
+func TestHexStripsAlgorithm(t *testing.T) {
+	if got := (Fingerprint{Digest: "sha256:abc"}).Hex(); got != "abc" {
+		t.Fatalf("Hex() = %q", got)
+	}
+}
+
+func TestNilEnvUsesProcessEnvironment(t *testing.T) {
+	dir := writeTree(t, baseFiles, nil)
+	c := testContract()
+	t.Setenv("DB_IMAGE", "postgres:16")
+	t.Setenv("MODE", "") // restores MODE after the test
+	if err := os.Unsetenv("MODE"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Compute(dir, c, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Digest != compute(t, dir, c) {
+		t.Fatal("nil env must resolve variables from the process environment")
+	}
+}
+
+func TestGitDirectoryIsIgnored(t *testing.T) {
+	dir := writeTree(t, baseFiles, nil)
+	base := compute(t, dir, testContract())
+	withGit := clone(baseFiles)
+	withGit[".git/objects/x.go"] = "package x\n"
+	if compute(t, writeTree(t, withGit, nil), testContract()) != base {
+		t.Fatal("files under .git must not affect the fingerprint")
+	}
+}
+
+func TestUnreadableInputsFailClosed(t *testing.T) {
+	if _, err := Compute(filepath.Join(t.TempDir(), "missing"), testContract(), fixedEnv); err == nil {
+		t.Error("missing contract root must fail")
+	}
+	if _, _, err := hashFile(filepath.Join(t.TempDir(), "gone.go")); err == nil {
+		t.Error("file removed after listing must fail")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root can read files without permission bits")
+	}
+	dir := writeTree(t, baseFiles, nil)
+	if err := os.Chmod(filepath.Join(dir, "main.go"), 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Compute(dir, testContract(), fixedEnv); err == nil {
+		t.Error("unreadable file in scope must fail")
+	}
+}

@@ -58,10 +58,7 @@ func Compute(dir string, c *contract.Contract, env LookupEnv) (Fingerprint, erro
 	if env == nil {
 		env = os.LookupEnv
 	}
-	canon, err := canonicalContract(c)
-	if err != nil {
-		return Fingerprint{}, err
-	}
+	canon := canonicalContract(c)
 	files, err := listFiles(dir)
 	if err != nil {
 		return Fingerprint{}, err
@@ -111,7 +108,7 @@ func Compute(dir string, c *contract.Contract, env LookupEnv) (Fingerprint, erro
 // canonicalContract serializes the contract so that formatting, comments and
 // the order of set-like lists (globs, env names) do not matter, while argv
 // order (which is semantic) does.
-func canonicalContract(c *contract.Contract) ([]byte, error) {
+func canonicalContract(c *contract.Contract) []byte {
 	cc := *c
 	// Empty and omitted lists/maps must hash the same, so both become nil.
 	sorted := func(s []string) []string {
@@ -129,7 +126,10 @@ func canonicalContract(c *contract.Contract) ([]byte, error) {
 	cc.Scope.Exclude = sorted(c.Scope.Exclude)
 	cc.Scope.Dependencies = sorted(c.Scope.Dependencies)
 	cc.Environment.Env = sorted(c.Environment.Env)
-	return json.Marshal(cc) // map keys are sorted by encoding/json
+	// Marshal cannot fail: the contract holds only strings, string slices
+	// and string maps. Map keys are sorted by encoding/json.
+	b, _ := json.Marshal(cc)
+	return b
 }
 
 // listFiles returns all regular files and symlinks under dir as sorted,
@@ -146,10 +146,7 @@ func listFiles(dir string) ([]string, error) {
 			}
 			return nil
 		}
-		rel, err := filepath.Rel(dir, p)
-		if err != nil {
-			return err
-		}
+		rel, _ := filepath.Rel(dir, p) // cannot fail: WalkDir yields paths under dir
 		out = append(out, filepath.ToSlash(rel))
 		return nil
 	})
@@ -205,13 +202,13 @@ func hashFile(p string) (string, string, error) {
 	if !fi.Mode().IsRegular() {
 		return "", "", errors.New("only regular files are supported in scope (symlinks and devices are rejected)")
 	}
-	f, err := os.Open(p)
-	if err != nil {
-		return "", "", err
-	}
-	defer f.Close()
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
+	f, err := os.Open(p)
+	if err == nil {
+		defer f.Close()
+		_, err = io.Copy(h, f)
+	}
+	if err != nil {
 		return "", "", err
 	}
 	mode := "-"

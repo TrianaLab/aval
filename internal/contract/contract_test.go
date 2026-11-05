@@ -1,6 +1,8 @@
 package contract
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -43,6 +45,11 @@ func TestParseInvalid(t *testing.T) {
 		"bad name":       {"orders-integration", "Orders Integration", "metadata.name"},
 		"bad env name":   {"[DB_IMAGE]", "[DB-IMAGE]", "environment.env"},
 		"missing scope":  {`source: ["**/*.go", "compose.yaml"]`, `source: []`, "scope.source"},
+		"bad kind":       {"kind: Test", "kind: Suite", "kind"},
+		"bad tool key":   {"{go: ", "{Go: ", "environment.toolchain"},
+		"no class":       {"cacheability: controlled-environment", "", "cacheability: required"},
+		"empty glob":     {`["go.sum"]`, `[""]`, "empty glob"},
+		"malformed glob": {`["go.sum"]`, `["go.[sum"]`, "syntax error"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -88,5 +95,26 @@ func TestReusableByDefault(t *testing.T) {
 	}
 	if !Hermetic.ReusableByDefault() {
 		t.Fatal("hermetic must be reusable by default")
+	}
+}
+
+func TestLoad(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	if _, err := Load(write("ok.yaml", valid)); err != nil {
+		t.Fatal(err)
+	}
+	bad := write("bad.yaml", "kind: Test\n")
+	if _, err := Load(bad); err == nil || !strings.Contains(err.Error(), bad) {
+		t.Fatalf("invalid contract error must name the file, got %v", err)
+	}
+	if _, err := Load(filepath.Join(dir, "missing.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("missing file: got %v", err)
 	}
 }

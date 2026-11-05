@@ -1,6 +1,7 @@
 package evidence
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -41,5 +42,52 @@ func TestVerificationErrorIs(t *testing.T) {
 	var err error = &VerificationError{Reason: "untrusted signer"}
 	if !errors.Is(err, ErrVerification) || errors.Is(err, ErrNotFound) {
 		t.Fatal("VerificationError must wrap ErrVerification only")
+	}
+}
+
+func TestParseRejectsInvalidPredicates(t *testing.T) {
+	cases := map[string]struct{ from, to, wantErr string }{
+		"not json":        {"{", "[", "decoding predicate"},
+		"schema version":  {`"schemaVersion": "v1"`, `"schemaVersion": "v2"`, "schemaVersion"},
+		"no subject":      {`"name": "git+https://github.com/acme/orders", `, `"name": "", `, "subject"},
+		"no test id":      {`"id": "orders-integration"`, `"id": ""`, "test.id"},
+		"bad fingerprint": {`"fingerprint": "sha256:`, `"fingerprint": "md5:`, "execution.fingerprint"},
+		"no identity":     {`"identity": "https://`, `"identity": "", "x": "`, "runner.identity"},
+		"inverted times":  {`"finishedAt": "2026-11-05T10:04:00Z"`, `"finishedAt": "2026-11-05T09:00:00Z"`, "startedAt/finishedAt"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := Parse([]byte(strings.Replace(validPredicate, tc.from, tc.to, 1)))
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("want error containing %q, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestTrustLevelString(t *testing.T) {
+	want := map[TrustLevel]string{
+		TrustUnknown: "unknown", TrustDeveloper: "developer", TrustRunner: "runner",
+		TrustIsolated: "isolated", TrustLevel(42): "unknown",
+	}
+	for l, s := range want {
+		if got := l.String(); got != s {
+			t.Errorf("TrustLevel(%d).String() = %q, want %q", int(l), got, s)
+		}
+	}
+}
+
+func TestVerificationErrorMessage(t *testing.T) {
+	err := &VerificationError{Reason: "untrusted signer"}
+	if got := err.Error(); got != "attestation verification failed: untrusted signer" {
+		t.Fatalf("Error() = %q", got)
+	}
+}
+
+// Milestone-2 stub: until Verify is implemented it must never report success.
+func TestVerifyIsNotImplemented(t *testing.T) {
+	v, err := Verify(context.Background(), &Envelope{}, VerifyOptions{})
+	if v != nil || !errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("Verify = %v, %v; want nil, ErrNotImplemented", v, err)
 	}
 }

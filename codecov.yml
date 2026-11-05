@@ -1,0 +1,20 @@
+# Codecov mirrors the gate `make coverage-check` enforces in CI; the upload is
+# informational (no token required, failures ignored). CI uploads
+# coverage.gate.out, which already excludes tests/, examples/ and the one-line
+# main() in cmd/aval.
+coverage:
+  status:
+    project:
+      default:
+        target: 100%
+        threshold: 0%
+    patch:
+      default:
+        target: 100%
+        threshold: 0%
+
+# Go profiles emit "0 0" blocks for statement-less branches; go tool cover
+# counts them as covered, Codecov does not without this flag.
+parsers:
+  go:
+    partials_as_hits: true
