@@ -1,9 +1,9 @@
 # Integrations
 
 Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
-Lookup, fetch, signature verification and the policy file land in milestone 2;
-until then the code paths below return "not implemented" (exit code 6). The
-consumption contract is scheduled to be declared stable in milestone 5. All
+Lookup, fetch, signature verification and the policy file are implemented
+and used by `aval verify`; `aval run` and `aval push` are still stubs that
+exit with code 6 (milestone 2). The consumption contract is scheduled to be declared stable in milestone 5. All
 media types, the predicate type and the report version are **provisional**
 until then.
 
@@ -41,9 +41,12 @@ public Go API. It exposes:
 |---|---|
 | `Parse(data []byte) (*Predicate, error)` | Decode predicate JSON and run `Validate`. Does not check signatures. |
 | `(*Predicate).Validate() error` | Structural checks: `schemaVersion == "v2"`, subject, `test.id`, `result`, fingerprint format `sha256:<64 hex>`, `runner.identity`, timestamps. |
-| `Verify(ctx, *Envelope, VerifyOptions) (*Verification, error)` | Check the DSSE signature against accepted identities, decode the statement and predicate, enforce the policy. **Milestone-2 stub**: returns `ErrNotImplemented` today. |
-| `MatchIdentity(ids, issuer, subject) (Identity, bool)` | The accepted identity that grants a signer the highest trust level. The issuer must be equal; `SubjectRegexp` must match the whole subject (anchored); an invalid regexp matches nothing. The level comes from the policy, never from the predicate. |
-| `VerifyOptions` | Expected fingerprint, expected test id, accepted `Identities` (empty accepts nothing), `MinTrustLevel`, `AllowedCacheability` (empty means `hermetic` and `controlled-environment` only). |
+| `Verify(ctx, *Envelope, VerifyOptions) (*Verification, error)` | Check the signature with `VerifyOptions.Signature`, match the signer against the accepted identities, enforce the minimum trust level, decode the statement and predicate, and require the expected fingerprint, test id and a reusable cacheability. Every failure is a `*VerificationError`. |
+| `SignatureVerifier`, `Signer` | `VerifySignature(ctx, *Envelope) (Signer, error)` checks the signature cryptographically and returns the signer it binds (`Issuer` and `Subject` of a keyless certificate, or `KeyID`). It applies no policy. `pkg/evidence` ships no implementation, to stay free of Sigstore dependencies; Aval's own is `internal/attest.Verifier` over the Sigstore bundle. A public Sigstore implementation for consumers is planned for milestone 5. |
+| `MatchIdentity(ids, issuer, subject) (Identity, bool)` | The accepted keyless identity that grants a signer the highest trust level. The issuer must be equal; `SubjectRegexp` must match the whole subject (anchored); an invalid regexp matches nothing. Entries with a `PublicKey` never match. The level comes from the policy, never from the predicate. |
+| `MatchSigner(ids, Signer) (Identity, bool)` | `MatchIdentity` for keyless signers; for key-based ones, the entries whose `PublicKey` has the signer's `KeyID`. The returned identity carries the signer's real `Subject` / `KeyID`. |
+| `PublicKeyID(pem) (string, error)` | `base64(sha256(DER))` of a PEM public key: the key hint in key-based Sigstore bundles. |
+| `VerifyOptions` | Expected fingerprint and test id (both required), accepted `Identities` (empty accepts nothing), `MinTrustLevel` (level `0` and levels above `3` are never accepted), `AllowedCacheability` (`hermetic` and `controlled-environment` always; `external-dependencies` only if listed; `non-deterministic` never), `Signature` (required). |
 | `ErrNotFound` | No attestation exists for the fingerprint. A miss; re-run. |
 | `ErrVerification` | An attestation exists but failed signature or policy checks. Security event. `*VerificationError` wraps it with a reason. |
 | `Report`, `ReportVersion` | The document printed by `aval verify --output json`. |
@@ -68,8 +71,9 @@ import (
 )
 
 // CheckResult returns the verified predicate for testID at fingerprint, or an
-// error. envBytes is the DSSE envelope layer, fetched by digest.
-func CheckResult(ctx context.Context, envBytes []byte, testID, fingerprint string) (*evidence.Predicate, error) {
+// error. envBytes is the DSSE envelope layer, fetched by digest; sig checks
+// its signature, typically with sigstore-go over the bundle layer.
+func CheckResult(ctx context.Context, envBytes []byte, sig evidence.SignatureVerifier, testID, fingerprint string) (*evidence.Predicate, error) {
 	var env evidence.Envelope
 	if err := json.Unmarshal(envBytes, &env); err != nil {
 		return nil, fmt.Errorf("decoding envelope: %w", err)
@@ -83,13 +87,14 @@ func CheckResult(ctx context.Context, envBytes []byte, testID, fingerprint strin
 			TrustLevel:    evidence.TrustRunner,
 		}},
 		MinTrustLevel: evidence.TrustRunner,
+		Signature:     sig,
 	})
 	switch {
 	case errors.Is(err, evidence.ErrVerification):
 		// Someone published a result we do not trust. Alert, do not reuse.
 		return nil, err
 	case err != nil:
-		// Includes ErrNotImplemented until milestone 2. Do not reuse.
+		// Not reachable from Verify today, but fail closed. Do not reuse.
 		return nil, err
 	}
 	if v.Predicate.Result != evidence.ResultPassed {
@@ -134,7 +139,7 @@ report's `outcome` is `verified`.
 | 0 | `verified` | A valid attestation satisfies the policy. | Reuse `result`. |
 | 4 | `miss` | No attestation for this fingerprint. | Run the test. |
 | 5 | `verification-failed` | Attestation exists but failed signature or policy. | Run the test **and** alert. |
-| 1, 6 | `error` (exit 1 may have no report if fingerprinting failed) | Aval could not decide (registry down, I/O, not implemented). | Run the test (fail closed). |
+| 1 | `error` (may have no report if fingerprinting failed) | Aval could not decide (registry down, I/O, bad policy file, trusted root unavailable). | Run the test (fail closed). |
 | 2 | (no report) | Bad flags or invalid `aval.yaml`. | Fix the invocation. |
 
 CI snippet that keeps miss and verification failure apart:
@@ -171,7 +176,8 @@ esac
 ```
 
 Check both the exit code and `outcome`; if they disagree, treat it as `error`.
-The policy file format (`--policy`) is defined in milestone 2.
+The policy file format (`--policy`) is described in
+[trust-model.md](trust-model.md#policy-file).
 
 ### Guidance for consumers
 

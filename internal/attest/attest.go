@@ -70,31 +70,11 @@ type SignOptions struct {
 	RekorURL string
 }
 
-// Signer is the identity bound to a signature. For keyless signatures it
-// comes from the Fulcio certificate; for key-based ones it is the key.
-type Signer struct {
-	// Issuer is the OIDC issuer in the certificate. Empty for key-based.
-	Issuer string
-	// Subject is the certificate subject alternative name (URI or email).
-	// Empty for key-based.
-	Subject string
-	// KeyID is base64(sha256(DER public key)) for key-based signatures.
-	KeyID string
-}
-
-// TrustLevel returns the policy identity that matches the signer and the
-// level it grants. It never reads the predicate: the runner block there is
-// only a claim. Key-based signers match no keyless identity and get
-// TrustUnknown.
-//
-// TODO(milestone-2): key identities in the trust policy (#8).
-func (s Signer) TrustLevel(ids []evidence.Identity) (evidence.Identity, evidence.TrustLevel) {
-	id, ok := evidence.MatchIdentity(ids, s.Issuer, s.Subject)
-	if !ok {
-		return evidence.Identity{}, evidence.TrustUnknown
-	}
-	return id, id.TrustLevel
-}
+// Signer is the identity bound to a signature: the OIDC issuer and subject
+// of the Fulcio certificate for keyless signatures, or the key's
+// evidence.PublicKeyID for key-based ones. Trust levels come from matching it
+// against the policy (evidence.MatchSigner), never from the predicate.
+type Signer = evidence.Signer
 
 // Signed is the result of Sign.
 type Signed struct {

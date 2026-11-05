@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/TrianaLab/aval/internal/attest"
 	"github.com/TrianaLab/aval/internal/contract"
 	"github.com/TrianaLab/aval/internal/fingerprint"
 	"github.com/TrianaLab/aval/internal/policy"
@@ -42,6 +43,7 @@ var (
 	lookup         = registry.Lookup
 	fetch          = registry.Fetch
 	verifyEnvelope = evidence.Verify
+	newVerifier    = attest.NewVerifier
 )
 
 // main stays one line: the coverage gate (make coverage-check) excludes
@@ -245,6 +247,10 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 	if err != nil {
 		return fail(err)
 	}
+	sigs, err := newVerifier(pol.TrustedRoot, pol.Identities)
+	if err != nil {
+		return fail(fmt.Errorf("trust policy: %w", err))
+	}
 	cands, err := lookup(ctx, repo, fp.Digest)
 	if err == nil && len(cands) == 0 {
 		err = evidence.ErrNotFound // fail closed on an empty answer
@@ -252,7 +258,7 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 	if err != nil {
 		return fail(err)
 	}
-	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest))
+	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest), sigs)
 	r.Reference, r.Rejected = ref, rejected
 	if err != nil {
 		return fail(err)
@@ -285,7 +291,7 @@ func outcomeOf(err error) evidence.Outcome {
 // (invariant 4). Whenever no candidate is reused it returns the reference and
 // error of the first verification failure, which outranks any other error: it
 // is the security event that must surface.
-func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions) (*evidence.Verification, string, []evidence.Rejection, error) {
+func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier) (*evidence.Verification, string, []evidence.Rejection, error) {
 	var (
 		best             *evidence.Verification
 		bestRef, failRef string
@@ -294,7 +300,7 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 		rejected         []evidence.Rejection
 	)
 	for _, d := range cands {
-		v, err := verifyCandidate(ctx, d, opts)
+		v, err := verifyCandidate(ctx, d, opts, sigs)
 		if err == nil {
 			if best == nil || v.Signer.TrustLevel > best.Signer.TrustLevel ||
 				(v.Signer.TrustLevel == best.Signer.TrustLevel && best.Predicate.Result == evidence.ResultPassed && v.Predicate.Result != evidence.ResultPassed) {
@@ -315,11 +321,14 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 	return best, bestRef, rejected, nil
 }
 
-func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions) (*evidence.Verification, error) {
+// verifyCandidate fetches one attestation and verifies it with the Sigstore
+// bundle stored next to its envelope.
+func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier) (*evidence.Verification, error) {
 	a, err := fetch(ctx, d)
 	if err != nil {
 		return nil, err
 	}
+	opts.Signature = sigs.For(a.Bundle)
 	return verifyEnvelope(ctx, a.Envelope, opts)
 }
 

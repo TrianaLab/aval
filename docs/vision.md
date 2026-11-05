@@ -1,7 +1,9 @@
 # Aval: vision
 
 Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
-Everything else is a stub that exits with code 6 (not implemented).
+Milestone 2 is in progress: signing, push, lookup, verification and the
+policy file are implemented and `aval verify` uses them; `aval run` and
+`aval push` are stubs that exit with code 6 (not implemented).
 
 ## Thesis
 

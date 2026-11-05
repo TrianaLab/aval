@@ -5,10 +5,10 @@ registry, the attestation it signs, and the JSON that `aval verify --output json
 prints. It is the contract external tools consume through `pkg/evidence`.
 
 Status: pre-alpha. The Go types in `pkg/evidence` are the source of truth.
-Signing, push, lookup and fetch are implemented (`attest.Sign`,
-`registry.Push`, `registry.Lookup`, `registry.Fetch`) but not yet wired into
-`aval push` and `aval run`; signature verification and the policy file are
-milestone-2 stubs (#8).
+Signing, push, lookup, fetch, verification and the policy file are
+implemented (`attest.Sign`, `registry.Push`, `registry.Lookup`,
+`registry.Fetch`, `evidence.Verify`, `policy.Load`). `aval verify` uses them;
+`aval push` and `aval run` are not wired yet (milestone 2, #9).
 
 **Every media type, the predicate type and the report version are PROVISIONAL
 until v1.** They may change before then without a compatibility path.
@@ -204,8 +204,9 @@ Signing uses sigstore-go (`attest.Sign`, keyless with a Fulcio certificate
 and Rekor entry, or key-based; see [trust-model.md](trust-model.md#signing)).
 It also produces a Sigstore bundle (`application/vnd.dev.sigstore.bundle.v0.3+json`)
 carrying the certificate or key hint and the Rekor entry; it is stored as the
-optional second layer of the execution manifest. Verification is milestone 2
-(#8); `evidence.Verify` returns `ErrNotImplemented` today.
+second layer of the execution manifest. The layer is optional for
+`registry.Push`, but `aval verify` checks the signature through the bundle
+(`attest.Verifier`), so an attestation without one is a verification failure.
 
 ## in-toto Statement
 
@@ -265,7 +266,7 @@ identities (`evidence.Verification.Signer` / `.TrustLevel`). Consumers must not
 make trust decisions from the `runner` block.
 
 `evidence.Parse` only checks structure. A parsed predicate is a claim, not
-evidence; use `evidence.Verify` (milestone 2) to get something you can rely on.
+evidence; use `evidence.Verify` to get something you can rely on.
 
 ### Annotations
 
@@ -323,7 +324,7 @@ stable machine interface for CI scripts and external tools.
 | `fingerprint` | string | always | Locally computed `sha256:<hex>`. |
 | `reference` | string | when an attestation was found | Immutable `repo@sha256:<manifest digest>`. |
 | `result` | string | `verified` only | `passed` or `failed` from the verified predicate. |
-| `signer` | object | `verified` only | Accepted policy identity that matched: `issuer`, `subjectRegexp`, `trustLevel`. |
+| `signer` | object | `verified` only | Accepted policy identity that matched (`issuer`, `subjectRegexp`, `trustLevel`) plus the identity the signature actually carried: `subject`, the certificate subject (SAN) for keyless signatures, or `keyId`, `base64(sha256(DER public key))` for key-based ones. `subject` and `keyId` are omitted when empty. |
 | `predicate` | object | `verified` only | Full verified predicate. |
 | `reason` | string | non-`verified` outcomes | Human-readable cause. |
 | `rejected` | array | when a candidate was not used | Each `{reference, outcome, reason}`; `outcome` is `verification-failed` or `error`. A `verification-failed` entry is a security event even when `outcome` is `verified`: alert. |
@@ -335,15 +336,16 @@ Outcomes and exit codes:
 | `verified` | Valid attestation satisfies the policy. | Reuse `result`. | 0 |
 | `miss` | No attestation for this fingerprint. | Run the test. | 4 |
 | `verification-failed` | Attestation exists but fails signature or policy. | Run the test **and** alert. Never hide this. | 5 |
-| `error` | Aval could not decide (registry unreachable, bad policy file, not implemented). | Treat as a miss: run the test (fail closed). | 1, or 6 while stubbed |
+| `error` | Aval could not decide (registry unreachable, bad policy file, trusted root unavailable). | Treat as a miss: run the test (fail closed). | 1 |
 
 If the fingerprint cannot be computed (empty scope, missing dependency,
 symlink, control characters in a path, I/O error), `aval verify` prints no
 report and exits 1; bad flags or an invalid contract print no report and exit 2.
 
 Without `--policy`, `aval verify` skips the lookup and reports `outcome: "miss"`
-(exit 4). With `--policy`, it currently ends in `outcome: "error"` with exit
-code 6 because `policy.Load` and `evidence.Verify` are milestone-2 stubs.
+(exit 4). With `--policy`, a policy file that cannot be loaded, or a
+trusted root that cannot be loaded, is `outcome: "error"` (exit 1) and no
+lookup is made.
 
 Example (`verified`):
 
@@ -358,7 +360,8 @@ Example (`verified`):
   "signer": {
     "issuer": "https://token.actions.githubusercontent.com",
     "subjectRegexp": "^https://github.com/acme/orders/\\.github/workflows/ci\\.yaml@refs/heads/main$",
-    "trustLevel": 2
+    "trustLevel": 2,
+    "subject": "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"
   },
   "predicate": { "...": "as in the predicate example" }
 }

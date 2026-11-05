@@ -109,7 +109,7 @@ func TestCLI(t *testing.T) {
 		{"verify no registry", []string{"verify", "-f", hermetic}, ExitUsage, "", "--registry is required"},
 		{"verify missing contract", []string{"verify", "-f", missing, "--registry", "r"}, ExitUsage, "", "aval:"},
 		{"verify no policy", []string{"verify", "-f", hermetic, "--registry", "r"}, ExitMiss, "miss unit sha256:", "no trust policy"},
-		{"verify policy stub", []string{"verify", "-f", hermetic, "--registry", "r", "--policy", "p.yaml"}, ExitNotImplemented, "error unit sha256:", ""},
+		{"verify unreadable policy", []string{"verify", "-f", hermetic, "--registry", "r", "--policy", "p.yaml"}, ExitError, "error unit sha256:", "p.yaml"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

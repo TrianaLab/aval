@@ -11,10 +11,16 @@ package evidence
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"time"
 )
 
@@ -213,6 +219,18 @@ type Identity struct {
 	SubjectRegexp string `json:"subjectRegexp"`
 	// TrustLevel granted to signatures from this identity.
 	TrustLevel TrustLevel `json:"trustLevel"`
+	// PublicKey is a PEM-encoded public key accepted for key-based
+	// signatures. An entry has either PublicKey or Issuer and
+	// SubjectRegexp, never both. Not part of the verify report; KeyID
+	// identifies the key there.
+	PublicKey string `json:"-"`
+	// Subject is the certificate subject (SAN) the verified signature
+	// actually carried, and KeyID the key that verified a key-based
+	// signature (see PublicKeyID). Verify sets them on Verification.Signer,
+	// so the verify report shows the real signer next to the policy entry
+	// it matched. They are ignored in VerifyOptions.Identities.
+	Subject string `json:"subject,omitempty"`
+	KeyID   string `json:"keyId,omitempty"`
 }
 
 // MatchIdentity returns the accepted identity that grants the highest trust
@@ -225,7 +243,7 @@ func MatchIdentity(ids []Identity, issuer, subject string) (Identity, bool) {
 	var best Identity
 	found := false
 	for _, id := range ids {
-		if issuer == "" || id.Issuer != issuer || (found && id.TrustLevel <= best.TrustLevel) {
+		if issuer == "" || id.PublicKey != "" || id.Issuer != issuer || (found && id.TrustLevel <= best.TrustLevel) {
 			continue
 		}
 		// Compile the policy regexp alone first: wrapping an unbalanced one
@@ -242,24 +260,91 @@ func MatchIdentity(ids []Identity, issuer, subject string) (Identity, bool) {
 	return best, found
 }
 
+// Signer is the identity a cryptographically valid signature binds: the
+// OIDC issuer and subject of a keyless certificate, or the KeyID of a key.
+type Signer struct {
+	Issuer  string
+	Subject string
+	KeyID   string
+}
+
+// SignatureVerifier checks the signature over an envelope (and the
+// certificate chain and transparency log behind it) and returns the signer
+// it binds. It applies no policy: Verify matches the signer against the
+// accepted identities. Aval's Sigstore implementation lives outside this
+// package so that it stays dependency-light.
+type SignatureVerifier interface {
+	VerifySignature(ctx context.Context, env *Envelope) (Signer, error)
+}
+
+// PublicKeyID returns the key identifier of a PEM-encoded PKIX public key:
+// base64(sha256(DER)), the hint Aval writes into key-based Sigstore bundles.
+func PublicKeyID(pemKey string) (string, error) {
+	b, _ := pem.Decode([]byte(pemKey))
+	if b == nil || b.Type != "PUBLIC KEY" {
+		return "", errors.New("not a PEM public key")
+	}
+	if _, err := x509.ParsePKIXPublicKey(b.Bytes); err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(b.Bytes)
+	return base64.StdEncoding.EncodeToString(sum[:]), nil
+}
+
+// MatchSigner returns the accepted identity that grants the highest trust
+// level to a verified signer, with Subject and KeyID set to what the signer
+// actually carried. A keyless signer is matched with MatchIdentity; a
+// key-based one (KeyID set) only by entries whose PublicKey has that
+// PublicKeyID. A signer with both a key and a certificate identity matches
+// nothing. The level comes from the policy entry only.
+func MatchSigner(ids []Identity, s Signer) (Identity, bool) {
+	var (
+		best  Identity
+		found bool
+	)
+	switch {
+	case s.KeyID == "":
+		best, found = MatchIdentity(ids, s.Issuer, s.Subject)
+	case s.Issuer == "" && s.Subject == "":
+		for _, id := range ids {
+			if kid, err := PublicKeyID(id.PublicKey); err == nil && kid == s.KeyID && (!found || id.TrustLevel > best.TrustLevel) {
+				best, found = id, true
+			}
+		}
+	}
+	if !found {
+		return Identity{}, false
+	}
+	best.Subject, best.KeyID = s.Subject, s.KeyID
+	return best, true
+}
+
 // VerifyOptions is the trust policy applied by Verify.
 type VerifyOptions struct {
 	// ExpectedFingerprint must equal the predicate's execution fingerprint.
+	// Required.
 	ExpectedFingerprint string
-	// ExpectedTestID must equal the predicate's test.id.
+	// ExpectedTestID must equal the predicate's test.id. Required.
 	ExpectedTestID string
 	// Identities lists accepted signers. Empty means nothing is accepted.
 	Identities []Identity
-	// MinTrustLevel is the minimum level required for reuse.
+	// MinTrustLevel is the minimum level required for reuse. Levels below
+	// TrustDeveloper or above TrustIsolated are never accepted.
 	MinTrustLevel TrustLevel
-	// AllowedCacheability lists classes that may be reused. Empty means
-	// hermetic and controlled-environment only.
+	// AllowedCacheability lists classes that may be reused besides
+	// hermetic and controlled-environment. Only external-dependencies has
+	// an effect; non-deterministic and unknown classes are never reused.
 	AllowedCacheability []string
+	// Signature checks the envelope's signature. Required: without it
+	// nothing verifies.
+	Signature SignatureVerifier
 }
 
 // Verification is the outcome of a successful Verify.
 type Verification struct {
-	Predicate  *Predicate
+	Predicate *Predicate
+	// Signer is the policy entry that accepted the signer, with Subject and
+	// KeyID set to the identity the signature actually carried.
 	Signer     Identity
 	TrustLevel TrustLevel
 }
@@ -281,12 +366,101 @@ type VerificationError struct{ Reason string }
 func (e *VerificationError) Error() string { return ErrVerification.Error() + ": " + e.Reason }
 func (e *VerificationError) Unwrap() error { return ErrVerification }
 
-// Verify checks a DSSE envelope's signature against opts.Identities, decodes
-// the in-toto statement and predicate, and enforces opts. Any failure returns
-// an error wrapping ErrVerification.
-//
-// TODO(milestone-2): verify with sigstore-go (Fulcio cert chain, Rekor
-// inclusion), then apply fingerprint, test id, cacheability and trust level.
+// Verify checks a DSSE envelope's signature with opts.Signature, matches the
+// signer against opts.Identities, decodes the in-toto statement and
+// predicate, and enforces the minimum trust level, cacheability, expected
+// fingerprint and expected test id. Any failure returns a
+// *VerificationError, which wraps ErrVerification.
 func Verify(ctx context.Context, env *Envelope, opts VerifyOptions) (*Verification, error) {
-	return nil, fmt.Errorf("evidence.Verify: %w", ErrNotImplemented)
+	v, reason := verify(ctx, env, opts)
+	if reason != "" {
+		return nil, &VerificationError{Reason: reason}
+	}
+	return v, nil
+}
+
+func verify(ctx context.Context, env *Envelope, opts VerifyOptions) (*Verification, string) {
+	if opts.ExpectedFingerprint == "" || opts.ExpectedTestID == "" {
+		return nil, "expected fingerprint and test id are required"
+	}
+	id, reason := verifySigner(ctx, env, opts)
+	if reason != "" {
+		return nil, reason
+	}
+	p, reason := verifyPayload(env.Payload, opts)
+	if reason != "" {
+		return nil, reason
+	}
+	return &Verification{Predicate: p, Signer: id, TrustLevel: id.TrustLevel}, ""
+}
+
+// verifySigner checks the signature and returns the accepted identity that
+// grants the signer at least the minimum trust level.
+func verifySigner(ctx context.Context, env *Envelope, opts VerifyOptions) (Identity, string) {
+	if opts.Signature == nil {
+		return Identity{}, "no signature verifier configured"
+	}
+	if env == nil || env.PayloadType != PayloadType {
+		return Identity{}, "envelope: missing or not an in-toto payload"
+	}
+	signer, err := opts.Signature.VerifySignature(ctx, env)
+	if err != nil {
+		return Identity{}, "signature: " + err.Error()
+	}
+	id, ok := MatchSigner(opts.Identities, signer)
+	if !ok {
+		return Identity{}, fmt.Sprintf("signer %s is not accepted by the policy", describe(signer))
+	}
+	need := max(opts.MinTrustLevel, TrustDeveloper)
+	if id.TrustLevel < need || id.TrustLevel > TrustIsolated {
+		return Identity{}, fmt.Sprintf("signer %s has trust level %s, policy requires at least %s", describe(signer), id.TrustLevel, need)
+	}
+	return id, ""
+}
+
+// verifyPayload decodes the signed statement and checks the predicate
+// against what the caller computed locally.
+func verifyPayload(payload []byte, opts VerifyOptions) (*Predicate, string) {
+	var st Statement
+	if err := json.Unmarshal(payload, &st); err != nil {
+		return nil, "decoding statement: " + err.Error()
+	}
+	if st.Type != StatementType || st.PredicateType != PredicateType {
+		return nil, fmt.Sprintf("statement: type %q, predicate type %q; want %q, %q", st.Type, st.PredicateType, StatementType, PredicateType)
+	}
+	p, err := Parse(st.Predicate)
+	if err != nil {
+		return nil, "predicate: " + err.Error()
+	}
+	switch {
+	case len(st.Subject) != 1 || st.Subject[0].Name != p.Subject.Name || !maps.Equal(st.Subject[0].Digest, p.Subject.Digest):
+		return nil, "statement subject does not match the predicate subject"
+	case p.Execution.Fingerprint != opts.ExpectedFingerprint:
+		return nil, fmt.Sprintf("fingerprint %s, want %s", p.Execution.Fingerprint, opts.ExpectedFingerprint)
+	case p.Test.ID != opts.ExpectedTestID:
+		return nil, fmt.Sprintf("test id %q, want %q", p.Test.ID, opts.ExpectedTestID)
+	case !reusable(p.Test.Cacheability, opts.AllowedCacheability):
+		return nil, fmt.Sprintf("cacheability %q is not reusable under the policy", p.Test.Cacheability)
+	}
+	return p, ""
+}
+
+// reusable reports whether a cacheability class may be reused. Only the
+// known reusable classes count: non-deterministic never does, whatever the
+// policy lists (invariant 7), and neither does an unknown class.
+func reusable(class string, allowed []string) bool {
+	switch class {
+	case "hermetic", "controlled-environment":
+		return true
+	case "external-dependencies":
+		return slices.Contains(allowed, class)
+	}
+	return false
+}
+
+func describe(s Signer) string {
+	if s.KeyID != "" {
+		return "key " + s.KeyID
+	}
+	return fmt.Sprintf("%q (issuer %q)", s.Subject, s.Issuer)
 }
