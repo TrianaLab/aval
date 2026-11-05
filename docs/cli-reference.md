@@ -20,7 +20,8 @@ Available Commands:
   verify      Check whether a trusted result exists for the current inputs
 
 Flags:
-  -h, --help   help for aval
+  -h, --help      help for aval
+  -v, --version   version for aval
 
 Use "aval [command] --help" for more information about a command.
 ```

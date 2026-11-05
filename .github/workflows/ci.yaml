@@ -102,6 +102,9 @@ jobs:
           go-version-file: go.mod
       - run: make ci-acceptance
 
+  # Release dry-run: the release build from .goreleaser.yaml as a snapshot
+  # (unsigned: a PR gets no OIDC token), checked by tests/release. Runs on
+  # every PR that changes code, which includes every release config change.
   ci-release:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -111,7 +114,23 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: v1.42.3
       - run: make ci-release
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-dry-run
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sbom.json
+            dist/checksums.txt
+            dist/metadata.json
+            dist/artifacts.json
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Short fuzz run (FUZZTIME per target, see Makefile); the long run is
   # fuzz.yaml on a schedule. A crasher is uploaded so it can be committed as

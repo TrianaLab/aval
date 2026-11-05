@@ -1,5 +1,5 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
-	lint fmt fmt-check example fuzz vuln ci ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz ci-security \
+	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz ci-security \
 	docs-lint docs-cli ci-docs
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
@@ -42,9 +42,22 @@ test-architecture:
 test-acceptance:
 	go test -count=1 ./tests/acceptance/...
 
-# Level 5 — release.
-test-release:
-	go test -count=1 ./tests/release/...
+# Level 5 — release. A snapshot dry-run of the release build (.goreleaser.yaml:
+# binaries, archives, checksums, SBOMs; unsigned, nothing published), then the
+# tests/release assertions against its dist/. The release workflow runs the
+# same tests against the tagged, signed build before publishing it.
+# GoReleaser is installed into bin/ like govulncheck; SBOMs need syft on PATH
+# (ci.yaml installs SYFT_VERSION).
+GORELEASER_VERSION := v2.20.0
+
+goreleaser:
+	CGO_ENABLED=0 GOBIN=$(CURDIR)/bin go install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
+
+release-snapshot: goreleaser
+	bin/goreleaser release --snapshot --clean --skip=sign
+
+test-release: release-snapshot
+	AVAL_RELEASE_DIST=$(CURDIR)/dist go test -count=1 ./tests/release/...
 
 # Go native fuzzing: every Fuzz* target in the unit packages, one at a time
 # (go test -fuzz takes one target per run), FUZZTIME each. A crasher is
@@ -90,12 +103,14 @@ fmt-check:
 	@out="$$(gofmt -l .)"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 # Docs gates. DOCS_MD is the one list both linters read: every Markdown file
-# except the agent skills (.agents/, .claude/), which are maintained apart, and
-# CLAUDE.md, which is only an include of AGENTS.md.
+# except the agent skills (.agents/, .claude/), which are maintained apart,
+# CLAUDE.md, which is only an include of AGENTS.md, and the Changesets entries
+# (.changeset/) and the CHANGELOG.md generated from them.
 # Links are checked by tests/architecture/docs_test.go (ci-gates); external
 # URLs are not fetched, so the gates stay deterministic and offline.
 DOCS_MD = $(shell find . -name '*.md' -not -path './.git/*' -not -path './.agents/*' \
-	-not -path './.claude/*' -not -path './CLAUDE.md' -not -path '*/node_modules/*' | sort)
+	-not -path './.claude/*' -not -path './CLAUDE.md' -not -path './.changeset/*' -not -path './CHANGELOG.md' \
+	-not -path '*/node_modules/*' | sort)
 MARKDOWNLINT_CLI2_VERSION := 0.24.0
 # Vale ships as a binary (building it needs cgo); install the release whose
 # sha256 ci.yaml pins, and `make docs-lint` refuses any other version.

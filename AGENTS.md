@@ -67,7 +67,7 @@ A change that breaks one of these is wrong, even if tests pass.
 | `make ci-engine` | level 1: unit tests with `-race` and the 100% coverage gate (`make coverage-check`), the example module |
 | `make ci-integration` | level 2: `tests/integration` (`make test-integration`) |
 | `make ci-acceptance` | level 4: `tests/acceptance`, through the built CLI (`make test-acceptance`) |
-| `make ci-release` | level 5: `tests/release` (`make test-release`) |
+| `make ci-release` | level 5: release dry-run (GoReleaser snapshot of `.goreleaser.yaml`, needs syft) checked by `tests/release` (`make test-release`) |
 | `make ci-fuzz` | every `Fuzz*` target for `FUZZTIME` (default 10s) each (`make fuzz`); crashers land in `testdata/fuzz/` |
 | `make ci-security` | govulncheck (pinned version) on both modules against the go.mod toolchain (`make vuln`); needs network |
 | `make ci-docs` | markdownlint, vale, CLI reference drift (`make docs-lint`; regenerate with `make docs-cli`) |

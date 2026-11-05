@@ -22,6 +22,7 @@ func renderCLIReference() []byte {
 	// cobra adds these lazily in Execute; add them so the reference matches --help.
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
+	root.InitDefaultVersionFlag()
 	var b bytes.Buffer
 	b.WriteString("# CLI reference\n\n")
 	b.WriteString("Generated from the cobra command tree by `make docs-cli`. Do not edit by hand:\n")

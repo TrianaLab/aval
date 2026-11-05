@@ -14,3 +14,9 @@ updates:
     schedule:
       interval: weekly
     rebase-strategy: auto
+  # @changesets/cli in package.json (versions and changelog only).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    rebase-strategy: auto

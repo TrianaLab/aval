@@ -4,6 +4,7 @@
 
 - Go version: whatever `go.mod` says (currently 1.27).
 - [golangci-lint](https://golangci-lint.run) at the exact version `GOLANGCI_LINT_VERSION` in the `Makefile` (CI installs the same one; `make lint` refuses any other). Config in `.golangci.yml`, including the cyclomatic complexity cap of 15.
+- For `make test-release`: [syft](https://github.com/anchore/syft) on `PATH` (CI pins the version). GoReleaser is installed into `bin/` at `GORELEASER_VERSION`.
 - For `make docs-lint`: Node.js (`npx` fetches markdownlint-cli2 at the pinned `MARKDOWNLINT_CLI2_VERSION`) and [Vale](https://vale.sh) at the exact `VALE_VERSION` in the `Makefile`.
 
 ```sh
@@ -26,7 +27,7 @@ has one `make` target:
 | 2 Integration | real components wired together, nothing over a reachable network | `tests/integration/` | `make test-integration` |
 | 3 Architecture | rules about the repository itself | `tests/architecture/` | `make test-architecture` |
 | 4 Local acceptance | a whole user story through the `aval` binary, no cluster | `tests/acceptance/` | `make test-acceptance` |
-| 5 Release | the release produces what it claims (from milestone 3) | `tests/release/` | `make test-release` |
+| 5 Release | the release produces what it claims | `tests/release/` | `make test-release` |
 
 **Choosing a home for a new test.** Ask, in order:
 
@@ -60,7 +61,7 @@ Two more rules once you have picked:
 | `ci-engine` | level 1 with `-race`, the `examples/go-compose` module |
 | `ci-integration` | level 2 |
 | `ci-acceptance` | level 4 |
-| `ci-release` | level 5 |
+| `ci-release` | level 5 against a snapshot dry-run of the release build |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
 | `ci-security` | govulncheck on both modules (needs network) |
 | `ci-docs` | markdownlint and vale (`make docs-lint`), and `docs/cli-reference.md` matches the cobra commands |
@@ -86,13 +87,51 @@ offline).
 
 Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
 marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint
-every Markdown file except `.agents/`, `.claude/` and `CLAUDE.md`.
+every Markdown file except `.agents/`, `.claude/`, `CLAUDE.md`, `.changeset/` and the generated `CHANGELOG.md`.
 
 ## Commits
 
 [Conventional Commits](https://www.conventionalcommits.org): `<type>[(scope)][!]: <description>`, with type one of `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`, `perf`, `build`, `style`. Scope is optional, e.g. `feat(fingerprint): ...`; `!` marks a breaking change.
 
 PRs are squash-merged with the PR title as the commit message, so the `pr-title` CI job rejects a PR whose title is not in that format. Editing the title reruns CI.
+
+## Changesets and releases
+
+A PR that changes what users get (the CLI, `pkg/evidence`, formats) adds a
+changeset: `npx changeset` (after `npm ci`) writes `.changeset/<name>.md` with
+the bump (`patch`, `minor`, `major`) and one line for the changelog. Pre-1.0, a
+breaking change is a `minor`.
+
+On every push to `main`, `.github/workflows/release.yaml` keeps a `chore:
+version packages` PR open that applies the pending changesets: it sets the
+version in `package.json` and writes `CHANGELOG.md`. `package.json` only holds
+the version; Aval is not an npm package. To release:
+
+1. Close and reopen the version PR so `ci` runs on it (PRs opened with
+   `GITHUB_TOKEN` trigger no workflows), then merge it.
+2. Tag its merge commit `v<version from package.json>` and push the tag.
+
+The tag runs the `release` job: GoReleaser (`.goreleaser.yaml`) builds the
+binaries for Linux, macOS and Windows (amd64, arm64), archives, `checksums.txt`
+and one SPDX SBOM per archive (syft), and signs `checksums.txt` keyless with
+cosign; `actions/attest-build-provenance` adds SLSA provenance for every file
+in `checksums.txt`. `tests/release` then verifies all of it, including that
+the tag equals the `package.json` version, and only then the job creates the
+GitHub Release. It uploads only the files `checksums.txt` lists, plus
+`checksums.txt` and its signature and provenance bundles. If any check fails,
+nothing is published. `make test-release` runs the same build as an unsigned
+snapshot and the same tests; CI runs it on every PR that changes code
+(`ci-release`).
+
+To verify a downloaded release (`<tag>` is e.g. `v0.1.0`):
+
+```sh
+cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity https://github.com/TrianaLab/aval/.github/workflows/release.yaml@refs/tags/<tag>
+sha256sum --ignore-missing -c checksums.txt
+gh attestation verify aval_<version>_linux_amd64.tar.gz --repo TrianaLab/aval
+```
 
 ## Pull requests and issues
 

@@ -1,6 +1,5 @@
-// Package release holds level 5 tests: the release produces what it claims
-// (archives, checksums, signatures, provenance).
-//
-// TODO(milestone-3): add the release assertions with the release pipeline
-// (TrianaLab/aval#12). Until then this level has no tests.
+// Package release holds level 5 tests: the release produces what it claims.
+// They read GoReleaser's dist/ (AVAL_RELEASE_DIST): `make test-release`
+// builds a snapshot dry-run first; the release workflow points them at the
+// tagged build (AVAL_RELEASE_TAG) before anything is published.
 package release

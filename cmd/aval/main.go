@@ -34,6 +34,9 @@ const (
 	ExitNotImplemented     = 6 // feature lands in a later milestone
 )
 
+// version is set at release build time (-ldflags "-X main.version=...").
+var version = "dev"
+
 type usageError struct{ error }
 
 // ponytail: package-level seams so tests can drive every outcome without a
@@ -97,6 +100,7 @@ func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "aval",
 		Short:         "Verifiable test execution reuse: signed test results as OCI artifacts",
+		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
