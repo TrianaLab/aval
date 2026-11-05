@@ -122,7 +122,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	}
 	// A security event: run the test, then exit 5 (invariant 4).
 	if errors.Is(lookupErr, evidence.ErrVerification) {
-		fmt.Fprintf(warn, "aval: SECURITY: attestation verification failed for %s: %v; running the test\n", c.Metadata.Name, lookupErr)
+		fmt.Fprintf(warn, "aval: SECURITY: attestation verification failed for %s: %v; running the test\n", c.Metadata.Name, oneLine(lookupErr.Error()))
 		errs = append(errs, lookupErr)
 	}
 	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), fp)

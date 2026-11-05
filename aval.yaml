@@ -11,5 +11,5 @@ scope:
   source: ["cmd/**/*.go", "internal/**/*.go", "pkg/**/*.go"]
   dependencies: [go.mod, go.sum]
 environment:
-  toolchain: {go: "1.25"}
+  toolchain: {go: "1.27"}
 cacheability: hermetic

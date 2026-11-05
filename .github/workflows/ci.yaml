@@ -80,27 +80,42 @@ jobs:
           files: coverage.gate.out
           fail_ci_if_error: false
 
-  ci-integration:
+  # Dogfooding M3 (#28): the heavy suite (levels 2 and 4, aval.e2e.yaml)
+  # through `aval run`. A verified passing result for the same inputs is
+  # reused instead of running it; anything unproven runs it (invariant 3). A
+  # verification failure runs it and exits 5, which fails this job
+  # (invariant 4). Read-only: GHCR is read anonymously and no token or OIDC
+  # permission reaches the suite. If the package cannot be read anonymously,
+  # every lookup is an error and the suite runs. On main, dogfood-publish
+  # signs and pushes the recorded result.
+  ci-e2e:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    env:
+      AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
+      # Main accepts only this workflow on main; PRs also developer signatures.
+      AVAL_POLICY: ${{ github.event_name == 'push' && '.github/aval/main.yaml' || '.github/aval/pr.yaml' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - run: make ci-integration
-
-  ci-acceptance:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - run: make ci-e2e
+      - name: Summary
+        if: always()
+        run: .github/aval/summary.sh aval-e2e .aval/e2e-report.json
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          go-version-file: go.mod
-      - run: make ci-acceptance
+          name: aval-e2e
+          path: |
+            .aval/e2e-report.json
+            .aval/e2e-result.json
+          include-hidden-files: true
+          if-no-files-found: ignore
 
   # Release dry-run: the release build from .goreleaser.yaml as a snapshot
   # (unsigned: a PR gets no OIDC token), checked by tests/release. Runs on
@@ -323,15 +338,20 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Fingerprint from two checkout paths
+        env:
+          OS: ${{ matrix.os }}
         run: |
           make build
-          a=$(./bin/aval run --fingerprint-only)
           other="$RUNNER_TEMP/elsewhere/aval"
           mkdir -p "$(dirname "$other")" && cp -R . "$other"
-          b=$(./bin/aval run --fingerprint-only -f "$other/aval.yaml")
-          test "$a" = "$b" || { echo "::error::fingerprint depends on checkout path: $a vs $b"; exit 1; }
-          echo "$a" > fingerprint.txt
-          { echo "### aval-engine on ${{ matrix.os }}: \`$a\`"; echo '```'; ./bin/aval run --explain --fingerprint-only | sed '$d'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          : > fingerprint.txt
+          for f in aval.yaml aval.e2e.yaml; do
+            a=$(./bin/aval run --fingerprint-only -f "$f")
+            b=$(./bin/aval run --fingerprint-only -f "$other/$f")
+            test "$a" = "$b" || { echo "::error::$f: fingerprint depends on checkout path: $a vs $b"; exit 1; }
+            echo "$f $a" >> fingerprint.txt
+            { echo "### $f on $OS: \`$a\`"; echo '```'; ./bin/aval run --explain --fingerprint-only -f "$f" | sed '$d'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fingerprint-${{ matrix.os }}
@@ -347,7 +367,96 @@ jobs:
       - name: Same fingerprint on every OS
         run: |
           cat fingerprint-*/fingerprint.txt
-          test "$(cat fingerprint-*/fingerprint.txt | sort -u | wc -l)" -eq 1 || { echo "::error::fingerprint differs across OSes"; exit 1; }
+          files=(fingerprint-*/fingerprint.txt)
+          for f in "${files[@]}"; do
+            cmp -s "${files[0]}" "$f" || { echo "::error::fingerprints differ across OSes"; exit 1; }
+          done
+
+  # Dogfooding M2 (#28): shadow mode for the engine unit suite (aval.yaml).
+  # `aval run --shadow` verifies a published result and runs the suite
+  # anyway, so unit tests always run; a verified result that disagrees with
+  # the run is a false hit and exits 1, a verification failure exits 5, and
+  # both fail this job. The report goes up as an artifact in the
+  # `aval verify --output json` format. Read-only, like ci-e2e.
+  dogfood-shadow:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    env:
+      AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
+      AVAL_POLICY: ${{ github.event_name == 'push' && '.github/aval/main.yaml' || '.github/aval/pr.yaml' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Shadow run of the engine unit suite
+        run: |
+          make build
+          ./bin/aval run --shadow -f aval.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
+            --result .aval/engine-result.json --report .aval/engine-report.json
+      - name: Summary
+        if: always()
+        run: .github/aval/summary.sh aval-engine .aval/engine-report.json
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: aval-shadow-engine
+          path: |
+            .aval/engine-report.json
+            .aval/engine-result.json
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+  # Dogfooding M2 (#28): on main, sign keyless and push every result that
+  # ci-e2e and dogfood-shadow recorded and did not reuse. Only this job gets
+  # `packages: write` and `id-token: write`, it runs no tests, and it runs
+  # only after both suites passed, so it publishes passing results only.
+  # `aval push` refuses a result whose fingerprint differs from this
+  # checkout's (same commit).
+  dogfood-publish:
+    needs: [ci-e2e, dogfood-shadow]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: aval-*
+          path: results
+          merge-multiple: true
+      - name: Sign and push results that were not reused
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          make build
+          export DOCKER_CONFIG="$RUNNER_TEMP/docker"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for pair in aval.yaml:engine aval.e2e.yaml:e2e; do
+            contract=${pair%%:*} name=${pair##*:}
+            if jq -e '.outcome == "verified"' "results/$name-report.json" > /dev/null; then
+              echo "$contract: reused a verified result, nothing to push"
+              continue
+            fi
+            # A fresh OIDC token per push, fetched after the tests ran.
+            SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
+            export SIGSTORE_ID_TOKEN
+            ./bin/aval push -f "$contract" --registry "$AVAL_REGISTRY" --result "results/$name-result.json"
+          done
 
   # Conventional commit PR title (CONTRIBUTING.md "Commits"). Squash merges
   # use the title as the commit message. The title goes through env, never
@@ -377,8 +486,7 @@ jobs:
       - ci-static
       - ci-gates
       - ci-engine
-      - ci-integration
-      - ci-acceptance
+      - ci-e2e
       - ci-release
       - ci-fuzz
       - ci-security
@@ -388,6 +496,8 @@ jobs:
       - example-go-compose
       - dogfood-fingerprint
       - dogfood-compare
+      - dogfood-shadow
+      - dogfood-publish
       - pr-title
     runs-on: ubuntu-latest
     steps:

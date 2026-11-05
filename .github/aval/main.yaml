@@ -1,0 +1,10 @@
+# Dogfooding trust policy for main and releases (#28): reuse only results
+# signed keyless by Aval's own CI workflow on main, at runner level. No
+# developer signatures. tests/architecture/dogfood_test.go enforces this.
+apiVersion: aval.dev/v1alpha1   # provisional
+kind: Policy
+minTrustLevel: runner
+identities:
+  - issuer: https://token.actions.githubusercontent.com
+    subjectRegexp: https://github\.com/TrianaLab/aval/\.github/workflows/ci\.yaml@refs/heads/main
+    trustLevel: runner

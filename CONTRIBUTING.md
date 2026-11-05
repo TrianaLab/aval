@@ -59,15 +59,27 @@ Two more rules once you have picked:
 | `ci-static` | gofmt, `go vet`, golangci-lint |
 | `ci-gates` | level 3 |
 | `ci-engine` | level 1 with `-race`, the `examples/go-compose` module |
-| `ci-integration` | level 2 |
-| `ci-acceptance` | level 4 |
+| `ci-e2e` | levels 2 and 4, run through `aval run -f aval.e2e.yaml` (reused in CI on a verified hit) |
 | `ci-release` | level 5 against a snapshot dry-run of the release build |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
 | `ci-security` | govulncheck on both modules (needs network) |
 | `ci-docs` | markdownlint and vale (`make docs-lint`), and `docs/cli-reference.md` matches the cobra commands |
 
-CI also runs `dogfood-fingerprint` and `dogfood-compare` (Aval's own contract
-must fingerprint identically across OSes and checkout paths) and, on pull
+CI also dogfoods Aval (#28). `dogfood-fingerprint` and `dogfood-compare`
+check that Aval's own contracts (`aval.yaml`, `aval.e2e.yaml`) fingerprint
+identically across OSes and checkout paths. `ci-e2e` reuses a verified passing
+e2e result for the same inputs and otherwise runs the suite. `dogfood-shadow`
+runs the unit suite with `aval run --shadow` and fails on a false hit (exit 1).
+Both fail on a verification failure (exit 5), read
+`ghcr.io/trianalab/aval-attestations` anonymously and upload their reports
+(the `aval verify --output json` format) as artifacts. On `main`,
+`dogfood-publish`, the only job with `packages: write` and `id-token: write`,
+signs keyless and pushes the results that were not reused; it runs no tests.
+Trust comes from `.github/aval/main.yaml` (main and releases: only `ci.yaml`
+on `main`, runner level) and `.github/aval/pr.yaml` (pull requests: also
+developer signatures); `tests/architecture/dogfood_test.go` enforces both.
+The release job refuses to publish without a verified, passing e2e
+attestation for the tagged commit. CI also runs, on pull
 requests, `dependency-review` and `pr-title` (the PR title is a conventional commit, see [Commits](#commits)). `dependency-review` is skipped until a
 maintainer enables Settings > Code security > Dependency graph and sets the
 repository variable `DEPENDENCY_REVIEW=true`; without the dependency graph the

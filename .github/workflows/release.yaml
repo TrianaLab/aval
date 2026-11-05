@@ -62,6 +62,27 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # Dogfooding (#28): the tagged commit must carry a verified, passing
+      # result of the heavy suite (aval.e2e.yaml), signed by ci.yaml on main
+      # (.github/aval/main.yaml). The fingerprint is computed from this
+      # checkout. A miss (exit 4) or any error stops the release; a
+      # verification failure (exit 5) is a security event and stops it too.
+      # GHCR is read anonymously; no token reaches aval.
+      - name: Require a verified e2e attestation for this commit
+        env:
+          AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
+        run: |
+          make build
+          # The report goes outside the work tree: GoReleaser refuses a dirty one.
+          code=0
+          ./bin/aval verify -f aval.e2e.yaml --registry "$AVAL_REGISTRY" --policy .github/aval/main.yaml -o json > "$RUNNER_TEMP/e2e-verify.json" || code=$?
+          .github/aval/summary.sh aval-e2e "$RUNNER_TEMP/e2e-verify.json"
+          if [ "$code" -ne 0 ]; then
+            echo "::error title=no verified e2e attestation::aval verify exited $code; wait for ci.yaml on main to publish the e2e result for this commit, then re-run"
+            exit 1
+          fi
+          jq -e '.outcome == "verified" and .result == "passed"' "$RUNNER_TEMP/e2e-verify.json" > /dev/null \
+            || { echo "::error title=e2e attestation is not a pass::the verified e2e result for this commit did not pass"; exit 1; }
       - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           syft-version: v1.42.3

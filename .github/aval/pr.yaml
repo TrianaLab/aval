@@ -1,0 +1,16 @@
+# Dogfooding trust policy for pull requests (#28): the main policy's CI
+# identity, plus developer signatures (trust level developer). Only this file
+# may accept developer signatures; tests/architecture/dogfood_test.go fails if
+# it grants runner level to anything the main policy does not trust.
+apiVersion: aval.dev/v1alpha1   # provisional
+kind: Policy
+minTrustLevel: developer
+identities:
+  - issuer: https://token.actions.githubusercontent.com
+    subjectRegexp: https://github\.com/TrianaLab/aval/\.github/workflows/ci\.yaml@refs/heads/main
+    trustLevel: runner
+  # Maintainers add their own signing identity here, always at developer
+  # level, e.g. a keyless Sigstore identity:
+  #   - issuer: https://github.com/login/oauth
+  #     subjectRegexp: maintainer@example\.com
+  #     trustLevel: developer

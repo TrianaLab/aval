@@ -1,5 +1,5 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
-	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz ci-security \
+	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-e2e ci-release ci-fuzz ci-security \
 	docs-lint docs-cli ci-docs
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
@@ -132,13 +132,19 @@ example:
 # `make ci` is the gate CI runs and the one agents and humans run before
 # pushing. Each ci-* leg is one job in .github/workflows/ci.yaml, aggregated by
 # the `required` job (tests/architecture/ci_test.go enforces both).
-ci: ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz ci-security ci-docs
+ci: ci-static ci-gates ci-engine ci-e2e ci-release ci-fuzz ci-security ci-docs
 
 ci-static: fmt-check lint
 ci-gates: test-architecture
 ci-engine: coverage-check example
-ci-integration: test-integration
-ci-acceptance: test-acceptance
+# Levels 2 and 4, the heavy suite, through `aval run` with the contract
+# aval.e2e.yaml. Locally (no AVAL_REGISTRY, AVAL_POLICY) it always runs. CI
+# sets both, so a verified passing result for the same inputs is reused and
+# anything unproven runs (invariant 3); a verification failure runs the suite
+# and exits 5. The report is in the `aval verify --output json` format.
+ci-e2e: build
+	bin/aval run -f aval.e2e.yaml --result .aval/e2e-result.json --report .aval/e2e-report.json \
+		$${AVAL_REGISTRY:+--registry "$$AVAL_REGISTRY"} $${AVAL_POLICY:+--policy "$$AVAL_POLICY"}
 ci-release: test-release
 ci-fuzz: fuzz
 ci-security: vuln
