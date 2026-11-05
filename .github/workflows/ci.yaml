@@ -9,6 +9,10 @@ on:
   push:
     branches: [main]
   pull_request:
+    # `edited` reruns the workflow when the title changes, so pr-title sees
+    # the current title. Every job reruns: skipping the others on `edited`
+    # would let `required` go green over a failed run on the same commit.
+    types: [opened, edited, synchronize, reopened]
 
 permissions:
   contents: read
@@ -219,6 +223,25 @@ jobs:
           cat fingerprint-*/fingerprint.txt
           test "$(cat fingerprint-*/fingerprint.txt | sort -u | wc -l)" -eq 1 || { echo "::error::fingerprint differs across OSes"; exit 1; }
 
+  # Conventional commit PR title (CONTRIBUTING.md "Commits"). Squash merges
+  # use the title as the commit message. The title goes through env, never
+  # interpolated into the script, so `$(...)` in a title is not executed.
+  # tests/architecture/hygiene_test.go checks the pattern with Go cases.
+  pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check conventional commit format
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|docs|chore|refactor|test|ci|perf|build|style)(\([^()]+\))?!?: [^ ].*$'
+          if [[ ! "$TITLE" =~ $pattern ]]; then
+            echo "::error::PR title must be a conventional commit: <type>[(scope)][!]: <description>"
+            echo "::error::types: feat, fix, docs, chore, refactor, test, ci, perf, build, style"
+            exit 1
+          fi
+
   # The only required status check. Green only when no job failed or was
   # cancelled; jobs skipped by the path filter do not count as failures.
   required:
@@ -237,6 +260,7 @@ jobs:
       - dependency-review
       - dogfood-fingerprint
       - dogfood-compare
+      - pr-title
     runs-on: ubuntu-latest
     steps:
       - name: Verify no job failed

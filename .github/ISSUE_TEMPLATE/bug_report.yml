@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a bug or unexpected behaviour. Report security issues privately (see SECURITY.md).
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A result reused when it should not have been (false hit, signature or policy bypass) is a security issue: follow SECURITY.md instead of opening a public issue.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `aval run ...`
+        2. With this aval.yaml: ...
+        3. See: ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include the exit code and any error output.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Aval version
+      description: The release, or the commit you built from.
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract (if relevant)
+      description: The relevant `aval.yaml`, or a minimal reproduction.
+      render: yaml
