@@ -146,12 +146,14 @@ ci-engine: coverage-check example
 # relevant and irrelevant changes (TestFalseHitCorpus), the manifest goldens
 # that fail on a change to the golden tree's manifests without a
 # fingerprint.Version bump (TestManifestGolden), the append-only check on
-# committed goldens (TestGoldensAppendOnly, against AVAL_GOLDEN_BASE or
-# origin/main), the glob tables and the fuzz seeds. ci-engine also runs these
-# packages; this leg is uncached and runs on docs-only PRs too. The recipe is
-# pinned by TestFalseHitGateIsBinding. Unix only: the golden sets exec bits.
+# committed goldens (TestGoldensAppendOnly, against AVAL_GOLDEN_BASE, which
+# defaults to origin/main here; it fails if the base does not resolve and
+# skips only outside this leg), the glob tables and the fuzz seeds. ci-engine
+# also runs these packages; this leg is uncached and runs on docs-only PRs
+# too. The recipe is pinned by TestFalseHitGateIsBinding. Unix only: the
+# golden sets exec bits.
 ci-false-hit:
-	go test -count=1 ./internal/fingerprint/... ./internal/contract/...
+	AVAL_GOLDEN_BASE="$${AVAL_GOLDEN_BASE-origin/main}" go test -count=1 ./internal/fingerprint/... ./internal/contract/...
 # Levels 2 and 4, the heavy suite, through `aval run` with the contract
 # aval.e2e.yaml. Locally (no AVAL_REGISTRY, AVAL_POLICY) it always runs. CI
 # sets both, so a verified passing result for the same inputs is reused and

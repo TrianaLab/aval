@@ -270,9 +270,12 @@ modified, renamed or deleted. It diffs the goldens against the merge base of
 `HEAD` and `AVAL_GOLDEN_BASE`; in CI that is the PR base branch or the commit
 before the push, and the test fails if it does not resolve (after a
 force-push to `main` the old commit may be unreachable, and the job fails
-until the next normal push). Locally the default is `origin/main`; the test
-fails when that ref is missing, so set `AVAL_GOLDEN_BASE` to the upstream
-main if your remote is named differently. `TestGoldenEditsCatchesEdits` is
+until the next normal push). Locally `make ci-false-hit` sets it to
+`origin/main` when it is unset, and the test fails when that ref is missing,
+so set `AVAL_GOLDEN_BASE` to the upstream main if your remote is named
+differently. A plain `go test` without `AVAL_GOLDEN_BASE` (the `ci-engine`
+job and the dogfood suite, which check out shallow) skips this one test;
+the `ci-false-hit` leg never does. `TestGoldenEditsCatchesEdits` is
 its negative test; by hand, append a line to the golden and run
 `AVAL_GOLDEN_BASE=HEAD go test ./internal/fingerprint -run TestGoldensAppendOnly`.
 The `ci-false-hit` CI job (`make ci-false-hit`, part of `make ci`) runs these
@@ -281,7 +284,7 @@ tests and the glob tables on every PR and push, with no path filter.
 is removed, made conditional, allowed to fail (`continue-on-error`), checked
 out shallow, or given any other `AVAL_GOLDEN_BASE`, or if the recipe of
 `make ci-false-hit` changes in any way (a `-skip`, a dropped package, a
-dropped `-count=1`). Edits to the tests themselves are left to review.
+dropped `-count=1`, a dropped `AVAL_GOLDEN_BASE` default). Edits to the tests themselves are left to review.
 
 ### Fail-closed errors
 

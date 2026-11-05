@@ -229,17 +229,20 @@ func goldenEdits(dir, base string) ([]string, error) {
 // TestGoldensAppendOnly makes the version gate binding: without it a manifest
 // change could pass TestManifestGolden by rewriting the golden of the current
 // version. A committed golden may be added (a new version) but never modified,
-// renamed or deleted. The base is the merge base of HEAD and AVAL_GOLDEN_BASE,
-// which CI sets; unset, it is origin/main. The test fails if the base does
-// not resolve (no clone, no remote): it never passes without checking.
+// renamed or deleted. The base is the merge base of HEAD and AVAL_GOLDEN_BASE.
+// `make ci-false-hit` always sets it (CI: the PR base or the previous push;
+// otherwise origin/main), and TestFalseHitGateIsBinding pins that recipe.
+// Once set, the test fails if the base does not resolve: in the gate it never
+// passes without checking. Other runs of this package (ci-engine, the
+// dogfood suite) check out shallow, have no base and leave it to the gate.
 func TestGoldensAppendOnly(t *testing.T) {
 	ref, set := os.LookupEnv("AVAL_GOLDEN_BASE")
 	if !set {
-		ref = "origin/main"
+		t.Skip("AVAL_GOLDEN_BASE is unset: this check runs in `make ci-false-hit`, which sets it")
 	}
 	base, err := git(".", "merge-base", "HEAD", "--end-of-options", ref)
 	if err != nil {
-		t.Fatalf("append-only check needs a base: %s does not resolve (%v); fetch origin/main or set AVAL_GOLDEN_BASE to the upstream main", ref, err)
+		t.Fatalf("append-only check needs a base: %s does not resolve (%v); fetch origin/main, or set AVAL_GOLDEN_BASE to the upstream main", ref, err)
 	}
 	edits, err := goldenEdits(filepath.Join("testdata", "golden"), base)
 	if err != nil {

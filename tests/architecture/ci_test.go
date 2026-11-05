@@ -230,8 +230,9 @@ jobs:
 const goldenBase = "${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}"
 
 // falseHitRecipe is the only recipe `make ci-false-hit` may have: both
-// packages, uncached, nothing skipped.
-var falseHitRecipe = regexp.MustCompile(`(?m)^ci-false-hit:\n\tgo test -count=1 \./internal/fingerprint/\.\.\. \./internal/contract/\.\.\.\n`)
+// packages, uncached, nothing skipped, and AVAL_GOLDEN_BASE always set (an
+// unset base is the only way TestGoldensAppendOnly skips).
+const falseHitRecipe = "\tAVAL_GOLDEN_BASE=\"$${AVAL_GOLDEN_BASE-origin/main}\" go test -count=1 ./internal/fingerprint/... ./internal/contract/...\n"
 
 // falseHitGateProblems lists every way the false-hit gate (#15) could stop
 // binding: dropped from `make ci` (and so, by TestMakeCILegsMirrorCIJobs,
@@ -249,8 +250,8 @@ func falseHitGateProblems(data, mk []byte) ([]string, error) {
 	if m == nil || !slices.Contains(strings.Fields(string(m[1])), name) {
 		problems = append(problems, "make ci has no "+name+" leg")
 	}
-	if !falseHitRecipe.Match(mk) {
-		problems = append(problems, "make "+name+" recipe must be exactly `go test -count=1 ./internal/fingerprint/... ./internal/contract/...`")
+	if !strings.Contains(string(mk), "\n"+name+":\n"+falseHitRecipe) {
+		problems = append(problems, "make "+name+" recipe must be exactly: "+strings.TrimSpace(falseHitRecipe))
 	}
 	job, ok := wf.Jobs[name]
 	if !ok {
@@ -300,7 +301,7 @@ jobs:
         with: {fetch-depth: 0}
       - run: make ci-false-hit
 ` + env
-	const recipe = "\tgo test -count=1 ./internal/fingerprint/... ./internal/contract/...\n"
+	const recipe = falseHitRecipe
 	const mk = "ci: ci-static ci-false-hit\n\nci-false-hit:\n" + recipe
 	for _, wf := range []string{good, strings.Replace(good, "    steps:", "    continue-on-error: false\n    steps:", 1)} {
 		if p, err := falseHitGateProblems([]byte(wf), []byte(mk)); err != nil || len(p) != 0 {
@@ -313,6 +314,8 @@ jobs:
 		"recipe skips":           {good, strings.Replace(mk, "-count=1 ", "-count=1 -skip Golden ", 1)},
 		"recipe cached":          {good, strings.Replace(mk, "-count=1 ", "", 1)},
 		"recipe narrowed":        {good, strings.Replace(mk, " ./internal/contract/...", "", 1)},
+		"recipe without a base":  {good, strings.Replace(mk, "AVAL_GOLDEN_BASE=\"$${AVAL_GOLDEN_BASE-origin/main}\" ", "", 1)},
+		"empty base becomes set": {good, strings.Replace(mk, "BASE-origin", "BASE:-origin", 1)},
 		"no job":                 {"jobs: {}\n", mk},
 		"conditional":            {strings.Replace(good, "    steps:", "    if: false\n    steps:", 1), mk},
 		"needs":                  {strings.Replace(good, "    steps:", "    needs: changes\n    steps:", 1), mk},
