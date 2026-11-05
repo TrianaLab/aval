@@ -220,6 +220,14 @@ type failWriter struct{}
 
 func (failWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
 
+func TestTextReportListsRejected(t *testing.T) {
+	var b strings.Builder
+	r := evidence.Report{Outcome: evidence.OutcomeVerified, Rejected: []evidence.Rejection{{Reference: "r@sha256:ff", Outcome: evidence.OutcomeVerificationFailed, Reason: "untrusted"}}}
+	if err := writeReport(&b, "text", r); err != nil || !strings.Contains(b.String(), "rejected: r@sha256:ff verification-failed: untrusted\n") {
+		t.Fatalf("text report %q, %v", b.String(), err)
+	}
+}
+
 func TestWriteReportPropagatesWriteErrors(t *testing.T) {
 	if err := writeReport(failWriter{}, "json", evidence.Report{}); err == nil {
 		t.Fatal("json write error must be returned")
@@ -239,6 +247,8 @@ func TestWriteReportPropagatesWriteErrors(t *testing.T) {
 func TestVerifyPicksAmongCandidates(t *testing.T) {
 	untrusted := &evidence.VerificationError{Reason: "untrusted signer"}
 	down := errors.New("registry down")
+	// What registry.Fetch returns for a malformed or tampered manifest.
+	malformed := fmt.Errorf("registry.Fetch r@sha256:aa: %w", &evidence.VerificationError{Reason: "malformed attestation: not an Aval attestation"})
 	cases := []struct {
 		name    string
 		lookup  error
@@ -288,6 +298,14 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 		{"only errors", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"only malformed candidates are a verification failure, not a miss", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: malformed},
+			"sha256:bb": {fetchErr: malformed},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeVerificationFailed, evidence.OutcomeVerificationFailed}},
+		{"malformed candidate is reported beside a verified one", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: malformed},
+			"sha256:bb": {trust: evidence.TrustRunner},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
 		{"empty answer is a miss", nil, map[string]candidate{}, ExitMiss, evidence.OutcomeMiss, "", "", nil},
 	}
 	for _, tc := range cases {

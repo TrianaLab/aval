@@ -19,14 +19,14 @@ All constants live in `pkg/evidence`.
 
 | Constant | Value | Used for | Status |
 |---|---|---|---|
-| `ArtifactType` | `application/vnd.trianalab.aval.execution.v1` | `artifactType` of the OCI manifest | PROVISIONAL |
+| `ArtifactType` | `application/vnd.trianalab.aval.execution.v2` | `artifactType` of the OCI manifest | PROVISIONAL |
 | `ArtifactTypeFingerprint` | `application/vnd.trianalab.aval.fingerprint.v1` | `artifactType` of the per-fingerprint anchor manifest | PROVISIONAL |
-| `MediaTypeDSSE` | `application/vnd.dsse.envelope.v1+json` | Media type of the single layer (signed DSSE envelope) | PROVISIONAL (Aval usage) |
-| `MediaTypeExecution` | `application/vnd.trianalab.aval.execution.v1+json` | Media type of the raw predicate JSON, when carried on its own | PROVISIONAL |
+| `MediaTypeDSSE` | `application/vnd.dsse.envelope.v1+json` | Media type of the signed DSSE envelope layer | PROVISIONAL (Aval usage) |
+| `MediaTypeExecution` | `application/vnd.trianalab.aval.execution.v2+json` | Media type of the raw predicate JSON, when carried on its own | PROVISIONAL |
 | `PayloadType` | `application/vnd.in-toto+json` | DSSE `payloadType` | in-toto standard |
 | `StatementType` | `https://in-toto.io/Statement/v1` | in-toto Statement `_type` | in-toto standard |
-| `PredicateType` | `https://aval.trianalab.io/attestation/execution/v1` | in-toto `predicateType` | PROVISIONAL |
-| `SchemaVersion` | `v1` | Predicate `schemaVersion` | PROVISIONAL |
+| `PredicateType` | `https://aval.trianalab.io/attestation/execution/v2` | in-toto `predicateType` | PROVISIONAL |
+| `SchemaVersion` | `v2` | Predicate `schemaVersion` | PROVISIONAL |
 | `ReportVersion` | `aval.dev/verify-report/v1alpha1` | `version` of the verify report | PROVISIONAL |
 
 Registry identifiers (`internal/registry`): the optional bundle layer uses the
@@ -83,7 +83,7 @@ guidance (`artifactType` set, empty config):
 {
   "schemaVersion": 2,
   "mediaType": "application/vnd.oci.image.manifest.v1+json",
-  "artifactType": "application/vnd.trianalab.aval.execution.v1",
+  "artifactType": "application/vnd.trianalab.aval.execution.v2",
   "config": {
     "mediaType": "application/vnd.oci.empty.v1+json",
     "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
@@ -118,12 +118,16 @@ guidance (`artifactType` set, empty config):
 - **layers**: the signed DSSE envelope (see below), then optionally the
   Sigstore bundle with the verification material. `registry.Fetch` rejects
   any other layer, a repeated layer, or a missing envelope as a verification
-  failure.
+  failure, and so a manifest that is not sha256-addressed, is larger than
+  4 MiB, or does not match the digest it was fetched by.
 - **subject**: always the anchor of the execution's fingerprint. The tested
   revision or artifact is recorded inside the statement (`subject`), not in
   the manifest, so the referrers of a tested image do not list its evidence.
-  Changed before v1 (provisional): `subject` is the fingerprint anchor, not
-  the tested artifact.
+
+The `execution.v2` identifiers replace `execution.v1`, whose manifest had the
+tested artifact as an optional `subject` and exactly one layer. Aval no
+longer reads or writes v1: there is no accept window, and a v1 artifact is
+never a candidate.
 
 ### Push
 
@@ -149,8 +153,10 @@ hit.
    that fingerprint; anything else is a verification failure (the tag was
    moved).
 3. List the anchor's referrers with `artifactType`
-   `application/vnd.trianalab.aval.execution.v1`. Each one is a candidate,
-   identified by its manifest **digest**.
+   `application/vnd.trianalab.aval.execution.v2`. Each one is a candidate,
+   identified by its manifest **digest**, even when the referrer entry is
+   malformed (not an image manifest, not sha256): Fetch then rejects it as a
+   verification failure, so it never turns into a miss.
 4. Fetch each candidate by digest (`repo@sha256:...`). Never fetch by tag:
    tags are mutable, digests aren't.
 5. Verify each envelope and apply the trust policy (see below).
@@ -211,7 +217,7 @@ The envelope payload is an in-toto Statement v1 (`evidence.Statement`). Its
       "digest": { "gitCommit": "9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d" }
     }
   ],
-  "predicateType": "https://aval.trianalab.io/attestation/execution/v1",
+  "predicateType": "https://aval.trianalab.io/attestation/execution/v2",
   "predicate": { "...": "see below" }
 }
 ```
@@ -226,7 +232,7 @@ checked by `Predicate.Validate` (called by `evidence.Parse`).
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
-| `schemaVersion` | string | yes, must be `v1` | Predicate schema version. |
+| `schemaVersion` | string | yes, must be `v2` | Predicate schema version. |
 | `subject` | object | yes | Tested revision/artifact. |
 | `subject.name` | string | yes | e.g. `git+https://github.com/acme/orders` or an image reference. |
 | `subject.digest` | map string to string | yes, non-empty | e.g. `{"gitCommit": "..."}` or `{"sha256": "..."}`. |
@@ -266,7 +272,7 @@ put secrets there: the predicate is published to the registry.
 
 ```json
 {
-  "schemaVersion": "v1",
+  "schemaVersion": "v2",
   "subject": {
     "name": "git+https://github.com/acme/orders",
     "digest": { "gitCommit": "9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d" }
@@ -367,14 +373,17 @@ Example (`miss`):
 
 ## Versioning and compatibility
 
-- Within predicate `v1` (`PredicateType` `.../execution/v1`, `schemaVersion`
-  `v1`): additive changes only. New optional fields may appear; existing
+- Within predicate `v2` (`PredicateType` `.../execution/v2`, `schemaVersion`
+  `v2`): additive changes only. New optional fields may appear; existing
   fields keep their name, JSON tag, type and meaning. Consumers must ignore
   unknown fields.
 - A breaking change (rename, removal, type or semantic change) requires a new
-  predicate type (`.../execution/v2`), a new `MediaTypeExecution` and
-  `ArtifactType` (`...execution.v2...`) and a new `schemaVersion`. Old and new
+  predicate type (`.../execution/v3`), a new `MediaTypeExecution` and
+  `ArtifactType` (`...execution.v3...`) and a new `schemaVersion`. Old and new
   can coexist in the same repository.
+- History: `v1` became `v2` when the execution manifest's `subject` changed
+  from the tested artifact to the fingerprint anchor and the optional
+  Sigstore bundle layer was added.
 - The verify report follows the same rule per `ReportVersion`: additive within
   `v1alpha1`, new version string for anything breaking.
 - A change to what the fingerprint covers bumps `aval-fingerprint/vN`. Old

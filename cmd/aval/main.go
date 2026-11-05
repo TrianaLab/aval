@@ -329,5 +329,8 @@ func writeReport(w io.Writer, format string, r evidence.Report) error {
 	if r.Reason != "" {
 		fmt.Fprintf(w, "reason: %s\n", r.Reason)
 	}
+	for _, rj := range r.Rejected {
+		fmt.Fprintf(w, "rejected: %s %s: %s\n", rj.Reference, rj.Outcome, rj.Reason)
+	}
 	return nil
 }

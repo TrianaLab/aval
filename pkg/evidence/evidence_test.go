@@ -8,7 +8,7 @@ import (
 )
 
 const validPredicate = `{
-  "schemaVersion": "v1",
+  "schemaVersion": "v2",
   "subject": {"name": "git+https://github.com/acme/orders", "digest": {"gitCommit": "0123abcd"}},
   "test": {"id": "orders-integration", "cacheability": "controlled-environment"},
   "result": "passed",
@@ -48,7 +48,8 @@ func TestVerificationErrorIs(t *testing.T) {
 func TestParseRejectsInvalidPredicates(t *testing.T) {
 	cases := map[string]struct{ from, to, wantErr string }{
 		"not json":        {"{", "[", "decoding predicate"},
-		"schema version":  {`"schemaVersion": "v1"`, `"schemaVersion": "v2"`, "schemaVersion"},
+		"old schema v1":   {`"schemaVersion": "v2"`, `"schemaVersion": "v1"`, "schemaVersion"},
+		"future schema":   {`"schemaVersion": "v2"`, `"schemaVersion": "v3"`, "schemaVersion"},
 		"no subject":      {`"name": "git+https://github.com/acme/orders", `, `"name": "", `, "subject"},
 		"no test id":      {`"id": "orders-integration"`, `"id": ""`, "test.id"},
 		"bad fingerprint": {`"fingerprint": "sha256:`, `"fingerprint": "md5:`, "execution.fingerprint"},

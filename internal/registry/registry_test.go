@@ -220,36 +220,68 @@ func TestLookupMovedTagIsVerificationFailure(t *testing.T) {
 	}
 }
 
-// Referrers entries are registry data: only sha256 image manifests are
-// candidates.
-func TestLookupSkipsForeignReferrers(t *testing.T) {
+// Referrers entries are registry data. Every entry with the Aval artifactType
+// is a candidate, so a malformed one reaches Fetch and is reported as a
+// verification failure instead of turning the lookup into a miss
+// (invariant 4).
+func TestLookupKeepsMalformedReferrers(t *testing.T) {
 	ctx := context.Background()
-	_, ad := anchor(fpA)
+	// bad[0] becomes a stored index once the repository exists.
+	bad := []digest.Digest{"", digest.SHA512.FromString("x"), "sha256:zz"}
 	var good digest.Digest
 	repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
-		if !strings.Contains(r.URL.Path, "/referrers/") {
-			return false
+		if strings.Contains(r.URL.Path, "/referrers/") {
+			idx := ocispec.Index{Versioned: specs.Versioned{SchemaVersion: 2}, MediaType: ocispec.MediaTypeImageIndex}
+			mts := []string{ocispec.MediaTypeImageIndex, ocispec.MediaTypeImageManifest, ocispec.MediaTypeImageManifest}
+			for i, d := range bad {
+				idx.Manifests = append(idx.Manifests, ocispec.Descriptor{MediaType: mts[i], Digest: d, ArtifactType: evidence.ArtifactType})
+			}
+			if good != "" {
+				idx.Manifests = append(idx.Manifests,
+					ocispec.Descriptor{MediaType: ocispec.MediaTypeImageManifest, Digest: good, ArtifactType: evidence.ArtifactType},
+					ocispec.Descriptor{MediaType: ocispec.MediaTypeImageManifest, Digest: good, ArtifactType: evidence.ArtifactType})
+			}
+			w.Header().Set("Content-Type", ocispec.MediaTypeImageIndex)
+			_ = json.NewEncoder(w).Encode(idx)
+			return true
 		}
-		idx := ocispec.Index{Versioned: specs.Versioned{SchemaVersion: 2}, MediaType: ocispec.MediaTypeImageIndex, Manifests: []ocispec.Descriptor{
-			{MediaType: ocispec.MediaTypeImageIndex, Digest: digest.FromString("index"), ArtifactType: evidence.ArtifactType},
-			{MediaType: ocispec.MediaTypeImageManifest, Digest: digest.SHA512.FromString("x"), ArtifactType: evidence.ArtifactType},
-			{MediaType: ocispec.MediaTypeImageManifest, Digest: "sha256:zz", ArtifactType: evidence.ArtifactType},
-			{MediaType: ocispec.MediaTypeImageManifest, Digest: good, ArtifactType: evidence.ArtifactType},
-			{MediaType: ocispec.MediaTypeImageManifest, Digest: good, ArtifactType: evidence.ArtifactType},
-		}}
-		w.Header().Set("Content-Type", ocispec.MediaTypeImageIndex)
-		_ = json.NewEncoder(w).Encode(idx)
-		return true
+		return false
 	})
-	pushed, err := Push(ctx, repo, fpA, att("ci", nil))
+	if _, err := Push(ctx, repo, fpA, att("ci", nil)); err != nil {
+		t.Fatal(err)
+	}
+	bad[0] = digest.Digest(pushIndex(t, repo).Digest)
+	// Only malformed referrers: candidates, never a miss.
+	got, err := Lookup(ctx, repo, fpA)
+	if err != nil || len(got) != len(bad) {
+		t.Fatalf("Lookup = %+v %v; want the %d malformed candidates", got, err, len(bad))
+	}
+	for _, d := range got {
+		if _, err := Fetch(ctx, d); !errors.Is(err, evidence.ErrVerification) {
+			t.Errorf("Fetch(%s): want verification failure, got %v", d.Digest, err)
+		}
+	}
+	pushed, err := Push(ctx, repo, fpA, att("dev", nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	good = digest.Digest(pushed.Digest)
-	got, err := Lookup(ctx, repo, fpA)
-	if err != nil || len(got) != 1 || got[0] != pushed {
-		t.Fatalf("Lookup = %+v %v (anchor %s)", got, err, ad.Digest)
+	got, err = Lookup(ctx, repo, fpA)
+	if err != nil || len(got) != len(bad)+1 || !slices.Contains(got, pushed) {
+		t.Fatalf("Lookup = %+v %v; want malformed candidates plus %s, deduplicated", got, err, pushed.Digest)
 	}
+}
+
+// pushIndex stores an index that carries the Aval artifactType.
+func pushIndex(t *testing.T, repo string) Descriptor {
+	t.Helper()
+	raw, _ := json.Marshal(ocispec.Index{Versioned: specs.Versioned{SchemaVersion: 2}, MediaType: ocispec.MediaTypeImageIndex, ArtifactType: evidence.ArtifactType})
+	r, _ := newRepository(repo)
+	d, err := oras.PushBytes(context.Background(), r, ocispec.MediaTypeImageIndex, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Descriptor{Repository: repo, Digest: d.Digest.String()}
 }
 
 // Referrers are untrusted registry data: too many candidates is an error
@@ -423,12 +455,15 @@ func TestFetchRejectsMalformedAttestations(t *testing.T) {
 	notJSOND := content.NewDescriptorFromBytes(evidence.MediaTypeDSSE, notJSON)
 	wrongType := manifest(envD)
 	wrongType.ArtifactType = "application/vnd.example"
+	oldType := manifest(envD)
+	oldType.ArtifactType = "application/vnd.trianalab.aval.execution.v1" // superseded layout
 	big := envD
 	big.Size = maxBlobSize + 1
 	badDigest := envD
 	badDigest.Digest = "sha256:zz"
 	cases := map[string]Descriptor{
 		"wrong type":        pushManifest(t, repo, wrongType, env),
+		"old v1 type":       pushManifest(t, repo, oldType, env),
 		"no envelope":       pushManifest(t, repo, manifest(bundleD), bundle),
 		"repeated envelope": pushManifest(t, repo, manifest(envD, envD), env),
 		"repeated bundle":   pushManifest(t, repo, manifest(envD, bundleD, bundleD), env, bundle),
@@ -454,6 +489,45 @@ func TestFetchRejectsMalformedAttestations(t *testing.T) {
 	if _, err := Fetch(ctx, Descriptor{Repository: badRepo, Digest: digest.FromBytes(bad).String()}); !errors.Is(err, evidence.ErrVerification) {
 		t.Fatalf("not json: want verification failure, got %v", err)
 	}
+	// An oversized manifest, or bytes that do not match the digest they
+	// were fetched by, are tampered candidates, not transport errors.
+	good, _ := json.Marshal(manifest(envD))
+	huge := bytes.Repeat([]byte(" "), maxBlobSize+1)
+	manifestCases := map[string]struct {
+		served []byte
+		want   digest.Digest
+		header bool // send a Docker-Content-Digest header that claims the wanted digest
+	}{
+		"oversized manifest":           {huge, digest.FromBytes(huge), false},
+		"tampered manifest":            {bytes.ToUpper(good), digest.FromBytes(good), false},
+		"tampered manifest, lying hdr": {bytes.ToUpper(good), digest.FromBytes(good), true},
+	}
+	for name, tc := range manifestCases {
+		t.Run(name, func(t *testing.T) {
+			repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
+				if !strings.Contains(r.URL.Path, "/manifests/") {
+					return false
+				}
+				w.Header().Set("Content-Type", ocispec.MediaTypeImageManifest)
+				if tc.header {
+					w.Header().Set("Docker-Content-Digest", tc.want.String())
+				}
+				_, _ = w.Write(tc.served)
+				return true
+			})
+			_, err := Fetch(ctx, Descriptor{Repository: repo, Digest: tc.want.String()})
+			if !errors.Is(err, evidence.ErrVerification) {
+				t.Fatalf("want verification failure, got %v", err)
+			}
+		})
+	}
+	// Referrer entries are registry data: a digest that is not a valid
+	// sha256 digest is malformed.
+	for _, dg := range []string{"sha256:zz", digest.SHA512.FromString("x").String(), ""} {
+		if _, err := Fetch(ctx, Descriptor{Repository: repo, Digest: dg}); !errors.Is(err, evidence.ErrVerification) {
+			t.Errorf("digest %q: want verification failure, got %v", dg, err)
+		}
+	}
 	// Sanity: the same building blocks, well formed, fetch fine.
 	if _, err := Fetch(ctx, pushManifest(t, repo, manifest(envD, bundleD), env, bundle)); err != nil {
 		t.Fatal(err)
@@ -478,6 +552,28 @@ func body(b string) func(http.ResponseWriter) bool {
 	}
 }
 
+// shortBody announces the full length of b but sends only half of it, so the
+// client sees an unexpected EOF (a transport error, not tampering).
+func shortBody(b []byte) func(http.ResponseWriter) bool {
+	return func(w http.ResponseWriter) bool {
+		w.Header().Set("Content-Length", fmt.Sprint(len(b)))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b[:len(b)/2])
+		return true
+	}
+}
+
+func TestFetchUnreachableRegistry(t *testing.T) {
+	repo := serve(t, true, nil)
+	d := Descriptor{Repository: repo, Digest: fpA}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := Fetch(ctx, d)
+	if err == nil || errors.Is(err, evidence.ErrNotFound) || errors.Is(err, evidence.ErrVerification) {
+		t.Fatalf("want a plain error, got %v", err)
+	}
+}
+
 func TestFetchTransportErrors(t *testing.T) {
 	env := []byte(`{"payloadType":"x","payload":"e30=","signatures":[]}`)
 	envD := content.NewDescriptorFromBytes(evidence.MediaTypeDSSE, env)
@@ -490,6 +586,7 @@ func TestFetchTransportErrors(t *testing.T) {
 		verErr bool
 	}{
 		"missing manifest":      {on("/manifests/"+digest.FromBytes(raw).String(), fail), false},
+		"truncated manifest":    {on("/manifests/"+digest.FromBytes(raw).String(), shortBody(raw)), false},
 		"missing envelope blob": {on("/blobs/"+envD.Digest.String(), fail), false},
 		"missing bundle blob":   {on("/blobs/"+bundleD.Digest.String(), fail), false},
 		"tampered blob":         {on("/blobs/"+bundleD.Digest.String(), body("BUNDLE-BYTES")), true},

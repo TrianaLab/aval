@@ -21,7 +21,7 @@ An execution result is an in-toto v1 Statement wrapped in a DSSE envelope,
 stored in an OCI registry, found through the tag `sha256-<fingerprint hex>`
 and the OCI 1.1 referrers of the manifest it points at, and consumed by
 digest. The predicate type is
-`https://aval.trianalab.io/attestation/execution/v1` (provisional).
+`https://aval.trianalab.io/attestation/execution/v2` (provisional).
 
 See [artifact-format.md](artifact-format.md) for the media types, manifest
 layout and predicate fields.
@@ -29,7 +29,7 @@ layout and predicate fields.
 Predicate fields are neutral on purpose: `subject`, `test.id`,
 `test.cacheability`, `result`, `execution.fingerprint`,
 `execution.fingerprintVersion`, `execution.environment`, `execution.exitCode`,
-`runner`, `startedAt`, `finishedAt`, and a free `annotations` map. Within `v1`
+`runner`, `startedAt`, `finishedAt`, and a free `annotations` map. Within `v2`
 only additive changes are allowed.
 
 ### 2. Go package `github.com/TrianaLab/aval/pkg/evidence`
@@ -40,7 +40,7 @@ public Go API. It exposes:
 | Symbol | Purpose |
 |---|---|
 | `Parse(data []byte) (*Predicate, error)` | Decode predicate JSON and run `Validate`. Does not check signatures. |
-| `(*Predicate).Validate() error` | Structural checks: `schemaVersion == "v1"`, subject, `test.id`, `result`, fingerprint format `sha256:<64 hex>`, `runner.identity`, timestamps. |
+| `(*Predicate).Validate() error` | Structural checks: `schemaVersion == "v2"`, subject, `test.id`, `result`, fingerprint format `sha256:<64 hex>`, `runner.identity`, timestamps. |
 | `Verify(ctx, *Envelope, VerifyOptions) (*Verification, error)` | Check the DSSE signature against accepted identities, decode the statement and predicate, enforce the policy. **Milestone-2 stub**: returns `ErrNotImplemented` today. |
 | `MatchIdentity(ids, issuer, subject) (Identity, bool)` | The accepted identity that grants a signer the highest trust level. The issuer must be equal; `SubjectRegexp` must match the whole subject (anchored); an invalid regexp matches nothing. The level comes from the policy, never from the predicate. |
 | `VerifyOptions` | Expected fingerprint, expected test id, accepted `Identities` (empty accepts nothing), `MinTrustLevel`, `AllowedCacheability` (empty means `hermetic` and `controlled-environment` only). |
@@ -182,7 +182,7 @@ The policy file format (`--policy`) is defined in milestone 2.
   never fold it into "miss" or silently re-run without a trace.
 - **Fail closed.** Any outcome other than `verified` means run the test.
 - **Consume by digest.** Tags are only for lookup.
-- **Pin versions.** Check `schemaVersion == "v1"` on predicates (`Validate`
+- **Pin versions.** Check `schemaVersion == "v2"` on predicates (`Validate`
   does this) and `version == "aval.dev/verify-report/v1alpha1"` on reports.
   Reject versions you do not know. Within a version, ignore unknown fields:
   changes are additive.

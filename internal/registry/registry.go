@@ -16,7 +16,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"regexp"
 	"slices"
 	"strings"
@@ -246,11 +248,11 @@ func lookup(ctx context.Context, r *remote.Repository, fingerprint string) ([]st
 	var ds []string
 	err = r.Referrers(ctx, want, evidence.ArtifactType, func(refs []ocispec.Descriptor) error {
 		for _, d := range refs {
-			// The referrers list is registry data; Fetch checks the
-			// manifest itself.
-			if d.MediaType == ocispec.MediaTypeImageManifest && d.Digest.Validate() == nil && d.Digest.Algorithm() == digest.SHA256 {
-				ds = append(ds, d.Digest.String())
-			}
+			// Registry data: every entry with our artifactType is a
+			// candidate. Fetch rejects anything that is not a sha256 image
+			// manifest as malformed, so it reaches the report as a
+			// verification failure instead of vanishing into a miss.
+			ds = append(ds, d.Digest.String())
 		}
 		if len(ds) > maxCandidates {
 			return fmt.Errorf("more than %d attestations for fingerprint %s", maxCandidates, fingerprint)
@@ -267,13 +269,17 @@ func lookup(ctx context.Context, r *remote.Repository, fingerprint string) ([]st
 	return slices.Compact(ds), nil
 }
 
-// Fetch downloads the attestation for a descriptor, by digest. A manifest
-// that is not a well-formed Aval attestation is an error wrapping
+// Fetch downloads the attestation for a descriptor, by digest. A digest that
+// is not sha256, or a manifest that is oversized, does not match its digest
+// or is not a well-formed Aval attestation, is an error wrapping
 // evidence.ErrVerification.
 func Fetch(ctx context.Context, d Descriptor) (*Attestation, error) {
 	dg, err := digest.Parse(d.Digest)
+	if err == nil && dg.Algorithm() != digest.SHA256 {
+		err = fmt.Errorf("algorithm %s", dg.Algorithm())
+	}
 	if err != nil {
-		return nil, fmt.Errorf("registry.Fetch: %w", err)
+		return nil, fmt.Errorf("registry.Fetch %s: %w", d.Reference(), malformed("digest: %v", err))
 	}
 	r, err := newRepository(d.Repository)
 	if err != nil {
@@ -287,10 +293,9 @@ func Fetch(ctx context.Context, d Descriptor) (*Attestation, error) {
 }
 
 func fetch(ctx context.Context, r *remote.Repository, dg digest.Digest) (*Attestation, error) {
-	// FetchBytes by digest checks the content against it.
-	_, raw, err := oras.FetchBytes(ctx, r.Manifests(), dg.String(), oras.FetchBytesOptions{MaxBytes: maxBlobSize})
+	raw, err := fetchManifest(ctx, r, dg)
 	if err != nil {
-		return nil, fmt.Errorf("fetching manifest: %w", err)
+		return nil, err
 	}
 	var m ocispec.Manifest
 	if err := json.Unmarshal(raw, &m); err != nil {
@@ -323,6 +328,42 @@ func fetch(ctx context.Context, r *remote.Repository, dg digest.Digest) (*Attest
 		return nil, malformed("no DSSE envelope layer")
 	}
 	return a, nil
+}
+
+// fetchManifest GETs the manifest bytes by digest and checks size and digest
+// itself. oras reports a body that does not match the digest as an untyped
+// error, and a mismatch is a tampered candidate (verification failure), not a
+// transport error. The body is read whatever its media type, so an index
+// reaches the attestation checks and is rejected there.
+func fetchManifest(ctx context.Context, r *remote.Repository, dg digest.Digest) ([]byte, error) {
+	scheme := "https"
+	if r.PlainHTTP {
+		scheme = "http"
+	}
+	url := fmt.Sprintf("%s://%s/v2/%s/manifests/%s", scheme, r.Reference.Host(), r.Reference.Repository, dg)
+	// ponytail: host, repository and digest were validated by newRepository
+	// and digest.Parse, so the request cannot fail to build.
+	req, _ := http.NewRequestWithContext(auth.AppendRepositoryScope(ctx, r.Reference, auth.ActionPull), http.MethodGet, url, nil)
+	req.Header.Set("Accept", strings.Join([]string{ocispec.MediaTypeImageManifest, ocispec.MediaTypeImageIndex}, ", "))
+	resp, err := r.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetching manifest: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetching manifest %s: %s", dg, resp.Status)
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxBlobSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("reading manifest %s: %w", dg, err)
+	}
+	if len(raw) > maxBlobSize {
+		return nil, malformed("manifest %s larger than %d bytes", dg, maxBlobSize)
+	}
+	if got := digest.FromBytes(raw); got != dg {
+		return nil, malformed("manifest %s: content has digest %s", dg, got)
+	}
+	return raw, nil
 }
 
 func fetchBlob(ctx context.Context, r *remote.Repository, l ocispec.Descriptor) ([]byte, error) {

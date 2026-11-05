@@ -21,15 +21,15 @@ import (
 const (
 	// PredicateType identifies the Aval execution predicate inside an
 	// in-toto Statement. Provisional.
-	PredicateType = "https://aval.trianalab.io/attestation/execution/v1"
+	PredicateType = "https://aval.trianalab.io/attestation/execution/v2"
 
 	// MediaTypeExecution is the media type of the raw predicate JSON.
 	// Provisional.
-	MediaTypeExecution = "application/vnd.trianalab.aval.execution.v1+json"
+	MediaTypeExecution = "application/vnd.trianalab.aval.execution.v2+json"
 
 	// ArtifactType is the OCI artifactType of the manifest that carries an
 	// execution result. Provisional.
-	ArtifactType = "application/vnd.trianalab.aval.execution.v1"
+	ArtifactType = "application/vnd.trianalab.aval.execution.v2"
 
 	// ArtifactTypeFingerprint is the OCI artifactType of the per-fingerprint
 	// anchor manifest that every execution manifest refers to (its subject).
@@ -46,7 +46,7 @@ const (
 	PayloadType = "application/vnd.in-toto+json"
 
 	// SchemaVersion is the predicate schema version emitted by this build.
-	SchemaVersion = "v1"
+	SchemaVersion = "v2"
 )
 
 // Result is the outcome of a test execution.
