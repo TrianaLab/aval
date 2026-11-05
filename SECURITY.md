@@ -14,11 +14,9 @@ the latest release) receives fixes.
 
 Do not open a public issue or pull request.
 
-- Preferred: GitHub private vulnerability reporting, from the repository's
-  **Security** tab, **Report a vulnerability**
-  (https://github.com/TrianaLab/aval/security/advisories/new).
-- Or email the maintainer at edudiazasencio@gmail.com with the subject
-  `[aval security]`.
+Email the maintainer at edudiazasencio@gmail.com with the subject
+`[aval security]`. GitHub private vulnerability reporting is not enabled yet;
+it will be listed here once it is.
 
 Include the affected version or commit, the steps or contract that reproduce
 it, and the impact you see. You will get an acknowledgement within 7 days. A
@@ -27,9 +25,11 @@ credits the reporter, unless you ask not to be named.
 
 ## What CI checks
 
-- `govulncheck` on every pull request, every push to `main` and daily
-  (`make ci-security`).
-- `dependency-review` on every pull request.
+- `govulncheck` on every pull request, every push to `main` by a person
+  (merges by the Dependabot workflow use `GITHUB_TOKEN` and trigger no
+  workflow) and daily (`make ci-security`).
+- `dependency-review` on every pull request, once the repository's dependency
+  graph is enabled (see `CONTRIBUTING.md`).
 - Dependabot for Go modules and GitHub Actions; patch updates merge
   automatically once `ci` passes, everything else waits for review.
 - Every action in `.github/workflows` is pinned by commit SHA

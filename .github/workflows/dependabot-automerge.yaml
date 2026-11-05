@@ -46,9 +46,10 @@ jobs:
           if [ "$types" != "version-update:semver-patch" ]; then
             echo "not a patch-only update (${types:-no update-type}); leaving for review"; exit 0
           fi
-          # Strict branch protection: a PR behind main cannot merge. Ask
-          # Dependabot to rebase; its push reruns ci and this workflow.
+          # Strict branch protection: a PR behind main cannot merge.
+          # Dependabot rebases it (rebase-strategy: auto) and its push reruns
+          # ci and this workflow. Dependabot ignores commands from this bot.
           if [ "$state" = "BEHIND" ]; then
-            gh pr comment "$PR" --body "@dependabot rebase"; exit 0
+            echo "PR $PR is behind main; waiting for Dependabot to rebase"; exit 0
           fi
           gh pr merge "$PR" --squash --match-head-commit "$HEAD_SHA"

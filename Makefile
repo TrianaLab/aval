@@ -63,7 +63,8 @@ fuzz:
 # dependencies and in the standard library. It is installed into bin/ and run
 # with the project's own go (go.mod), so it checks the standard library Aval
 # builds with; `go run ...@version` would scan the newer toolchain govulncheck
-# itself requires.
+# itself requires. Building govulncheck needs go >= 1.26; GOTOOLCHAIN=auto
+# (the default) fetches it.
 GOVULNCHECK_VERSION := v1.9.0
 
 vuln:
