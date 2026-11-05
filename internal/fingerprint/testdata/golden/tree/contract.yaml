@@ -2,7 +2,9 @@
 # golden manifest: make one only together with a fingerprint.Version bump.
 # Lists are unsorted and repeated so the golden pins canonical sort and dedup;
 # the last argv entry pins argv order and JSON escaping (&, <, >, non-ASCII).
-# The test sets DB_IMAGE, sets EMPTY to "" and leaves MODE unset.
+# The test sets DB_IMAGE, sets EMPTY to "" and leaves MODE unset. pkg/.git is
+# a regular file the test creates (a worktree gitfile): it is an input, unlike
+# a .git directory. crlf.txt pins raw content bytes (no EOL normalization).
 apiVersion: aval.dev/v1alpha1
 kind: Test
 metadata:
@@ -10,10 +12,10 @@ metadata:
 runner:
   command: ["./run.sh", "-v", "a && b <c> é"]
 scope:
-  source: ["run.sh", "hook.sh", "contract.yaml", "**/*.go", ".hidden/*", "run.sh"]
-  exclude: ["vendor/**"]
-  dependencies: [go.sum]
+  source: ["run.sh", "hook.sh", "owner.sh", "other.sh", "suid.txt", "crlf.txt", "contract.yaml", "**/*.go", ".hidden/*", "pkg/.git", "run.sh"]
+  exclude: ["vendor/**", "notes.txt", "vendor/**"]
+  dependencies: [go.sum, deps.lock, go.sum]
 environment:
-  toolchain: {go: "1.25", docker: "27"}
+  toolchain: {go: "1.25", docker: "27", node: "22", python: "3.13", rust: "1.90", zig: "0.15"}
   env: [MODE, DB_IMAGE, MODE, EMPTY]
 cacheability: hermetic

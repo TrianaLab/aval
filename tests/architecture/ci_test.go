@@ -16,17 +16,19 @@ const aggregator = "required"
 
 type workflow struct {
 	Jobs map[string]struct {
-		If    string    `yaml:"if"`
-		Needs yamlNeeds `yaml:"needs"`
-		Steps []step    `yaml:"steps"`
+		If              string    `yaml:"if"`
+		Needs           yamlNeeds `yaml:"needs"`
+		Steps           []step    `yaml:"steps"`
+		ContinueOnError string    `yaml:"continue-on-error"`
 	} `yaml:"jobs"`
 }
 
 type step struct {
-	Env  map[string]string `yaml:"env"`
-	Run  string            `yaml:"run"`
-	Uses string            `yaml:"uses"`
-	With map[string]string `yaml:"with"`
+	Env             map[string]string `yaml:"env"`
+	Run             string            `yaml:"run"`
+	Uses            string            `yaml:"uses"`
+	With            map[string]string `yaml:"with"`
+	ContinueOnError string            `yaml:"continue-on-error"`
 }
 
 // yamlNeeds accepts both `needs: job` and `needs: [a, b]`.
@@ -227,19 +229,28 @@ jobs:
 // branch) would let a PR rewrite a committed golden unseen.
 const goldenBase = "${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}"
 
+// falseHitRecipe is the only recipe `make ci-false-hit` may have: both
+// packages, uncached, nothing skipped.
+var falseHitRecipe = regexp.MustCompile(`(?m)^ci-false-hit:\n\tgo test -count=1 \./internal/fingerprint/\.\.\. \./internal/contract/\.\.\.\n`)
+
 // falseHitGateProblems lists every way the false-hit gate (#15) could stop
 // binding: dropped from `make ci` (and so, by TestMakeCILegsMirrorCIJobs,
-// from CI), made conditional, or run without full history or against a base
-// the PR chooses.
-func falseHitGateProblems(data []byte, legs []string) ([]string, error) {
+// from CI), its recipe narrowed, made conditional or allowed to fail
+// (continue-on-error), or run without full history or against a base the PR
+// chooses.
+func falseHitGateProblems(data, mk []byte) ([]string, error) {
 	const name = "ci-false-hit"
 	var wf workflow
 	if err := yaml.Unmarshal(data, &wf); err != nil {
 		return nil, err
 	}
 	var problems []string
-	if !slices.Contains(legs, name) {
+	m := regexp.MustCompile(`(?m)^ci:(.*)$`).FindSubmatch(mk)
+	if m == nil || !slices.Contains(strings.Fields(string(m[1])), name) {
 		problems = append(problems, "make ci has no "+name+" leg")
+	}
+	if !falseHitRecipe.Match(mk) {
+		problems = append(problems, "make "+name+" recipe must be exactly `go test -count=1 ./internal/fingerprint/... ./internal/contract/...`")
 	}
 	job, ok := wf.Jobs[name]
 	if !ok {
@@ -247,6 +258,10 @@ func falseHitGateProblems(data []byte, legs []string) ([]string, error) {
 	}
 	if job.If != "" || len(job.Needs) > 0 {
 		problems = append(problems, name+" must run on every PR and push: no if, no needs")
+	}
+	mayFail := func(v string) bool { return v != "" && v != "false" }
+	if mayFail(job.ContinueOnError) || slices.ContainsFunc(job.Steps, func(s step) bool { return mayFail(s.ContinueOnError) }) {
+		problems = append(problems, name+" must not set continue-on-error: a failing test would report success to "+aggregator)
 	}
 	if !slices.ContainsFunc(job.Steps, func(s step) bool {
 		return strings.HasPrefix(s.Uses, "actions/checkout@") && s.With["fetch-depth"] == "0"
@@ -266,11 +281,7 @@ func TestFalseHitGateIsBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := regexp.MustCompile(`(?m)^ci:(.*)$`).FindSubmatch(mk)
-	if m == nil {
-		t.Fatal("Makefile has no ci target")
-	}
-	problems, err := falseHitGateProblems(readCI(t), strings.Fields(string(m[1])))
+	problems, err := falseHitGateProblems(readCI(t), mk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,27 +300,33 @@ jobs:
         with: {fetch-depth: 0}
       - run: make ci-false-hit
 ` + env
-	legs := []string{"ci-false-hit"}
-	if p, err := falseHitGateProblems([]byte(good), legs); err != nil || len(p) != 0 {
-		t.Fatalf("valid gate reported %v, %v", p, err)
+	const recipe = "\tgo test -count=1 ./internal/fingerprint/... ./internal/contract/...\n"
+	const mk = "ci: ci-static ci-false-hit\n\nci-false-hit:\n" + recipe
+	for _, wf := range []string{good, strings.Replace(good, "    steps:", "    continue-on-error: false\n    steps:", 1)} {
+		if p, err := falseHitGateProblems([]byte(wf), []byte(mk)); err != nil || len(p) != 0 {
+			t.Fatalf("valid gate reported %v, %v", p, err)
+		}
 	}
-	cases := map[string]struct {
-		wf   string
-		legs []string
-	}{
-		"no leg":       {good, nil},
-		"no job":       {"jobs: {}\n", legs},
-		"conditional":  {strings.Replace(good, "    steps:", "    if: false\n    steps:", 1), legs},
-		"needs":        {strings.Replace(good, "    steps:", "    needs: changes\n    steps:", 1), legs},
-		"shallow":      {strings.Replace(good, "{fetch-depth: 0}", "{fetch-depth: 1}", 1), legs},
-		"base is HEAD": {strings.Replace(good, goldenBase, "HEAD", 1), legs},
-		"no base":      {strings.Replace(good, env, "", 1), legs},
+	cases := map[string]struct{ wf, mk string }{
+		"no leg":                 {good, strings.Replace(mk, " ci-false-hit\n", "\n", 1)},
+		"recipe emptied":         {good, strings.Replace(mk, recipe, "", 1)},
+		"recipe skips":           {good, strings.Replace(mk, "-count=1 ", "-count=1 -skip Golden ", 1)},
+		"recipe cached":          {good, strings.Replace(mk, "-count=1 ", "", 1)},
+		"recipe narrowed":        {good, strings.Replace(mk, " ./internal/contract/...", "", 1)},
+		"no job":                 {"jobs: {}\n", mk},
+		"conditional":            {strings.Replace(good, "    steps:", "    if: false\n    steps:", 1), mk},
+		"needs":                  {strings.Replace(good, "    steps:", "    needs: changes\n    steps:", 1), mk},
+		"job continue-on-error":  {strings.Replace(good, "    steps:", "    continue-on-error: true\n    steps:", 1), mk},
+		"step continue-on-error": {strings.Replace(good, "      - run: make ci-false-hit\n", "      - run: make ci-false-hit\n        continue-on-error: ${{ true }}\n", 1), mk},
+		"shallow":                {strings.Replace(good, "{fetch-depth: 0}", "{fetch-depth: 1}", 1), mk},
+		"base is HEAD":           {strings.Replace(good, goldenBase, "HEAD", 1), mk},
+		"no base":                {strings.Replace(good, env, "", 1), mk},
 	}
 	for name, tc := range cases {
-		if tc.wf == good && tc.legs != nil {
+		if tc.wf == good && tc.mk == mk {
 			t.Fatalf("%s: case changes nothing", name)
 		}
-		p, err := falseHitGateProblems([]byte(tc.wf), tc.legs)
+		p, err := falseHitGateProblems([]byte(tc.wf), []byte(tc.mk))
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}

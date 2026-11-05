@@ -91,6 +91,10 @@ func TestDocsLinksResolve(t *testing.T) {
 		t.Fatal("no Markdown files found")
 	}
 	for _, doc := range docs {
+		// The Makefile passes DOCS_MD to the linters as a word list.
+		if strings.ContainsAny(doc, " \t") {
+			t.Errorf("%s: whitespace in a Markdown path splits DOCS_MD in the Makefile", doc)
+		}
 		for _, p := range brokenLinks(doc, read) {
 			t.Error(p)
 		}

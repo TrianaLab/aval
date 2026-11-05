@@ -93,6 +93,7 @@ func TestMatch(t *testing.T) {
 		{"**/z", "z", true},
 		{"a/**", "a", true}, // ** matches zero segments; exclude refuses this (MatchContents)
 		{"a/**", "a/b", true},
+		{"a/**/**", "a", true}, // consecutive ** still match zero segments
 		{"**/*.go", ".hidden.go", true},
 		{"**/*.go", ".gen/x.go", true},
 		{"*.go", "a/x.go", false},
@@ -124,6 +125,7 @@ func TestMatchContents(t *testing.T) {
 		{"a/**/z", "a/z", true}, // only a trailing ** needs a segment
 		{"**", "a", true},
 		{"a/**", "../a/b", false},
+		{"**", "../a", false}, // the clean-path guard of Match applies
 		{"*.go", "x.txt", false},
 	}
 	for _, tc := range cases {

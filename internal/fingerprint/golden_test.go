@@ -25,24 +25,34 @@ func goldenFile(version string) string {
 }
 
 // goldenContracts are fingerprinted over the same tree. With the tree,
-// goldenModes and goldenEnv they reach every branch of the manifest encoding:
-//   - contract.yaml: unsorted and repeated lists, a toolchain map, argv
-//     order, JSON escaping, an exclude, a dependency, and env vars that are
-//     set, set to "" and unset (one of them repeated);
+// goldenModes and goldenEnv they reach the encoding branches listed in
+// docs/contract.md ("False-hit corpus"):
+//   - contract.yaml: source, exclude, dependencies and env each unsorted and
+//     with a repeat, a six-key toolchain map, argv order, JSON escaping, and
+//     env vars that are set, set to "" and unset;
 //   - minimal.yaml: every optional field omitted, so no dependency,
 //     toolchain or env lines;
 //   - empty.yaml: every optional field present but empty; it must encode
 //     exactly like minimal.yaml.
 //
-// The tree adds a nested path, a path with a space, an empty file under a
-// dot-directory (included), a .git directory made by goldenTree (skipped),
-// an excluded vendor file and a file outside the scope.
+// The tree adds a nested path, a path with a space, pkg.go (sorts before
+// pkg/..., unlike walk order), an empty file under a dot-directory
+// (included), CRLF content, an excluded vendor file and a file outside the
+// scope; goldenTree adds a top-level and a nested .git directory (skipped)
+// and a regular file pkg/.git (included).
 var goldenContracts = []string{"contract.yaml", "minimal.yaml", "empty.yaml"}
 
 // goldenModes fixes the mode of tree files (default 0644), so the mode column
-// is the same on every OS, umask and git core.fileMode setting. hook.sh has
-// only the group exec bit: any exec bit means "x".
-var goldenModes = map[string]fs.FileMode{"run.sh": 0o755, "hook.sh": 0o654}
+// is the same on every OS, umask and git core.fileMode setting. owner.sh,
+// hook.sh and other.sh each have one exec bit (owner, group, other): any of
+// them means "x". suid.txt has setuid, setgid and sticky but no exec bit: "-".
+var goldenModes = map[string]fs.FileMode{
+	"run.sh":   0o755,
+	"owner.sh": 0o744,
+	"hook.sh":  0o654,
+	"other.sh": 0o645,
+	"suid.txt": fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky | 0o644,
+}
 
 func goldenEnv(k string) (string, bool) {
 	switch k {
@@ -91,13 +101,22 @@ func goldenTree(t *testing.T) []Fingerprint {
 	if err := os.CopyFS(dir, os.DirFS(filepath.Join("testdata", "golden", "tree"))); err != nil {
 		t.Fatal(err)
 	}
-	// git cannot commit a .git directory, so it is made here. g.go matches
-	// **/*.go and must not appear in any manifest.
-	if err := os.Mkdir(filepath.Join(dir, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, ".git", "g.go"), []byte("package g\n"), 0o644); err != nil {
-		t.Fatal(err)
+	// git cannot commit .git paths, so they are made here. The .go files
+	// under the top-level and the nested .git directory match **/*.go and
+	// must not appear in any manifest; the regular file pkg/.git (a worktree
+	// or submodule gitfile) is in scope and must.
+	for name, data := range map[string]string{
+		".git/g.go":       "package g\n",
+		"pkg/b/.git/n.go": "package n\n",
+		"pkg/.git":        "gitdir: ../.git\n",
+	} {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -211,8 +230,8 @@ func goldenEdits(dir, base string) ([]string, error) {
 // change could pass TestManifestGolden by rewriting the golden of the current
 // version. A committed golden may be added (a new version) but never modified,
 // renamed or deleted. The base is the merge base of HEAD and AVAL_GOLDEN_BASE,
-// which CI sets and which must then resolve; unset, it is origin/main, and the
-// test is skipped if that ref is missing (no clone, no remote).
+// which CI sets; unset, it is origin/main. The test fails if the base does
+// not resolve (no clone, no remote): it never passes without checking.
 func TestGoldensAppendOnly(t *testing.T) {
 	ref, set := os.LookupEnv("AVAL_GOLDEN_BASE")
 	if !set {
@@ -220,10 +239,7 @@ func TestGoldensAppendOnly(t *testing.T) {
 	}
 	base, err := git(".", "merge-base", "HEAD", "--end-of-options", ref)
 	if err != nil {
-		if set {
-			t.Fatalf("AVAL_GOLDEN_BASE=%q: %v", ref, err)
-		}
-		t.Skipf("append-only check not run: no %s to compare against (%v)", ref, err)
+		t.Fatalf("append-only check needs a base: %s does not resolve (%v); fetch origin/main or set AVAL_GOLDEN_BASE to the upstream main", ref, err)
 	}
 	edits, err := goldenEdits(filepath.Join("testdata", "golden"), base)
 	if err != nil {

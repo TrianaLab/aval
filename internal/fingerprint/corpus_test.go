@@ -150,7 +150,14 @@ var corpus = []corpusCase{
 	{name: "file in dot-directory added", change: func(f *fixture) { f.write(".gen/x.go", "package gen\n") }, want: differ},
 	{name: "source file deleted", change: func(f *fixture) { f.remove("pkg/a/a.go") }, want: differ},
 	{name: "exec bit set", change: func(f *fixture) { f.chmod("main.go", 0o755) }, want: differ},
+	{name: "owner exec bit only", change: func(f *fixture) { f.chmod("main.go", 0o744) }, want: differ},
 	{name: "group exec bit only", change: func(f *fixture) { f.chmod("main.go", 0o654) }, want: differ},
+	{name: "other exec bit only", change: func(f *fixture) { f.chmod("main.go", 0o645) }, want: differ},
+	{name: "LF to CRLF", change: func(f *fixture) { f.write("main.go", strings.ReplaceAll(baseFiles["main.go"], "\n", "\r\n")) }, want: differ},
+	{name: "gitfile in scope edited", setup: func(f *fixture) {
+		f.c.Scope.Source = append(f.c.Scope.Source, "pkg/.git")
+		f.write("pkg/.git", "gitdir: ../.git/worktrees/a\n")
+	}, change: func(f *fixture) { f.write("pkg/.git", "gitdir: ../.git/worktrees/b\n") }, want: differ},
 	{name: "exec bit cleared", setup: func(f *fixture) { f.chmod("main.go", 0o755) }, change: func(f *fixture) { f.chmod("main.go", 0o644) }, want: differ},
 	{name: "unicode NFC to NFD rename", setup: func(f *fixture) { f.write("caf\u00e9.go", "package main\n") }, change: func(f *fixture) {
 		// Paths are hashed as the bytes the filesystem returns, never
@@ -203,6 +210,7 @@ var corpus = []corpusCase{
 		f.write("build", "#!/bin/sh\necho a\n")
 	}, change: func(f *fixture) { f.write("build", "#!/bin/sh\necho b\n") }, want: same},
 	{name: "file under .git added", change: func(f *fixture) { f.write(".git/objects/x.go", "package x\n") }, want: same},
+	{name: "file under a nested .git added", change: func(f *fixture) { f.write("pkg/a/.git/x.go", "package x\n") }, want: same},
 	{name: "checkout path", change: func(f *fixture) {
 		to := filepath.Join(f.t.TempDir(), "elsewhere")
 		f.do(os.Rename(f.dir, to))

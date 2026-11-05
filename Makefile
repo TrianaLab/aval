@@ -148,7 +148,8 @@ ci-engine: coverage-check example
 # fingerprint.Version bump (TestManifestGolden), the append-only check on
 # committed goldens (TestGoldensAppendOnly, against AVAL_GOLDEN_BASE or
 # origin/main), the glob tables and the fuzz seeds. ci-engine also runs these
-# packages; this leg is uncached and runs on docs-only PRs too.
+# packages; this leg is uncached and runs on docs-only PRs too. The recipe is
+# pinned by TestFalseHitGateIsBinding. Unix only: the golden sets exec bits.
 ci-false-hit:
 	go test -count=1 ./internal/fingerprint/... ./internal/contract/...
 # Levels 2 and 4, the heavy suite, through `aval run` with the contract
