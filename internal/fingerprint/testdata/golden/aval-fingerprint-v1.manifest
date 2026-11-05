@@ -1,6 +1,6 @@
 aval-fingerprint/v1
 contract 9af09960ee11326648d1fc83f5f150cf9609c3854a7d0df97494716c17bfc984
-source 09adc4c5ee6ca5c861d92ad7f4a41e6186c035f3ce7725261d9c345fa0217ea5 - contract.yaml
+source 00dd474b6eb54bcb09e30981d74d14bdbfeafb33fe6d97a5c2e8bfb64c0746fa - contract.yaml
 source df1d036cbbf3df46e2045071e082245ece204c7f53ecf0a4e022bff9bb228f47 - main.go
 source 7b39baa38a2ec2b8d111bbbd8e448e80226477ab40105d9d2123d4dc18067438 - pkg/a/a.go
 source cfee5be6eb223196f1c04685b86c63410a2dc6d0d7c53185152b82953346c5b6 x run.sh

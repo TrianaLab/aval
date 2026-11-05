@@ -102,17 +102,22 @@ jobs:
           fail_ci_if_error: false
 
   # The false-hit suite (#15): fails on any false hit in the corpus and on
-  # a manifest change without a fingerprint.Version bump.
+  # a manifest change without a fingerprint.Version bump. No path filter, so
+  # it runs on every PR and push. Full history so TestGoldensAppendOnly can
+  # diff the committed goldens against the PR base or the previous push; it
+  # fails if AVAL_GOLDEN_BASE does not resolve.
   ci-false-hit:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - run: make ci-false-hit
+        env:
+          AVAL_GOLDEN_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
 
   # Dogfooding M3 (#28): the heavy suite (levels 2 and 4, aval.e2e.yaml)
   # through `aval run`. A verified passing result for the same inputs is

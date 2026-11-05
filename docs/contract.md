@@ -234,8 +234,18 @@ field needs its row added by review.
 `testdata/golden/aval-fingerprint-vN.manifest`. Any change to which bytes
 are hashed or how they are laid out (including the canonical contract JSON) fails
 it unless the header version is bumped too, so an old fingerprint can never
-mean different inputs. The `ci-false-hit` CI job (`make ci-false-hit`) runs
-both tests and the glob tables on every code change.
+mean different inputs. `TestGoldensAppendOnly` stops the golden being
+rewritten to match: a committed `*.manifest` golden may be added (a new
+version) but never modified, renamed or deleted. It diffs the goldens
+against the merge base of `HEAD` and `AVAL_GOLDEN_BASE`; in CI that is the PR
+base branch or the commit before the push, and the test fails if it does not
+resolve. Locally the default is `origin/main`, and the check is logged as not
+run when that ref is missing. `TestGoldenEditsCatchesEdits` is its negative
+test; by hand, append a line to the golden and run
+`AVAL_GOLDEN_BASE=HEAD go test ./internal/fingerprint -run TestGoldensAppendOnly`.
+The `ci-false-hit` CI job (`make ci-false-hit`, part of `make ci`) runs these
+tests and the glob tables on every PR and push, with no path filter. Edits to
+the tests themselves are left to review.
 
 ### Fail-closed errors
 
