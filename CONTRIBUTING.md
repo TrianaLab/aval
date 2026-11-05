@@ -3,7 +3,7 @@
 ## Setup
 
 - Go version: whatever `go.mod` says (currently 1.25).
-- [golangci-lint](https://golangci-lint.run) v2 (CI pins v2.6; config in `.golangci.yml`).
+- [golangci-lint](https://golangci-lint.run) at the exact version `GOLANGCI_LINT_VERSION` in the `Makefile` (CI installs the same one; `make lint` refuses any other). Config in `.golangci.yml`, including the cyclomatic complexity cap of 15.
 
 ```sh
 make build   # bin/aval
@@ -63,7 +63,11 @@ CI also runs `dogfood-fingerprint` and `dogfood-compare` (Aval's own contract
 must fingerprint identically across OSes and checkout paths). A PR that changes
 only Markdown or `docs/` skips every job except `ci-gates`. The `required` job
 aggregates every other job and is the only required status check;
-`tests/architecture` fails if a job is not wired into it.
+`tests/architecture` fails if a job is not wired into it. It also enforces that
+`pkg/evidence` depends only on the standard library and allowlisted modules,
+that no Go code names a consumer, that every `TODO` names a milestone, that the
+golangci-lint pin matches between `Makefile` and CI, and that the complexity cap
+stays at 15.
 
 ## Commits
 

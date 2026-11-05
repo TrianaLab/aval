@@ -172,22 +172,26 @@ func (c *Contract) Validate() error {
 			}
 		}
 	}
-	for k := range c.Environment.Toolchain {
-		if !toolKeyRe.MatchString(k) {
-			add("environment.toolchain: invalid key %q", k)
-		}
-	}
-	for i, e := range c.Environment.Env {
-		if !envRe.MatchString(e) {
-			add("environment.env[%d]: invalid variable name %q", i, e)
-		}
-	}
+	c.Environment.validate(add)
 	if c.Cacheability == "" {
 		add("cacheability: required (hermetic, controlled-environment, external-dependencies, non-deterministic)")
 	} else if !c.Cacheability.valid() {
 		add("cacheability: unknown class %q", c.Cacheability)
 	}
 	return errors.Join(errs...)
+}
+
+func (e Environment) validate(add func(string, ...any)) {
+	for k := range e.Toolchain {
+		if !toolKeyRe.MatchString(k) {
+			add("environment.toolchain: invalid key %q", k)
+		}
+	}
+	for i, v := range e.Env {
+		if !envRe.MatchString(v) {
+			add("environment.env[%d]: invalid variable name %q", i, v)
+		}
+	}
 }
 
 // ValidateGlob rejects globs that could escape the contract directory or are

@@ -1,5 +1,7 @@
 version: "2"
 linters:
+  enable:
+    - gocyclo
   settings:
     errcheck:
       exclude-functions:
@@ -7,3 +9,6 @@ linters:
         - fmt.Fprintf
         - fmt.Fprintln
         - (*os.File).Close
+    gocyclo:
+      # Reports functions above this complexity (tests/architecture keeps it <= 15).
+      min-complexity: 15

@@ -23,7 +23,9 @@ type workflow struct {
 }
 
 type step struct {
-	Run string `yaml:"run"`
+	Run  string            `yaml:"run"`
+	Uses string            `yaml:"uses"`
+	With map[string]string `yaml:"with"`
 }
 
 // yamlNeeds accepts both `needs: job` and `needs: [a, b]`.
