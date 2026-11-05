@@ -67,14 +67,14 @@ Two more rules once you have picked:
 
 CI also runs `dogfood-fingerprint` and `dogfood-compare` (Aval's own contract
 must fingerprint identically across OSes and checkout paths) and, on pull
-requests, `dependency-review`. `dependency-review` is skipped until a
+requests, `dependency-review` and `pr-title` (the PR title is a conventional commit, see [Commits](#commits)). `dependency-review` is skipped until a
 maintainer enables Settings > Code security > Dependency graph and sets the
 repository variable `DEPENDENCY_REVIEW=true`; without the dependency graph the
 action fails on every PR. `security.yaml` reruns govulncheck daily, which also
 covers merges by the Dependabot workflow (they use `GITHUB_TOKEN` and trigger
 no workflow); see `SECURITY.md` for Dependabot and how to report a
 vulnerability. A PR that changes only Markdown or `docs/` skips every job
-except `ci-gates`, `ci-docs` and `dependency-review`. The `required` job aggregates every
+except `ci-gates`, `ci-docs`, `dependency-review` and `pr-title`. The `required` job aggregates every
 other job and is the only required status check; `tests/architecture` fails if
 a job is not wired into it. It also enforces that `pkg/evidence` depends only
 on the standard library and allowlisted modules, that no Go code names a
@@ -90,7 +90,17 @@ every Markdown file except `.agents/`, `.claude/` and `CLAUDE.md`.
 
 ## Commits
 
-[Conventional Commits](https://www.conventionalcommits.org): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`. Scope is optional, e.g. `feat(fingerprint): ...`.
+[Conventional Commits](https://www.conventionalcommits.org): `<type>[(scope)][!]: <description>`, with type one of `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`, `perf`, `build`, `style`. Scope is optional, e.g. `feat(fingerprint): ...`; `!` marks a breaking change.
+
+PRs are squash-merged with the PR title as the commit message, so the `pr-title` CI job rejects a PR whose title is not in that format. Editing the title reruns CI.
+
+## Pull requests and issues
+
+Opening a PR fills in `.github/pull_request_template.md`; keep its checklist. Bugs and feature requests use the issue forms in `.github/ISSUE_TEMPLATE/`. Report security issues privately as described in [SECURITY.md](SECURITY.md), not in a public issue.
+
+## Code of conduct
+
+Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Design rules PRs must not break
 
