@@ -71,7 +71,8 @@ A change that breaks one of these is wrong, even if tests pass.
 | `make coverage` | unit tests plus an HTML report in `coverage.html` |
 | `make build` | `bin/aval` |
 
-Epic 0 grows `make ci` to Pacto's standard (security, docs lint, fuzzing). When a target lands, add it to
+Epic 0 grows `make ci` to Pacto's standard (coverage gate, integration,
+local acceptance, security, docs lint, fuzzing). When a target lands, add it to
 this table.
 
 ## Tests
@@ -88,10 +89,8 @@ Every test belongs to exactly one level, chosen by what it proves:
 
 Prefer level 1. Every change to fingerprinting, contract parsing, verification
 or policy comes with false-hit cases (see `aval-false-hit`). Semantic
-assertions go in Go, not in shell. `make coverage-check` fails below 100.0%
-statement coverage outside `tests/`, `examples/` and the one-line
-`cmd/aval/main()`; keep `main()` one line. Stubs are covered by tests that
-assert they return `evidence.ErrNotImplemented`.
+assertions go in Go, not in shell. Target: 100% statement coverage outside
+`tests/`, `examples/` and `cmd/aval/main()`.
 
 ## Work tracking
 

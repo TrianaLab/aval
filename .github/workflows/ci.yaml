@@ -73,7 +73,6 @@ jobs:
       # Informational: the 100% gate is enforced by `make ci-engine` above.
       - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.gate.out
           fail_ci_if_error: false
 

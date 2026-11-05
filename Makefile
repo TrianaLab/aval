@@ -20,9 +20,9 @@ coverage-check: test-unit
 	grep -v "/cmd/aval/main.go:$$line\." coverage.out > coverage.gate.out; \
 	total=$$(go tool cover -func=coverage.gate.out | awk '/^total:/ {print $$3}'); \
 	echo "total coverage: $$total"; \
-	if [ "$$total" != "100.0%" ]; then \
+	if ! awk 'NR>1 {t+=$$2; if ($$3>0) c+=$$2} END {exit !(t==c)}' coverage.gate.out; then \
 		go tool cover -func=coverage.gate.out | grep -v '100.0%'; \
-		echo "coverage gate: $$total is below 100.0%"; exit 1; \
+		echo "coverage gate: below 100.0%"; exit 1; \
 	fi
 
 # HTML report of the unit coverage profile, written to coverage.html.

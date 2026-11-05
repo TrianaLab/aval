@@ -204,7 +204,7 @@ func hashFile(p string) (string, string, error) {
 	}
 	h := sha256.New()
 	f, err := os.Open(p)
-	if err == nil {
+	if err == nil { // one error branch for open and read
 		defer f.Close()
 		_, err = io.Copy(h, f)
 	}

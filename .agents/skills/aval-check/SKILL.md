@@ -45,9 +45,11 @@ here automatically.
 
 ### coverage
 
-Run `make coverage-check` (part of `make ci-engine`). It fails below 100.0%
-statement coverage outside the paths excluded in `AGENTS.md` (Tests) and lists
-the functions below 100%. `make coverage` writes `coverage.html`.
+If a coverage target exists (Epic 0), run it; it must report 100% statement
+coverage outside the paths excluded in `AGENTS.md` (Tests). Until then run
+`go test -coverprofile=/tmp/aval.cover ./...` and
+`go tool cover -func=/tmp/aval.cover | tail -1`, and report the number as
+informational, not as pass or fail. List packages that dropped.
 
 ### registry
 

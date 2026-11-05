@@ -1,6 +1,7 @@
 package fingerprint
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -261,14 +262,25 @@ func TestUnreadableInputsFailClosed(t *testing.T) {
 	if _, _, err := hashFile(filepath.Join(t.TempDir(), "gone.go")); err == nil {
 		t.Error("file removed after listing must fail")
 	}
-	if os.Geteuid() == 0 {
-		t.Skip("root can read files without permission bits")
-	}
 	dir := writeTree(t, baseFiles, nil)
 	if err := os.Chmod(filepath.Join(dir, "main.go"), 0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Compute(dir, testContract(), fixedEnv); err == nil {
 		t.Error("unreadable file in scope must fail")
+	}
+}
+
+// canonicalContract discards the json.Marshal error; guard against it ever
+// collapsing to empty or identical bytes for distinct contracts.
+func TestCanonicalContractNonEmptyAndDistinct(t *testing.T) {
+	a, b := testContract(), testContract()
+	b.Metadata.Name = a.Metadata.Name + "-other"
+	ca, cb := canonicalContract(a), canonicalContract(b)
+	if len(ca) == 0 {
+		t.Fatal("canonical contract bytes must not be empty")
+	}
+	if bytes.Equal(ca, cb) {
+		t.Error("contracts differing only in name must give different canonical bytes")
 	}
 }

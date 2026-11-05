@@ -34,8 +34,9 @@ const (
 
 type usageError struct{ error }
 
-// Milestone-2 seams: package variables so tests can drive verify through
-// every outcome while the real implementations are still stubs.
+// Package variables so tests can drive verify through every outcome while
+// the real implementations are still stubs.
+// TODO(milestone-2): replace these seams with injected dependencies once registry, policy and evidence are real.
 var (
 	loadPolicy     = policy.Load
 	lookup         = registry.Lookup
