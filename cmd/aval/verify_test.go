@@ -89,7 +89,7 @@ func TestVerifyWithRealPolicy(t *testing.T) {
 	}
 	pol := filepath.Join(dir, "policy.yaml")
 	writePol := func(min string) {
-		body := "apiVersion: aval.dev/v1alpha1\nkind: Policy\nminTrustLevel: " + min +
+		body := "apiVersion: aval.trianalab.io/v1\nkind: Policy\nminTrustLevel: " + min +
 			"\nidentities:\n  - publicKey: dev.pub\n    trustLevel: developer\n"
 		if err := os.WriteFile(pol, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
@@ -162,7 +162,7 @@ func checkReport(t *testing.T, stdout, reason string, pub []byte) {
 func TestVerifyTrustedRootError(t *testing.T) {
 	dir := t.TempDir()
 	pol := filepath.Join(dir, "policy.yaml")
-	body := "apiVersion: aval.dev/v1alpha1\nkind: Policy\nminTrustLevel: runner\ntrustedRoot: missing.json\n" +
+	body := "apiVersion: aval.trianalab.io/v1\nkind: Policy\nminTrustLevel: runner\ntrustedRoot: missing.json\n" +
 		"identities:\n  - issuer: https://issuer.example\n    subjectRegexp: ci\n    trustLevel: runner\n"
 	if err := os.WriteFile(pol, []byte(body), 0o600); err != nil {
 		t.Fatal(err)

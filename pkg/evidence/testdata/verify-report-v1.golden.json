@@ -1,0 +1,57 @@
+{
+  "version": "aval.trianalab.io/verify-report/v1",
+  "outcome": "verified",
+  "testId": "orders-integration",
+  "fingerprint": "sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7",
+  "reference": "ghcr.io/acme/orders-aval@sha256:8c1d4e5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7a8b9c0",
+  "result": "passed",
+  "signer": {
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subjectRegexp": "^https://github.com/acme/orders/\\.github/workflows/ci\\.yaml@refs/heads/main$",
+    "trustLevel": 2,
+    "subject": "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main",
+    "keyId": "q83vEjRWeJCrze8SNFZ4kKvN7xI0VniQq83vEjRWeJA="
+  },
+  "predicate": {
+    "schemaVersion": "v2",
+    "subject": {
+      "name": "git+https://github.com/acme/orders",
+      "digest": {
+        "gitCommit": "9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d"
+      }
+    },
+    "test": {
+      "id": "orders-integration",
+      "cacheability": "controlled-environment"
+    },
+    "result": "passed",
+    "execution": {
+      "fingerprint": "sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7",
+      "fingerprintVersion": "aval-fingerprint/v1",
+      "environment": {
+        "arch": "amd64",
+        "go": "1.23.4",
+        "os": "linux"
+      },
+      "exitCode": 0
+    },
+    "runner": {
+      "identity": "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main",
+      "issuer": "https://token.actions.githubusercontent.com",
+      "trustLevel": 2
+    },
+    "startedAt": "2026-11-05T10:12:03Z",
+    "finishedAt": "2026-11-05T10:31:47Z",
+    "annotations": {
+      "com.acme.team": "payments"
+    }
+  },
+  "reason": "shape fixture: every field is set, which no single real report does",
+  "rejected": [
+    {
+      "reference": "ghcr.io/acme/orders-aval@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "outcome": "verification-failed",
+      "reason": "signer is not accepted by the policy"
+    }
+  ]
+}

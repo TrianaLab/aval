@@ -2,7 +2,7 @@
 # identity, plus developer signatures (trust level developer). Only this file
 # may accept developer signatures; tests/architecture/dogfood_test.go fails if
 # it grants runner level to anything the main policy does not trust.
-apiVersion: aval.dev/v1alpha1   # provisional
+apiVersion: aval.trianalab.io/v1
 kind: Policy
 minTrustLevel: developer
 identities:

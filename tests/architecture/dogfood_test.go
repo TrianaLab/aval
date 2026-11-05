@@ -298,7 +298,7 @@ func TestDogfoodScopeCheckCatchesUndeclaredReads(t *testing.T) {
 	// Go sources only: testdata, the CLI reference and the fuzz seeds drop out.
 	c.Scope.Source = []string{"cmd/**/*.go", "internal/**/*.go", "pkg/**/*.go"}
 	got := undeclaredReads(t, c, dogfoodSuites["aval.yaml"])
-	for _, want := range []string{"pkg/evidence/testdata/report.golden.json", "docs/cli-reference.md", "aval.yaml", "examples/go-compose/aval.yaml"} {
+	for _, want := range []string{"pkg/evidence/testdata/verify-report-v1.golden.json", "docs/cli-reference.md", "aval.yaml", "examples/go-compose/aval.yaml"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("undeclared read of %s not reported (got %v)", want, got)
 		}
@@ -309,6 +309,19 @@ func TestDogfoodScopeCheckCatchesUndeclaredReads(t *testing.T) {
 // .github/aval/install.sh verifies, never a binary built from the PR.
 var releaseJobs = []string{"example-go-compose", "dogfood-shadow", "dogfood-publish"}
 
+// lastPreFreezeRelease is the last release that reads only the pre-freeze
+// apiVersion aval.dev/v1alpha1 (#17), so it cannot read this repository's
+// aval.trianalab.io/v1 contracts and policies. While ci.yaml pins it, the
+// release jobs build aval from the checked-out commit instead, and must not
+// install it. Pinning any later release ends the transition: they must
+// install the pinned release again. The transition may outlive at most one
+// release: once CHANGELOG.md lists two releases newer than the pin, the
+// check fails until the pin moves (the version PR of the first one cannot
+// pin it yet, its sha256 does not exist before the release).
+// TODO(milestone-3): pin the first release that reads aval.trianalab.io/v1
+// in ci.yaml (AVAL_VERSION, AVAL_SHA256) to end this transition.
+const lastPreFreezeRelease = "0.1.0"
+
 var (
 	pinVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 	pinSHA256  = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -318,7 +331,9 @@ var (
 // section) and a sha256, and each release job installs cosign, then runs
 // install.sh before any aval step, and builds nothing. Offline, this cannot
 // prove the sha256 belongs to the version; install.sh checks that at run
-// time against the signed checksums.txt.
+// time against the signed checksums.txt. While the pin is
+// lastPreFreezeRelease, each release job instead builds aval (make build)
+// before any aval step and installs nothing.
 func releasePinProblems(ci, changelog []byte) ([]string, error) {
 	var wf struct {
 		Env  map[string]string  `yaml:"env"`
@@ -332,32 +347,74 @@ func releasePinProblems(ci, changelog []byte) ([]string, error) {
 	if !pinVersion.MatchString(v) || !slices.Contains(strings.Split(string(changelog), "\n"), "## "+v) {
 		problems = append(problems, "AVAL_VERSION "+strconv.Quote(v)+" is not a released version in CHANGELOG.md")
 	}
+	if v == lastPreFreezeRelease && releasesNewerThan(changelog, v) > 1 {
+		problems = append(problems, "AVAL_VERSION "+v+" is pinned after a newer release shipped: pin the release that reads aval.trianalab.io/v1")
+	}
 	if !pinSHA256.MatchString(wf.Env["AVAL_SHA256"]) {
 		problems = append(problems, "AVAL_SHA256 is not a sha256")
 	}
 	for _, name := range releaseJobs {
-		cosign, installed := false, false
-		for _, s := range wf.Jobs[name].Steps {
-			switch {
-			case strings.HasPrefix(s.Uses, "sigstore/cosign-installer@"):
-				cosign = true
-			case strings.TrimSpace(s.Run) == ".github/aval/install.sh":
-				if !cosign {
-					problems = append(problems, name+": install.sh before cosign is installed")
-				}
-				installed = true
-			case strings.Contains(s.Run, "make build") || strings.Contains(s.Run, "bin/aval"):
-				problems = append(problems, name+": builds aval instead of using the release")
-			case strings.Contains(s.Run, "aval ") && !installed:
-				problems = append(problems, name+": runs aval before installing the release")
-			}
-		}
-		if !installed {
-			problems = append(problems, name+": does not install the pinned release")
-		}
+		problems = append(problems, releaseJobProblems(name, wf.Jobs[name].Steps, v)...)
 	}
 	slices.Sort(problems)
 	return problems, nil
+}
+
+// releasesNewerThan counts the CHANGELOG.md release sections above "## v"
+// (changesets writes the newest first).
+func releasesNewerThan(changelog []byte, v string) int {
+	n := 0
+	for _, line := range strings.Split(string(changelog), "\n") {
+		if line == "## "+v {
+			break
+		}
+		if r, ok := strings.CutPrefix(line, "## "); ok && pinVersion.MatchString(r) {
+			n++
+		}
+	}
+	return n
+}
+
+// buildsAval reports whether a step builds or runs a source-built aval.
+func buildsAval(run string) bool {
+	return strings.Contains(run, "make build") || strings.Contains(run, "bin/aval")
+}
+
+// releaseJobProblems checks one release job against the pinned version v:
+// install the release (after cosign) before any aval step, or, while v is
+// lastPreFreezeRelease, build aval before any aval step and install nothing.
+func releaseJobProblems(name string, steps []step, v string) []string {
+	var problems []string
+	fromSource := v == lastPreFreezeRelease
+	cosign, installed, built := false, false, false
+	for _, s := range steps {
+		switch {
+		case strings.HasPrefix(s.Uses, "sigstore/cosign-installer@"):
+			cosign = true
+		case strings.TrimSpace(s.Run) == ".github/aval/install.sh":
+			if fromSource {
+				problems = append(problems, name+": installs "+v+", which cannot read aval.trianalab.io/v1 contracts")
+			}
+			if !cosign {
+				problems = append(problems, name+": install.sh before cosign is installed")
+			}
+			installed = true
+		case buildsAval(s.Run):
+			if !fromSource {
+				problems = append(problems, name+": builds aval instead of using the release")
+			}
+			built = true
+		case strings.Contains(s.Run, "aval ") && !installed && !built:
+			problems = append(problems, name+": runs aval before installing the release")
+		}
+	}
+	switch {
+	case fromSource && !built:
+		problems = append(problems, name+": does not build aval while "+v+" is pinned")
+	case !fromSource && !installed:
+		problems = append(problems, name+": does not install the pinned release")
+	}
+	return problems
 }
 
 func TestCIPinsVerifiedRelease(t *testing.T) {
@@ -375,9 +432,10 @@ func TestCIPinsVerifiedRelease(t *testing.T) {
 }
 
 func TestReleasePinCheckCatchesDrift(t *testing.T) {
-	changelog := []byte("# aval\n\n## 0.1.0\n")
+	changelog := []byte("# aval\n\n## 0.2.0\n\n## 0.1.0\n")
 	sha := strings.Repeat("a", 64)
 	install := "[{uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}, {run: aval run}]"
+	build := "[{run: make build}, {run: aval run}]"
 	wf := func(version, sha, steps string) []byte {
 		s := "env: {AVAL_VERSION: " + version + ", AVAL_SHA256: " + sha + "}\njobs:\n"
 		for _, j := range releaseJobs {
@@ -385,21 +443,34 @@ func TestReleasePinCheckCatchesDrift(t *testing.T) {
 		}
 		return []byte(s)
 	}
-	if p, err := releasePinProblems(wf("0.1.0", sha, install), changelog); err != nil || len(p) != 0 {
-		t.Fatalf("valid workflow reported %v (%v)", p, err)
+	for name, data := range map[string][]byte{
+		"pinned release":           wf("0.2.0", sha, install),
+		"source during transition": wf(lastPreFreezeRelease, sha, build),
+	} {
+		if p, err := releasePinProblems(data, changelog); err != nil || len(p) != 0 {
+			t.Fatalf("%s: valid workflow reported %v (%v)", name, p, err)
+		}
 	}
 	bad := map[string][]byte{
-		"unreleased version":  wf("0.2.0", sha, install),
-		"version with v":      wf("v0.1.0", sha, install),
-		"short sha":           wf("0.1.0", "abc", install),
-		"no install":          wf("0.1.0", sha, "[{run: aval run}]"),
-		"no cosign":           wf("0.1.0", sha, "[{run: .github/aval/install.sh}]"),
-		"builds from source":  wf("0.1.0", sha, "[{uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}, {run: make build}]"),
-		"aval before install": wf("0.1.0", sha, "[{run: aval run}, {uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}]"),
+		"unreleased version":          wf("0.3.0", sha, install),
+		"version with v":              wf("v0.2.0", sha, install),
+		"short sha":                   wf("0.2.0", "abc", install),
+		"no install":                  wf("0.2.0", sha, "[{run: aval run}]"),
+		"no cosign":                   wf("0.2.0", sha, "[{run: .github/aval/install.sh}]"),
+		"builds from source":          wf("0.2.0", sha, "[{uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}, {run: make build}]"),
+		"aval before install":         wf("0.2.0", sha, "[{run: aval run}, {uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}]"),
+		"installs pre-freeze release": wf(lastPreFreezeRelease, sha, install),
+		"no build in transition":      wf(lastPreFreezeRelease, sha, "[{run: aval run}]"),
+		"aval before build":           wf(lastPreFreezeRelease, sha, "[{run: aval run}, {run: make build}]"),
 	}
 	for name, data := range bad {
 		if p, err := releasePinProblems(data, changelog); err != nil || len(p) == 0 {
 			t.Errorf("%s: no problem reported (%v)", name, err)
 		}
+	}
+	// The transition outlives one release (its version PR), not two.
+	later := []byte("# aval\n\n## 0.3.0\n\n## 0.2.0\n\n## 0.1.0\n")
+	if p, err := releasePinProblems(wf(lastPreFreezeRelease, sha, build), later); err != nil || len(p) == 0 {
+		t.Errorf("transition after two newer releases: no problem reported (%v)", err)
 	}
 }

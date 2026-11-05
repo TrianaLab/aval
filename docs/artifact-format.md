@@ -10,8 +10,9 @@ implemented (`attest.Sign`, `registry.Push`, `registry.Lookup`,
 `registry.Fetch`, `evidence.Verify`, `policy.Load`). `aval verify`,
 `aval run` and `aval push` use them.
 
-**Every media type, the predicate type and the report version are PROVISIONAL
-until v1.** They may change before then without a compatibility path.
+The identifiers below and the JSON shape of the statement, predicate and
+verify report are **frozen**. Within a version they change additively only;
+see [Versioning and compatibility](#versioning-and-compatibility).
 
 ## Identifiers
 
@@ -19,26 +20,31 @@ All constants live in `pkg/evidence`.
 
 | Constant | Value | Used for | Status |
 |---|---|---|---|
-| `ArtifactType` | `application/vnd.trianalab.aval.execution.v2` | `artifactType` of the OCI manifest | PROVISIONAL |
-| `ArtifactTypeFingerprint` | `application/vnd.trianalab.aval.fingerprint.v1` | `artifactType` of the per-fingerprint anchor manifest | PROVISIONAL |
-| `MediaTypeDSSE` | `application/vnd.dsse.envelope.v1+json` | Media type of the signed DSSE envelope layer | PROVISIONAL (Aval usage) |
-| `MediaTypeExecution` | `application/vnd.trianalab.aval.execution.v2+json` | Media type of the raw predicate JSON, when carried on its own | PROVISIONAL |
+| `ArtifactType` | `application/vnd.trianalab.aval.execution.v2` | `artifactType` of the OCI manifest | frozen |
+| `ArtifactTypeFingerprint` | `application/vnd.trianalab.aval.fingerprint.v1` | `artifactType` of the per-fingerprint anchor manifest | frozen |
+| `MediaTypeDSSE` | `application/vnd.dsse.envelope.v1+json` | Media type of the signed DSSE envelope layer | DSSE standard |
+| `MediaTypeExecution` | `application/vnd.trianalab.aval.execution.v2+json` | Media type of the raw predicate JSON, when carried on its own | frozen |
 | `PayloadType` | `application/vnd.in-toto+json` | DSSE `payloadType` | in-toto standard |
 | `StatementType` | `https://in-toto.io/Statement/v1` | in-toto Statement `_type` | in-toto standard |
-| `PredicateType` | `https://aval.trianalab.io/attestation/execution/v2` | in-toto `predicateType` | PROVISIONAL |
-| `SchemaVersion` | `v2` | Predicate `schemaVersion` | PROVISIONAL |
-| `ReportVersion` | `aval.dev/verify-report/v1alpha1` | `version` of the verify report | PROVISIONAL |
+| `PredicateType` | `https://aval.trianalab.io/attestation/execution/v2` | in-toto `predicateType` | frozen |
+| `SchemaVersion` | `v2` | Predicate `schemaVersion` | frozen |
+| `ReportVersion` | `aval.trianalab.io/verify-report/v1` | `version` of the verify report | frozen |
 
 Registry identifiers (`internal/registry`): the optional bundle layer uses the
 Sigstore media type `application/vnd.dev.sigstore.bundle.v0.3+json`
 (`MediaTypeSigstoreBundle`), and manifests carry the annotation
 `io.trianalab.aval.fingerprint` (`AnnotationFingerprint`, informational:
-verification reads the fingerprint from the signed predicate). Both are
-PROVISIONAL.
+verification reads the fingerprint from the signed predicate). The
+annotation key is frozen.
 
 Related identifiers from other packages: the fingerprint manifest format is
-`aval-fingerprint/v1` (`internal/fingerprint`), and the contract `apiVersion`
-is `aval.dev/v1alpha1` (`internal/contract`). Both are provisional too.
+`aval-fingerprint/v1` (`internal/fingerprint`), and the contract and policy
+`apiVersion` is `aval.trianalab.io/v1` (`internal/contract`, see
+[contract.md](contract.md#versioning)). Both are frozen. The fingerprint
+manifest version is a format tag, not a namespaced identifier: it names the
+canonical manifest layout and hash, not a resource, so it stays outside
+`aval.trianalab.io` and is frozen as `aval-fingerprint/v1`; a breaking change
+mints `aval-fingerprint/v2`.
 
 ## OCI layout
 
@@ -325,7 +331,7 @@ This is the stable machine interface for CI scripts and external tools.
 
 | Field | Type | Present | Meaning |
 |---|---|---|---|
-| `version` | string | always | `aval.dev/verify-report/v1alpha1`. |
+| `version` | string | always | `aval.trianalab.io/verify-report/v1`. |
 | `outcome` | string | always | See outcomes below. |
 | `testId` | string | always | `metadata.name` from the contract. |
 | `fingerprint` | string | always | Locally computed `sha256:<hex>`. |
@@ -364,7 +370,7 @@ Example (`verified`):
 
 ```json
 {
-  "version": "aval.dev/verify-report/v1alpha1",
+  "version": "aval.trianalab.io/verify-report/v1",
   "outcome": "verified",
   "testId": "orders-integration",
   "fingerprint": "sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7",
@@ -384,7 +390,7 @@ Example (`miss`):
 
 ```json
 {
-  "version": "aval.dev/verify-report/v1alpha1",
+  "version": "aval.trianalab.io/verify-report/v1",
   "outcome": "miss",
   "testId": "orders-integration",
   "fingerprint": "sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7",
@@ -394,22 +400,93 @@ Example (`miss`):
 
 ## Versioning and compatibility
 
-- Within predicate `v2` (`PredicateType` `.../execution/v2`, `schemaVersion`
-  `v2`): additive changes only. New optional fields may appear; existing
-  fields keep their name, JSON tag, type and meaning. Consumers must ignore
-  unknown fields.
-- A breaking change (rename, removal, type or semantic change) requires a new
-  predicate type (`.../execution/v3`), a new `MediaTypeExecution` and
-  `ArtifactType` (`...execution.v3...`) and a new `schemaVersion`. Old and new
-  can coexist in the same repository.
-- History: `v1` became `v2` when the execution manifest's `subject` changed
+These rules apply to every frozen format:
+
+| Format | Version identifiers (move together) | Frozen at |
+|---|---|---|
+| Statement and predicate | `PredicateType`, `SchemaVersion`, `MediaTypeExecution`, `ArtifactType` | `.../execution/v2`, `v2`, `execution.v2` |
+| Fingerprint anchor | `ArtifactTypeFingerprint` | `fingerprint.v1` |
+| Verify report, outcomes and exit codes | `ReportVersion` | `aval.trianalab.io/verify-report/v1` |
+| Contract and policy file | `apiVersion` | `aval.trianalab.io/v1` |
+| Fingerprint manifest | header line, `execution.fingerprintVersion` | `aval-fingerprint/v1` |
+
+The predicate keeps `v2`: `v1` was used before and an identifier is never
+recycled, and `v2` is already under `aval.trianalab.io` and is what v0.1.0
+writes, so attestations published by v0.1.0 stay readable. The report and the
+contract moved from the pre-freeze `aval.dev/.../v1alpha1` names to
+`aval.trianalab.io` at `v1`. There is no accept window for the old names: a
+contract or policy file with `aval.dev/v1alpha1` is invalid.
+
+### Additive changes (same identifier)
+
+- A new optional field, omitted when empty, whose absence means what it
+  meant before.
+- A new key under `annotations`.
+- A new optional contract field. Older `aval` binaries reject a contract
+  that uses it (unknown fields are rejected), which fails closed.
+
+Existing fields keep their name, JSON tag, type and meaning.
+
+### Breaking changes (new identifier)
+
+- Renaming or removing a field, changing its type or its meaning.
+- Making an optional field required, or tightening validation of an
+  existing one.
+- A new value of a closed set: `outcome`, `result`, `trustLevel`,
+  cacheability class, or an exit code.
+- A change to what the fingerprint covers or how it is hashed: a new
+  `aval-fingerprint/vN`. There is no accept window: old attestations become
+  misses, never false hits.
+
+A new predicate version changes `PredicateType`, `SchemaVersion`,
+`MediaTypeExecution` and `ArtifactType` together (`execution/v3`,
+`execution.v3`). Old and new artifacts can coexist in one repository.
+
+### How consumers treat versions
+
+- **Unknown version: not evidence.** Reject a `predicateType`,
+  `schemaVersion`, report `version` or `artifactType` you do not know, and
+  run the test. `evidence.Verify` does this for predicates.
+- **Unknown fields: ignore them** within a version you know. Do not decode
+  Aval documents strictly. `evidence.Parse` ignores unknown fields.
+- **Unknown values of a closed set: fail closed.** An `outcome` other than
+  the four listed above, a `result` other than `passed` or `failed`, or an
+  unknown trust level or cacheability class means "not verified": run the
+  test. Within a version such a value can only come from a bug or tampering.
+- **No field grants trust.** Trust comes from the verified signer and the
+  policy (see [trust-model.md](trust-model.md)), never from a field that is
+  new or that you do not understand.
+
+### Deprecation
+
+Aval writes only the newest version of each format. When a breaking change
+mints a new version, the release notes say whether Aval keeps reading the
+old one for a transition. If it does, the old parser stays next to the new
+one, dispatching on the identifier, and old documents get no more trust than
+new ones; any identifier Aval does not know fails closed. Ending a transition
+is announced in the release notes of the release that removes it.
+
+### Golden files
+
+`pkg/evidence/testdata/statement-execution-v2.golden.json` and
+`pkg/evidence/testdata/verify-report-v1.golden.json` set every field of the
+statement, predicate and verify report. A test decodes each strictly into the
+current types and requires the same JSON back, so dropping, renaming or
+retyping a field, or adding a required one, fails. Another test requires
+every JSON field of those types to be set in its golden file, so a new field
+fails until it is added there. Golden files only grow: an existing field or
+value is never removed or changed, an additive change adds its new field to
+the golden file of its version, and a new version adds a new file next to
+the old ones.
+
+### History
+
+- Predicate `v1` became `v2` when the execution manifest's `subject` changed
   from the tested artifact to the fingerprint anchor and the optional
   Sigstore bundle layer was added.
-- The verify report follows the same rule per `ReportVersion`: additive within
-  `v1alpha1`, new version string for anything breaking.
-- A change to what the fingerprint covers bumps `aval-fingerprint/vN`. Old
-  attestations then stop matching, which is a miss, not a false hit.
-- Until Epic 5 freezes them, the identifiers themselves are provisional and
-  may be renamed. Even then, a breaking change always gets a new identifier,
-  and the fingerprint version bump applies from day one: it is a safety rule,
-  not a compatibility promise.
+- At the freeze (#17), the verify report moved from
+  `aval.dev/verify-report/v1alpha1` to `aval.trianalab.io/verify-report/v1`
+  and the contract and policy `apiVersion` from `aval.dev/v1alpha1` to
+  `aval.trianalab.io/v1`, without other changes. The contract hash covers
+  `apiVersion`, so every fingerprint changed: results published before
+  are misses and the tests run once.

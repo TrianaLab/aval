@@ -3,7 +3,7 @@
 # with signing). `make ci-e2e` runs it through `aval run`; in CI a verified
 # result for the same inputs is reused (#28). The scope is every file the
 # suite builds or reads, including the Makefile targets runner.command calls.
-apiVersion: aval.dev/v1alpha1
+apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
   name: aval-e2e

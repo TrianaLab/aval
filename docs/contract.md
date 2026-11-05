@@ -1,6 +1,7 @@
 # The test contract: `aval.yaml`
 
-Status: `aval.dev/v1alpha1`, provisional. The schema can change before v1.
+Status: `aval.trianalab.io/v1`, frozen. Within v1 the schema changes additively
+only (see [Versioning](#versioning)).
 Source of truth: `internal/contract` (schema, validation) and
 `internal/fingerprint` (what gets hashed). If this document and the code
 disagree, the code wins and this document has a bug.
@@ -13,7 +14,7 @@ declared, Aval cannot see it.
 ## Example
 
 ```yaml
-apiVersion: aval.dev/v1alpha1   # required, exact value (provisional)
+apiVersion: aval.trianalab.io/v1   # required, exact value
 kind: Test                      # required, exact value
 
 metadata:
@@ -53,7 +54,7 @@ aval run -f path/to/aval.yaml --explain --fingerprint-only   # also prints the m
 
 ## Fields
 
-All fields below are the complete v1alpha1 schema. Unknown fields at any
+All fields below are the complete v1 schema. Unknown fields at any
 level are rejected (strict YAML decoding), so a typo such as `sorce:` fails
 instead of silently shrinking the scope. A file with more than one YAML
 document is rejected. Semantic validation reports all errors at once; YAML
@@ -61,7 +62,7 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 
 | Field | Type | Required | Rules |
 |---|---|---|---|
-| `apiVersion` | string | yes | Must be `aval.dev/v1alpha1`. |
+| `apiVersion` | string | yes | Must be `aval.trianalab.io/v1`. |
 | `kind` | string | yes | Must be `Test`. |
 | `metadata.name` | string | yes | 1-64 chars of `[a-z0-9._-]`, starting and ending with `[a-z0-9]`. |
 | `runner.command` | list of strings | yes | Non-empty argv. The first element must not be blank. No shell interpolation. v0 only supports this generic runner. |
@@ -265,6 +266,21 @@ both. The differing line names the file, toolchain entry or variable.
 
 `-f` defaults to `aval.yaml` in the current directory. The root is always the
 directory of the contract file, not the current directory.
+
+## Versioning
+
+`apiVersion` `aval.trianalab.io/v1` is frozen. Policy files (`kind: Policy`)
+use the same value. Within v1 the schema only gets new optional fields:
+existing contracts keep parsing and keep their meaning. Because unknown
+fields are rejected, an older `aval` rejects a contract that uses a field
+it does not know, which fails closed. Renaming or removing a field, changing
+its type or meaning, or tightening its validation needs a new `apiVersion`.
+
+The pre-freeze `aval.dev/v1alpha1` is not accepted: change the line to
+`aval.trianalab.io/v1`. The contract hash covers `apiVersion`, so results
+published under the old value become misses and the tests run once. The
+general rules are in
+[artifact-format.md](artifact-format.md#versioning-and-compatibility).
 
 ## Future work
 

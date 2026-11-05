@@ -23,7 +23,7 @@ No server or database: ORAS, Cosign and OCI 1.1 referrers do the work, and artif
 
 ```yaml
 # aval.yaml
-apiVersion: aval.dev/v1alpha1   # provisional
+apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
   name: orders-integration
@@ -45,7 +45,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml   # exit 0 
 
 ## Status: pre-alpha
 
-Contract, fingerprint, signing (keyless and key-based), push to and lookup in an OCI registry, verification against a trust policy and `aval run` reuse or execute work. Formats are provisional until milestone 5. `aval run --shadow` verifies and still runs the test, and fails on a false hit.
+Contract, fingerprint, signing (keyless and key-based), push to and lookup in an OCI registry, verification against a trust policy and `aval run` reuse or execute work. Formats are frozen at `aval.trianalab.io/v1` (contract and verify report) and predicate `execution/v2`; see [compatibility rules](docs/artifact-format.md#versioning-and-compatibility). `aval run --shadow` verifies and still runs the test, and fails on a false hit.
 
 ## Docs
 

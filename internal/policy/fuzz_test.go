@@ -11,7 +11,7 @@ import (
 // outside developer..isolated.
 func FuzzParse(f *testing.F) {
 	f.Add([]byte(validPolicy))
-	f.Add([]byte("apiVersion: aval.dev/v1alpha1\nkind: Policy\nminTrustLevel: developer\nidentities:\n  - issuer: x\n    subjectRegexp: a)|(b\n    trustLevel: isolated\n"))
+	f.Add([]byte("apiVersion: aval.trianalab.io/v1\nkind: Policy\nminTrustLevel: developer\nidentities:\n  - issuer: x\n    subjectRegexp: a)|(b\n    trustLevel: isolated\n"))
 	f.Add([]byte("allowedCacheability: [non-deterministic]"))
 	dir := f.TempDir()
 	f.Fuzz(func(t *testing.T, data []byte) {

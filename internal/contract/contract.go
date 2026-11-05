@@ -19,11 +19,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// APIVersion is the only contract version accepted by this build.
-// Provisional: it may change before v1.
-const APIVersion = "aval.dev/v1alpha1"
+// APIVersion is the only contract and policy version accepted by this
+// build. Frozen: changes within it are additive only (docs/contract.md).
+const APIVersion = "aval.trianalab.io/v1"
 
-// Kind is the only kind accepted in v1alpha1.
+// Kind is the only contract kind accepted in v1.
 const Kind = "Test"
 
 // DefaultFile is the conventional contract file name.

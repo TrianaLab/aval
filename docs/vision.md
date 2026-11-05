@@ -113,11 +113,11 @@ environment is valid in another.
 External tools consume Aval results through:
 
 - versioned artifact and predicate formats with Aval's own media types
-  (provisional: predicate type
+  (frozen: predicate type
   `https://aval.trianalab.io/attestation/execution/v2`, media type
   `application/vnd.trianalab.aval.execution.v2+json`, artifact type
   `application/vnd.trianalab.aval.execution.v2`, contract `apiVersion`
-  `aval.dev/v1alpha1`),
+  `aval.trianalab.io/v1`),
 - neutral predicate fields: `subject`, `test.id`, `result`,
   `execution.fingerprint`, `execution.environment`, `runner` identity,
   `startedAt`/`finishedAt`, plus a free `annotations` map that Aval never
@@ -125,7 +125,8 @@ External tools consume Aval results through:
 - the public Go package `pkg/evidence` (`Parse`, `Verify`),
 - `aval verify --output json`.
 
-These formats are provisional until milestone 5 makes them stable.
+These formats are frozen; within a version they change additively only (see
+[artifact-format.md](artifact-format.md#versioning-and-compatibility)).
 
 ## Risks
 
@@ -170,8 +171,10 @@ These formats are provisional until milestone 5 makes them stable.
    push to `main` (see [its README](../examples/go-compose/README.md)).
    The release pipeline for signed `aval` binaries (checksums, SBOMs, SLSA
    provenance) is in place and dry-runs on every PR. The example and the
-   dogfood shadow and publish jobs install the pinned v0.1.0 release,
-   verified before use.
+   dogfood shadow and publish jobs install the pinned release, verified
+   before use. While the pin is v0.1.0, which cannot read the frozen
+   `aval.trianalab.io/v1` contracts, they build `aval` from the commit
+   instead (#17).
    Aval also dogfoods itself (#28): `ci-e2e` runs the heavy suite
    (`aval.e2e.yaml`) through `aval run` and reuses a verified result,
    `dogfood-shadow` runs the unit suite (`aval.yaml`) with `--shadow`, and on
@@ -191,3 +194,7 @@ These formats are provisional until milestone 5 makes them stable.
    `aval verify --output json` report are declared stable and versioned,
    with only additive changes allowed within v1, and an external consumer
    can verify results using `pkg/evidence` alone.
+   *In progress:* the predicate type, media types, contract `apiVersion`
+   and verify report version are frozen, with compatibility rules in
+   [artifact-format.md](artifact-format.md#versioning-and-compatibility)
+   and golden files guarding the JSON shape (#17).

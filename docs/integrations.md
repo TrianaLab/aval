@@ -2,9 +2,9 @@
 
 Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
 Milestone 2 (sign, push, verify, `aval run` reuse or execute) is
-implemented. The consumption contract is scheduled to be declared stable in milestone 5. All
-media types, the predicate type and the report version are **provisional**
-until then.
+implemented. The consumption contract is stable: the media types, the
+predicate type and the report version are frozen, and the compatibility rules
+are in [artifact-format.md](artifact-format.md#versioning-and-compatibility).
 
 ## Consuming Aval evidence
 
@@ -20,7 +20,7 @@ An execution result is an in-toto v1 Statement wrapped in a DSSE envelope,
 stored in an OCI registry, found through the tag `sha256-<fingerprint hex>`
 and the OCI 1.1 referrers of the manifest it points at, and consumed by
 digest. The predicate type is
-`https://aval.trianalab.io/attestation/execution/v2` (provisional).
+`https://aval.trianalab.io/attestation/execution/v2`.
 
 See [artifact-format.md](artifact-format.md) for the media types, manifest
 layout and predicate fields.
@@ -115,7 +115,7 @@ message, if any, goes to stderr.
 
 ```json
 {
-  "version": "aval.dev/verify-report/v1alpha1",
+  "version": "aval.trianalab.io/verify-report/v1",
   "outcome": "verified",
   "testId": "orders-integration",
   "fingerprint": "sha256:...",
@@ -188,7 +188,7 @@ The policy file format (`--policy`) is described in
 - **Fail closed.** Any outcome other than `verified` means run the test.
 - **Consume by digest.** Tags are only for lookup.
 - **Pin versions.** Check `schemaVersion == "v2"` on predicates (`Validate`
-  does this) and `version == "aval.dev/verify-report/v1alpha1"` on reports.
+  does this) and `version == "aval.trianalab.io/verify-report/v1"` on reports.
   Reject versions you do not know. Within a version, ignore unknown fields:
   changes are additive.
 - **Respect cacheability.** `non-deterministic` results are never reusable by

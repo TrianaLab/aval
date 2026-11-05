@@ -57,7 +57,7 @@ scope:
 runner: {command: [go, test, ./...]}
 metadata: {name: it}
 kind: Test
-apiVersion: aval.dev/v1alpha1
+apiVersion: aval.trianalab.io/v1
 `
 
 // fixture is one project checkout: a tree, its contract and its environment.

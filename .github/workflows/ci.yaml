@@ -23,6 +23,12 @@ permissions:
 # as checksums.txt lists it, so a re-tagged release cannot change what runs.
 # Jobs that test the PR's code build from source (CONTRIBUTING.md "Which aval
 # a CI job runs").
+# Transition (#17): 0.1.0 reads only the pre-freeze apiVersion
+# aval.dev/v1alpha1, not this repository's aval.trianalab.io/v1 contracts and
+# policies, so while it is pinned those jobs build aval from the checked-out
+# commit instead. Pinning the first release that reads aval.trianalab.io/v1
+# switches them back to install.sh (tests/architecture enforces both, and
+# fails once CHANGELOG.md lists two releases newer than 0.1.0).
 env:
   AVAL_VERSION: 0.1.0
   AVAL_SHA256: 1128344383f48cd7dd8e46b21cbe838dd6e7b075f45a0365f9784c1b71f6e67a
@@ -269,11 +275,10 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        with:
-          cosign-release: v3.0.6
-      - name: Install the pinned aval release (verified)
-        run: .github/aval/install.sh
+      # Transition (#17, see the top of this file): build aval from this
+      # commit while the pinned release cannot read its contracts.
+      - name: Build aval from this commit
+        run: make build && echo "$PWD/bin" >> "$GITHUB_PATH"
       - name: Log in to GHCR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -406,11 +411,10 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        with:
-          cosign-release: v3.0.6
-      - name: Install the pinned aval release (verified)
-        run: .github/aval/install.sh
+      # Transition (#17, see the top of this file): build aval from this
+      # commit while the pinned release cannot read its contracts.
+      - name: Build aval from this commit
+        run: make build && echo "$PWD/bin" >> "$GITHUB_PATH"
       - name: Shadow run of the engine unit suite
         run: |
           aval run --shadow -f aval.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
@@ -456,11 +460,10 @@ jobs:
           pattern: aval-*
           path: results
           merge-multiple: true
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        with:
-          cosign-release: v3.0.6
-      - name: Install the pinned aval release (verified)
-        run: .github/aval/install.sh
+      # Transition (#17, see the top of this file): build aval from this
+      # commit while the pinned release cannot read its contracts.
+      - name: Build aval from this commit
+        run: make build && echo "$PWD/bin" >> "$GITHUB_PATH"
       - name: Sign and push results that were not reused
         env:
           GH_TOKEN: ${{ github.token }}
