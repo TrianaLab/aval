@@ -127,9 +127,11 @@ the test runs.
 - **No silent replacement.** Pushes only add referrers to the anchor; a later
   push for the same fingerprint cannot replace an earlier attestation. Every
   candidate is verified and the policy picks the verified one with the
-  highest trust level; a candidate that fails never decides the outcome while
-  another verifies, and is listed in `rejected` in the verify report (and on
-  stderr), so the security event stays visible.
+  highest trust level. A candidate that fails verification never decides the
+  outcome while another verifies, and is listed in `rejected` in the verify
+  report (and on stderr), so the security event stays visible. A candidate
+  that cannot be fetched or checked blocks reuse (the test runs), because it
+  might have outranked the verified one.
 - **Unknown or missing fields** in `aval.yaml` are rejected (exit 2) rather
   than ignored.
 

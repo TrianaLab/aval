@@ -243,7 +243,8 @@ func TestWriteReportPropagatesWriteErrors(t *testing.T) {
 // Several attestations per fingerprint: the policy picks the verified one with
 // the highest trust; rejected candidates are listed in the report and on
 // stderr, and a verification failure is never hidden behind a plain error or
-// a verified sibling (invariant 4).
+// a verified sibling (invariant 4). A candidate that could not be evaluated
+// blocks reuse of any sibling (invariant 3).
 func TestVerifyPicksAmongCandidates(t *testing.T) {
 	untrusted := &evidence.VerificationError{Reason: "untrusted signer"}
 	down := errors.New("registry down")
@@ -282,10 +283,23 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:ff": {verifyErr: untrusted},
 		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
-		{"verified sibling does not hide errors", nil, map[string]candidate{
+		{"error on a sibling fails closed", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 			"sha256:bb": {trust: evidence.TrustRunner},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeError}},
+		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"unreachable trusted failure does not let a pass through", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustRunner},
+			"sha256:bb": {fetchErr: down},
+		}, ExitError, evidence.OutcomeError, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"verify error on a sibling fails closed", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustIsolated},
+			"sha256:bb": {verifyErr: down},
+		}, ExitError, evidence.OutcomeError, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"verification failure outranks a sibling error beside a verified one", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: down},
+			"sha256:bb": {trust: evidence.TrustRunner},
+			"sha256:cc": {verifyErr: untrusted},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:cc", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed}},
 		{"untrusted push does not become a hit", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 			"sha256:ff": {verifyErr: untrusted},

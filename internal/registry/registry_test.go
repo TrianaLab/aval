@@ -133,6 +133,17 @@ func TestPushLookupFetchRoundTrip(t *testing.T) {
 	for _, api := range []bool{true, false} {
 		t.Run(fmt.Sprintf("referrersAPI=%v", api), func(t *testing.T) { roundTrip(t, serve(t, api, nil)) })
 	}
+	// Registries that refuse DELETE: the fallback push must not try to
+	// clean up the previous referrers index.
+	t.Run("referrersAPI=false/no-delete", func(t *testing.T) {
+		roundTrip(t, serve(t, false, func(w http.ResponseWriter, r *http.Request) bool {
+			if r.Method == http.MethodDelete {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return true
+			}
+			return false
+		}))
+	})
 }
 
 func roundTrip(t *testing.T, repo string) {

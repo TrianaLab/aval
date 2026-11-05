@@ -277,17 +277,20 @@ func outcomeOf(err error) evidence.Outcome {
 // pick verifies every candidate and lets the policy choose: the verified one
 // with the highest trust level wins. On a tie a non-passed result wins, then
 // the lowest digest (the lookup order), so disagreeing trusted runs never
-// reuse a pass by accident (fail closed). Rejected candidates never decide
-// the outcome while another verifies, but they are returned for the report
-// and printed on warn, never dropped (invariant 4). With no verified
-// candidate it returns the reference and error of the first verification
-// failure, which outranks any other error: it is the security event that
-// must surface.
+// reuse a pass by accident (fail closed). Candidates that fail verification
+// never decide the outcome while another verifies; a candidate that ends in
+// any other error makes the outcome an error (run the test), because it might
+// have outranked or contradicted the verified one (invariant 3). Rejected
+// candidates are returned for the report and printed on warn, never dropped
+// (invariant 4). Whenever no candidate is reused it returns the reference and
+// error of the first verification failure, which outranks any other error: it
+// is the security event that must surface.
 func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions) (*evidence.Verification, string, []evidence.Rejection, error) {
 	var (
 		best             *evidence.Verification
 		bestRef, failRef string
 		failErr          error
+		unknown          bool // a candidate could not be evaluated
 		rejected         []evidence.Rejection
 	)
 	for _, d := range cands {
@@ -302,10 +305,11 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 		if failErr == nil || (errors.Is(err, evidence.ErrVerification) && !errors.Is(failErr, evidence.ErrVerification)) {
 			failErr, failRef = err, d.Reference()
 		}
+		unknown = unknown || !errors.Is(err, evidence.ErrVerification)
 		rejected = append(rejected, evidence.Rejection{Reference: d.Reference(), Outcome: outcomeOf(err), Reason: err.Error()})
 		fmt.Fprintf(warn, "aval: warning: rejected attestation %s: %v\n", d.Reference(), err)
 	}
-	if best == nil {
+	if best == nil || unknown {
 		return nil, failRef, rejected, failErr
 	}
 	return best, bestRef, rejected, nil

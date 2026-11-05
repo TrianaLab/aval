@@ -101,6 +101,9 @@ func newRepository(repo string) (*remote.Repository, error) {
 	}
 	r.Client = &auth.Client{Client: auth.DefaultClient.Client, Cache: auth.NewCache(), Credential: credentials.Credential(store)}
 	r.PlainHTTP = isLoopback(r.Reference.Host())
+	// ponytail: in referrers-tag fallback mode a dangling old referrers index
+	// is harmless; deleting it needs DELETE rights that CI tokens often lack.
+	r.SkipReferrersGC = true
 	return r, nil
 }
 

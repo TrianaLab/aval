@@ -141,8 +141,11 @@ Registries without the referrers API (for example GHCR) are supported: oras
 maintains the OCI referrers tag schema (`sha256-<anchor hex>` index) on push
 and reads it on lookup. That index is rewritten on every push, so two concurrent
 pushes for the same fingerprint can drop one entry from it. The dropped
-execution is then not found (a miss, so the test runs again), never a false
-hit.
+execution is then not a candidate: with no other execution the result is a
+miss (the test runs again); otherwise the policy picks among the remaining
+ones. It never makes an unsigned or untrusted result reusable. Aval does not
+delete the previous referrers index after rewriting it, so pushing does not
+need DELETE rights.
 
 ### Lookup and consumption
 
@@ -177,9 +180,11 @@ run, or a re-run). All of them stay listed as referrers of the anchor, so a
 later push cannot hide or replace an earlier one. `aval verify` verifies every
 candidate: the verified one with the highest trust level wins (ties go to a
 non-passed result, then the lowest digest). Candidates that fail are listed in
-the report's `rejected` field and printed as warnings on stderr; if
-none verifies, the outcome is `verification-failed` when any candidate failed
-verification, otherwise `error`.
+the report's `rejected` field and printed as warnings on stderr. A candidate
+that cannot be fetched or checked (outcome `error`) might have outranked the
+verified one, so it blocks reuse and the test runs. When nothing is reused,
+the outcome is `verification-failed` when any candidate failed verification,
+otherwise `error`.
 
 ## DSSE envelope
 
