@@ -165,6 +165,12 @@ path, directory iteration order or glob order. The `x` mode is taken from the
 filesystem, so Windows (which has no execute bit) and Unix checkouts of the
 same executable file fingerprint differently.
 
+Paths are hashed as the bytes the filesystem returns, never normalized. The
+NFC and NFD spellings of the same visible name (`café.go`) are different
+inputs, and so are `A.go` and `a.go`. A checkout whose filesystem rewrites
+names (case folding, Unicode normalization) can therefore miss; it never
+hits for a different tree.
+
 ### What does not go in
 
 - Files not matched by `source` or `dependencies`. Undeclared inputs are
@@ -177,6 +183,41 @@ same executable file fingerprint differently.
   force a re-run.
 - Environment variables not listed in `environment.env`.
 - The real toolchain version, OS and architecture, unless declared.
+
+### Known gaps
+
+Declared scope means some relevant changes are invisible by design
+(invariant 2 in `AGENTS.md`). A test that depends on one of these can reuse a
+result it should not. Each is either pinned by a `gap` row in the false-hit
+corpus (`internal/fingerprint/corpus_test.go`), which asserts the
+fingerprint does *not* change, or by the matching manifest rule above:
+
+- A file the test reads but `scope` does not match (corpus row).
+- An environment variable the test reads but `environment.env` does not
+  list (corpus row).
+- Content behind a declared name: a container tag such as `postgres:16`
+  that is repushed, a dependency fetched from the network at run time, a
+  service reached over the network. Only the declared text is hashed. Pin
+  digests inside the scope (`controlled-environment`) or use
+  `external-dependencies`, which is not reusable by default.
+- The installed toolchain, OS and architecture: `environment.toolchain` is
+  trusted as written (see "Future work").
+
+Mitigations: contract review, the cacheability classes, `aval run --shadow`
+(runs the test anyway and fails on a false hit) and, in the future, observed
+inputs.
+
+### False-hit corpus
+
+`TestFalseHitCorpus` applies every known kind of change to one base project
+and asserts its outcome: a relevant change (content, rename, add, delete,
+exec bit, lockfile, toolchain, env value or presence, command, any contract
+field, re-included excludes) changes the fingerprint; an irrelevant one
+(out-of-scope or excluded files, `.git`, checkout path, ordering,
+duplicates, timestamps, non-exec permission bits, YAML formatting) does not;
+an unprovable one (see "Fail-closed errors") fails closed. The test fails if
+a manifest section is changed by no row, so a new fingerprint rule must come
+with corpus cases.
 
 ### Fail-closed errors
 
