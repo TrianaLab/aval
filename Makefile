@@ -1,5 +1,6 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
-	lint fmt fmt-check example fuzz vuln ci ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz ci-security
+	lint fmt fmt-check example fuzz vuln ci ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz ci-security \
+	docs-lint docs-cli ci-docs
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
 UNIT_PKGS = $(shell go list ./... | grep -v /tests/)
@@ -88,13 +89,35 @@ fmt:
 fmt-check:
 	@out="$$(gofmt -l .)"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
+# Docs gates. DOCS_MD is the one list both linters read: every Markdown file
+# except the agent skills (.agents/, .claude/), which are maintained apart, and
+# CLAUDE.md, which is only an include of AGENTS.md.
+# Links are checked by tests/architecture/docs_test.go (ci-gates); external
+# URLs are not fetched, so the gates stay deterministic and offline.
+DOCS_MD = $(shell find . -name '*.md' -not -path './.git/*' -not -path './.agents/*' \
+	-not -path './.claude/*' -not -path './CLAUDE.md' -not -path '*/node_modules/*' | sort)
+MARKDOWNLINT_CLI2_VERSION := 0.24.0
+# Vale ships as a binary (building it needs cgo); install the release whose
+# sha256 ci.yaml pins, and `make docs-lint` refuses any other version.
+VALE_VERSION := 3.21.0
+
+docs-lint:
+	npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) $(DOCS_MD)
+	@v=$$(vale --version 2>/dev/null | awk '{print $$3}'); if [ "$$v" != "$(VALE_VERSION)" ]; then \
+		echo "vale $(VALE_VERSION) required, found $${v:-none}"; exit 1; fi
+	vale $(DOCS_MD)
+
+# Regenerate docs/cli-reference.md from the cobra command tree.
+docs-cli:
+	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval -update
+
 example:
 	cd examples/go-compose && go vet ./... && go test ./...
 
 # `make ci` is the gate CI runs and the one agents and humans run before
 # pushing. Each ci-* leg is one job in .github/workflows/ci.yaml, aggregated by
 # the `required` job (tests/architecture/ci_test.go enforces both).
-ci: ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz ci-security
+ci: ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz ci-security ci-docs
 
 ci-static: fmt-check lint
 ci-gates: test-architecture
@@ -104,3 +127,6 @@ ci-acceptance: test-acceptance
 ci-release: test-release
 ci-fuzz: fuzz
 ci-security: vuln
+# Fails when docs/cli-reference.md drifts from the CLI (TestCLIReference).
+ci-docs: docs-lint
+	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval

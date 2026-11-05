@@ -1,0 +1,19 @@
+// Markdown syntax gate (`make docs-lint`). Rules only: the Makefile (DOCS_MD)
+// decides which files are linted, so the scope lives in one place.
+{
+  "config": {
+    "default": true,
+    // Prose is one paragraph per line or hand-wrapped; a column limit would
+    // rewrap every page and change no rendering.
+    "MD013": false,
+    // Table delimiter rows are written `|---|---|`, which MD060 reads as a
+    // spacing violation in every table.
+    "MD060": false,
+    // Go code in fenced blocks is gofmt-indented with tabs.
+    "MD010": { "code_blocks": false },
+    // GitHub autolinks bare URLs and addresses.
+    "MD034": false,
+    // One bullet character everywhere.
+    "MD004": { "style": "dash" }
+  }
+}
