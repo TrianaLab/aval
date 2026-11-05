@@ -296,5 +296,7 @@ Example (`miss`):
   `v1alpha1`, new version string for anything breaking.
 - A change to what the fingerprint covers bumps `aval-fingerprint/vN`. Old
   attestations then stop matching, which is a miss, not a false hit.
-- Until v1, all of the above are provisional and may change; the rules apply
-  from the first stable release.
+- Until Epic 5 freezes them, the identifiers themselves are provisional and
+  may be renamed. Even then, a breaking change always gets a new identifier,
+  and the fingerprint version bump applies from day one: it is a safety rule,
+  not a compatibility promise.

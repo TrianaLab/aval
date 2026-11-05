@@ -34,3 +34,7 @@ Stubs return `evidence.ErrNotImplemented` (exit 6) and carry a `TODO(milestone-N
 ## License
 
 Contributions are accepted under the Apache-2.0 license (see [LICENSE](LICENSE)). No CLA or DCO sign-off required.
+
+## Working with coding agents
+
+`AGENTS.md` holds the project rules for humans and agents alike. Portable skills for implementing the roadmap live in `.agents/skills/` (symlinked into `.claude/skills/`); see the table at the end of `AGENTS.md`.
