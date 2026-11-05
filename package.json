@@ -1,0 +1,13 @@
+{
+  "name": "aval",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Version and changelog source for the aval release (Changesets). Not an npm package.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "release:version": "changeset version && npm install --package-lock-only --ignore-scripts"
+  },
+  "devDependencies": {
+    "@changesets/cli": "3.0.3"
+  }
+}

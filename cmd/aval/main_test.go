@@ -48,6 +48,13 @@ func TestStrayArgsAreUsageErrors(t *testing.T) {
 	}
 }
 
+func TestVersionFlag(t *testing.T) {
+	var out bytes.Buffer
+	if code := run([]string{"--version"}, &out, &out); code != ExitOK || out.String() != "aval version dev\n" {
+		t.Errorf("aval --version: exit %d, output %q", code, out.String())
+	}
+}
+
 const testContract = `apiVersion: aval.dev/v1alpha1
 kind: Test
 metadata:

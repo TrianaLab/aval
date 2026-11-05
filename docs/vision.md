@@ -168,6 +168,9 @@ These formats are provisional until milestone 5 makes them stable.
    *In progress:* the `example-go-compose` job in `.github/workflows/ci.yaml`
    runs this story for `examples/go-compose` in this repository on every
    push to `main` (see [its README](../examples/go-compose/README.md)).
+   The release pipeline for signed `aval` binaries (checksums, SBOMs, SLSA
+   provenance) is in place and dry-runs on every PR; no release is published
+   yet, so the example still builds `aval` from source.
 4. **False-hit suite.** Exit criterion: an automated suite that applies every
    known kind of relevant change (source, dependency, toolchain, env var,
    exec bit, contract edit, symlink, file rename) and asserts that none of

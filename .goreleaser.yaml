@@ -1,0 +1,54 @@
+# Release build for the aval CLI. GoReleaser builds, archives, checksums,
+# SBOMs and signs; it never publishes (the release workflow runs it with
+# --skip=publish, verifies dist/ with tests/release, then creates the GitHub
+# Release). `make test-release` runs the same config as a snapshot dry-run.
+version: 2
+
+project_name: aval
+
+builds:
+  - main: ./cmd/aval
+    binary: aval
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    # Reproducible: file times come from the commit, not the build clock.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+# One SPDX SBOM per archive, from syft (on PATH).
+sboms:
+  - artifacts: archive
+
+# Keyless Sigstore signature over checksums.txt, which covers every archive.
+# Cosign picks up the GitHub Actions OIDC token; the dry-run skips signing.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args: [sign-blob, --yes, "--bundle=${signature}", "${artifact}"]
+    artifacts: checksum
+
+snapshot:
+  version_template: "{{ .Version }}-snapshot+{{ .ShortCommit }}"
+
+changelog:
+  disable: true
+
+release:
+  disable: true
