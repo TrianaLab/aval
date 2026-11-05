@@ -228,7 +228,8 @@ func MatchIdentity(ids []Identity, issuer, subject string) (Identity, bool) {
 		if _, err := regexp.Compile(id.SubjectRegexp); err != nil {
 			continue
 		}
-		if !regexp.MustCompile(`^(?:` + id.SubjectRegexp + `)$`).MatchString(subject) {
+		re, err := regexp.Compile(`^(?:` + id.SubjectRegexp + `)$`)
+		if err != nil || !re.MatchString(subject) {
 			continue
 		}
 		best, found = id, true

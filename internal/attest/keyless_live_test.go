@@ -28,7 +28,7 @@ func githubIDToken(t *testing.T) string {
 	if reqURL == "" || reqTok == "" {
 		t.Fatal("no GitHub Actions OIDC token: run in a job with `permissions: id-token: write`")
 	}
-	req, err := http.NewRequest(http.MethodGet, reqURL+"&audience=sigstore", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, reqURL+"&audience=sigstore", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

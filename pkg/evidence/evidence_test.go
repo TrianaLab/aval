@@ -129,6 +129,8 @@ func TestMatchIdentity(t *testing.T) {
 		{Issuer: gh, SubjectRegexp: `(`, TrustLevel: TrustIsolated},
 		// Unbalanced: wrapping it naively as ^(?:a)|(b)$ would match "a..." unanchored.
 		{Issuer: gh, SubjectRegexp: `https://x)|(y`, TrustLevel: TrustIsolated},
+		// Compiles alone, but wrapping exceeds the nesting limit: must not panic.
+		{Issuer: gh, SubjectRegexp: strings.Repeat("(", 999) + "a" + strings.Repeat(")", 999), TrustLevel: TrustIsolated},
 	}
 	if id, ok := MatchIdentity(bad, gh, "https://x-anything"); ok {
 		t.Errorf("invalid regexp must match nothing, got %+v", id)

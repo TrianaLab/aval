@@ -182,13 +182,13 @@ jobs:
       - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
 
   # Live keyless signing (#6): Fulcio + Rekor on Sigstore public good with
-  # this workflow's OIDC identity, then verification of the bundle. Fork PRs
-  # get no OIDC token, so it runs on main and on PRs from this repository
-  # only; every other test uses in-process fakes. CI-only (needs the token),
-  # so it has no `make` leg.
+  # this workflow's OIDC identity, then verification of the bundle. Runs on
+  # push to main only, so no PR-triggered job gets `id-token: write`; every
+  # other test uses in-process fakes. CI-only (needs the token), so it has
+  # no `make` leg.
   sigstore-keyless:
     needs: changes
-    if: needs.changes.outputs.code == 'true' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: needs.changes.outputs.code == 'true' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
