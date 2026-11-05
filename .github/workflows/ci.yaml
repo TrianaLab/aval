@@ -200,6 +200,94 @@ jobs:
           go-version-file: go.mod
       - run: go test -count=1 -tags sigstore_live -run '^TestKeylessSigningLive$' -v ./internal/attest
 
+  # Milestone 3 demo (#11): examples/go-compose through GHCR with keyless
+  # signing and examples/go-compose/policy.yaml, which trusts only this
+  # workflow on main. Publish (or reuse a previous run's result), reuse
+  # (hit), change the scope (miss), and an attestation signed with a key the
+  # policy does not trust (exit 5, expected here). Push to main only: it
+  # needs `packages: write` and `id-token: write`, which no PR-triggered job
+  # gets. The same story runs locally in tests/acceptance (run_test.go).
+  example-go-compose:
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      REPO: ghcr.io/trianalab/aval-example-go-compose
+      CONTRACT: examples/go-compose/aval.yaml
+      POLICY: examples/go-compose/policy.yaml
+      SCOPED: examples/go-compose/counter/counter.go
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+      - name: Build aval and log in to GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          make build
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          echo "| step | outcome |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish (runs and pushes unless a verified result exists)
+        run: |
+          ./bin/aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report publish.json
+          if [ "$(jq -r .outcome publish.json)" != "verified" ]; then
+            # The Actions OIDC token for Fulcio, fetched after the test so a
+            # slow test cannot outlive it. aval push reads SIGSTORE_ID_TOKEN.
+            SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
+            export SIGSTORE_ID_TOKEN
+            ./bin/aval push -f "$CONTRACT" --registry "$REPO"
+          fi
+          echo "| publish | \`$(jq -r .outcome publish.json)\` |" >> "$GITHUB_STEP_SUMMARY"
+      - name: Unchanged scope reuses (hit)
+        run: |
+          ./bin/aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report hit.json
+          jq -e '.outcome == "verified"' hit.json
+          echo "| unchanged scope | \`$(jq -r .outcome hit.json)\` (reused, test not run) |" >> "$GITHUB_STEP_SUMMARY"
+      - name: Changed scope re-runs (miss)
+        run: |
+          # Unique per run, so this fingerprint was never published.
+          echo "// demo change $GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$SCOPED"
+          ./bin/aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report miss.json
+          git checkout -- "$SCOPED"
+          jq -e '.outcome == "miss"' miss.json
+          echo "| changed scope | \`$(jq -r .outcome miss.json)\` (test ran) |" >> "$GITHUB_STEP_SUMMARY"
+      - name: Untrusted attestation fails verification (exit 5, expected)
+        run: |
+          # A fixed scope change that someone published with their own key,
+          # as anyone with write access to the repository could. Published
+          # once; later runs find it already there.
+          echo "// demo: published with an untrusted key" >> "$SCOPED"
+          code=0; ./bin/aval verify -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" || code=$?
+          if [ "$code" -eq 4 ]; then
+            openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$RUNNER_TEMP/untrusted.key"
+            ./bin/aval run -f "$CONTRACT" --no-reuse
+            ./bin/aval push -f "$CONTRACT" --registry "$REPO" --key "$RUNNER_TEMP/untrusted.key"
+          fi
+          code=0; ./bin/aval verify -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" -o json > untrusted.json || code=$?
+          git checkout -- "$SCOPED"
+          cat untrusted.json
+          test "$code" -eq 5 || { echo "::error::untrusted attestation: exit $code, want 5"; exit 1; }
+          jq -e '.outcome == "verification-failed"' untrusted.json
+          # Only the expected cause passes; any other verification failure
+          # is a real security event and fails the job (invariant 4).
+          jq -e '.reason | contains("key-based signature, but the policy accepts no keys")' untrusted.json \
+            || { echo "::error::untrusted attestation: unexpected verification failure: $(jq .reason untrusted.json)"; exit 1; }
+          echo "::warning title=aval verification failed (expected in this demo)::$(jq .reason untrusted.json)"
+          echo "| untrusted attestation | \`$(jq -r .outcome untrusted.json)\` (exit 5) |" >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: example-go-compose-reports
+          path: '*.json'
+          if-no-files-found: ignore
+
   # Dogfooding M1 (#28): Aval's own contract must fingerprint identically on
   # every OS and checkout path. Any difference is a determinism bug. CI-only
   # (needs several OSes), so it has no `make` leg.
@@ -278,6 +366,7 @@ jobs:
       - ci-docs
       - dependency-review
       - sigstore-keyless
+      - example-go-compose
       - dogfood-fingerprint
       - dogfood-compare
       - pr-title

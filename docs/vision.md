@@ -165,6 +165,9 @@ These formats are provisional until milestone 5 makes them stable.
    repo where one workflow run executes and publishes, a second run with
    unchanged inputs reuses the result, and a run with changed inputs misses
    and re-executes, all visible in the workflow logs.
+   *In progress:* the `example-go-compose` job in `.github/workflows/ci.yaml`
+   runs this story for `examples/go-compose` in this repository on every
+   push to `main` (see [its README](../examples/go-compose/README.md)).
 4. **False-hit suite.** Exit criterion: an automated suite that applies every
    known kind of relevant change (source, dependency, toolchain, env var,
    exec bit, contract edit, symlink, file rename) and asserts that none of
