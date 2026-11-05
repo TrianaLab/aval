@@ -76,9 +76,10 @@ example on every push to `main` against `ghcr.io/trianalab/aval-example-go-compo
 signing keyless with the workflow's OIDC token. [`policy.yaml`](policy.yaml)
 trusts only that workflow on `main`, at runner level. The job:
 
-1. **Publish.** `aval run --push`: on a miss it runs the test, signs the
-   result and publishes it; if an earlier run already published this
-   fingerprint, it reuses that result instead.
+1. **Publish.** `aval run`: if an earlier run already published this
+   fingerprint, it reuses that result. Otherwise the test runs and
+   `aval push` signs and publishes the result; the OIDC token is fetched
+   only then, after the test.
 2. **Hit.** `aval run` with the scope unchanged: outcome `verified`, the test
    does not run.
 3. **Miss.** Appends a comment to `counter/counter.go` (unique per run) and
@@ -86,8 +87,9 @@ trusts only that workflow on `main`, at runner level. The job:
 4. **Untrusted attestation.** For another fixed change to `counter.go`, a
    result signed with a throwaway key is published once, as anyone with write
    access to the repository could. `aval verify` reports
-   `verification-failed` and exits 5. The job expects that exit code and shows
-   it as a warning annotation.
+   `verification-failed` and exits 5. The job passes only when the reason is
+   the untrusted key; any other exit code or verification failure fails it.
+   The expected failure shows as a warning annotation.
 
 Each outcome goes to the job summary, and the verify reports are uploaded as
 the `example-go-compose-reports` artifact. The job needs `packages: write` and

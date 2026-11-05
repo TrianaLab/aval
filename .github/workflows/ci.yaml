@@ -233,14 +233,17 @@ jobs:
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           echo "| step | outcome |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-      - name: Publish (runs and pushes on a miss, reuses on a hit)
+      - name: Publish (runs and pushes unless a verified result exists)
         run: |
-          # The Actions OIDC token for Fulcio; aval reads it from
-          # SIGSTORE_ID_TOKEN and hides it from runner.command.
-          SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
-          export SIGSTORE_ID_TOKEN
-          ./bin/aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --push --report publish.json
+          ./bin/aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report publish.json
+          if [ "$(jq -r .outcome publish.json)" != "verified" ]; then
+            # The Actions OIDC token for Fulcio, fetched after the test so a
+            # slow test cannot outlive it. aval push reads SIGSTORE_ID_TOKEN.
+            SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
+            export SIGSTORE_ID_TOKEN
+            ./bin/aval push -f "$CONTRACT" --registry "$REPO"
+          fi
           echo "| publish | \`$(jq -r .outcome publish.json)\` |" >> "$GITHUB_STEP_SUMMARY"
       - name: Unchanged scope reuses (hit)
         run: |
@@ -272,7 +275,11 @@ jobs:
           cat untrusted.json
           test "$code" -eq 5 || { echo "::error::untrusted attestation: exit $code, want 5"; exit 1; }
           jq -e '.outcome == "verification-failed"' untrusted.json
-          echo "::warning title=aval verification failed (expected in this demo)::$(jq -r .reason untrusted.json)"
+          # Only the expected cause passes; any other verification failure
+          # is a real security event and fails the job (invariant 4).
+          jq -e '.reason | contains("key-based signature, but the policy accepts no keys")' untrusted.json \
+            || { echo "::error::untrusted attestation: unexpected verification failure: $(jq .reason untrusted.json)"; exit 1; }
+          echo "::warning title=aval verification failed (expected in this demo)::$(jq .reason untrusted.json)"
           echo "| untrusted attestation | \`$(jq -r .outcome untrusted.json)\` (exit 5) |" >> "$GITHUB_STEP_SUMMARY"
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
