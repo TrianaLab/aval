@@ -41,6 +41,7 @@ public Go API. It exposes:
 | `Parse(data []byte) (*Predicate, error)` | Decode predicate JSON and run `Validate`. Does not check signatures. |
 | `(*Predicate).Validate() error` | Structural checks: `schemaVersion == "v1"`, subject, `test.id`, `result`, fingerprint format `sha256:<64 hex>`, `runner.identity`, timestamps. |
 | `Verify(ctx, *Envelope, VerifyOptions) (*Verification, error)` | Check the DSSE signature against accepted identities, decode the statement and predicate, enforce the policy. **Milestone-2 stub**: returns `ErrNotImplemented` today. |
+| `MatchIdentity(ids, issuer, subject) (Identity, bool)` | The accepted identity that grants a signer the highest trust level. The issuer must be equal; `SubjectRegexp` must match the whole subject (anchored); an invalid regexp matches nothing. The level comes from the policy, never from the predicate. |
 | `VerifyOptions` | Expected fingerprint, expected test id, accepted `Identities` (empty accepts nothing), `MinTrustLevel`, `AllowedCacheability` (empty means `hermetic` and `controlled-environment` only). |
 | `ErrNotFound` | No attestation exists for the fingerprint. A miss; re-run. |
 | `ErrVerification` | An attestation exists but failed signature or policy checks. Security event. `*VerificationError` wraps it with a reason. |

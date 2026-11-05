@@ -210,6 +210,32 @@ type Identity struct {
 	TrustLevel TrustLevel `json:"trustLevel"`
 }
 
+// MatchIdentity returns the accepted identity that grants the highest trust
+// level to a signer with this OIDC issuer and certificate subject. The issuer
+// must be equal and non-empty, and SubjectRegexp must match the whole
+// subject (it is anchored even if the policy omits ^ and $). An invalid
+// regexp matches nothing. The level comes from the policy entry only, never
+// from a predicate's runner claim.
+func MatchIdentity(ids []Identity, issuer, subject string) (Identity, bool) {
+	var best Identity
+	found := false
+	for _, id := range ids {
+		if issuer == "" || id.Issuer != issuer || (found && id.TrustLevel <= best.TrustLevel) {
+			continue
+		}
+		// Compile the policy regexp alone first: wrapping an unbalanced one
+		// such as "a)|(b" would compile but escape the anchors.
+		if _, err := regexp.Compile(id.SubjectRegexp); err != nil {
+			continue
+		}
+		if !regexp.MustCompile(`^(?:` + id.SubjectRegexp + `)$`).MatchString(subject) {
+			continue
+		}
+		best, found = id, true
+	}
+	return best, found
+}
+
 // VerifyOptions is the trust policy applied by Verify.
 type VerifyOptions struct {
 	// ExpectedFingerprint must equal the predicate's execution fingerprint.

@@ -51,7 +51,7 @@ jobs:
           go-version-file: go.mod
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.13.0
+          version: v2.15.0
           install-only: true
       - run: make ci-static
 
@@ -181,6 +181,25 @@ jobs:
     steps:
       - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
 
+  # Live keyless signing (#6): Fulcio + Rekor on Sigstore public good with
+  # this workflow's OIDC identity, then verification of the bundle. Fork PRs
+  # get no OIDC token, so it runs on main and on PRs from this repository
+  # only; every other test uses in-process fakes. CI-only (needs the token),
+  # so it has no `make` leg.
+  sigstore-keyless:
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+      - run: go test -count=1 -tags sigstore_live -run '^TestKeylessSigningLive$' -v ./internal/attest
+
   # Dogfooding M1 (#28): Aval's own contract must fingerprint identically on
   # every OS and checkout path. Any difference is a determinism bug. CI-only
   # (needs several OSes), so it has no `make` leg.
@@ -258,6 +277,7 @@ jobs:
       - ci-security
       - ci-docs
       - dependency-review
+      - sigstore-keyless
       - dogfood-fingerprint
       - dogfood-compare
       - pr-title

@@ -91,3 +91,49 @@ func TestVerifyIsNotImplemented(t *testing.T) {
 		t.Fatalf("Verify = %v, %v; want nil, ErrNotImplemented", v, err)
 	}
 }
+
+func TestMatchIdentity(t *testing.T) {
+	const gh = "https://token.actions.githubusercontent.com"
+	const ci = "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"
+	ids := []Identity{
+		{Issuer: gh, SubjectRegexp: `https://github\.com/acme/orders/.*`, TrustLevel: TrustDeveloper},
+		{Issuer: gh, SubjectRegexp: `https://github\.com/acme/orders/\.github/workflows/ci\.yaml@refs/heads/main`, TrustLevel: TrustRunner},
+		{Issuer: "https://accounts.google.com", SubjectRegexp: `.*`, TrustLevel: TrustIsolated},
+	}
+	cases := []struct {
+		name, issuer, subject string
+		want                  TrustLevel
+		ok                    bool
+	}{
+		{"highest matching level wins", gh, ci, TrustRunner, true},
+		{"lower entry still matches other workflows", gh, "https://github.com/acme/orders/.github/workflows/dev.yaml@refs/heads/x", TrustDeveloper, true},
+		// False hits: none of these may be granted a level.
+		{"regexp is anchored at the start", gh, "https://evil.example/https://github.com/acme/orders/x", TrustUnknown, false},
+		{"regexp is anchored at the end", gh, ci + "-fork", TrustDeveloper, true},
+		{"other issuer, same subject", "https://evil.example", ci, TrustUnknown, false},
+		{"empty issuer never matches", "", ci, TrustUnknown, false},
+		{"issuer must be equal, not a prefix", gh + "/", ci, TrustUnknown, false},
+	}
+	for _, c := range cases {
+		id, ok := MatchIdentity(ids, c.issuer, c.subject)
+		if ok != c.ok || id.TrustLevel != c.want {
+			t.Errorf("%s: got %v %v, want %v %v", c.name, id.TrustLevel, ok, c.want, c.ok)
+		}
+	}
+	// The runner-level entry is anchored: a suffix only matches the wildcard
+	// developer entry, never the runner one.
+	if id, _ := MatchIdentity(ids[1:2], gh, ci+"-fork"); id.TrustLevel != TrustUnknown {
+		t.Errorf("suffix matched an anchored identity: %+v", id)
+	}
+	bad := []Identity{
+		{Issuer: gh, SubjectRegexp: `(`, TrustLevel: TrustIsolated},
+		// Unbalanced: wrapping it naively as ^(?:a)|(b)$ would match "a..." unanchored.
+		{Issuer: gh, SubjectRegexp: `https://x)|(y`, TrustLevel: TrustIsolated},
+	}
+	if id, ok := MatchIdentity(bad, gh, "https://x-anything"); ok {
+		t.Errorf("invalid regexp must match nothing, got %+v", id)
+	}
+	if _, ok := MatchIdentity(nil, gh, ci); ok {
+		t.Error("no identities must accept nothing")
+	}
+}

@@ -4,8 +4,9 @@ This document describes how Aval stores an execution result in an OCI
 registry, the attestation it signs, and the JSON that `aval verify --output json`
 prints. It is the contract external tools consume through `pkg/evidence`.
 
-Status: pre-alpha. The Go types in `pkg/evidence` are the source of truth. Push,
-lookup, fetch and signature verification are stubs until milestone 2; the
+Status: pre-alpha. The Go types in `pkg/evidence` are the source of truth.
+Signing is implemented; push, lookup, fetch and signature verification are
+stubs until milestone 2; the
 format below is what they will produce and consume.
 
 **Every media type, the predicate type and the report version are PROVISIONAL
@@ -110,9 +111,12 @@ The layer is a DSSE envelope (`evidence.Envelope`):
 }
 ```
 
-Signing and verification use Cosign / sigstore (keyless: Fulcio certificate,
-Rekor inclusion). This is milestone 2; `evidence.Verify` returns
-`ErrNotImplemented` today.
+Signing uses sigstore-go (`attest.Sign`, keyless with a Fulcio certificate
+and Rekor entry, or key-based; see [trust-model.md](trust-model.md#signing)).
+It also produces a Sigstore bundle (`application/vnd.dev.sigstore.bundle.v0.3+json`)
+carrying the certificate or key hint and the Rekor entry. How the bundle is
+attached to the OCI artifact is milestone 2 (#7). Verification is milestone 2
+too; `evidence.Verify` returns `ErrNotImplemented` today.
 
 ## in-toto Statement
 
