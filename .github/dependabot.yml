@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directories:
+      - /
+      - /examples/go-compose
+    schedule:
+      interval: weekly
+    rebase-strategy: auto
+  # Keeps the commit SHA pins in .github/workflows current (with their
+  # version comments).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    rebase-strategy: auto

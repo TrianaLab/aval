@@ -159,3 +159,64 @@ func TestMakeCILegsMirrorCIJobs(t *testing.T) {
 		}
 	}
 }
+
+var (
+	usesLine  = regexp.MustCompile(`(?m)^\s*(?:-\s*)?uses:\s*['"]?([^'"\s#]+)`)
+	pinnedSHA = regexp.MustCompile(`^[^@\s]+@[0-9a-f]{40}$`)
+)
+
+// unpinnedActions lists every `uses:` that is not a local action or a full
+// commit SHA. A tag or branch can be moved to new code; a SHA cannot.
+func unpinnedActions(data []byte) []string {
+	var bad []string
+	for _, m := range usesLine.FindAllSubmatch(data, -1) {
+		ref := string(m[1])
+		if !strings.HasPrefix(ref, "./") && !pinnedSHA.MatchString(ref) {
+			bad = append(bad, ref)
+		}
+	}
+	return bad
+}
+
+func TestActionsArePinnedBySHA(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join("..", "..", ".github", "workflows", "*.y*ml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) == 0 {
+		t.Fatal("no workflows found")
+	}
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, ref := range unpinnedActions(data) {
+			t.Errorf("%s: %s is not pinned by commit SHA", filepath.Base(f), ref)
+		}
+	}
+}
+
+func TestPinCheckCatchesTagsAndBranches(t *testing.T) {
+	wf := `
+jobs:
+  a:
+    uses: org/repo/.github/workflows/x.yaml@main
+    steps:
+      - uses: actions/checkout@v4
+      - uses: "actions/setup-go@v5.6.0"
+      - uses: actions/cache@0123456789abcdef0123456789abcdef0123456 # 39 hex
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./local-action
+`
+	got := unpinnedActions([]byte(wf))
+	want := []string{
+		"org/repo/.github/workflows/x.yaml@main",
+		"actions/checkout@v4",
+		"actions/setup-go@v5.6.0",
+		"actions/cache@0123456789abcdef0123456789abcdef0123456",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("unpinned = %v, want %v", got, want)
+	}
+}

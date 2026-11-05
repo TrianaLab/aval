@@ -1,5 +1,5 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
-	lint fmt fmt-check example fuzz ci ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz
+	lint fmt fmt-check example fuzz vuln ci ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz ci-security
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
 UNIT_PKGS = $(shell go list ./... | grep -v /tests/)
@@ -59,6 +59,19 @@ fuzz:
 		done; \
 	done
 
+# govulncheck reports known vulnerabilities that the code can reach, in
+# dependencies and in the standard library. It is installed into bin/ and run
+# with the project's own go (go.mod), so it checks the standard library Aval
+# builds with; `go run ...@version` would scan the newer toolchain govulncheck
+# itself requires. Building govulncheck needs go >= 1.26; GOTOOLCHAIN=auto
+# (the default) fetches it.
+GOVULNCHECK_VERSION := v1.9.0
+
+vuln:
+	GOBIN=$(CURDIR)/bin go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+	bin/govulncheck ./...
+	cd examples/go-compose && ../../bin/govulncheck ./...
+
 # One golangci-lint version for local runs and CI (ci.yaml installs the same
 # one; tests/architecture enforces it).
 GOLANGCI_LINT_VERSION := v2.13.0
@@ -81,7 +94,7 @@ example:
 # `make ci` is the gate CI runs and the one agents and humans run before
 # pushing. Each ci-* leg is one job in .github/workflows/ci.yaml, aggregated by
 # the `required` job (tests/architecture/ci_test.go enforces both).
-ci: ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz
+ci: ci-static ci-gates ci-engine ci-integration ci-acceptance ci-release ci-fuzz ci-security
 
 ci-static: fmt-check lint
 ci-gates: test-architecture
@@ -90,3 +103,4 @@ ci-integration: test-integration
 ci-acceptance: test-acceptance
 ci-release: test-release
 ci-fuzz: fuzz
+ci-security: vuln
