@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -187,6 +188,11 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 	pol, err := loadPolicy(policyFile)
 	if err != nil {
 		return fail(err)
+	}
+	// A class the policy does not allow is routine non-reuse, not a security
+	// event, so do not look (invariant 4).
+	if !c.Cacheability.ReusableByDefault() && !slices.Contains(pol.AllowedCacheability, string(c.Cacheability)) {
+		return fail(fmt.Errorf("cacheability %s is not reusable under the policy: %w", c.Cacheability, evidence.ErrNotFound))
 	}
 	sigs, err := newVerifier(pol.TrustedRoot, pol.Identities)
 	if err != nil {

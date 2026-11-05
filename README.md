@@ -19,7 +19,7 @@ CI on push: fingerprint inputs -> lookup sha256-<fp> -> verify signature + polic
 
 No server or database: ORAS, Cosign and OCI 1.1 referrers do the work, and artifacts are always consumed by digest. If input equivalence cannot be proven, the test runs.
 
-## Quickstart (target UX, not implemented yet)
+## Quickstart
 
 ```yaml
 # aval.yaml
@@ -39,7 +39,7 @@ cacheability: controlled-environment
 ```
 
 ```sh
-aval run --push --registry ghcr.io/acme/orders-aval      # reuse a verified result, or run and publish
+aval run --push --registry ghcr.io/acme/orders-aval --policy policy.yaml   # reuse a verified result, or run and publish
 aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml   # exit 0 verified, 4 miss, 5 verification failed
 ```
 

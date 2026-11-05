@@ -12,6 +12,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -53,7 +55,8 @@ result disagrees with the run, that is a false hit and run exits 1.
 
 Exit codes: 0 passed or reused a pass, 3 failed or reused a failure,
 5 verification failed (after running the test), 1 error or false hit,
-2 usage. Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
+2 usage. Keyless signing reads the OIDC token from $` + idTokenEnv + `;
+runner.command never sees it.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runTest(cmd, o) },
 	}
@@ -96,14 +99,21 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 			return err
 		}
 	}
+	// Read the signing token once and keep it out of the environment, so
+	// neither runner.command nor anything else started later inherits it.
+	token := os.Getenv(idTokenEnv)
+	_ = os.Unsetenv(idTokenEnv) // ponytail: only fails on an invalid name
 	r, lookupErr := decide(ctx, out, warn, c, fp, fpErr, o)
 	_ = writeReport(out, "text", r) // text never fails, like the other lines printed
+	// No I/O failure may skip the test or hide a verification failure
+	// (invariants 3, 4): errors are collected, never returned early.
+	var errs []error
 	if o.reportFile != "" {
 		if err := writeReportFile(o.reportFile, r); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
-	if r.Outcome == evidence.OutcomeVerified && !o.shadow {
+	if r.Outcome == evidence.OutcomeVerified && !o.shadow && len(errs) == 0 {
 		fmt.Fprintf(out, "reused %s result %s\n", r.Result, r.Reference)
 		if r.Result != evidence.ResultPassed {
 			return fmt.Errorf("reused result %s: %w", r.Result, errTestFailed)
@@ -111,7 +121,6 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 		return nil
 	}
 	// A security event: run the test, then exit 5 (invariant 4).
-	var errs []error
 	if errors.Is(lookupErr, evidence.ErrVerification) {
 		fmt.Fprintf(warn, "aval: SECURITY: attestation verification failed for %s: %v; running the test\n", c.Metadata.Name, lookupErr)
 		errs = append(errs, lookupErr)
@@ -121,12 +130,13 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 		return errors.Join(append(errs, err)...)
 	}
 	fmt.Fprintf(out, "ran %s: %s (exit %d)\n", c.Metadata.Name, p.Result, p.Execution.ExitCode)
-	errs = append(errs, keep(ctx, out, p, fpErr, o)...)
+	errs = append(errs, keep(ctx, out, p, fpErr, token, o)...)
 	return errors.Join(append(errs, judge(out, warn, r, p))...)
 }
 
 // printFingerprint handles --explain and --fingerprint-only. Both need the
-// fingerprint, so its error is final here. --explain alone goes on to run.
+// fingerprint, so its error is final here. --explain alone goes on to run
+// when the fingerprint is known.
 func printFingerprint(out io.Writer, fp fingerprint.Fingerprint, fpErr error, o runFlags) error {
 	if fpErr != nil {
 		return fpErr
@@ -179,11 +189,13 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 
 // execute runs runner.command in the contract's directory and returns the
 // unsigned predicate for the run. A command that cannot start is an error,
-// not a failed test.
+// not a failed test. The signing token is withheld from the command: the code
+// under test must not be able to sign results as this workload.
 func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract, dir string, fp fingerprint.Fingerprint) (*evidence.Predicate, error) {
 	argv := c.Runner.Command
 	x := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	x.Dir, x.Stdout, x.Stderr = dir, stdout, stderr
+	x.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, idTokenEnv+"=") })
 	start := time.Now().UTC()
 	err := x.Run()
 	var exit *exec.ExitError
@@ -213,7 +225,7 @@ func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract
 
 // keep records the result and, with --push, publishes it. Without a
 // fingerprint there is nothing a result could be reused for.
-func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr error, o runFlags) []error {
+func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr error, token string, o runFlags) []error {
 	if fpErr != nil {
 		if o.push {
 			return []error{fmt.Errorf("result not published: %w", fpErr)}
@@ -226,7 +238,7 @@ func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr error
 	if !o.push {
 		return nil
 	}
-	ref, err := signAndPush(ctx, p, o.repo, o.key)
+	ref, err := signAndPush(ctx, p, o.repo, o.key, token)
 	if err != nil {
 		return []error{err}
 	}
@@ -250,12 +262,12 @@ func writeJSON(path string, v any) error {
 }
 
 // signAndPush signs the predicate (key-based with key, else keyless with the
-// token in $SIGSTORE_ID_TOKEN) and publishes it under its fingerprint.
-func signAndPush(ctx context.Context, p *evidence.Predicate, repo, key string) (string, error) {
+// OIDC token) and publishes it under its fingerprint.
+func signAndPush(ctx context.Context, p *evidence.Predicate, repo, key, token string) (string, error) {
 	st, err := attest.NewStatement(p)
 	var s *attest.Signed
 	if err == nil {
-		s, err = sign(ctx, st, attest.SignOptions{Key: key, IDToken: os.Getenv(idTokenEnv)})
+		s, err = sign(ctx, st, attest.SignOptions{Key: key, IDToken: token})
 	}
 	if err != nil {
 		return "", fmt.Errorf("signing: %w", err)
@@ -296,7 +308,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 				return fmt.Errorf("recorded result is for test %q (%s) with fingerprint %s; the contract is %q (%s) with fingerprint %s: run the test again",
 					p.Test.ID, p.Test.Cacheability, p.Execution.Fingerprint, c.Metadata.Name, c.Cacheability, fp.Digest)
 			}
-			ref, err := signAndPush(cmd.Context(), p, repo, key)
+			ref, err := signAndPush(cmd.Context(), p, repo, key, os.Getenv(idTokenEnv))
 			if err != nil {
 				return err
 			}

@@ -190,7 +190,7 @@ directory:
 |---|---|---|
 | `verified`, result `passed` | reuse, do not run | 0 |
 | `verified`, result `failed` | reuse the failure, do not run | 3 |
-| `miss` (also: no `--registry`, no `--policy`, `--no-reuse`, `non-deterministic`) | run | test result: 0 or 3 |
+| `miss` (also: no `--registry`, no `--policy`, `--no-reuse`, `non-deterministic`, `external-dependencies` not in `AllowedCacheability`) | run | test result: 0 or 3 |
 | `error` (registry, policy or fingerprint error) | run | test result: 0 or 3 |
 | `verification-failed` | run, print `aval: SECURITY: ...` on stderr | 5, whatever the test result |
 
@@ -201,6 +201,14 @@ Otherwise the run is recorded as an unsigned predicate in `--result`
 `aval push` publishes a recorded result later, only if its test id,
 cacheability and fingerprint still match the contract.
 
+A `--report` file that cannot be written does not skip the test: `aval run`
+then never reuses, runs the test, and still exits 5 on a verification
+failure.
+
+`$SIGSTORE_ID_TOKEN` is read once and removed from the environment before
+`runner.command` starts: the code under test cannot use it to sign results as
+the workload identity.
+
 `--shadow` verifies and runs the test anyway. If a verified result disagrees
 with the real run, that is a false hit: `aval run` prints `aval: FALSE HIT:
 ...` on stderr and exits 1. If they agree, it says reuse would have been
@@ -208,6 +216,8 @@ correct.
 
 Defense in depth for cacheability (invariant 7): a `non-deterministic`
 contract is a miss without any lookup, in `aval run` and `aval verify`, and
+so is an `external-dependencies` contract that the policy does not list in
+`AllowedCacheability` (routine non-reuse, not a security event). Also,
 a candidate whose signed `test.cacheability` differs from the local
 contract's is a verification failure, even if the policy would allow its
 class.

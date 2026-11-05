@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/TrianaLab/aval/internal/attest"
+	"github.com/TrianaLab/aval/internal/policy"
 	"github.com/TrianaLab/aval/internal/registry"
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
@@ -215,6 +216,74 @@ func TestRunVerificationFailureSurvivesStartError(t *testing.T) {
 	}
 }
 
+// A --report that cannot be written never skips the test nor hides a
+// verification failure, and never lets a result be reused (invariants 3, 4).
+func TestRunReportWriteFailure(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	under := filepath.Join(file, "report.json") // its directory is a file
+	cases := []struct {
+		name   string
+		cand   candidate
+		code   int
+		stderr string
+	}{
+		{"verification failure still runs and exits 5", candidate{verifyErr: &evidence.VerificationError{Reason: "untrusted"}}, ExitVerificationFailed, "SECURITY"},
+		{"verified result is not reused", candidate{trust: evidence.TrustRunner}, ExitError, "writing report"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeCandidates(t, nil, map[string]candidate{"sha256:aa": tc.cand})
+			argv, ran := marker(t, 0)
+			code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", argv...), "--registry", "r", "--policy", "p.yaml", "--result", filepath.Join(t.TempDir(), "r.json"), "--report", under)
+			if code != tc.code || !ran() || !strings.Contains(stderr, tc.stderr) || !strings.Contains(stderr, "writing report") {
+				t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
+			}
+		})
+	}
+}
+
+// The keyless signing token never reaches runner.command, which could
+// otherwise sign results as this workload; aval itself still signs with it.
+func TestRunWithholdsSigningToken(t *testing.T) {
+	signed := fakePublish(t, nil, nil) // sets the token and checks signing gets it
+	c := contractWith(t, "hermetic", "sh", "-c", `test -z "$`+idTokenEnv+`"`)
+	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "r", "--push", "--result", filepath.Join(t.TempDir(), "r.json"))
+	if code != ExitOK || len(*signed) != 1 {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	if _, set := os.LookupEnv(idTokenEnv); set {
+		t.Fatalf("$%s still set after run", idTokenEnv)
+	}
+}
+
+// An external-dependencies contract the policy does not allow is a miss
+// without lookup, not a security event; listing it in the policy looks up.
+func TestExternalDependenciesFollowsPolicy(t *testing.T) {
+	for _, allowed := range []bool{false, true} {
+		t.Run(fmt.Sprint("allowed=", allowed), func(t *testing.T) {
+			fakeCandidates(t, nil, map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, cacheability: "external-dependencies"}})
+			want, code := evidence.OutcomeVerified, ExitOK
+			if allowed {
+				loadPolicy = func(string) (*policy.Policy, error) {
+					return &policy.Policy{AllowedCacheability: []string{"external-dependencies"}}, nil
+				}
+			} else {
+				noLookup(t)
+				want, code = evidence.OutcomeMiss, ExitMiss
+			}
+			c := writeContract(t, "external-dependencies")
+			got, stdout, stderr := runCLI("verify", "-f", c, "--registry", "r", "--policy", "p.yaml", "-o", "json")
+			var r evidence.Report
+			if err := json.Unmarshal([]byte(stdout), &r); err != nil || got != code || r.Outcome != want || strings.Contains(stderr, "SECURITY") {
+				t.Fatalf("exit %d, report %+v, stderr %q", got, r, stderr)
+			}
+		})
+	}
+}
+
 // fakePublish replaces signing and publishing; it records what was signed.
 func fakePublish(t *testing.T, signErr, pushErr error) *[]*evidence.Statement {
 	t.Helper()
@@ -244,6 +313,7 @@ func TestRunThenPush(t *testing.T) {
 	if code, _, stderr := runCLI("run", "-f", c, "--result", result); code != ExitTestFailed {
 		t.Fatalf("run: exit %d, stderr %q", code, stderr)
 	}
+	t.Setenv(idTokenEnv, "token") // run unset it
 	code, stdout, stderr := runCLI("push", "-f", c, "--registry", "r", "--result", result)
 	if code != ExitOK || !strings.Contains(stdout, "pushed r@sha256:bb") || len(*signed) != 1 {
 		t.Fatalf("push: exit %d, stdout %q, stderr %q", code, stdout, stderr)
@@ -256,7 +326,6 @@ func TestRunThenPush(t *testing.T) {
 	if p.Result != evidence.ResultFailed || p.Execution.ExitCode != 1 || p.Execution.Fingerprint != fp.Digest || p.Test.ID != "unit" || p.Test.Cacheability != "hermetic" {
 		t.Fatalf("pushed predicate %+v", p)
 	}
-
 }
 
 // A recorded result that does not apply to the current inputs, or cannot be

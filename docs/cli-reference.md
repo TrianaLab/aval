@@ -79,7 +79,8 @@ result disagrees with the run, that is a false hit and run exits 1.
 
 Exit codes: 0 passed or reused a pass, 3 failed or reused a failure,
 5 verification failed (after running the test), 1 error or false hit,
-2 usage. Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
+2 usage. Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN;
+runner.command never sees it.
 
 ```text
 Usage:
