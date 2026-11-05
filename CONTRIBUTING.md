@@ -4,12 +4,15 @@
 
 - Go version: whatever `go.mod` says (currently 1.25).
 - [golangci-lint](https://golangci-lint.run) at the exact version `GOLANGCI_LINT_VERSION` in the `Makefile` (CI installs the same one; `make lint` refuses any other). Config in `.golangci.yml`, including the cyclomatic complexity cap of 15.
+- For `make docs-lint`: Node.js (`npx` fetches markdownlint-cli2 at the pinned `MARKDOWNLINT_CLI2_VERSION`) and [Vale](https://vale.sh) at the exact `VALE_VERSION` in the `Makefile`.
 
 ```sh
 make build   # bin/aval
 make ci      # every gate CI runs; run it before every push
 make lint    # go vet + golangci-lint
 make fmt     # gofmt -w .
+make docs-lint  # markdownlint + vale over every Markdown file
+make docs-cli   # regenerate docs/cli-reference.md after changing a command or flag
 ```
 
 ## Testing
@@ -60,6 +63,7 @@ Two more rules once you have picked:
 | `ci-release` | level 5 |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
 | `ci-security` | govulncheck on both modules (needs network) |
+| `ci-docs` | markdownlint and vale (`make docs-lint`), and `docs/cli-reference.md` matches the cobra commands |
 
 CI also runs `dogfood-fingerprint` and `dogfood-compare` (Aval's own contract
 must fingerprint identically across OSes and checkout paths) and, on pull
@@ -70,13 +74,19 @@ action fails on every PR. `security.yaml` reruns govulncheck daily, which also
 covers merges by the Dependabot workflow (they use `GITHUB_TOKEN` and trigger
 no workflow); see `SECURITY.md` for Dependabot and how to report a
 vulnerability. A PR that changes only Markdown or `docs/` skips every job
-except `ci-gates` and `dependency-review`. The `required` job aggregates every
+except `ci-gates`, `ci-docs` and `dependency-review`. The `required` job aggregates every
 other job and is the only required status check; `tests/architecture` fails if
 a job is not wired into it. It also enforces that `pkg/evidence` depends only
 on the standard library and allowlisted modules, that no Go code names a
 consumer, that every action is pinned by commit SHA, that every `TODO` names a
-milestone, that the golangci-lint pin matches between `Makefile` and CI, and
-that the complexity cap stays at 15.
+milestone, that the golangci-lint pin matches between `Makefile` and CI, that the
+complexity cap stays at 15, and that every relative link and heading anchor in
+the Markdown resolves (external URLs are not fetched, so the gate stays
+offline).
+
+Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
+marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint
+every Markdown file except `.agents/`, `.claude/` and `CLAUDE.md`.
 
 ## Commits
 

@@ -1,0 +1,46 @@
+extends: existence
+message: "'%s' is marketing register. State what it does, or delete the adjective."
+level: error
+ignorecase: true
+# Only words with no technical sense in these docs, so a hit is a real hit.
+# `simply` and `just` are absent: their restrictive sense ("only") is fine;
+# Filler.yml catches the dismissive imperative.
+tokens:
+  - seamless(?:ly)?
+  - effortless(?:ly)?
+  - blazing(?:ly)?
+  - lightning[- ]fast
+  - turnkey
+  - world[- ]class
+  - best[- ](?:in[- ]class|of[- ]breed)
+  - (?:cutting|bleeding)[- ]edge
+  - state[- ]of[- ]the[- ]art
+  - industry[- ]leading
+  - enterprise[- ]grade
+  - next[- ]gen(?:eration)?
+  - game[- ]chang(?:er|ing)
+  - revolutionary
+  - groundbreaking
+  - paradigm shift
+  - (?:super|turbo)charge[ds]?
+  - unparalleled
+  - unmatched
+  - rock[- ]solid
+  - battle[- ]tested
+  - one[- ]stop
+  - robust
+  - powerful
+  - comprehensive
+  - holistic
+  - synerg(?:y|ies|istic)
+  - delightful
+  - magical
+  - elegant
+  - beautiful
+  - stunning
+  - awesome
+  - amazing
+  - incredible
+  - rich (?:documentation|feedback|experience|set|ecosystem)
+  # "Leverage" is always "use".
+  - \bleverag\w+

@@ -142,6 +142,30 @@ jobs:
           go-version-file: go.mod
       - run: make ci-security
 
+  # Docs gates: markdownlint, vale and CLI reference drift. No path filter:
+  # a docs-only PR must run it too. Links are checked in ci-gates.
+  ci-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+      # Release binary checked against a pinned sha256; the version must equal
+      # VALE_VERSION in the Makefile (`make docs-lint` refuses any other).
+      - name: Install vale
+        env:
+          VALE_VERSION: 3.21.0
+          VALE_SHA256: 96997d19a4ca6981673b0d4c5ca7f3ede4a9f97964a96edc29fba9e28a328336
+        run: |
+          tgz="$RUNNER_TEMP/vale.tar.gz"
+          curl -fsSL --retry 5 --retry-all-errors -o "$tgz" \
+            "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+          echo "$VALE_SHA256  $tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/vale" && tar -xzf "$tgz" -C "$RUNNER_TEMP/vale" vale
+          echo "$RUNNER_TEMP/vale" >> "$GITHUB_PATH"
+      - run: make ci-docs
+
   # Fails a PR that adds a dependency with a known vulnerability. GitHub only
   # (needs the PR's dependency graph diff), so it has no `make` leg.
   # Skipped until a maintainer enables Settings > Code security > Dependency
@@ -209,6 +233,7 @@ jobs:
       - ci-release
       - ci-fuzz
       - ci-security
+      - ci-docs
       - dependency-review
       - dogfood-fingerprint
       - dogfood-compare

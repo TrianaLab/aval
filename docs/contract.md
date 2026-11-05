@@ -125,7 +125,7 @@ The fingerprint is `sha256:<hex>` of a canonical, line-oriented manifest
 (format `aval-fingerprint/v1`). `aval run --explain` prints the exact text
 that was hashed. Layout, in this order:
 
-```
+```text
 aval-fingerprint/v1
 contract <sha256 of canonical contract JSON>
 source <sha256> <mode> <path>

@@ -70,6 +70,7 @@ A change that breaks one of these is wrong, even if tests pass.
 | `make ci-release` | level 5: `tests/release` (`make test-release`) |
 | `make ci-fuzz` | every `Fuzz*` target for `FUZZTIME` (default 10s) each (`make fuzz`); crashers land in `testdata/fuzz/` |
 | `make ci-security` | govulncheck (pinned version) on both modules against the go.mod toolchain (`make vuln`); needs network |
+| `make ci-docs` | markdownlint, vale, CLI reference drift (`make docs-lint`; regenerate with `make docs-cli`) |
 | `make coverage` | unit tests plus an HTML report in `coverage.html` |
 | `make build` | `bin/aval` |
 

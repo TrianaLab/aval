@@ -8,7 +8,7 @@ Aval is not a test cache. It is a CI primitive for **verifiable test execution r
 
 ## How it works
 
-```
+```text
 dev / CI:   run test -> fingerprint inputs -> sign (in-toto/DSSE) -> push to OCI registry
                                                                      tag sha256-<fp>
 CI on push: fingerprint inputs -> lookup sha256-<fp> -> verify signature + policy -> reuse
@@ -49,7 +49,7 @@ Only the contract and fingerprinting work today: `aval run --fingerprint-only` p
 
 ## Docs
 
-[Vision](docs/vision.md) · [Trust model](docs/trust-model.md) · [Artifact format](docs/artifact-format.md) · [Contract](docs/contract.md) · [Integrations](docs/integrations.md) · [Example: Go + Compose](examples/go-compose)
+[Vision](docs/vision.md) · [Trust model](docs/trust-model.md) · [Artifact format](docs/artifact-format.md) · [Contract](docs/contract.md) · [Integrations](docs/integrations.md) · [CLI reference](docs/cli-reference.md) · [Example: Go + Compose](examples/go-compose)
 
 ## License
 
