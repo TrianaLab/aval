@@ -31,6 +31,11 @@ const (
 	// execution result. Provisional.
 	ArtifactType = "application/vnd.trianalab.aval.execution.v1"
 
+	// ArtifactTypeFingerprint is the OCI artifactType of the per-fingerprint
+	// anchor manifest that every execution manifest refers to (its subject).
+	// Provisional.
+	ArtifactTypeFingerprint = "application/vnd.trianalab.aval.fingerprint.v1"
+
 	// MediaTypeDSSE is the media type of the signed DSSE envelope layer.
 	MediaTypeDSSE = "application/vnd.dsse.envelope.v1+json"
 

@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -131,24 +133,49 @@ func TestVerifyJSONReport(t *testing.T) {
 	}
 }
 
-// fakeVerify replaces the milestone-2 seams for one test.
+// fakeVerify replaces the milestone-2 seams for one test with a single
+// candidate.
 func fakeVerify(t *testing.T, lookupErr, fetchErr, verifyErr error) {
+	t.Helper()
+	fakeCandidates(t, lookupErr, map[string]candidate{"sha256:feed": {fetchErr: fetchErr, verifyErr: verifyErr, trust: evidence.TrustRunner}})
+}
+
+type candidate struct {
+	fetchErr, verifyErr error
+	trust               evidence.TrustLevel
+}
+
+// fakeCandidates makes lookup return the given candidates, sorted by digest,
+// each fetching and verifying as described.
+func fakeCandidates(t *testing.T, lookupErr error, cands map[string]candidate) {
 	t.Helper()
 	l, lk, f, v := loadPolicy, lookup, fetch, verifyEnvelope
 	t.Cleanup(func() { loadPolicy, lookup, fetch, verifyEnvelope = l, lk, f, v })
 	loadPolicy = func(string) (*policy.Policy, error) { return &policy.Policy{}, nil }
-	lookup = func(_ context.Context, repo, fp string) (registry.Descriptor, error) {
-		return registry.Descriptor{Repository: repo, Digest: "sha256:feed"}, lookupErr
+	lookup = func(_ context.Context, repo, fp string) ([]registry.Descriptor, error) {
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
+		var ds []registry.Descriptor
+		for _, dg := range slices.Sorted(maps.Keys(cands)) {
+			ds = append(ds, registry.Descriptor{Repository: repo, Digest: dg})
+		}
+		return ds, nil
 	}
-	fetch = func(context.Context, registry.Descriptor) (*evidence.Envelope, error) {
-		return &evidence.Envelope{}, fetchErr
+	fetch = func(_ context.Context, d registry.Descriptor) (*registry.Attestation, error) {
+		if err := cands[d.Digest].fetchErr; err != nil {
+			return nil, err
+		}
+		// The digest travels in the envelope so verify knows the candidate.
+		return &registry.Attestation{Envelope: &evidence.Envelope{Payload: []byte(d.Digest)}}, nil
 	}
-	verifyEnvelope = func(_ context.Context, _ *evidence.Envelope, o evidence.VerifyOptions) (*evidence.Verification, error) {
-		if verifyErr != nil {
-			return nil, verifyErr
+	verifyEnvelope = func(_ context.Context, env *evidence.Envelope, o evidence.VerifyOptions) (*evidence.Verification, error) {
+		c := cands[string(env.Payload)]
+		if c.verifyErr != nil {
+			return nil, c.verifyErr
 		}
 		p := &evidence.Predicate{Test: evidence.Test{ID: o.ExpectedTestID}, Result: evidence.ResultPassed}
-		return &evidence.Verification{Predicate: p, Signer: evidence.Identity{Issuer: "https://issuer.example"}}, nil
+		return &evidence.Verification{Predicate: p, Signer: evidence.Identity{Issuer: "https://issuer.example", TrustLevel: c.trust}}, nil
 	}
 }
 
@@ -198,5 +225,65 @@ func TestWriteReportPropagatesWriteErrors(t *testing.T) {
 	root.SetArgs([]string{"verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "-o", "json"})
 	if err := root.Execute(); err == nil || errors.Is(err, evidence.ErrNotFound) {
 		t.Fatalf("report write failure must win over the outcome, got %v", err)
+	}
+}
+
+// Several attestations per fingerprint: the policy picks the verified one with
+// the highest trust; rejected candidates are reported, and a verification
+// failure is never hidden behind a plain error (invariant 4).
+func TestVerifyPicksAmongCandidates(t *testing.T) {
+	untrusted := &evidence.VerificationError{Reason: "untrusted signer"}
+	down := errors.New("registry down")
+	cases := []struct {
+		name    string
+		lookup  error
+		cands   map[string]candidate
+		code    int
+		outcome evidence.Outcome
+		ref     string
+		warns   int
+	}{
+		{"highest trust wins", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustDeveloper},
+			"sha256:bb": {trust: evidence.TrustIsolated},
+			"sha256:cc": {trust: evidence.TrustRunner},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", 0},
+		{"tie keeps lookup order", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustRunner},
+			"sha256:bb": {trust: evidence.TrustRunner},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", 0},
+		{"later untrusted push does not replace a trusted result", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustRunner},
+			"sha256:ff": {verifyErr: untrusted},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", 1},
+		{"untrusted push does not become a hit", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: down},
+			"sha256:ff": {verifyErr: untrusted},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:ff", 0},
+		{"verification failure outranks an earlier error", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: down},
+			"sha256:bb": {verifyErr: untrusted},
+			"sha256:cc": {verifyErr: down},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:bb", 0},
+		{"only errors", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: down},
+		}, ExitError, evidence.OutcomeError, "r@sha256:aa", 0},
+		{"empty answer is a miss", nil, map[string]candidate{}, ExitMiss, evidence.OutcomeMiss, "", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeCandidates(t, tc.lookup, tc.cands)
+			code, stdout, stderr := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "--policy", "p.yaml", "-o", "json")
+			var r evidence.Report
+			if err := json.Unmarshal([]byte(stdout), &r); err != nil {
+				t.Fatal(err)
+			}
+			if code != tc.code || r.Outcome != tc.outcome || r.Reference != tc.ref {
+				t.Fatalf("exit %d outcome %q ref %q; want %d %q %q", code, r.Outcome, r.Reference, tc.code, tc.outcome, tc.ref)
+			}
+			if got := strings.Count(stderr, "warning: rejected attestation"); got != tc.warns {
+				t.Fatalf("%d rejection warnings, want %d; stderr %q", got, tc.warns, stderr)
+			}
+		})
 	}
 }

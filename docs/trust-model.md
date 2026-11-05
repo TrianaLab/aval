@@ -2,7 +2,8 @@
 
 Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
 Signing (`attest.Sign`) is implemented but not yet wired into the CLI.
-Lookup, verification and policy loading are milestone-2 stubs that
+Push, lookup and fetch against an OCI registry (`internal/registry`) are
+implemented. Verification and policy loading are milestone-2 stubs that
 return "not implemented" (exit code 6). This document describes the model
 the code is built around; where behavior is not implemented yet, it says so.
 
@@ -61,8 +62,9 @@ in one of two modes:
   most level 1.
 
 Besides the envelope, `Sign` returns the Sigstore bundle (v0.3 JSON) with the
-verification material (certificate or key hint, Rekor entry). Where the
-bundle is stored in the registry is milestone 2 (#7).
+verification material (certificate or key hint, Rekor entry). `registry.Push`
+stores it next to the envelope as an optional layer of the execution manifest
+(see [artifact-format.md](artifact-format.md#oci-layout)).
 
 ## Trust levels
 
@@ -115,9 +117,17 @@ the test runs.
   outcome `error`, exit 1. For execution purposes this is a miss: run the
   test.
 - **Consume by digest.** `registry.Lookup` resolves the tag
-  `sha256-<fingerprint hex>` to a manifest digest; everything after that
-  (fetch, verify, report `reference`) uses `repo@sha256:...`. The tag is
-  only an index for lookup. It is mutable and is never trusted on its own.
+  `sha256-<fingerprint hex>`, checks that it points at the fingerprint's
+  deterministic anchor manifest (a moved tag is a verification failure), and
+  returns the anchor's referrers as candidate manifest digests; everything
+  after that (fetch, verify, report `reference`) uses `repo@sha256:...`. The
+  tag is only an index for lookup. It is mutable and is never trusted on its
+  own.
+- **No silent replacement.** Pushes only add referrers to the anchor; a later
+  push for the same fingerprint cannot replace an earlier attestation. Every
+  candidate is verified and the policy picks the verified one with the
+  highest trust level; a candidate that fails never decides the outcome while
+  another verifies, and is reported on stderr.
 - **Unknown or missing fields** in `aval.yaml` are rejected (exit 2) rather
   than ignored.
 

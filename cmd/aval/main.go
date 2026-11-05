@@ -214,7 +214,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event).`,
 			if err != nil {
 				return err
 			}
-			report, err := verify(cmd.Context(), c, fp, repo, policyFile)
+			report, err := verify(cmd.Context(), cmd.ErrOrStderr(), c, fp, repo, policyFile)
 			if werr := writeReport(cmd.OutOrStdout(), output, report); werr != nil {
 				return werr
 			}
@@ -229,7 +229,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event).`,
 	return cmd
 }
 
-func verify(ctx context.Context, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
+func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
 	r := evidence.Report{Version: evidence.ReportVersion, TestID: c.Metadata.Name, Fingerprint: fp.Digest}
 	fail := func(err error) (evidence.Report, error) {
 		r.Reason = err.Error()
@@ -253,21 +253,63 @@ func verify(ctx context.Context, c *contract.Contract, fp fingerprint.Fingerprin
 	if err != nil {
 		return fail(err)
 	}
-	desc, err := lookup(ctx, repo, fp.Digest)
+	cands, err := lookup(ctx, repo, fp.Digest)
+	if err == nil && len(cands) == 0 {
+		err = evidence.ErrNotFound // fail closed on an empty answer
+	}
 	if err != nil {
 		return fail(err)
 	}
-	r.Reference = desc.Reference()
-	env, err := fetch(ctx, desc)
+	best, ref, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest))
+	r.Reference = ref
 	if err != nil {
 		return fail(err)
 	}
-	v, err := verifyEnvelope(ctx, env, pol.VerifyOptions(c.Metadata.Name, fp.Digest))
-	if err != nil {
-		return fail(err)
-	}
-	r.Outcome, r.Result, r.Signer, r.Predicate = evidence.OutcomeVerified, v.Predicate.Result, &v.Signer, v.Predicate
+	r.Outcome, r.Result, r.Signer, r.Predicate = evidence.OutcomeVerified, best.Predicate.Result, &best.Signer, best.Predicate
 	return r, nil
+}
+
+// pick verifies every candidate and lets the policy choose: the verified one
+// with the highest trust level wins (ties: lowest digest, the lookup order).
+// Rejected candidates never decide the outcome while another verifies, but
+// they are reported on warn, not dropped. With no verified candidate it
+// returns the reference and error of the first verification failure, which
+// outranks any other error: it is the security event that must surface.
+func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions) (*evidence.Verification, string, error) {
+	var (
+		best             *evidence.Verification
+		bestRef, failRef string
+		failErr          error
+		rejected         []string
+	)
+	for _, d := range cands {
+		v, err := verifyCandidate(ctx, d, opts)
+		if err == nil {
+			if best == nil || v.Signer.TrustLevel > best.Signer.TrustLevel {
+				best, bestRef = v, d.Reference()
+			}
+			continue
+		}
+		if failErr == nil || (errors.Is(err, evidence.ErrVerification) && !errors.Is(failErr, evidence.ErrVerification)) {
+			failErr, failRef = err, d.Reference()
+		}
+		rejected = append(rejected, fmt.Sprintf("%s: %v", d.Reference(), err))
+	}
+	if best == nil {
+		return nil, failRef, failErr
+	}
+	for _, msg := range rejected {
+		fmt.Fprintf(warn, "aval: warning: rejected attestation %s\n", msg)
+	}
+	return best, bestRef, nil
+}
+
+func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions) (*evidence.Verification, error) {
+	a, err := fetch(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	return verifyEnvelope(ctx, a.Envelope, opts)
 }
 
 func writeReport(w io.Writer, format string, r evidence.Report) error {

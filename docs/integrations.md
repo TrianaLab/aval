@@ -18,7 +18,8 @@ contract.
 ### 1. OCI artifact and predicate format
 
 An execution result is an in-toto v1 Statement wrapped in a DSSE envelope,
-stored in an OCI registry, tagged `sha256-<fingerprint hex>` and consumed by
+stored in an OCI registry, found through the tag `sha256-<fingerprint hex>`
+and the OCI 1.1 referrers of the manifest it points at, and consumed by
 digest. The predicate type is
 `https://aval.trianalab.io/attestation/execution/v1` (provisional).
 
