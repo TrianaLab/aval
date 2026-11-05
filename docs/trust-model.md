@@ -113,9 +113,10 @@ the test runs.
 - **Fingerprint errors** (empty source scope, missing or mismatched
   dependency, symlink in scope, unreadable file): input equivalence cannot
   be proven, so there is nothing to look up. Run the test.
-- **Registry errors** (unreachable, auth failure, malformed manifest):
-  outcome `error`, exit 1. For execution purposes this is a miss: run the
-  test.
+- **Registry errors** (unreachable, auth failure): outcome `error`, exit 1.
+  For execution purposes this is a miss: run the test. A malformed
+  attestation manifest, or a fingerprint tag that does not point at the
+  fingerprint anchor, is a verification failure (exit 5).
 - **Consume by digest.** `registry.Lookup` resolves the tag
   `sha256-<fingerprint hex>`, checks that it points at the fingerprint's
   deterministic anchor manifest (a moved tag is a verification failure), and
@@ -127,7 +128,8 @@ the test runs.
   push for the same fingerprint cannot replace an earlier attestation. Every
   candidate is verified and the policy picks the verified one with the
   highest trust level; a candidate that fails never decides the outcome while
-  another verifies, and is reported on stderr.
+  another verifies, and is listed in `rejected` in the verify report (and on
+  stderr), so the security event stays visible.
 - **Unknown or missing fields** in `aval.yaml` are rejected (exit 2) rather
   than ignored.
 

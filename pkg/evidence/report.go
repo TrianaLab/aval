@@ -33,4 +33,16 @@ type Report struct {
 	Predicate *Predicate `json:"predicate,omitempty"`
 	// Reason explains miss, verification-failed and error outcomes.
 	Reason string `json:"reason,omitempty"`
+	// Rejected lists candidate attestations for the fingerprint that were
+	// not used, with why. An entry with outcome verification-failed is a
+	// security event even when Outcome is verified.
+	Rejected []Rejection `json:"rejected,omitempty"`
+}
+
+// Rejection is a candidate attestation that did not verify.
+type Rejection struct {
+	Reference string `json:"reference"`
+	// Outcome is OutcomeVerificationFailed or OutcomeError.
+	Outcome Outcome `json:"outcome"`
+	Reason  string  `json:"reason"`
 }

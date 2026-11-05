@@ -143,6 +143,7 @@ func fakeVerify(t *testing.T, lookupErr, fetchErr, verifyErr error) {
 type candidate struct {
 	fetchErr, verifyErr error
 	trust               evidence.TrustLevel
+	failed              bool // verifies with result failed instead of passed
 }
 
 // fakeCandidates makes lookup return the given candidates, sorted by digest,
@@ -175,6 +176,9 @@ func fakeCandidates(t *testing.T, lookupErr error, cands map[string]candidate) {
 			return nil, c.verifyErr
 		}
 		p := &evidence.Predicate{Test: evidence.Test{ID: o.ExpectedTestID}, Result: evidence.ResultPassed}
+		if c.failed {
+			p.Result = evidence.ResultFailed
+		}
 		return &evidence.Verification{Predicate: p, Signer: evidence.Identity{Issuer: "https://issuer.example", TrustLevel: c.trust}}, nil
 	}
 }
@@ -229,8 +233,9 @@ func TestWriteReportPropagatesWriteErrors(t *testing.T) {
 }
 
 // Several attestations per fingerprint: the policy picks the verified one with
-// the highest trust; rejected candidates are reported, and a verification
-// failure is never hidden behind a plain error (invariant 4).
+// the highest trust; rejected candidates are listed in the report and on
+// stderr, and a verification failure is never hidden behind a plain error or
+// a verified sibling (invariant 4).
 func TestVerifyPicksAmongCandidates(t *testing.T) {
 	untrusted := &evidence.VerificationError{Reason: "untrusted signer"}
 	down := errors.New("registry down")
@@ -241,34 +246,49 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 		code    int
 		outcome evidence.Outcome
 		ref     string
-		warns   int
+		result  evidence.Result
+		// rejected is the outcome of each rejected candidate, in lookup order.
+		rejected []evidence.Outcome
 	}{
 		{"highest trust wins", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustDeveloper},
 			"sha256:bb": {trust: evidence.TrustIsolated},
 			"sha256:cc": {trust: evidence.TrustRunner},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", 0},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, nil},
 		{"tie keeps lookup order", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:bb": {trust: evidence.TrustRunner},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", 0},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", evidence.ResultPassed, nil},
+		{"tie prefers a failed result", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustRunner},
+			"sha256:bb": {trust: evidence.TrustRunner, failed: true},
+			"sha256:cc": {trust: evidence.TrustRunner},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultFailed, nil},
+		{"higher trust pass beats lower trust fail", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustDeveloper, failed: true},
+			"sha256:bb": {trust: evidence.TrustIsolated},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, nil},
 		{"later untrusted push does not replace a trusted result", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:ff": {verifyErr: untrusted},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", 1},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
+		{"verified sibling does not hide errors", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: down},
+			"sha256:bb": {trust: evidence.TrustRunner},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeError}},
 		{"untrusted push does not become a hit", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 			"sha256:ff": {verifyErr: untrusted},
-		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:ff", 0},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:ff", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed}},
 		{"verification failure outranks an earlier error", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 			"sha256:bb": {verifyErr: untrusted},
 			"sha256:cc": {verifyErr: down},
-		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:bb", 0},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed, evidence.OutcomeError}},
 		{"only errors", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
-		}, ExitError, evidence.OutcomeError, "r@sha256:aa", 0},
-		{"empty answer is a miss", nil, map[string]candidate{}, ExitMiss, evidence.OutcomeMiss, "", 0},
+		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"empty answer is a miss", nil, map[string]candidate{}, ExitMiss, evidence.OutcomeMiss, "", "", nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -278,11 +298,21 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			if err := json.Unmarshal([]byte(stdout), &r); err != nil {
 				t.Fatal(err)
 			}
-			if code != tc.code || r.Outcome != tc.outcome || r.Reference != tc.ref {
-				t.Fatalf("exit %d outcome %q ref %q; want %d %q %q", code, r.Outcome, r.Reference, tc.code, tc.outcome, tc.ref)
+			if code != tc.code || r.Outcome != tc.outcome || r.Reference != tc.ref || r.Result != tc.result {
+				t.Fatalf("exit %d outcome %q ref %q result %q; want %d %q %q %q", code, r.Outcome, r.Reference, r.Result, tc.code, tc.outcome, tc.ref, tc.result)
 			}
-			if got := strings.Count(stderr, "warning: rejected attestation"); got != tc.warns {
-				t.Fatalf("%d rejection warnings, want %d; stderr %q", got, tc.warns, stderr)
+			var got []evidence.Outcome
+			for _, rj := range r.Rejected {
+				if !strings.HasPrefix(rj.Reference, "r@sha256:") || rj.Reason == "" {
+					t.Fatalf("incomplete rejection %+v", rj)
+				}
+				got = append(got, rj.Outcome)
+			}
+			if !slices.Equal(got, tc.rejected) {
+				t.Fatalf("rejected outcomes %v, want %v; report %s", got, tc.rejected, stdout)
+			}
+			if n := strings.Count(stderr, "warning: rejected attestation"); n != len(tc.rejected) {
+				t.Fatalf("%d rejection warnings, want %d; stderr %q", n, len(tc.rejected), stderr)
 			}
 		})
 	}

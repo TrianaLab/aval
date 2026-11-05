@@ -122,8 +122,12 @@ message, if any, goes to stderr.
 }
 ```
 
-`reference`, `result`, `signer`, `predicate` and `reason` are omitted when
-empty. `reason` is set for `miss`, `verification-failed` and `error`.
+`reference`, `result`, `signer`, `predicate`, `reason` and `rejected` are
+omitted when empty. `reason` is set for `miss`, `verification-failed` and
+`error`. `rejected` lists candidate attestations that were not used, each
+`{reference, outcome, reason}` with `outcome` `verification-failed` or
+`error`. A `verification-failed` entry is a security event even when the
+report's `outcome` is `verified`.
 
 | Exit code | `outcome` | Meaning | What to do |
 |---|---|---|---|
@@ -144,6 +148,9 @@ set -e
 outcome=$(jq -r '.outcome // "error"' <<<"$report")
 case "$code:$outcome" in
   0:verified)
+    if jq -e '[.rejected[]? | select(.outcome == "verification-failed")] | length > 0' <<<"$report" >/dev/null; then
+      ./notify-security.sh "$report" # a rejected candidate failed verification
+    fi
     echo "reusing $(jq -r .reference <<<"$report") (result: $(jq -r .result <<<"$report"))"
     [ "$(jq -r .result <<<"$report")" = passed ] || exit 1
     ;;

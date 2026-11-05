@@ -232,15 +232,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event).`,
 func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
 	r := evidence.Report{Version: evidence.ReportVersion, TestID: c.Metadata.Name, Fingerprint: fp.Digest}
 	fail := func(err error) (evidence.Report, error) {
-		r.Reason = err.Error()
-		switch {
-		case errors.Is(err, evidence.ErrVerification):
-			r.Outcome = evidence.OutcomeVerificationFailed
-		case errors.Is(err, evidence.ErrNotFound):
-			r.Outcome = evidence.OutcomeMiss
-		default:
-			r.Outcome = evidence.OutcomeError
-		}
+		r.Reason, r.Outcome = err.Error(), outcomeOf(err)
 		return r, err
 	}
 
@@ -260,8 +252,8 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 	if err != nil {
 		return fail(err)
 	}
-	best, ref, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest))
-	r.Reference = ref
+	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest))
+	r.Reference, r.Rejected = ref, rejected
 	if err != nil {
 		return fail(err)
 	}
@@ -269,23 +261,40 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 	return r, nil
 }
 
+// outcomeOf maps an error to its report outcome; miss and verification
+// failure stay distinct (invariant 4).
+func outcomeOf(err error) evidence.Outcome {
+	switch {
+	case errors.Is(err, evidence.ErrVerification):
+		return evidence.OutcomeVerificationFailed
+	case errors.Is(err, evidence.ErrNotFound):
+		return evidence.OutcomeMiss
+	default:
+		return evidence.OutcomeError
+	}
+}
+
 // pick verifies every candidate and lets the policy choose: the verified one
-// with the highest trust level wins (ties: lowest digest, the lookup order).
-// Rejected candidates never decide the outcome while another verifies, but
-// they are reported on warn, not dropped. With no verified candidate it
-// returns the reference and error of the first verification failure, which
-// outranks any other error: it is the security event that must surface.
-func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions) (*evidence.Verification, string, error) {
+// with the highest trust level wins. On a tie a non-passed result wins, then
+// the lowest digest (the lookup order), so disagreeing trusted runs never
+// reuse a pass by accident (fail closed). Rejected candidates never decide
+// the outcome while another verifies, but they are returned for the report
+// and printed on warn, never dropped (invariant 4). With no verified
+// candidate it returns the reference and error of the first verification
+// failure, which outranks any other error: it is the security event that
+// must surface.
+func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions) (*evidence.Verification, string, []evidence.Rejection, error) {
 	var (
 		best             *evidence.Verification
 		bestRef, failRef string
 		failErr          error
-		rejected         []string
+		rejected         []evidence.Rejection
 	)
 	for _, d := range cands {
 		v, err := verifyCandidate(ctx, d, opts)
 		if err == nil {
-			if best == nil || v.Signer.TrustLevel > best.Signer.TrustLevel {
+			if best == nil || v.Signer.TrustLevel > best.Signer.TrustLevel ||
+				(v.Signer.TrustLevel == best.Signer.TrustLevel && best.Predicate.Result == evidence.ResultPassed && v.Predicate.Result != evidence.ResultPassed) {
 				best, bestRef = v, d.Reference()
 			}
 			continue
@@ -293,15 +302,13 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 		if failErr == nil || (errors.Is(err, evidence.ErrVerification) && !errors.Is(failErr, evidence.ErrVerification)) {
 			failErr, failRef = err, d.Reference()
 		}
-		rejected = append(rejected, fmt.Sprintf("%s: %v", d.Reference(), err))
+		rejected = append(rejected, evidence.Rejection{Reference: d.Reference(), Outcome: outcomeOf(err), Reason: err.Error()})
+		fmt.Fprintf(warn, "aval: warning: rejected attestation %s: %v\n", d.Reference(), err)
 	}
 	if best == nil {
-		return nil, failRef, failErr
+		return nil, failRef, rejected, failErr
 	}
-	for _, msg := range rejected {
-		fmt.Fprintf(warn, "aval: warning: rejected attestation %s\n", msg)
-	}
-	return best, bestRef, nil
+	return best, bestRef, rejected, nil
 }
 
 func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions) (*evidence.Verification, error) {

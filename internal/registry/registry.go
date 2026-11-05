@@ -45,6 +45,11 @@ const (
 	// maxBlobSize caps every manifest and layer read from the registry,
 	// which is untrusted input.
 	maxBlobSize = 4 << 20
+	// maxCandidates caps the attestations listed for one fingerprint, so
+	// anyone with push access cannot make verify fetch an unbounded number
+	// of manifests. Over the cap lookup fails with a plain error (outcome
+	// error: run the test).
+	maxCandidates = 64
 )
 
 var fingerprintRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
@@ -246,6 +251,9 @@ func lookup(ctx context.Context, r *remote.Repository, fingerprint string) ([]st
 			if d.MediaType == ocispec.MediaTypeImageManifest && d.Digest.Validate() == nil && d.Digest.Algorithm() == digest.SHA256 {
 				ds = append(ds, d.Digest.String())
 			}
+		}
+		if len(ds) > maxCandidates {
+			return fmt.Errorf("more than %d attestations for fingerprint %s", maxCandidates, fingerprint)
 		}
 		return nil
 	})

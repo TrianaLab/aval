@@ -33,7 +33,8 @@ Registry identifiers (`internal/registry`): the optional bundle layer uses the
 Sigstore media type `application/vnd.dev.sigstore.bundle.v0.3+json`
 (`MediaTypeSigstoreBundle`), and manifests carry the annotation
 `io.trianalab.aval.fingerprint` (`AnnotationFingerprint`, informational:
-verification reads the fingerprint from the signed predicate).
+verification reads the fingerprint from the signed predicate). Both are
+PROVISIONAL.
 
 Related identifiers from other packages: the fingerprint manifest format is
 `aval-fingerprint/v1` (`internal/fingerprint`), and the contract `apiVersion`
@@ -121,6 +122,8 @@ guidance (`artifactType` set, empty config):
 - **subject**: always the anchor of the execution's fingerprint. The tested
   revision or artifact is recorded inside the statement (`subject`), not in
   the manifest, so the referrers of a tested image do not list its evidence.
+  Changed before v1 (provisional): `subject` is the fingerprint anchor, not
+  the tested artifact.
 
 ### Push
 
@@ -152,6 +155,10 @@ hit.
    tags are mutable, digests aren't.
 5. Verify each envelope and apply the trust policy (see below).
 
+Lookup accepts at most 64 candidates per fingerprint. Above that it fails
+with outcome `error` (run the test), so whoever can push cannot make
+`aval verify` fetch an unbounded number of manifests.
+
 A missing tag, or an anchor without executions, is a **miss**
 (`evidence.ErrNotFound`, exit code 4). An artifact that exists but is
 malformed or fails signature or policy checks is a **verification failure**
@@ -162,8 +169,9 @@ malformed or fails signature or policy checks is a **verification failure**
 Several executions can produce the same fingerprint (a developer run and a CI
 run, or a re-run). All of them stay listed as referrers of the anchor, so a
 later push cannot hide or replace an earlier one. `aval verify` verifies every
-candidate: the verified one with the highest trust level wins (ties go to the
-lowest digest). Candidates that fail are printed as warnings on stderr; if
+candidate: the verified one with the highest trust level wins (ties go to a
+non-passed result, then the lowest digest). Candidates that fail are listed in
+the report's `rejected` field and printed as warnings on stderr; if
 none verifies, the outcome is `verification-failed` when any candidate failed
 verification, otherwise `error`.
 
@@ -307,6 +315,7 @@ stable machine interface for CI scripts and external tools.
 | `signer` | object | `verified` only | Accepted policy identity that matched: `issuer`, `subjectRegexp`, `trustLevel`. |
 | `predicate` | object | `verified` only | Full verified predicate. |
 | `reason` | string | non-`verified` outcomes | Human-readable cause. |
+| `rejected` | array | when a candidate was not used | Each `{reference, outcome, reason}`; `outcome` is `verification-failed` or `error`. A `verification-failed` entry is a security event even when `outcome` is `verified`: alert. |
 
 Outcomes and exit codes:
 

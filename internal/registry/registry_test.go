@@ -43,7 +43,8 @@ const (
 	fpB = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 )
 
-// serve starts an in-process OCI registry. hook, when set, may answer a
+// serve starts an in-process OCI registry, a stand-in for distribution or
+// zot (AGENTS.md test level 2). hook, when set, may answer a
 // request itself (returning true) to inject faults.
 func serve(t *testing.T, referrersAPI bool, hook func(http.ResponseWriter, *http.Request) bool) string {
 	t.Helper()
@@ -248,6 +249,31 @@ func TestLookupSkipsForeignReferrers(t *testing.T) {
 	got, err := Lookup(ctx, repo, fpA)
 	if err != nil || len(got) != 1 || got[0] != pushed {
 		t.Fatalf("Lookup = %+v %v (anchor %s)", got, err, ad.Digest)
+	}
+}
+
+// Referrers are untrusted registry data: too many candidates is an error
+// (fail closed, run the test), never a miss, a verification failure or a hit.
+func TestLookupCapsCandidates(t *testing.T) {
+	ctx := context.Background()
+	repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
+		if !strings.Contains(r.URL.Path, "/referrers/") {
+			return false
+		}
+		idx := ocispec.Index{Versioned: specs.Versioned{SchemaVersion: 2}, MediaType: ocispec.MediaTypeImageIndex}
+		for i := range maxCandidates + 1 {
+			idx.Manifests = append(idx.Manifests, ocispec.Descriptor{MediaType: ocispec.MediaTypeImageManifest, Digest: digest.FromString(fmt.Sprint(i)), ArtifactType: evidence.ArtifactType})
+		}
+		w.Header().Set("Content-Type", ocispec.MediaTypeImageIndex)
+		_ = json.NewEncoder(w).Encode(idx)
+		return true
+	})
+	if _, err := Push(ctx, repo, fpA, att("ci", nil)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Lookup(ctx, repo, fpA)
+	if err == nil || errors.Is(err, evidence.ErrNotFound) || errors.Is(err, evidence.ErrVerification) || got != nil {
+		t.Fatalf("Lookup = %+v %v; want a plain error", got, err)
 	}
 }
 
