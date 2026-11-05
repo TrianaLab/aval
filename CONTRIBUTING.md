@@ -77,7 +77,9 @@ Both fail on a verification failure (exit 5), read
 signs keyless and pushes the results that were not reused; it runs no tests.
 Trust comes from `.github/aval/main.yaml` (main and releases: only `ci.yaml`
 on `main`, runner level) and `.github/aval/pr.yaml` (pull requests: also
-developer signatures); `tests/architecture/dogfood_test.go` enforces both.
+developer signatures); `tests/architecture/dogfood_test.go` enforces both,
+and fails if a dogfood suite reads a tracked file outside its contract's
+scope.
 The release job refuses to publish without a verified, passing e2e
 attestation for the tagged commit. CI also runs, on pull
 requests, `dependency-review` and `pr-title` (the PR title is a conventional commit, see [Commits](#commits)). `dependency-review` is skipped until a
@@ -121,7 +123,20 @@ the version; Aval is not an npm package. To release:
 
 1. Close and reopen the version PR so `ci` runs on it (PRs opened with
    `GITHUB_TOKEN` trigger no workflows), then merge it.
-2. Tag its merge commit `v<version from package.json>` and push the tag.
+2. Wait until `ci` on `main` has passed for the merge commit (its
+   `dogfood-publish` job pushes the e2e result to
+   `ghcr.io/trianalab/aval-attestations`), then tag the merge commit
+   `v<version from package.json>` and push the tag. The `release` job
+   refuses to publish without a verified, passing e2e attestation for that
+   commit (`aval verify -f aval.e2e.yaml --policy .github/aval/main.yaml`).
+   A tag pushed too early fails; re-run the `release` job once `ci` on
+   `main` has finished.
+
+One-time human step, before the first release after v0.1.0: when the first
+`main` run creates the `aval-attestations` package, make it public in its
+package settings. The `release`, `ci-e2e` and `dogfood-shadow` jobs read it
+anonymously. While it is private every lookup is an error: the suites run
+every time and every release is blocked.
 
 The tag runs the `release` job: GoReleaser (`.goreleaser.yaml`) builds the
 binaries for Linux, macOS and Windows (amd64, arm64), archives, `checksums.txt`

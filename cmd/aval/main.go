@@ -315,8 +315,8 @@ func writeReport(w io.Writer, format string, r evidence.Report) error {
 	return nil
 }
 
-// oneLine escapes newlines and other control characters (Go string literal
-// escapes, without the quotes). Reasons can carry text from an untrusted
+// oneLine applies Go string literal escapes, without the surrounding quotes:
+// newlines, control and non-printable characters, quotes and backslashes. Reasons can carry text from an untrusted
 // attestation; escaped, it cannot start a line of its own in a log, where a
 // CI system might read it as a command, or move a terminal cursor.
 func oneLine(s string) string {

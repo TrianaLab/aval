@@ -17,6 +17,8 @@ scope:
     - "tests/integration/**"
     - "tests/acceptance/**"
     - "examples/go-compose/**"
+  # Results and reports that `aval run` writes; git ignores them.
+  exclude: ["**/.aval/**"]
   dependencies: [go.mod, go.sum, Makefile]
 environment:
   toolchain: {go: "1.27"}

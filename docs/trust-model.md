@@ -210,7 +210,8 @@ failure.
 the workload identity.
 
 Reasons can carry text from an untrusted attestation, so the text output
-and stderr escape newlines and other control characters: such text never
+and stderr escape it with Go string escapes (newlines, control and other
+non-printable characters, quotes and backslashes): such text never
 starts a line of its own (a CI log command, a terminal escape). The JSON
 report keeps the reason as is.
 
