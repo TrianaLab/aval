@@ -1,5 +1,10 @@
 name: ci
 
+# Each ci-* job runs the `make` leg of the same name, so `make ci` locally and
+# this workflow stay one to one. The `required` job aggregates every other job
+# and is the only required status check; tests/architecture/ci_test.go fails if
+# a job is not wired into it.
+
 on:
   push:
     branches: [main]
@@ -8,31 +13,103 @@ on:
 permissions:
   contents: read
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - run: go vet ./...
-      - run: make ci-engine ci-gates
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-  lint:
+jobs:
+  # Path filter: a change that touches only Markdown or docs/ cannot affect
+  # the code legs, so they are skipped. ci-gates always runs.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          predicate-quantifier: every
+          filters: |
+            code:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+
+  ci-static:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.6
+          install-only: true
+      - run: make ci-static
+
+  ci-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make ci-gates
+
+  ci-engine:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make ci-engine
+
+  ci-integration:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make ci-integration
+
+  ci-acceptance:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make ci-acceptance
+
+  ci-release:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make ci-release
 
   # Dogfooding M1 (#28): Aval's own contract must fingerprint identically on
-  # every OS and checkout path. Any difference is a determinism bug.
+  # every OS and checkout path. Any difference is a determinism bug. CI-only
+  # (needs several OSes), so it has no `make` leg.
   dogfood-fingerprint:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -68,3 +145,27 @@ jobs:
         run: |
           cat fingerprint-*/fingerprint.txt
           test "$(cat fingerprint-*/fingerprint.txt | sort -u | wc -l)" -eq 1 || { echo "::error::fingerprint differs across OSes"; exit 1; }
+
+  # The only required status check. Green only when no job failed or was
+  # cancelled; jobs skipped by the path filter do not count as failures.
+  required:
+    if: always()
+    needs:
+      - changes
+      - ci-static
+      - ci-gates
+      - ci-engine
+      - ci-integration
+      - ci-acceptance
+      - ci-release
+      - dogfood-fingerprint
+      - dogfood-compare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no job failed
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "job results: $results"
+          for r in $results; do
+            case "$r" in failure|cancelled) echo "::error::a CI job did not pass"; exit 1 ;; esac
+          done

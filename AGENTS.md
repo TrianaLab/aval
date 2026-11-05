@@ -63,8 +63,11 @@ A change that breaks one of these is wrong, even if tests pass.
 | Target | What it runs |
 |---|---|
 | `make ci-static` | gofmt check, `go vet`, golangci-lint |
-| `make ci-gates` | architecture/invariant tests (`tests/architecture`) |
-| `make ci-engine` | unit tests with `-race`, the example module |
+| `make ci-gates` | level 3: architecture/invariant tests (`make test-architecture`) |
+| `make ci-engine` | level 1: unit tests with `-race` (`make test-unit`), the example module |
+| `make ci-integration` | level 2: `tests/integration` (`make test-integration`) |
+| `make ci-acceptance` | level 4: `tests/acceptance`, through the built CLI (`make test-acceptance`) |
+| `make ci-release` | level 5: `tests/release` (`make test-release`) |
 | `make build` | `bin/aval` |
 
 Epic 0 grows `make ci` to Pacto's standard (coverage gate, integration,

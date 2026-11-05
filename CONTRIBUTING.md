@@ -7,12 +7,63 @@
 
 ```sh
 make build   # bin/aval
-make test    # go test -race ./...
+make ci      # every gate CI runs; run it before every push
 make lint    # go vet + golangci-lint
 make fmt     # gofmt -w .
 ```
 
-CI runs `go vet`, `go test -race` and golangci-lint on every PR.
+## Testing
+
+Every test belongs to exactly one level, chosen by what it proves. Each level
+has one `make` target:
+
+| Level | Proves | Lives in | Target |
+|---|---|---|---|
+| 1 Unit | one package in isolation | beside the code | `make test-unit` (`make test`) |
+| 2 Integration | real components wired together, nothing over a reachable network | `tests/integration/` | `make test-integration` |
+| 3 Architecture | rules about the repository itself | `tests/architecture/` | `make test-architecture` |
+| 4 Local acceptance | a whole user story through the `aval` binary, no cluster | `tests/acceptance/` | `make test-acceptance` |
+| 5 Release | the release produces what it claims (from milestone 3) | `tests/release/` | `make test-release` |
+
+**Choosing a home for a new test.** Ask, in order:
+
+1. **Is it a rule about the repository rather than the product?** ("`pkg/evidence`
+   does not import `internal/`", "every CI job is aggregated") → level 3,
+   `tests/architecture/`.
+2. **Is it about the release artifacts?** → level 5, `tests/release/`.
+3. **Can one package prove it?** → level 1, beside the code. Prefer this.
+4. **Does it need several real components (contract loader and fingerprint
+   engine, an in-process registry), but nothing over a reachable network?** →
+   level 2, `tests/integration/`.
+5. **Is it a whole user story through the CLI?** → level 4, `tests/acceptance/`.
+
+Two more rules once you have picked:
+
+- **A semantic assertion goes in Go**, not in shell or workflow YAML. Shell
+  stays on thin process orchestration.
+- **Changes to fingerprinting, contract parsing, verification or policy come
+  with false-hit cases**: a relevant change must never produce a reusable
+  result.
+
+### CI quality gates
+
+`make ci` runs these legs; each is one job of the same name in
+`.github/workflows/ci.yaml`:
+
+| Leg | What it checks |
+|---|---|
+| `ci-static` | gofmt, `go vet`, golangci-lint |
+| `ci-gates` | level 3 |
+| `ci-engine` | level 1 with `-race`, the `examples/go-compose` module |
+| `ci-integration` | level 2 |
+| `ci-acceptance` | level 4 |
+| `ci-release` | level 5 |
+
+CI also runs `dogfood-fingerprint` and `dogfood-compare` (Aval's own contract
+must fingerprint identically across OSes and checkout paths). A PR that changes
+only Markdown or `docs/` skips every job except `ci-gates`. The `required` job
+aggregates every other job and is the only required status check;
+`tests/architecture` fails if a job is not wired into it.
 
 ## Commits
 
