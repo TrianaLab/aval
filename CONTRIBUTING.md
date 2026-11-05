@@ -107,7 +107,8 @@ version packages` PR open that applies the pending changesets: it sets the
 version in `package.json` and writes `CHANGELOG.md`. `package.json` only holds
 the version; Aval is not an npm package. To release:
 
-1. Merge the version PR.
+1. Close and reopen the version PR so `ci` runs on it (PRs opened with
+   `GITHUB_TOKEN` trigger no workflows), then merge it.
 2. Tag its merge commit `v<version from package.json>` and push the tag.
 
 The tag runs the `release` job: GoReleaser (`.goreleaser.yaml`) builds the
@@ -116,9 +117,11 @@ and one SPDX SBOM per archive (syft), and signs `checksums.txt` keyless with
 cosign; `actions/attest-build-provenance` adds SLSA provenance for every file
 in `checksums.txt`. `tests/release` then verifies all of it, including that
 the tag equals the `package.json` version, and only then the job creates the
-GitHub Release. If any check fails, nothing is published. `make test-release`
-runs the same build as an unsigned snapshot and the same tests; CI runs it on
-every PR that changes code (`ci-release`).
+GitHub Release. It uploads only the files `checksums.txt` lists, plus
+`checksums.txt` and its signature and provenance bundles. If any check fails,
+nothing is published. `make test-release` runs the same build as an unsigned
+snapshot and the same tests; CI runs it on every PR that changes code
+(`ci-release`).
 
 To verify a downloaded release (`<tag>` is e.g. `v0.1.0`):
 

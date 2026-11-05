@@ -158,8 +158,22 @@ func TestReleaseClaims(t *testing.T) {
 	}
 }
 
-// Every file in checksums.txt exists with that digest, and every archive and
-// SBOM in dist/ is listed: nothing ships unchecksummed.
+// unlisted are the files in dist/ that may be absent from checksums.txt:
+// GoReleaser's own metadata (never published) and the signature and
+// provenance over checksums.txt itself.
+var unlisted = map[string]bool{
+	checksumsFile:                    true,
+	checksumsFile + ".sigstore.json": true,
+	provenanceFile:                   true,
+	"artifacts.json":                 true,
+	"metadata.json":                  true,
+	"config.yaml":                    true,
+}
+
+// checksums.txt lists exactly the archives and their SBOMs, each with its
+// real digest, and every other file in dist/ is in unlisted. The release job
+// publishes only checksums.txt, its entries and its two bundles
+// (TestReleaseWorkflowVerifiesBeforePublishing), so nothing ships unverified.
 func TestChecksumsMatchFiles(t *testing.T) {
 	r := load(t)
 	for name, want := range r.checksums {
@@ -167,11 +181,27 @@ func TestChecksumsMatchFiles(t *testing.T) {
 			t.Errorf("%s: sha256 %s, checksums.txt says %s", name, got, want)
 		}
 	}
+	want := map[string]bool{}
 	for _, a := range r.archives {
-		for _, name := range []string{a.Name, a.Name + ".sbom.json"} {
-			if r.checksums[name] == "" {
-				t.Errorf("%s is not in checksums.txt", name)
-			}
+		want[a.Name], want[a.Name+".sbom.json"] = true, true
+	}
+	for name := range want {
+		if r.checksums[name] == "" {
+			t.Errorf("%s is not in checksums.txt", name)
+		}
+	}
+	for name := range r.checksums {
+		if !want[name] {
+			t.Errorf("checksums.txt lists %s, which is not an archive or SBOM the release claims", name)
+		}
+	}
+	entries, err := os.ReadDir(r.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if !e.IsDir() && !unlisted[e.Name()] && r.checksums[e.Name()] == "" {
+			t.Errorf("%s is in dist/ but not in checksums.txt", e.Name())
 		}
 	}
 }
@@ -436,16 +466,37 @@ func TestReleaseWorkflowVerifiesBeforePublishing(t *testing.T) {
 	if job.If != "startsWith(github.ref, 'refs/tags/v')" {
 		t.Errorf("release job runs on %q, want tags only", job.If)
 	}
-	verified := false
+	verified, published := false, false
 	for _, s := range job.Steps {
 		switch {
 		case strings.Contains(s.Run, "./tests/release/") && s.Env[envTag] != "" && s.Env[envDist] != "":
 			verified = true
-		case strings.Contains(s.Run, "gh release create") && !verified:
-			t.Error("release job publishes before tests/release verifies the tagged dist/")
+		case strings.Contains(s.Run, "gh release create"):
+			published = true
+			if !verified {
+				t.Error("release job publishes before tests/release verifies the tagged dist/")
+			}
+			checkPublishedFiles(t, s.Run)
 		}
 	}
 	if !verified {
 		t.Error("release job never runs tests/release with the tag set")
+	}
+	if !published {
+		t.Error("release job has no gh release create step")
+	}
+}
+
+// publishRun is the only upload the release job may run: the entries of
+// checksums.txt, checksums.txt and its two bundles. A glob or any other path
+// could upload a file tests/release never checked, so the step is pinned.
+const publishRun = `mapfile -t files < <(awk '{print "dist/" $2}' dist/checksums.txt)
+gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md \
+  "${files[@]}" dist/checksums.txt dist/checksums.txt.sigstore.json dist/provenance.sigstore.json`
+
+func checkPublishedFiles(t *testing.T, run string) {
+	t.Helper()
+	if strings.TrimSpace(run) != publishRun {
+		t.Errorf("publish step must be exactly\n%s\ngot\n%s", publishRun, run)
 	}
 }
