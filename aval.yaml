@@ -4,7 +4,7 @@
 # testdata, the CLI reference cmd/aval checks, and the contracts the contract
 # fuzz target seeds from. tests/architecture/dogfood_test.go fails if a suite
 # reads a repository file outside its contract's scope.
-apiVersion: aval.dev/v1alpha1
+apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
   name: aval-engine

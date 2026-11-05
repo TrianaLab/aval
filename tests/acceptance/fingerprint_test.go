@@ -66,7 +66,7 @@ func writeProject(t *testing.T, files map[string]string) string {
 	return dir
 }
 
-const contract = `apiVersion: aval.dev/v1alpha1
+const contract = `apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
   name: story

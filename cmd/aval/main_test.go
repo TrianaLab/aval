@@ -55,7 +55,7 @@ func TestVersionFlag(t *testing.T) {
 	}
 }
 
-const testContract = `apiVersion: aval.dev/v1alpha1
+const testContract = `apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
   name: unit

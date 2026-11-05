@@ -2,7 +2,7 @@
 # .github/workflows/ci.yaml): reuse only results signed keyless by that
 # workflow on main. Anything else that sits under the fingerprint, such as a
 # result signed with some key, is a verification failure (exit 5).
-apiVersion: aval.dev/v1alpha1   # provisional
+apiVersion: aval.trianalab.io/v1
 kind: Policy
 minTrustLevel: runner
 identities:

@@ -62,7 +62,7 @@ func keyPair(t *testing.T, dir, name string) (priv, pub string) {
 func writePolicy(t *testing.T, dir, name, pub string) string {
 	t.Helper()
 	p := filepath.Join(dir, name)
-	body := "apiVersion: aval.dev/v1alpha1\nkind: Policy\nminTrustLevel: developer\nidentities:\n  - publicKey: " + pub + "\n    trustLevel: developer\n"
+	body := "apiVersion: aval.trianalab.io/v1\nkind: Policy\nminTrustLevel: developer\nidentities:\n  - publicKey: " + pub + "\n    trustLevel: developer\n"
 	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 const valid = `
-apiVersion: aval.dev/v1alpha1
+apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
   name: orders-integration
@@ -35,26 +35,29 @@ func TestParseValid(t *testing.T) {
 
 func TestParseInvalid(t *testing.T) {
 	cases := map[string]struct{ from, to, wantErr string }{
-		"bad apiVersion": {"aval.dev/v1alpha1", "aval.dev/v9", "apiVersion"},
-		"unknown field":  {"cacheability:", "cachability:", "cachability"},
-		"bad class":      {"controlled-environment", "sometimes", "unknown class"},
-		"escaping glob":  {`"compose.yaml"`, `"../secrets"`, "segments"},
-		"absolute glob":  {`"compose.yaml"`, `"/etc/passwd"`, "relative"},
-		"partial **":     {`"**/*.go"`, `"a**/*.go"`, "whole path segment"},
-		"empty command":  {`["go", "test", "./..."]`, `[]`, "runner.command"},
-		"bad name":       {"orders-integration", "Orders Integration", "metadata.name"},
-		"bad env name":   {"[DB_IMAGE]", "[DB-IMAGE]", "environment.env"},
-		"missing scope":  {`source: ["**/*.go", "compose.yaml"]`, `source: []`, "scope.source"},
-		"bad kind":       {"kind: Test", "kind: Suite", "kind"},
-		"bad tool key":   {"{go: ", "{Go: ", "environment.toolchain"},
-		"no class":       {"cacheability: controlled-environment", "", "cacheability: required"},
-		"empty glob":     {`["go.sum"]`, `[""]`, "empty glob"},
-		"malformed glob": {`["go.sum"]`, `["go.[sum"]`, "syntax error"},
-		"backslash glob": {`["go.sum"]`, `["a\\\\b"]`, "slash-separated"},
-		"trailing slash": {`["go.sum"]`, `["dir/"]`, "segments"},
-		"dot segment":    {`["go.sum"]`, `["./go.sum"]`, "segments"},
-		"empty segment":  {`["go.sum"]`, `["a//b"]`, "segments"},
-		"inner ..":       {`["go.sum"]`, `["a/../../b"]`, "segments"},
+		"bad apiVersion": {"aval.trianalab.io/v1", "aval.trianalab.io/v9", "apiVersion"},
+		// No accept window for the pre-freeze identifiers (fail closed).
+		"pre-freeze apiVersion": {"aval.trianalab.io/v1", "aval.dev/v1alpha1", "apiVersion"},
+		"alpha apiVersion":      {"aval.trianalab.io/v1", "aval.trianalab.io/v1alpha1", "apiVersion"},
+		"unknown field":         {"cacheability:", "cachability:", "cachability"},
+		"bad class":             {"controlled-environment", "sometimes", "unknown class"},
+		"escaping glob":         {`"compose.yaml"`, `"../secrets"`, "segments"},
+		"absolute glob":         {`"compose.yaml"`, `"/etc/passwd"`, "relative"},
+		"partial **":            {`"**/*.go"`, `"a**/*.go"`, "whole path segment"},
+		"empty command":         {`["go", "test", "./..."]`, `[]`, "runner.command"},
+		"bad name":              {"orders-integration", "Orders Integration", "metadata.name"},
+		"bad env name":          {"[DB_IMAGE]", "[DB-IMAGE]", "environment.env"},
+		"missing scope":         {`source: ["**/*.go", "compose.yaml"]`, `source: []`, "scope.source"},
+		"bad kind":              {"kind: Test", "kind: Suite", "kind"},
+		"bad tool key":          {"{go: ", "{Go: ", "environment.toolchain"},
+		"no class":              {"cacheability: controlled-environment", "", "cacheability: required"},
+		"empty glob":            {`["go.sum"]`, `[""]`, "empty glob"},
+		"malformed glob":        {`["go.sum"]`, `["go.[sum"]`, "syntax error"},
+		"backslash glob":        {`["go.sum"]`, `["a\\\\b"]`, "slash-separated"},
+		"trailing slash":        {`["go.sum"]`, `["dir/"]`, "segments"},
+		"dot segment":           {`["go.sum"]`, `["./go.sum"]`, "segments"},
+		"empty segment":         {`["go.sum"]`, `["a//b"]`, "segments"},
+		"inner ..":              {`["go.sum"]`, `["a/../../b"]`, "segments"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

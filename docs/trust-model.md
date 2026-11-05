@@ -7,8 +7,8 @@ verification (`evidence.Verify`, `attest.Verifier`) and the policy file
 use them. This document describes the model the code is built around; where
 behavior is not implemented yet, it says so.
 
-The predicate type, media types and the `aval.dev/v1alpha1` apiVersion are
-provisional until v1.
+The predicate type, media types and the `aval.trianalab.io/v1` apiVersion are
+frozen; see [artifact-format.md](artifact-format.md#versioning-and-compatibility).
 
 ## What a signature proves
 
@@ -125,7 +125,7 @@ runs and nothing is looked up.
 ### Policy file
 
 ```yaml
-apiVersion: aval.dev/v1alpha1   # provisional
+apiVersion: aval.trianalab.io/v1
 kind: Policy
 minTrustLevel: runner           # developer | runner | isolated
 # trustedRoot: sigstore/trusted_root.json  # keyless only; default: Sigstore public-good, fetched with TUF

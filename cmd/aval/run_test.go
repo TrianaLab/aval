@@ -391,7 +391,7 @@ func TestRunPushThenReuse(t *testing.T) {
 		t.Fatal(err)
 	}
 	pol := filepath.Join(dir, "policy.yaml")
-	if err := os.WriteFile(pol, []byte("apiVersion: aval.dev/v1alpha1\nkind: Policy\nminTrustLevel: developer\nidentities:\n  - publicKey: dev.pub\n    trustLevel: developer\n"), 0o600); err != nil {
+	if err := os.WriteFile(pol, []byte("apiVersion: aval.trianalab.io/v1\nkind: Policy\nminTrustLevel: developer\nidentities:\n  - publicKey: dev.pub\n    trustLevel: developer\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var stored *registry.Attestation

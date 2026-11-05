@@ -25,7 +25,7 @@ func TestVerifyOptions(t *testing.T) {
 	}
 }
 
-const validPolicy = `apiVersion: aval.dev/v1alpha1
+const validPolicy = `apiVersion: aval.trianalab.io/v1
 kind: Policy
 trustedRoot: sigstore/trusted_root.json
 minTrustLevel: runner
@@ -98,7 +98,8 @@ func TestLoadErrors(t *testing.T) {
 		"not yaml":                    {"kind: Policy", "kind: [", "decoding policy"},
 		"unknown field":               {"kind: Policy", "kind: Policy\nidentitys: []", "decoding policy"},
 		"two documents":               {"kind: Policy", "kind: Policy\n---\nkind: Policy", "multiple YAML documents"},
-		"wrong apiVersion":            {"aval.dev/v1alpha1", "aval.dev/v1", "apiVersion"},
+		"wrong apiVersion":            {"aval.trianalab.io/v1", "aval.trianalab.io/v2", "apiVersion"},
+		"pre-freeze apiVersion":       {"aval.trianalab.io/v1", "aval.dev/v1alpha1", "apiVersion"},
 		"wrong kind":                  {"kind: Policy", "kind: Test", "kind"},
 		"no minTrustLevel":            {"minTrustLevel: runner\n", "", "minTrustLevel"},
 		"numeric minTrustLevel":       {"minTrustLevel: runner", "minTrustLevel: 2", "minTrustLevel"},

@@ -6,7 +6,9 @@
 // consumer: external tools import it to turn an Aval attestation into
 // their own evidence model. Adapters live in the consumer's repository.
 //
-// All media types and the predicate type are PROVISIONAL until v1.
+// The identifiers below and the JSON shape of Predicate, Statement and
+// Report are frozen: within a version they change additively only (see
+// docs/artifact-format.md, "Versioning and compatibility").
 package evidence
 
 import (
@@ -26,20 +28,18 @@ import (
 
 const (
 	// PredicateType identifies the Aval execution predicate inside an
-	// in-toto Statement. Provisional.
+	// in-toto Statement.
 	PredicateType = "https://aval.trianalab.io/attestation/execution/v2"
 
 	// MediaTypeExecution is the media type of the raw predicate JSON.
-	// Provisional.
 	MediaTypeExecution = "application/vnd.trianalab.aval.execution.v2+json"
 
 	// ArtifactType is the OCI artifactType of the manifest that carries an
-	// execution result. Provisional.
+	// execution result.
 	ArtifactType = "application/vnd.trianalab.aval.execution.v2"
 
 	// ArtifactTypeFingerprint is the OCI artifactType of the per-fingerprint
 	// anchor manifest that every execution manifest refers to (its subject).
-	// Provisional.
 	ArtifactTypeFingerprint = "application/vnd.trianalab.aval.fingerprint.v1"
 
 	// MediaTypeDSSE is the media type of the signed DSSE envelope layer.
@@ -93,7 +93,7 @@ func (l TrustLevel) String() string {
 
 // Predicate is the Aval execution predicate (predicateType PredicateType).
 // Field names and JSON tags are part of the stable contract: additive changes
-// only within v1.
+// only within PredicateType and SchemaVersion.
 type Predicate struct {
 	SchemaVersion string    `json:"schemaVersion"`
 	Subject       Subject   `json:"subject"`

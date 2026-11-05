@@ -123,6 +123,15 @@ update both values; `tests/architecture` checks that the version has a
 `CHANGELOG.md` section and that each of these jobs installs the release and
 builds nothing.
 
+Transition: v0.1.0 reads only the pre-freeze `apiVersion` `aval.dev/v1alpha1`,
+not the frozen `aval.trianalab.io/v1` of this repository's contracts and
+policies. While `AVAL_VERSION` is `0.1.0`, these three jobs build `aval` from
+the commit (`make build`) and install nothing; `tests/architecture` enforces
+that too. On `main` that is the code being released, so `dogfood-publish`
+writes the e2e attestation in the format the `release.yaml` gate (also a
+source build) verifies. Moving the pin to the first release that reads
+`aval.trianalab.io/v1` makes the test require `install.sh` again.
+
 Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
 marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint
 every Markdown file except `.agents/`, `.claude/`, `CLAUDE.md`, `.changeset/` and the generated `CHANGELOG.md`.
@@ -201,7 +210,7 @@ Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 - **Scope is declared in the contract.** `aval.yaml` is the only source of inputs. No inference or runtime tracing in v0.
 - **Miss is not verification failure.** No attestation is exit 4 (`ErrNotFound`); an attestation that fails signature or policy is exit 5 (`ErrVerification`), a security event. Keep them separate in code, output and exit codes, and never hide the second.
 - **No Pacto dependency.** Aval does not import Pacto or model its concepts. Integrations consume Aval through `pkg/evidence` and `aval verify --output json`; adapters live in the consumer's repo.
-- **`pkg/evidence` is public API.** Breaking changes (rename, removal, type or meaning change) to exported identifiers, the predicate or the verify report JSON need a version bump (`PredicateType`, `ReportVersion`) and a note in `docs/artifact-format.md`; additive changes do not. Formats are provisional until v1, but changes are still deliberate.
+- **`pkg/evidence` is public API.** Breaking changes (rename, removal, type or meaning change) to exported identifiers, the predicate or the verify report JSON need a version bump (`PredicateType`, `ReportVersion`) and a note in `docs/artifact-format.md`; additive changes do not. The rules are in `docs/artifact-format.md` ("Versioning and compatibility"); golden files in `pkg/evidence/testdata` guard the JSON shape.
 - **Fingerprint changes bump the manifest version** (`aval-fingerprint/v1`) so old and new fingerprints never collide.
 
 ## Unfinished work

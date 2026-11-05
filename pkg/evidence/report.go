@@ -1,7 +1,7 @@
 package evidence
 
 // ReportVersion is the version of the `aval verify --output json` document.
-const ReportVersion = "aval.dev/verify-report/v1alpha1"
+const ReportVersion = "aval.trianalab.io/verify-report/v1"
 
 // Outcome is the machine-readable verdict of `aval verify`.
 type Outcome string
