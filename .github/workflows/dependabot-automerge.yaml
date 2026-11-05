@@ -1,0 +1,54 @@
+name: dependabot-automerge
+
+# Squash-merges a Dependabot PR after ci passed on its head commit, only when
+# every dependency it updates is a semver patch. Repository auto-merge is off,
+# so this merges directly (never `gh pr merge --auto`), pinned to the commit ci
+# tested. It never checks out or runs PR code; PR data reaches the shell only
+# through env.
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Merge patch updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          test -n "$PR" || { echo "no PR for this run"; exit 0; }
+          info=$(gh pr view "$PR" --json author,headRefOid,mergeStateStatus \
+            --jq '[.author.login, .headRefOid, .mergeStateStatus] | @tsv')
+          read -r author head state <<<"$info"
+          if [ "$author" != "app/dependabot" ] || [ "$head" != "$HEAD_SHA" ]; then
+            echo "PR $PR is not a Dependabot PR at $HEAD_SHA (author $author, head $head)"; exit 0
+          fi
+          # Dependabot lists every updated dependency with its update-type in
+          # the commit message; anything but all-patch is left for a human.
+          types=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA" --jq .commit.message \
+            | sed -n 's/^[[:space:]]*update-type:[[:space:]]*//p' | sort -u)
+          if [ "$types" != "version-update:semver-patch" ]; then
+            echo "not a patch-only update (${types:-no update-type}); leaving for review"; exit 0
+          fi
+          # Strict branch protection: a PR behind main cannot merge. Ask
+          # Dependabot to rebase; its push reruns ci and this workflow.
+          if [ "$state" = "BEHIND" ]; then
+            gh pr comment "$PR" --body "@dependabot rebase"; exit 0
+          fi
+          gh pr merge "$PR" --squash --match-head-commit "$HEAD_SHA"

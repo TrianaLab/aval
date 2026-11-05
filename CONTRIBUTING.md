@@ -58,14 +58,18 @@ Two more rules once you have picked:
 | `ci-integration` | level 2 |
 | `ci-acceptance` | level 4 |
 | `ci-release` | level 5 |
+| `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
+| `ci-security` | govulncheck on both modules (needs network) |
 
 CI also runs `dogfood-fingerprint` and `dogfood-compare` (Aval's own contract
-must fingerprint identically across OSes and checkout paths). A PR that changes
+must fingerprint identically across OSes and checkout paths) and, on pull
+requests, `dependency-review`. `security.yaml` reruns govulncheck daily; see
+`SECURITY.md` for Dependabot and how to report a vulnerability. A PR that changes
 only Markdown or `docs/` skips every job except `ci-gates`. The `required` job
 aggregates every other job and is the only required status check;
 `tests/architecture` fails if a job is not wired into it. It also enforces that
 `pkg/evidence` depends only on the standard library and allowlisted modules,
-that no Go code names a consumer, that every `TODO` names a milestone, that the
+that no Go code names a consumer, that every action is pinned by commit SHA, that every `TODO` names a milestone, that the
 golangci-lint pin matches between `Makefile` and CI, and that the complexity cap
 stays at 15.
 
