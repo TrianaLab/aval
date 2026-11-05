@@ -293,12 +293,12 @@ func TestTrustLevelComesFromSignerNotPredicate(t *testing.T) {
 		t.Fatal(err)
 	}
 	dev := []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: `https://github\.com/acme/.*`, TrustLevel: evidence.TrustDeveloper}}
-	if id, lvl := keyless.Signer.TrustLevel(dev); lvl != evidence.TrustDeveloper || id.SubjectRegexp != dev[0].SubjectRegexp {
-		t.Fatalf("got %v from %+v, want developer from the policy", lvl, id)
+	if id, ok := evidence.MatchSigner(dev, keyless.Signer); !ok || id.TrustLevel != evidence.TrustDeveloper || id.SubjectRegexp != dev[0].SubjectRegexp {
+		t.Fatalf("got %+v, want developer from the policy", id)
 	}
 	other := []evidence.Identity{{Issuer: "https://other.example", SubjectRegexp: `.*`, TrustLevel: evidence.TrustIsolated}}
-	if _, lvl := keyless.Signer.TrustLevel(other); lvl != evidence.TrustUnknown {
-		t.Fatalf("unmatched signer got %v, want unknown", lvl)
+	if id, ok := evidence.MatchSigner(other, keyless.Signer); ok {
+		t.Fatalf("unmatched signer got %+v", id)
 	}
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	keyed, err := Sign(context.Background(), stmt, SignOptions{Key: writePEM(t, key)})
@@ -306,8 +306,8 @@ func TestTrustLevelComesFromSignerNotPredicate(t *testing.T) {
 		t.Fatal(err)
 	}
 	wildcard := []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: `.*`, TrustLevel: evidence.TrustIsolated}}
-	if _, lvl := keyed.Signer.TrustLevel(wildcard); lvl != evidence.TrustUnknown {
-		t.Fatalf("key-based signer got %v from a keyless identity, want unknown", lvl)
+	if id, ok := evidence.MatchSigner(wildcard, keyed.Signer); ok {
+		t.Fatalf("key-based signer matched a keyless identity: %+v", id)
 	}
 }
 

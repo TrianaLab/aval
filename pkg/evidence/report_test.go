@@ -18,7 +18,7 @@ func TestReportGolden(t *testing.T) {
 		Fingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		Reference:   "ghcr.io/acme/orders-aval@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		Result:      ResultPassed,
-		Signer:      &Identity{Issuer: "https://token.actions.githubusercontent.com", SubjectRegexp: "^https://github.com/acme/orders/", TrustLevel: TrustRunner},
+		Signer:      &Identity{Issuer: "https://token.actions.githubusercontent.com", SubjectRegexp: "^https://github.com/acme/orders/", TrustLevel: TrustRunner, Subject: "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"},
 		Rejected: []Rejection{{
 			Reference: "ghcr.io/acme/orders-aval@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			Outcome:   OutcomeVerificationFailed,

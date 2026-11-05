@@ -1,11 +1,12 @@
 # Trust model
 
 Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
-Signing (`attest.Sign`) is implemented but not yet wired into the CLI.
-Push, lookup and fetch against an OCI registry (`internal/registry`) are
-implemented. Verification and policy loading are milestone-2 stubs that
-return "not implemented" (exit code 6). This document describes the model
-the code is built around; where behavior is not implemented yet, it says so.
+Signing (`attest.Sign`), push, lookup and fetch (`internal/registry`),
+verification (`evidence.Verify`, `attest.Verifier`) and the policy file
+(`policy.Load`) are implemented; `aval verify` uses them. `aval run` and
+`aval push` are not wired yet (milestone 2, #9). This document describes the
+model the code is built around; where behavior is not implemented yet, it
+says so.
 
 The predicate type, media types and the `aval.dev/v1alpha1` apiVersion are
 provisional until v1.
@@ -39,12 +40,12 @@ fingerprint and test id match what we computed locally".
 `runner.identity`, `runner.issuer` and `runner.trustLevel` inside the
 predicate are what the signer *claims*. The authoritative identity is the
 verified signer, and the trust level is the one the policy grants to that
-signer, not the one written in the predicate. In code: `attest.Sign` returns
-the `Signer` read from the Fulcio certificate (OIDC issuer and subject), and
-`Signer.TrustLevel` / `evidence.MatchIdentity` look that identity up in the
-policy's `Identities`. A key-based signer matches no keyless identity and
-gets level 0 (unknown) until key identities land in the policy format
-(milestone 2, #8).
+signer, not the one written in the predicate. In code: `attest.Verifier`
+verifies the Sigstore bundle and returns the `evidence.Signer` it binds (the
+OIDC issuer and subject of the Fulcio certificate, or the key's id), and
+`evidence.Verify` looks that signer up in the policy's `Identities` with
+`evidence.MatchSigner`. A key-based signer only matches identities that list
+its public key; a keyless one only matches issuer and subject entries.
 
 ## Signing
 
@@ -89,21 +90,63 @@ is `policy.Policy` (`internal/policy`), converted to
 
 | Field | Meaning |
 |---|---|
-| `Identities` | accepted signers. Each `evidence.Identity` is an OIDC `Issuer`, a `SubjectRegexp` matched against the certificate subject (SAN), and the `TrustLevel` that signer is granted. Empty means nothing is accepted. |
-| `MinTrustLevel` | minimum granted level required for reuse. |
-| `AllowedCacheability` | cacheability classes that may be reused. Empty means `hermetic` and `controlled-environment` only. |
-| `ExpectedFingerprint`, `ExpectedTestID` | set by Aval from the local contract, not by the policy file. Must equal the predicate's `execution.fingerprint` and `test.id`. |
+| `Identities` | accepted signers. Each `evidence.Identity` is either an OIDC `Issuer` plus a `SubjectRegexp` matched against the whole certificate subject (SAN), or a `PublicKey`, and the `TrustLevel` that signer is granted. Empty means nothing is accepted. |
+| `MinTrustLevel` | minimum granted level required for reuse. Level 0 (unknown) and levels above 3 are never accepted, whatever this says. |
+| `AllowedCacheability` | cacheability classes that may be reused besides `hermetic` and `controlled-environment`. Only `external-dependencies` has an effect; `non-deterministic` is never reusable. |
+| `TrustedRoot` | Sigstore trusted root for keyless signatures (policy file only). |
+| `ExpectedFingerprint`, `ExpectedTestID` | set by Aval from the local contract, not by the policy file. Must equal the predicate's `execution.fingerprint` and `test.id`. Required. |
+
+`evidence.Verify` checks, in order: the signature (through
+`VerifyOptions.Signature`), that the signer matches an accepted identity,
+that the granted level is at least `MinTrustLevel`, that the payload is an
+Aval in-toto statement whose subject equals the predicate's, the predicate
+structure, the expected fingerprint and test id, and the cacheability. Any
+failure is a `*VerificationError` (`ErrVerification`, exit 5). The verified
+`Signer` is the policy entry that matched, plus the `subject` or `keyId` the
+signature actually carried, so the verify report shows who really signed.
+
+`attest.Verifier` checks signatures with sigstore-go against the Sigstore
+bundle stored next to the envelope. A keyless signature must chain to a
+Fulcio CA in the trusted root, carry an embedded SCT from a trusted CT log,
+have a Rekor entry, and have a trusted timestamp (Rekor or a TSA) inside the
+certificate's validity. A key-based signature must verify with one of the
+policy's public keys; no Rekor entry is required. The envelope must be
+byte-for-byte the one the bundle signs. An attestation without a bundle
+never verifies.
 
 Without `--policy` nothing is trusted. Aval does not even query the
 registry: the outcome is `miss` (exit 4) with the reason "no trust policy
 configured", and the test runs. This avoids reporting every attestation it
 finds as a verification failure just because no policy exists. Once a policy
 is configured, an attestation from a signer it does not accept *is* a
-verification failure (exit 5).
+verification failure (exit 5). A policy file that cannot be loaded, or a
+trusted root that cannot be loaded, is outcome `error` (exit 1): the test
+runs and nothing is looked up.
 
-The policy file format (`aval.dev/v1alpha1`, kind `Policy`, regexp
-validation, rejecting `non-deterministic` in `AllowedCacheability`) is a
-milestone-2 TODO. Today `policy.Load` returns "not implemented".
+### Policy file
+
+```yaml
+apiVersion: aval.dev/v1alpha1   # provisional
+kind: Policy
+minTrustLevel: runner           # developer | runner | isolated
+# trustedRoot: sigstore/trusted_root.json  # keyless only; default: Sigstore public-good, fetched with TUF
+identities:
+  - issuer: https://token.actions.githubusercontent.com
+    subjectRegexp: https://github\.com/acme/orders/\.github/workflows/ci\.yaml@refs/heads/main
+    trustLevel: runner
+  - publicKey: keys/alice.pub   # PEM public key file
+    trustLevel: developer
+allowedCacheability: [external-dependencies]
+```
+
+`policy.Load` rejects, rather than ignores: unknown fields, more than one
+YAML document, another `apiVersion` or `kind`, a missing or unknown
+`minTrustLevel` or `trustLevel` (levels are written by name), no identities,
+an identity with both `publicKey` and `issuer`/`subjectRegexp` or with
+neither, a `subjectRegexp` that does not compile alone and anchored, a
+`publicKey` file that is not a PEM public key, and `non-deterministic` or an
+unknown class in `allowedCacheability`. Relative `trustedRoot` and
+`publicKey` paths are resolved against the policy file's directory.
 
 ## Fail closed
 
@@ -178,7 +221,7 @@ declared class.
 
 | Threat | Mitigation |
 |---|---|
-| Compromised developer key | Policy grants developer identities level 1 at most; CI sets `MinTrustLevel` >= 2, so a stolen developer key cannot satisfy CI. It can still poison that developer's own reuse. Prefer keyless (short-lived Fulcio certs, Rekor log) over long-lived keys (milestone 2). |
+| Compromised developer key | Policy grants developer identities level 1 at most; CI sets `MinTrustLevel` >= 2, so a stolen developer key cannot satisfy CI. It can still poison that developer's own reuse. Prefer keyless (short-lived Fulcio certs, Rekor log) over long-lived keys. |
 | Tag swapping (`sha256-<fp>` repointed to another manifest) | Tag is lookup only and must resolve to the fingerprint's deterministic anchor manifest; any other target is `verification-failed`. Candidates are the anchor's referrers, fetched and verified by digest. |
 | Replay of a passing result for a different fingerprint or test id | `Verify` requires `execution.fingerprint == ExpectedFingerprint` and `test.id == ExpectedTestID`, both computed locally. The signed predicate cannot be re-labeled without breaking the signature. Mismatch is `verification-failed`. |
 | Undeclared input changed (file outside scope, unlisted env var, network service) | Out of scope for detection in v0: the fingerprint only covers declared inputs. Mitigated by contract review, `external-dependencies` / `non-deterministic` classes not being reusable by default, and the false-hit suite (roadmap item 4). Observed-input tracing is future work. |

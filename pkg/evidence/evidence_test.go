@@ -1,7 +1,6 @@
 package evidence
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -82,14 +81,6 @@ func TestVerificationErrorMessage(t *testing.T) {
 	err := &VerificationError{Reason: "untrusted signer"}
 	if got := err.Error(); got != "attestation verification failed: untrusted signer" {
 		t.Fatalf("Error() = %q", got)
-	}
-}
-
-// Milestone-2 stub: until Verify is implemented it must never report success.
-func TestVerifyIsNotImplemented(t *testing.T) {
-	v, err := Verify(context.Background(), &Envelope{}, VerifyOptions{})
-	if v != nil || !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("Verify = %v, %v; want nil, ErrNotImplemented", v, err)
 	}
 }
 

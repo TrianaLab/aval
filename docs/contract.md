@@ -115,7 +115,8 @@ renaming a test produces a new fingerprint.
 
 "Reusable by default" only means the class does not block reuse. A result
 is still reused only if a valid, signed attestation exists and the trust
-policy accepts its signer (milestone 2). The default policy accepts nothing.
+policy accepts its signer (see [trust-model.md](trust-model.md#policy)).
+Without a policy nothing is accepted.
 Today `aval run` prints `cacheability <class>: not reusable by default` for
 the last two classes.
 
