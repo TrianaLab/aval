@@ -1,0 +1,15 @@
+# Aval dogfooding: the engine unit suite. tests/architecture is deliberately
+# out of scope (it reads .agents/ and .claude/, which hold symlinks) and
+# always runs.
+apiVersion: aval.dev/v1alpha1
+kind: Test
+metadata:
+  name: aval-engine
+runner:
+  command: ["go", "test", "-race", "./cmd/...", "./internal/...", "./pkg/..."]
+scope:
+  source: ["cmd/**/*.go", "internal/**/*.go", "pkg/**/*.go"]
+  dependencies: [go.mod, go.sum]
+environment:
+  toolchain: {go: "1.25"}
+cacheability: hermetic

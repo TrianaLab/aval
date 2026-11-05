@@ -29,3 +29,42 @@ jobs:
       - uses: golangci/golangci-lint-action@v8
         with:
           version: v2.6
+
+  # Dogfooding M1 (#28): Aval's own contract must fingerprint identically on
+  # every OS and checkout path. Any difference is a determinism bug.
+  dogfood-fingerprint:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Fingerprint from two checkout paths
+        run: |
+          make build
+          a=$(./bin/aval run --fingerprint-only)
+          other="$RUNNER_TEMP/elsewhere/aval"
+          mkdir -p "$(dirname "$other")" && cp -R . "$other"
+          b=$(./bin/aval run --fingerprint-only -f "$other/aval.yaml")
+          test "$a" = "$b" || { echo "::error::fingerprint depends on checkout path: $a vs $b"; exit 1; }
+          echo "$a" > fingerprint.txt
+          { echo "### aval-engine on ${{ matrix.os }}: \`$a\`"; echo '```'; ./bin/aval run --explain --fingerprint-only | sed '$d'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-${{ matrix.os }}
+          path: fingerprint.txt
+
+  dogfood-compare:
+    needs: dogfood-fingerprint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fingerprint-*
+      - name: Same fingerprint on every OS
+        run: |
+          cat fingerprint-*/fingerprint.txt
+          test "$(cat fingerprint-*/fingerprint.txt | sort -u | wc -l)" -eq 1 || { echo "::error::fingerprint differs across OSes"; exit 1; }
