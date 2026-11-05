@@ -1,0 +1,36 @@
+package evidence
+
+// ReportVersion is the version of the `aval verify --output json` document.
+const ReportVersion = "aval.dev/verify-report/v1alpha1"
+
+// Outcome is the machine-readable verdict of `aval verify`.
+type Outcome string
+
+const (
+	// OutcomeVerified: a valid attestation satisfies the policy; reuse it.
+	OutcomeVerified Outcome = "verified"
+	// OutcomeMiss: no attestation exists for the fingerprint; run the test.
+	OutcomeMiss Outcome = "miss"
+	// OutcomeVerificationFailed: an attestation exists but is not trusted.
+	// Security event: run the test AND alert.
+	OutcomeVerificationFailed Outcome = "verification-failed"
+	// OutcomeError: Aval could not decide (e.g. registry unreachable). Treat
+	// as a miss for execution purposes (fail closed).
+	OutcomeError Outcome = "error"
+)
+
+// Report is the stable JSON document printed by `aval verify --output json`.
+// Additive changes only within a ReportVersion.
+type Report struct {
+	Version     string  `json:"version"`
+	Outcome     Outcome `json:"outcome"`
+	TestID      string  `json:"testId"`
+	Fingerprint string  `json:"fingerprint"`
+	// Reference is the attestation's digest reference, when one was found.
+	Reference string     `json:"reference,omitempty"`
+	Result    Result     `json:"result,omitempty"`
+	Signer    *Identity  `json:"signer,omitempty"`
+	Predicate *Predicate `json:"predicate,omitempty"`
+	// Reason explains miss, verification-failed and error outcomes.
+	Reason string `json:"reason,omitempty"`
+}

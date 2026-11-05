@@ -1,0 +1,12 @@
+# Pinned by tag for readability. For controlled-environment reuse, pin by
+# digest instead (redis:7.4-alpine@sha256:...): a tag can be re-pushed without
+# changing this file, and then the fingerprint would not see the change.
+services:
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      retries: 30

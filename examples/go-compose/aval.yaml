@@ -1,0 +1,12 @@
+apiVersion: aval.dev/v1alpha1
+kind: Test
+metadata:
+  name: counter-integration
+runner:
+  command: ["sh", "-c", "docker compose up -d --wait && REDIS_ADDR=localhost:16379 go test -tags=integration -count=1 ./...; rc=$?; docker compose down; exit $rc"]
+scope:
+  source: ["**/*.go", "compose.yaml"]
+  dependencies: [go.mod]
+environment:
+  toolchain: {go: "1.25"}
+cacheability: controlled-environment
