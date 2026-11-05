@@ -109,6 +109,26 @@ jobs:
           go-version-file: go.mod
       - run: make ci-release
 
+  # Short fuzz run (FUZZTIME per target, see Makefile); the long run is
+  # fuzz.yaml on a schedule. A crasher is uploaded so it can be committed as
+  # a regression case.
+  ci-fuzz:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make ci-fuzz
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashers
+          path: '**/testdata/fuzz/**'
+          if-no-files-found: ignore
+
   # Dogfooding M1 (#28): Aval's own contract must fingerprint identically on
   # every OS and checkout path. Any difference is a determinism bug. CI-only
   # (needs several OSes), so it has no `make` leg.
@@ -163,6 +183,7 @@ jobs:
       - ci-integration
       - ci-acceptance
       - ci-release
+      - ci-fuzz
       - dogfood-fingerprint
       - dogfood-compare
     runs-on: ubuntu-latest

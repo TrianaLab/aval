@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -219,9 +220,15 @@ func ValidateGlob(g string) error {
 
 // Match reports whether a slash-separated relative path matches glob.
 // Each segment uses path.Match semantics; a `**` segment matches zero or
-// more segments. The glob is assumed valid (see ValidateGlob).
+// more segments. The glob is assumed valid (see ValidateGlob). A name that
+// is not a clean relative path (leading '/', empty, '.' or '..' segments)
+// never matches, so no glob can reach outside the contract root.
 func Match(glob, name string) bool {
-	return matchSegs(strings.Split(glob, "/"), strings.Split(name, "/"))
+	segs := strings.Split(name, "/")
+	if slices.ContainsFunc(segs, func(s string) bool { return s == "" || s == "." || s == ".." }) {
+		return false
+	}
+	return matchSegs(strings.Split(glob, "/"), segs)
 }
 
 func matchSegs(p, n []string) bool {

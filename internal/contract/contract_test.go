@@ -81,6 +81,13 @@ func TestMatch(t *testing.T) {
 		{"cmd/*/main.go", "cmd/a/b/main.go", false},
 		{"a/**/z", "a/z", true},
 		{"a/**/z", "a/b/c/z", true},
+		// Names that are not clean relative paths never match.
+		{"**", "../secrets", false},
+		{"*/x", "../x", false},
+		{"**", "/etc/passwd", false},
+		{"a/**", "a//b", false},
+		{"**", "./a", false},
+		{"**", "", false},
 	}
 	for _, tc := range cases {
 		if got := Match(tc.glob, tc.name); got != tc.want {

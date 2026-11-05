@@ -1,0 +1,29 @@
+name: fuzz
+
+# Long fuzz run on a schedule; ci.yaml runs the short one on every PR. A
+# crasher is uploaded as an artifact: commit it under testdata/fuzz/ with the
+# fix so it runs as a regression case in plain `go test`.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make fuzz FUZZTIME=5m
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashers
+          path: '**/testdata/fuzz/**'
+          if-no-files-found: ignore
