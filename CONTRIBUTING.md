@@ -80,7 +80,7 @@ aggregates every other job and is the only required status check;
 
 ## Unfinished work
 
-Stubs return `evidence.ErrNotImplemented` (exit 6) and carry a `TODO(milestone-N): ...` comment naming the roadmap milestone that removes them (see [docs/vision.md](docs/vision.md)). Use the same convention; no bare `TODO`.
+Stubs return `evidence.ErrNotImplemented` (exit 6) and carry a `TODO(milestone-N): ...` comment naming the roadmap milestone that removes them (see [docs/vision.md](docs/vision.md)). Use the same convention; no bare `TODO`. Stubs still count toward the 100% coverage gate (`make coverage-check`): cover each with a test that asserts it returns `ErrNotImplemented`.
 
 ## License
 

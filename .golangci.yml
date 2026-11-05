@@ -7,8 +7,3 @@ linters:
         - fmt.Fprintf
         - fmt.Fprintln
         - (*os.File).Close
-  exclusions:
-    rules:
-      # TODO(milestone-2): remove once registry/policy/evidence stubs return real values.
-      - path: cmd/aval/main.go
-        text: SA4023

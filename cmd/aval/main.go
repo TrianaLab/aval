@@ -34,13 +34,31 @@ const (
 
 type usageError struct{ error }
 
-func main() {
-	err := newRootCmd().Execute()
-	code := exitCode(err)
+// Package variables so tests can drive verify through every outcome while
+// the real implementations are still stubs.
+// TODO(milestone-2): replace these seams with injected dependencies once registry, policy and evidence are real.
+var (
+	loadPolicy     = policy.Load
+	lookup         = registry.Lookup
+	fetch          = registry.Fetch
+	verifyEnvelope = evidence.Verify
+)
+
+// main stays one line: the coverage gate (make coverage-check) excludes
+// exactly this line, so all logic belongs in run.
+func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
+
+// run executes the CLI with args and returns the process exit code.
+func run(args []string, stdout, stderr io.Writer) int {
+	root := newRootCmd()
+	root.SetArgs(args)
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	err := root.Execute()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "aval:", err)
+		fmt.Fprintln(stderr, "aval:", err)
 	}
-	os.Exit(code)
+	return exitCode(err)
 }
 
 func exitCode(err error) int {
@@ -231,20 +249,20 @@ func verify(ctx context.Context, c *contract.Contract, fp fingerprint.Fingerprin
 	if policyFile == "" {
 		return fail(fmt.Errorf("no trust policy configured (--policy): %w", evidence.ErrNotFound))
 	}
-	pol, err := policy.Load(policyFile)
+	pol, err := loadPolicy(policyFile)
 	if err != nil {
 		return fail(err)
 	}
-	desc, err := registry.Lookup(ctx, repo, fp.Digest)
+	desc, err := lookup(ctx, repo, fp.Digest)
 	if err != nil {
 		return fail(err)
 	}
 	r.Reference = desc.Reference()
-	env, err := registry.Fetch(ctx, desc)
+	env, err := fetch(ctx, desc)
 	if err != nil {
 		return fail(err)
 	}
-	v, err := evidence.Verify(ctx, env, pol.VerifyOptions(c.Metadata.Name, fp.Digest))
+	v, err := verifyEnvelope(ctx, env, pol.VerifyOptions(c.Metadata.Name, fp.Digest))
 	if err != nil {
 		return fail(err)
 	}
