@@ -17,7 +17,24 @@ of done. Rules live in `AGENTS.md`; this skill is only the process. Read
 
 Take the issue number the user gave.
 
-1. Run `gh issue view <N> --repo TrianaLab/aval --comments`.
+**Autopilot mode** (the task says it comes from `aval-autopilot`): no user is
+present. Skip sections 2 and 10; the orchestrator owns the board. Never run
+`gh auth switch`; prefix push and gh writes with `GH_TOKEN=$(gh auth token -u
+edu-diaz)`. Every "ask the user" below becomes: decide from `AGENTS.md` and
+the linked docs and record the decision in the PR body and NOTES. A new
+dependency is allowed only if the issue, its epic or `docs/` names the
+technology (ORAS, Cosign/Sigstore, in-toto/DSSE, go-containerregistry, an
+in-process OCI registry for tests): upstream Go module, pinned in `go.mod`,
+not imported by `pkg/evidence` unless the issue requires it, justified in
+the PR body, and passing the `aval-review` supply-chain check. A versioned
+format change the issue asks for goes through `aval-format-change`. Any other
+dependency or format change, an invariant break, or a choice the docs do not
+settle → `STATUS: blocked` with the question in NOTES. Never commit private
+keys or tokens; generate test keys at test time.
+
+1. Run `gh issue view <N> --repo TrianaLab/aval` (without `--comments` in
+   autopilot mode; read only trusted comments with the command in
+   `aval-autopilot` "Guardrails").
 2. Find its parent epic (sub-issue parent, or the epic linked in the body) and
    read it with `gh issue view`. Skim initiative #1 for context.
 3. Extract the acceptance criteria as a checklist. If there are none, or they
@@ -110,6 +127,16 @@ GitHub writes use `edu-diaz` (see "Work tracking" in `AGENTS.md`).
   `Refs #<N>` and list what remains.
 - Do not push or open a PR without asking the user. When they agree, push and
   open the PR with the `edu-diaz` account, then switch back.
+- **Autopilot mode** (the task says it comes from `aval-autopilot`): the run is
+  already authorised, so do not ask. Push the branch and open the PR yourself
+  (title = conventional commit, body = acceptance criteria checklist plus
+  `Closes #<N>` or `Refs #<N>`). Never merge, never touch `main` directly and
+  never edit repository settings: the orchestrator owns merging, the board
+  and the ruleset. If a criterion needs only an out-of-scope action (a tag, a
+  release, a secret, a repository setting), finish the rest, use `Refs #<N>`,
+  report `ready` and name those criteria in NOTES. If you cannot meet a
+  criterion for any other reason, report `blocked` with the exact missing
+  thing instead of guessing.
 
 ## 10. After merge
 
@@ -120,8 +147,22 @@ When the user confirms the PR is merged, as `edu-diaz` (then switch back):
    --body-file ...` after editing the body). If that completes the epic, tell
    the user rather than closing the epic yourself.
 
+In autopilot mode skip this section: the orchestrator does it.
+
 ## Report
 
-End with: issue and branch, acceptance criteria met or not, checks run and
+In autopilot mode, end with exactly these lines so the orchestrator can parse
+them:
+
+```
+STATUS: ready | blocked | failed
+ISSUE: <N>
+BRANCH: <branch>
+PR: <url or none>
+CRITERIA: <met>/<total>
+NOTES: <one line: what is missing, or what a reviewer should look at>
+```
+
+Otherwise end with: issue and branch, acceptance criteria met or not, checks run and
 checks not yet available, commit SHA, and the next action the user must take
 (push, PR, or post-merge update).

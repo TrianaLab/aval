@@ -96,7 +96,9 @@ assertions go in Go, not in shell. Target: 100% statement coverage outside
   `TrianaLab/pacto`.
 - `TODO(milestone-N)` marks deferred work and must name the roadmap milestone.
 - GitHub writes use the `edu-diaz` account (`gh auth switch -u edu-diaz`), then
-  switch back to the previously active account.
+  switch back to the previously active account. Unattended runs
+  (`aval-autopilot`) never switch: they prefix each write with
+  `GH_TOKEN=$(gh auth token -u edu-diaz)`.
 
 ## Style
 
@@ -118,6 +120,8 @@ fails if a link is missing.
 | `aval-implement` | implement a roadmap issue end to end |
 | `aval-check` | run the validation ladder (quick, registry, e2e, dogfood) |
 | `aval-audit` | review a diff against these invariants before pushing |
+| `aval-review` | engineering and security review (SOLID, DRY, KISS, YAGNI, secure by default) |
 | `aval-false-hit` | add adversarial cases for fingerprint and trust changes |
 | `aval-format-change` | change any versioned format safely |
 | `aval-dogfood-report` | measure reuse in Aval's own CI (hits, misses, false hits) |
+| `aval-autopilot` | implement Epics 0-5 unattended, one fresh subagent per step |
