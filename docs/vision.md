@@ -188,9 +188,10 @@ These formats are frozen; within a version they change additively only (see
    The table-driven corpus in `internal/fingerprint/corpus_test.go` covers
    these kinds and pins the known gaps (see
    [contract.md](contract.md#known-gaps)). The `ci-false-hit` CI job runs it
-   on every PR and push, together with a golden manifest that fails on any
-   manifest change without an `aval-fingerprint/vN` bump; committed goldens
-   are append-only, so the golden cannot be rewritten instead.
+   on every PR and push, together with golden manifests of a fixed tree that
+   reach every manifest encoding branch and fail on any change to them
+   without an `aval-fingerprint/vN` bump; committed goldens are append-only,
+   so the golden cannot be rewritten instead.
 5. **Stable consumption contract for external integrations.** Exit criterion:
    the predicate type, media types, predicate fields, `pkg/evidence` API and
    `aval verify --output json` report are declared stable and versioned,

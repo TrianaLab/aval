@@ -1,17 +1,19 @@
 # Fixed contract for TestManifestGolden. Any edit to this tree changes the
 # golden manifest: make one only together with a fingerprint.Version bump.
-# Lists are unsorted and repeated so the golden pins canonical sort and dedup.
+# Lists are unsorted and repeated so the golden pins canonical sort and dedup;
+# the last argv entry pins argv order and JSON escaping (&, <, >, non-ASCII).
+# The test sets DB_IMAGE, sets EMPTY to "" and leaves MODE unset.
 apiVersion: aval.dev/v1alpha1
 kind: Test
 metadata:
   name: golden
 runner:
-  command: ["./run.sh", "-v"]
+  command: ["./run.sh", "-v", "a && b <c> é"]
 scope:
-  source: ["run.sh", "contract.yaml", "**/*.go", "run.sh"]
+  source: ["run.sh", "hook.sh", "contract.yaml", "**/*.go", ".hidden/*", "run.sh"]
   exclude: ["vendor/**"]
   dependencies: [go.sum]
 environment:
   toolchain: {go: "1.25", docker: "27"}
-  env: [MODE, DB_IMAGE, MODE]
+  env: [MODE, DB_IMAGE, MODE, EMPTY]
 cacheability: hermetic

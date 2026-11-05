@@ -143,11 +143,12 @@ ci-static: fmt-check lint
 ci-gates: test-architecture
 ci-engine: coverage-check example
 # The false-hit suite (#15) as its own gate, never cached: the corpus of
-# relevant and irrelevant changes (TestFalseHitCorpus), the manifest golden
-# that fails on a manifest change without a fingerprint.Version bump
-# (TestManifestGolden), the append-only check on committed goldens
-# (TestGoldensAppendOnly, against AVAL_GOLDEN_BASE or origin/main), the glob
-# tables and the fuzz seeds.
+# relevant and irrelevant changes (TestFalseHitCorpus), the manifest goldens
+# that fail on a change to the golden tree's manifests without a
+# fingerprint.Version bump (TestManifestGolden), the append-only check on
+# committed goldens (TestGoldensAppendOnly, against AVAL_GOLDEN_BASE or
+# origin/main), the glob tables and the fuzz seeds. ci-engine also runs these
+# packages; this leg is uncached and runs on docs-only PRs too.
 ci-false-hit:
 	go test -count=1 ./internal/fingerprint/... ./internal/contract/...
 # Levels 2 and 4, the heavy suite, through `aval run` with the contract

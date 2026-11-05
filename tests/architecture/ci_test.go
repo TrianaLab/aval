@@ -23,6 +23,7 @@ type workflow struct {
 }
 
 type step struct {
+	Env  map[string]string `yaml:"env"`
 	Run  string            `yaml:"run"`
 	Uses string            `yaml:"uses"`
 	With map[string]string `yaml:"with"`
@@ -218,5 +219,102 @@ jobs:
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("unpinned = %v, want %v", got, want)
+	}
+}
+
+// goldenBase is the only AVAL_GOLDEN_BASE the false-hit job may set: the PR
+// base branch, or the commit before the push. Anything else (HEAD, the PR
+// branch) would let a PR rewrite a committed golden unseen.
+const goldenBase = "${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}"
+
+// falseHitGateProblems lists every way the false-hit gate (#15) could stop
+// binding: dropped from `make ci` (and so, by TestMakeCILegsMirrorCIJobs,
+// from CI), made conditional, or run without full history or against a base
+// the PR chooses.
+func falseHitGateProblems(data []byte, legs []string) ([]string, error) {
+	const name = "ci-false-hit"
+	var wf workflow
+	if err := yaml.Unmarshal(data, &wf); err != nil {
+		return nil, err
+	}
+	var problems []string
+	if !slices.Contains(legs, name) {
+		problems = append(problems, "make ci has no "+name+" leg")
+	}
+	job, ok := wf.Jobs[name]
+	if !ok {
+		return append(problems, "no "+name+" CI job"), nil
+	}
+	if job.If != "" || len(job.Needs) > 0 {
+		problems = append(problems, name+" must run on every PR and push: no if, no needs")
+	}
+	if !slices.ContainsFunc(job.Steps, func(s step) bool {
+		return strings.HasPrefix(s.Uses, "actions/checkout@") && s.With["fetch-depth"] == "0"
+	}) {
+		problems = append(problems, name+" must check out with fetch-depth: 0")
+	}
+	if !slices.ContainsFunc(job.Steps, func(s step) bool {
+		return strings.TrimSpace(s.Run) == "make "+name && s.Env["AVAL_GOLDEN_BASE"] == goldenBase
+	}) {
+		problems = append(problems, name+" must run `make "+name+"` with AVAL_GOLDEN_BASE: "+goldenBase)
+	}
+	return problems, nil
+}
+
+func TestFalseHitGateIsBinding(t *testing.T) {
+	mk, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`(?m)^ci:(.*)$`).FindSubmatch(mk)
+	if m == nil {
+		t.Fatal("Makefile has no ci target")
+	}
+	problems, err := falseHitGateProblems(readCI(t), strings.Fields(string(m[1])))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range problems {
+		t.Error(p)
+	}
+}
+
+func TestFalseHitGateCheckCatchesLooseGates(t *testing.T) {
+	const env = "        env:\n          AVAL_GOLDEN_BASE: " + goldenBase + "\n"
+	const good = `
+jobs:
+  ci-false-hit:
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {fetch-depth: 0}
+      - run: make ci-false-hit
+` + env
+	legs := []string{"ci-false-hit"}
+	if p, err := falseHitGateProblems([]byte(good), legs); err != nil || len(p) != 0 {
+		t.Fatalf("valid gate reported %v, %v", p, err)
+	}
+	cases := map[string]struct {
+		wf   string
+		legs []string
+	}{
+		"no leg":       {good, nil},
+		"no job":       {"jobs: {}\n", legs},
+		"conditional":  {strings.Replace(good, "    steps:", "    if: false\n    steps:", 1), legs},
+		"needs":        {strings.Replace(good, "    steps:", "    needs: changes\n    steps:", 1), legs},
+		"shallow":      {strings.Replace(good, "{fetch-depth: 0}", "{fetch-depth: 1}", 1), legs},
+		"base is HEAD": {strings.Replace(good, goldenBase, "HEAD", 1), legs},
+		"no base":      {strings.Replace(good, env, "", 1), legs},
+	}
+	for name, tc := range cases {
+		if tc.wf == good && tc.legs != nil {
+			t.Fatalf("%s: case changes nothing", name)
+		}
+		p, err := falseHitGateProblems([]byte(tc.wf), tc.legs)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if len(p) == 0 {
+			t.Errorf("%s: not reported", name)
+		}
 	}
 }

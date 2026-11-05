@@ -229,23 +229,40 @@ a manifest section is changed by no differ row, so a new section must come
 with corpus cases; a new attribute in an existing section or a new contract
 field needs its row added by review.
 
-`TestManifestGolden` pins the manifest of a fixed tree
-(`internal/fingerprint/testdata/golden/tree`) per manifest version, in
-`testdata/golden/aval-fingerprint-vN.manifest`. Any change to which bytes
-are hashed or how they are laid out (including the canonical contract JSON) fails
-it unless the header version is bumped too, so an old fingerprint can never
-mean different inputs. `TestGoldensAppendOnly` stops the golden being
-rewritten to match: a committed `*.manifest` golden may be added (a new
-version) but never modified, renamed or deleted. It diffs the goldens
-against the merge base of `HEAD` and `AVAL_GOLDEN_BASE`; in CI that is the PR
-base branch or the commit before the push, and the test fails if it does not
-resolve. Locally the default is `origin/main`, and the check is logged as not
-run when that ref is missing. `TestGoldenEditsCatchesEdits` is its negative
-test; by hand, append a line to the golden and run
+`TestManifestGolden` pins, per manifest version, the manifests of three
+contracts over a fixed tree (`internal/fingerprint/testdata/golden/tree`),
+concatenated in `testdata/golden/aval-fingerprint-vN.manifest`. Between them
+they reach every encoding branch of the manifest today: one contract sets
+every field (unsorted and repeated lists, a toolchain map, argv with `&`,
+`<`, `>` and non-ASCII characters, an exclude, a dependency, and env vars
+that are set, set to the empty string and unset); one omits every optional
+field; one sets every optional field to an empty list or map and must encode
+like the one that omits them (`TestGoldenOmittedEqualsEmpty`). The tree has
+a nested path, a path with a space, an empty file under a dot-directory,
+a `.git` directory (made by the test), an excluded file, a file outside the
+scope and a file with only the group exec bit; the test fixes the file
+modes and the env values. Any change to how these manifests are built (their
+lines, the hashes in them or the canonical contract JSON) fails it unless
+the header version is bumped too, so an old fingerprint can never mean
+different inputs. A change to a path the tree does not exercise is caught
+only by the corpus, so a new manifest feature must come with a case in the
+golden tree.
+
+`TestGoldensAppendOnly` stops the golden being rewritten to match: a
+committed `*.manifest` golden may be added (a new version) but never
+modified, renamed or deleted. It diffs the goldens against the merge base of
+`HEAD` and `AVAL_GOLDEN_BASE`; in CI that is the PR base branch or the commit
+before the push, and the test fails if it does not resolve (after a
+force-push to `main` the old commit may be unreachable, and the job fails
+until the next normal push). Locally the default is `origin/main`, and the
+test is skipped when that ref is missing. `TestGoldenEditsCatchesEdits` is
+its negative test; by hand, append a line to the golden and run
 `AVAL_GOLDEN_BASE=HEAD go test ./internal/fingerprint -run TestGoldensAppendOnly`.
 The `ci-false-hit` CI job (`make ci-false-hit`, part of `make ci`) runs these
-tests and the glob tables on every PR and push, with no path filter. Edits to
-the tests themselves are left to review.
+tests and the glob tables on every PR and push, with no path filter.
+`TestFalseHitGateIsBinding` (`tests/architecture`) fails if that job or leg
+is removed, made conditional, checked out shallow, or given any other
+`AVAL_GOLDEN_BASE`. Edits to the tests themselves are left to review.
 
 ### Fail-closed errors
 
