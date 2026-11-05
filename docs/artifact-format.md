@@ -7,8 +7,8 @@ prints. It is the contract external tools consume through `pkg/evidence`.
 Status: pre-alpha. The Go types in `pkg/evidence` are the source of truth.
 Signing, push, lookup, fetch, verification and the policy file are
 implemented (`attest.Sign`, `registry.Push`, `registry.Lookup`,
-`registry.Fetch`, `evidence.Verify`, `policy.Load`). `aval verify` uses them;
-`aval push` and `aval run` are not wired yet (milestone 2, #9).
+`registry.Fetch`, `evidence.Verify`, `policy.Load`). `aval verify`,
+`aval run` and `aval push` use them.
 
 **Every media type, the predicate type and the report version are PROVISIONAL
 until v1.** They may change before then without a compatibility path.
@@ -231,6 +231,12 @@ The envelope payload is an in-toto Statement v1 (`evidence.Statement`). Its
 For an image, use `"digest": {"sha256": "<hex>"}` with the image reference as
 `name`.
 
+`aval run` records `name` = the test id and `digest` = `{"sha256": "<fingerprint
+hex>"}` (the declared inputs), `runner.identity` = the host name (a claim;
+trust comes from the signer), `runner.trustLevel` = 0, and
+`execution.environment` = `os` and `arch` plus the declared toolchain.
+Recording a git commit or image as the subject is milestone 3 work.
+
 ## Predicate
 
 `evidence.Predicate`, JSON tags exactly as below. Required fields are the ones
@@ -313,8 +319,9 @@ put secrets there: the predicate is published to the registry.
 
 ## Verify report
 
-`aval verify --output json` prints one `evidence.Report` to stdout. This is the
-stable machine interface for CI scripts and external tools.
+`aval verify --output json` prints one `evidence.Report` to stdout, and
+`aval run --report <file>` writes the same document for its lookup decision.
+This is the stable machine interface for CI scripts and external tools.
 
 | Field | Type | Present | Meaning |
 |---|---|---|---|
@@ -338,12 +345,18 @@ Outcomes and exit codes:
 | `verification-failed` | Attestation exists but fails signature or policy. | Run the test **and** alert. Never hide this. | 5 |
 | `error` | Aval could not decide (registry unreachable, bad policy file, trusted root unavailable). | Treat as a miss: run the test (fail closed). | 1 |
 
+These are the `aval verify` exit codes. `aval run` acts on the outcome and
+exits with the result instead; see
+[trust-model.md](trust-model.md#what-aval-run-does-with-each-outcome).
+
 If the fingerprint cannot be computed (empty scope, missing dependency,
 symlink, control characters in a path, I/O error), `aval verify` prints no
 report and exits 1; bad flags or an invalid contract print no report and exit 2.
+`aval run --report` still writes one in that case, with outcome `error`, the
+reason, and an empty `fingerprint`, and then runs the test.
 
 Without `--policy`, `aval verify` skips the lookup and reports `outcome: "miss"`
-(exit 4). With `--policy`, a policy file that cannot be loaded, or a
+(exit 4), and so it does for a `non-deterministic` contract. With `--policy`, a policy file that cannot be loaded, or a
 trusted root that cannot be loaded, is `outcome: "error"` (exit 1) and no
 lookup is made.
 

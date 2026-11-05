@@ -48,7 +48,9 @@ Use "aval completion [command] --help" for more information about a command.
 
 ## aval push
 
-Sign and publish a recorded execution result
+push signs the result recorded by 'aval run' and publishes it. The result
+must be for the current inputs: same test id, cacheability and fingerprint.
+Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
 
 ```text
 Usage:
@@ -57,7 +59,7 @@ Usage:
 Flags:
   -f, --contract string   path to the test contract (default "aval.yaml")
   -h, --help              help for push
-      --key string        signing key path or KMS URI (default: keyless OIDC)
+      --key string        signing key path (default: keyless OIDC)
       --registry string   OCI repository for attestations (required)
       --result string     result recorded by 'aval run' (default ".aval/result.json")
 ```
@@ -66,7 +68,18 @@ Flags:
 
 run computes the execution fingerprint of the contract, looks for a signed
 attestation in the registry, and reuses it if it verifies against the trust
-policy. Otherwise it runs the test (and, with --push, publishes the result).
+policy. Otherwise it runs runner.command, records the result (--result) and,
+with --push, signs and publishes it.
+
+Anything that cannot be proven runs the test: a fingerprint error, a registry
+or policy error, a miss. A verification failure also runs the test, and then
+exits 5: it is a security event. A reused failing result exits 3, like a
+failing run. --shadow verifies and still runs the test; if the verified
+result disagrees with the run, that is a false hit and run exits 1.
+
+Exit codes: 0 passed or reused a pass, 3 failed or reused a failure,
+5 verification failed (after running the test), 1 error or false hit,
+2 usage. Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
 
 ```text
 Usage:
@@ -77,10 +90,14 @@ Flags:
       --explain            print the fingerprint manifest (what was hashed)
       --fingerprint-only   print the execution fingerprint and exit
   -h, --help               help for run
+      --key string         signing key path for --push (default: keyless OIDC)
       --no-reuse           always run, never reuse
       --policy string      trust policy file (required for reuse; without it the test always runs)
-      --push               sign and publish the result after running
+      --push               sign and publish the result after running (needs --registry)
       --registry string    OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
+      --report string      also write the lookup decision as a verify report (JSON) to this file
+      --result string      where to record the result for 'aval push' (default ".aval/result.json")
+      --shadow             verify, but run the test anyway and fail on a false hit
 ```
 
 ## aval verify

@@ -24,10 +24,10 @@ import (
 // failure are deliberately different: a miss is routine, a verification
 // failure means someone published a result we do not trust.
 const (
-	ExitOK                 = 0 // test passed, or a verified result was reused
-	ExitError              = 1 // unexpected error (registry down, I/O, ...)
+	ExitOK                 = 0 // test passed, or a verified passing result was reused (verify: any verified result)
+	ExitError              = 1 // unexpected error (registry down, I/O, ...), or a false hit in run --shadow
 	ExitUsage              = 2 // bad flags or invalid aval.yaml
-	ExitTestFailed         = 3 // the test ran and failed
+	ExitTestFailed         = 3 // the test ran and failed, or run reused a verified failing result
 	ExitMiss               = 4 // no attestation for this fingerprint
 	ExitVerificationFailed = 5 // attestation exists but failed signature/policy: security event
 	ExitNotImplemented     = 6 // feature lands in a later milestone
@@ -35,15 +35,25 @@ const (
 
 type usageError struct{ error }
 
-// Package variables so tests can drive verify through every outcome while
-// the real implementations are still stubs.
-// TODO(milestone-2): replace these seams with injected dependencies once registry, policy and evidence are real.
+// ponytail: package-level seams so tests can drive every outcome without a
+// registry or Sigstore; inject dependencies if the CLI grows a library API.
 var (
 	loadPolicy     = policy.Load
 	lookup         = registry.Lookup
 	fetch          = registry.Fetch
 	verifyEnvelope = evidence.Verify
 	newVerifier    = attest.NewVerifier
+	sign           = attest.Sign
+	publish        = registry.Push
+)
+
+var (
+	// errTestFailed: the test ran and failed, or a verified failing result
+	// was reused (exit 3).
+	errTestFailed = errors.New("test failed")
+	// errFalseHit: run --shadow found a verified result that disagrees with
+	// the real run.
+	errFalseHit = errors.New("false hit: the verified result disagrees with the real run")
 )
 
 // main stays one line: the coverage gate (make coverage-check) excludes
@@ -72,6 +82,8 @@ func exitCode(err error) int {
 		return ExitUsage
 	case errors.Is(err, evidence.ErrVerification):
 		return ExitVerificationFailed
+	case errors.Is(err, errTestFailed):
+		return ExitTestFailed
 	case errors.Is(err, evidence.ErrNotFound):
 		return ExitMiss
 	case errors.Is(err, evidence.ErrNotImplemented):
@@ -108,7 +120,8 @@ func noArgs(c *cobra.Command, args []string) error {
 }
 
 // loadAndFingerprint loads the contract and computes its fingerprint, rooted
-// at the contract's directory.
+// at the contract's directory. When only the fingerprint fails it still
+// returns the contract, so run can execute the test.
 func loadAndFingerprint(file string) (*contract.Contract, fingerprint.Fingerprint, error) {
 	c, err := contract.Load(file)
 	if err != nil {
@@ -117,82 +130,9 @@ func loadAndFingerprint(file string) (*contract.Contract, fingerprint.Fingerprin
 	fp, err := fingerprint.Compute(filepath.Dir(file), c, os.LookupEnv)
 	if err != nil {
 		// Cannot prove input equivalence: callers must run the test.
-		return nil, fingerprint.Fingerprint{}, fmt.Errorf("fingerprint: %w", err)
+		return c, fingerprint.Fingerprint{}, fmt.Errorf("fingerprint: %w", err)
 	}
 	return c, fp, nil
-}
-
-func newRunCmd() *cobra.Command {
-	var (
-		file, repo, policyFile string
-		push, noReuse          bool
-		fingerprintOnly        bool
-		explain                bool
-	)
-	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Reuse a verified result for the current inputs, or run the test",
-		Long: `run computes the execution fingerprint of the contract, looks for a signed
-attestation in the registry, and reuses it if it verifies against the trust
-policy. Otherwise it runs the test (and, with --push, publishes the result).`,
-		Args: noArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			c, fp, err := loadAndFingerprint(file)
-			if err != nil {
-				return err
-			}
-			out := cmd.OutOrStdout()
-			if explain {
-				fmt.Fprint(out, fp.Manifest)
-			}
-			if fingerprintOnly {
-				fmt.Fprintln(out, fp.Digest)
-				return nil
-			}
-			fmt.Fprintf(out, "test %s fingerprint %s\n", c.Metadata.Name, fp.Digest)
-			if !c.Cacheability.ReusableByDefault() {
-				fmt.Fprintf(out, "cacheability %s: not reusable by default\n", c.Cacheability)
-			}
-			// TODO(milestone-2): lookup + verify (reuse on success), else execute
-			// runner.command, record the result and optionally push it.
-			return fmt.Errorf("run: lookup and execution: %w", evidence.ErrNotImplemented)
-		},
-	}
-	f := cmd.Flags()
-	f.StringVarP(&file, "contract", "f", contract.DefaultFile, "path to the test contract")
-	f.StringVar(&repo, "registry", "", "OCI repository for attestations, e.g. ghcr.io/acme/orders-aval")
-	f.StringVar(&policyFile, "policy", "", "trust policy file (required for reuse; without it the test always runs)")
-	f.BoolVar(&push, "push", false, "sign and publish the result after running")
-	f.BoolVar(&noReuse, "no-reuse", false, "always run, never reuse")
-	f.BoolVar(&fingerprintOnly, "fingerprint-only", false, "print the execution fingerprint and exit")
-	f.BoolVar(&explain, "explain", false, "print the fingerprint manifest (what was hashed)")
-	return cmd
-}
-
-func newPushCmd() *cobra.Command {
-	var file, repo, key, resultFile string
-	cmd := &cobra.Command{
-		Use:   "push",
-		Short: "Sign and publish a recorded execution result",
-		Args:  noArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if repo == "" {
-				return usageError{errors.New("--registry is required")}
-			}
-			if _, _, err := loadAndFingerprint(file); err != nil {
-				return err
-			}
-			// TODO(milestone-2): read the result recorded by `aval run`, check it
-			// matches the current fingerprint, attest.Sign, registry.Push.
-			return fmt.Errorf("push: %w", evidence.ErrNotImplemented)
-		},
-	}
-	f := cmd.Flags()
-	f.StringVarP(&file, "contract", "f", contract.DefaultFile, "path to the test contract")
-	f.StringVar(&repo, "registry", "", "OCI repository for attestations (required)")
-	f.StringVar(&key, "key", "", "signing key path or KMS URI (default: keyless OIDC)")
-	f.StringVar(&resultFile, "result", ".aval/result.json", "result recorded by 'aval run'")
-	return cmd
 }
 
 func newVerifyCmd() *cobra.Command {
@@ -232,12 +172,13 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event).`,
 }
 
 func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
-	r := evidence.Report{Version: evidence.ReportVersion, TestID: c.Metadata.Name, Fingerprint: fp.Digest}
-	fail := func(err error) (evidence.Report, error) {
-		r.Reason, r.Outcome = err.Error(), outcomeOf(err)
-		return r, err
-	}
+	r := newReport(c, fp)
+	fail := func(err error) (evidence.Report, error) { return failReport(r, err) }
 
+	// Never reusable, so there is nothing to look up (invariant 7).
+	if c.Cacheability == contract.NonDeterministic {
+		return fail(fmt.Errorf("cacheability %s is never reusable: %w", c.Cacheability, evidence.ErrNotFound))
+	}
 	// Without a policy nothing is trusted, so do not even look: report a miss
 	// instead of flagging every attestation found as a security event.
 	if policyFile == "" {
@@ -258,13 +199,22 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 	if err != nil {
 		return fail(err)
 	}
-	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest), sigs)
+	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest), sigs, string(c.Cacheability))
 	r.Reference, r.Rejected = ref, rejected
 	if err != nil {
 		return fail(err)
 	}
 	r.Outcome, r.Result, r.Signer, r.Predicate = evidence.OutcomeVerified, best.Predicate.Result, &best.Signer, best.Predicate
 	return r, nil
+}
+
+func newReport(c *contract.Contract, fp fingerprint.Fingerprint) evidence.Report {
+	return evidence.Report{Version: evidence.ReportVersion, TestID: c.Metadata.Name, Fingerprint: fp.Digest}
+}
+
+func failReport(r evidence.Report, err error) (evidence.Report, error) {
+	r.Reason, r.Outcome = err.Error(), outcomeOf(err)
+	return r, err
 }
 
 // outcomeOf maps an error to its report outcome; miss and verification
@@ -291,7 +241,7 @@ func outcomeOf(err error) evidence.Outcome {
 // (invariant 4). Whenever no candidate is reused it returns the reference and
 // error of the first verification failure, which outranks any other error: it
 // is the security event that must surface.
-func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier) (*evidence.Verification, string, []evidence.Rejection, error) {
+func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, string, []evidence.Rejection, error) {
 	var (
 		best             *evidence.Verification
 		bestRef, failRef string
@@ -300,7 +250,7 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 		rejected         []evidence.Rejection
 	)
 	for _, d := range cands {
-		v, err := verifyCandidate(ctx, d, opts, sigs)
+		v, err := verifyCandidate(ctx, d, opts, sigs, cacheability)
 		if err == nil {
 			if best == nil || v.Signer.TrustLevel > best.Signer.TrustLevel ||
 				(v.Signer.TrustLevel == best.Signer.TrustLevel && best.Predicate.Result == evidence.ResultPassed && v.Predicate.Result != evidence.ResultPassed) {
@@ -322,14 +272,20 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 }
 
 // verifyCandidate fetches one attestation and verifies it with the Sigstore
-// bundle stored next to its envelope.
-func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier) (*evidence.Verification, error) {
+// bundle stored next to its envelope. The signed cacheability must equal the
+// local contract's: the fingerprint covers the contract, so a different class
+// under the same fingerprint is a lie, never a hit (invariant 7).
+func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, error) {
 	a, err := fetch(ctx, d)
 	if err != nil {
 		return nil, err
 	}
 	opts.Signature = sigs.For(a.Bundle)
-	return verifyEnvelope(ctx, a.Envelope, opts)
+	v, err := verifyEnvelope(ctx, a.Envelope, opts)
+	if err == nil && v.Predicate.Test.Cacheability != cacheability {
+		v, err = nil, &evidence.VerificationError{Reason: fmt.Sprintf("cacheability %q, want %q", v.Predicate.Test.Cacheability, cacheability)}
+	}
+	return v, err
 }
 
 func writeReport(w io.Writer, format string, r evidence.Report) error {

@@ -272,3 +272,22 @@ func TestNewVerifierErrors(t *testing.T) {
 		t.Fatalf("empty policy: %+v, %v", v, err)
 	}
 }
+
+// A verifier that sigstore-go refuses to build is an error with its cause,
+// never a Verifier that silently accepts nothing.
+func TestNewVerifierSurfacesSigstoreErrors(t *testing.T) {
+	useTrustedRoot(t, nil)
+	k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	bad := []verify.VerifierOption{func(*verify.VerifierConfig) error { return errors.New("bad option") }}
+	oldKeyed, oldKeyless := keyedOptions, keylessOptions
+	t.Cleanup(func() { keyedOptions, keylessOptions = oldKeyed, oldKeyless })
+	keyedOptions, keylessOptions = bad, bad
+	for name, id := range map[string]evidence.Identity{
+		"key verifier":     {PublicKey: pubPEM(t, &k.PublicKey)},
+		"keyless verifier": {Issuer: ghIssuer, SubjectRegexp: ".*"},
+	} {
+		if _, err := NewVerifier("", []evidence.Identity{id}); err == nil || !strings.Contains(err.Error(), name) || !strings.Contains(err.Error(), "bad option") {
+			t.Errorf("%s: error %v hides the cause", name, err)
+		}
+	}
+}

@@ -1,9 +1,7 @@
 # Aval: vision
 
-Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
-Milestone 2 is in progress: signing, push, lookup, verification and the
-policy file are implemented and `aval verify` uses them; `aval run` and
-`aval push` are stubs that exit with code 6 (not implemented).
+Status: pre-alpha. Milestones 1 (contract + fingerprint) and 2 (sign, push
+and verify against a registry, `aval run` reuse or execute) are implemented.
 
 ## Thesis
 
@@ -156,8 +154,9 @@ These formats are provisional until milestone 5 makes them stable.
    `aval run --fingerprint-only` / `--explain` produce a deterministic
    `aval-fingerprint/v1` digest and manifest that fail closed on undeclared
    or unprovable inputs.
-2. **Push/verify against a local registry with Cosign signing.** Exit
-   criterion: `aval run --push` signs and publishes an attestation to a local
+2. **Push/verify against a local registry with Cosign signing.**
+   *Implemented* (`aval run` exits with the test's own result after a miss,
+   and reports the miss). Exit criterion: `aval run --push` signs and publishes an attestation to a local
    OCI registry. `aval verify` and `aval run` against that registry reuse a
    policy-accepted result (exit 0), report a miss (exit 4), and report a
    tampered or untrusted attestation as a verification failure (exit 5). The

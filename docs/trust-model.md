@@ -3,10 +3,9 @@
 Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
 Signing (`attest.Sign`), push, lookup and fetch (`internal/registry`),
 verification (`evidence.Verify`, `attest.Verifier`) and the policy file
-(`policy.Load`) are implemented; `aval verify` uses them. `aval run` and
-`aval push` are not wired yet (milestone 2, #9). This document describes the
-model the code is built around; where behavior is not implemented yet, it
-says so.
+(`policy.Load`) are implemented; `aval verify`, `aval run` and `aval push`
+use them. This document describes the model the code is built around; where
+behavior is not implemented yet, it says so.
 
 The predicate type, media types and the `aval.dev/v1alpha1` apiVersion are
 provisional until v1.
@@ -178,7 +177,40 @@ the test runs.
 - **Unknown or missing fields** in `aval.yaml` are rejected (exit 2) rather
   than ignored.
 
-`aval run --no-reuse` (milestone 2) will always run and never reuse; the flag is accepted today but `aval run` is still a stub.
+`aval run --no-reuse` always runs and never looks anything up.
+
+## What `aval run` does with each outcome
+
+`aval run` makes the same decision as `aval verify` and prints it as the
+verify text report (`--report <file>` also writes the JSON report). Only
+`verified` reuses; everything else runs `runner.command` in the contract's
+directory:
+
+| Lookup outcome | `aval run` | Exit code |
+|---|---|---|
+| `verified`, result `passed` | reuse, do not run | 0 |
+| `verified`, result `failed` | reuse the failure, do not run | 3 |
+| `miss` (also: no `--registry`, no `--policy`, `--no-reuse`, `non-deterministic`) | run | test result: 0 or 3 |
+| `error` (registry, policy or fingerprint error) | run | test result: 0 or 3 |
+| `verification-failed` | run, print `aval: SECURITY: ...` on stderr | 5, whatever the test result |
+
+A fingerprint error leaves nothing to look up or record: the test runs, the
+report has outcome `error` with the reason, and `--push` fails (exit 1).
+Otherwise the run is recorded as an unsigned predicate in `--result`
+(default `.aval/result.json`) and, with `--push`, signed and published.
+`aval push` publishes a recorded result later, only if its test id,
+cacheability and fingerprint still match the contract.
+
+`--shadow` verifies and runs the test anyway. If a verified result disagrees
+with the real run, that is a false hit: `aval run` prints `aval: FALSE HIT:
+...` on stderr and exits 1. If they agree, it says reuse would have been
+correct.
+
+Defense in depth for cacheability (invariant 7): a `non-deterministic`
+contract is a miss without any lookup, in `aval run` and `aval verify`, and
+a candidate whose signed `test.cacheability` differs from the local
+contract's is a verification failure, even if the policy would allow its
+class.
 
 ## Miss vs verification failure
 

@@ -40,6 +40,7 @@ var (
 		return root.NewTrustedRootFromPath(path)
 	}
 	keylessOptions = []verify.VerifierOption{verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1)}
+	keyedOptions   = []verify.VerifierOption{verify.WithNoObserverTimestamps()}
 )
 
 // NewVerifier builds a Verifier for the accepted identities. Key identities
@@ -66,16 +67,20 @@ func NewVerifier(trustedRoot string, ids []evidence.Identity) (*Verifier, error)
 		}
 		keys[kid] = root.NewExpiringKey(sv, time.Time{}, time.Time{})
 	}
-	// ponytail: fixed, valid option sets; NewVerifier only fails on invalid ones.
+	var err error
 	if len(keys) > 0 {
-		v.keyed, _ = verify.NewVerifier(root.NewTrustedPublicKeyMaterialFromMapping(keys), verify.WithNoObserverTimestamps())
+		if v.keyed, err = verify.NewVerifier(root.NewTrustedPublicKeyMaterialFromMapping(keys), keyedOptions...); err != nil {
+			return nil, fmt.Errorf("key verifier: %w", err)
+		}
 	}
 	if keyless {
 		tm, err := loadTrustedRoot(trustedRoot)
 		if err != nil {
 			return nil, fmt.Errorf("sigstore trusted root: %w", err)
 		}
-		v.keyless, _ = verify.NewVerifier(tm, keylessOptions...)
+		if v.keyless, err = verify.NewVerifier(tm, keylessOptions...); err != nil {
+			return nil, fmt.Errorf("keyless verifier: %w", err)
+		}
 	}
 	return v, nil
 }
