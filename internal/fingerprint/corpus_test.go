@@ -24,9 +24,10 @@ import (
 //     documented here and in docs/contract.md, not hidden. If a future
 //     change closes a gap, flip the row to differ.
 //
-// A new fingerprint rule (a new manifest section, a new hashed attribute)
-// needs a corpus row: TestFalseHitCorpus fails if any manifest section is
-// changed by no differ row.
+// A new manifest section needs a differ row: TestFalseHitCorpus fails if a
+// section of the base manifest is changed by no differ row. A new attribute
+// inside an existing section, or a new contract field, is not detected: add
+// its row by hand.
 type outcome int
 
 const (
@@ -156,13 +157,17 @@ var corpus = []corpusCase{
 		// normalized: NFC and NFD spellings of a name are different inputs.
 		f.rename("caf\u00e9.go", "cafe\u0301.go")
 	}, want: differ},
+	{name: "dependency under an excluded path", setup: func(f *fixture) {
+		f.c.Scope.Dependencies = append(f.c.Scope.Dependencies, "vendor/modules.txt")
+		f.write("vendor/modules.txt", "a\n")
+	}, change: func(f *fixture) { f.write("vendor/modules.txt", "b\n") }, want: differ},
 	{name: "excluded file re-included", change: func(f *fixture) { f.c.Scope.Exclude = nil }, want: differ},
 
 	// Declared environment: toolchain and env vars.
 	{name: "toolchain value", change: func(f *fixture) { f.c.Environment.Toolchain["go"] = "1.26" }, want: differ},
 	{name: "toolchain key added", change: func(f *fixture) { f.c.Environment.Toolchain["node"] = "22" }, want: differ},
 	{name: "toolchain key removed", change: func(f *fixture) { delete(f.c.Environment.Toolchain, "docker") }, want: differ},
-	{name: "toolchain value forging a manifest line", change: func(f *fixture) {
+	{name: "toolchain value with an embedded newline", change: func(f *fixture) {
 		f.c.Environment.Toolchain["go"] = "1.25\nsource " + sum([]byte("x")) + " - x.go"
 	}, want: differ},
 	{name: "env value", change: func(f *fixture) { f.env["DB_IMAGE"] = "postgres:17" }, want: differ},
@@ -180,7 +185,7 @@ var corpus = []corpusCase{
 	{name: "command argv joined", change: func(f *fixture) { f.c.Runner.Command = []string{"go", "test ./..."} }, want: differ},
 	{name: "metadata.name", change: func(f *fixture) { f.c.Metadata.Name = "other" }, want: differ},
 	{name: "cacheability", change: func(f *fixture) { f.c.Cacheability = contract.Hermetic }, want: differ},
-	{name: "scope.source glob added", change: func(f *fixture) { f.c.Scope.Source = append(f.c.Scope.Source, "none/**") }, want: differ},
+	{name: "scope.source glob added", change: func(f *fixture) { f.c.Scope.Source = append(f.c.Scope.Source, "main.go") }, want: differ},
 	{name: "scope.exclude glob added", change: func(f *fixture) { f.c.Scope.Exclude = append(f.c.Scope.Exclude, "none/**") }, want: differ},
 	{name: "scope.dependencies glob added", change: func(f *fixture) { f.c.Scope.Dependencies = append(f.c.Scope.Dependencies, "compose.yaml") }, want: differ},
 
@@ -192,6 +197,11 @@ var corpus = []corpusCase{
 	{name: "exclude beats an explicit source glob", setup: func(f *fixture) {
 		f.c.Scope.Source = append(f.c.Scope.Source, "vendor/v/v.go")
 	}, change: func(f *fixture) { f.write("vendor/v/v.go", "package v // edited\n") }, want: same},
+	{name: "file excluded by name and by a directory glob", setup: func(f *fixture) {
+		f.c.Scope.Source = append(f.c.Scope.Source, "build")
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "build", "build/**")
+		f.write("build", "#!/bin/sh\necho a\n")
+	}, change: func(f *fixture) { f.write("build", "#!/bin/sh\necho b\n") }, want: same},
 	{name: "file under .git added", change: func(f *fixture) { f.write(".git/objects/x.go", "package x\n") }, want: same},
 	{name: "checkout path", change: func(f *fixture) {
 		to := filepath.Join(f.t.TempDir(), "elsewhere")
@@ -229,6 +239,7 @@ var corpus = []corpusCase{
 			f.remove(n)
 		}
 	}, want: failClosed},
+	{name: "every source excluded", change: func(f *fixture) { f.c.Scope.Exclude = append(f.c.Scope.Exclude, "**") }, want: failClosed},
 	{name: "symlink to file inside root", change: func(f *fixture) { f.symlink(f.path("main.go"), "link.go") }, want: failClosed},
 	{name: "symlink to file outside root", change: func(f *fixture) {
 		out := filepath.Join(f.t.TempDir(), "x.go")
@@ -250,6 +261,21 @@ var corpus = []corpusCase{
 	{name: "newline in path", change: func(f *fixture) {
 		f.write("x\nsource "+sum([]byte("c"))+" - y.go", "c")
 	}, want: failClosed},
+	{name: "source glob matches no file", change: func(f *fixture) { f.c.Scope.Source = append(f.c.Scope.Source, "mian.go") }, want: failClosed},
+	{name: "literal source glob differs from the file name by case", setup: func(f *fixture) {
+		f.write("makefile", "all:\n")
+	}, change: func(f *fixture) {
+		// The walk returns "makefile" on case-sensitive and case-insensitive
+		// filesystems alike, so "Makefile" matches nothing.
+		f.c.Scope.Source = append(f.c.Scope.Source, "Makefile")
+	}, want: failClosed},
+	{name: "file named like an excluded directory", setup: func(f *fixture) {
+		f.c.Scope.Source = append(f.c.Scope.Source, "build")
+		f.write("build", "#!/bin/sh\necho a\n")
+	}, change: func(f *fixture) {
+		// "build/**" declares the files under build/, not a file named build.
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "build/**")
+	}, want: failClosed},
 	{name: "carriage return in path", change: func(f *fixture) { f.write("x\r.go", "c") }, want: failClosed},
 
 	// Known gaps: relevant to the test, invisible to the fingerprint by
@@ -260,9 +286,10 @@ var corpus = []corpusCase{
 
 func TestFalseHitCorpus(t *testing.T) {
 	sections := map[string]bool{} // manifest sections some differ row changed
-	var all []string
+	ran := 0
 	for _, tc := range corpus {
 		t.Run(tc.name, func(t *testing.T) {
+			ran++
 			f := newFixture(t)
 			if tc.setup != nil {
 				tc.setup(f)
@@ -271,7 +298,6 @@ func TestFalseHitCorpus(t *testing.T) {
 			if err != nil {
 				t.Fatalf("base: %v", err)
 			}
-			all = sectionsOf(before.Manifest)
 			tc.change(f)
 			after, err := f.compute()
 			switch {
@@ -294,8 +320,21 @@ func TestFalseHitCorpus(t *testing.T) {
 			}
 		})
 	}
-	for _, s := range all {
-		if !sections[s] {
+	if ran == len(corpus) { // -run or -skip may select some rows only
+		checkSectionsCovered(t, sections)
+	}
+}
+
+// checkSectionsCovered fails for each section of the base manifest that no
+// differ row changed.
+func checkSectionsCovered(t *testing.T, covered map[string]bool) {
+	t.Helper()
+	base, err := newFixture(t).compute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range sectionsOf(base.Manifest) {
+		if !covered[s] {
 			t.Errorf("manifest section %q is changed by no differ row: add corpus cases for it", s)
 		}
 	}

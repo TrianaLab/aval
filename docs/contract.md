@@ -24,7 +24,7 @@ runner:
   command: ["go", "test", "-tags=integration", "./orders/..."]
 
 scope:
-  source:                       # required, at least one glob
+  source:                       # required, each glob must match >= 1 file
     - "orders/**/*.go"
     - "internal/**/*.go"
     - "testdata/orders/**"
@@ -65,8 +65,8 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 | `kind` | string | yes | Must be `Test`. |
 | `metadata.name` | string | yes | 1-64 chars of `[a-z0-9._-]`, starting and ending with `[a-z0-9]`. |
 | `runner.command` | list of strings | yes | Non-empty argv. The first element must not be blank. No shell interpolation. v0 only supports this generic runner. |
-| `scope.source` | list of globs | yes | At least one glob. Matched files are hashed. At fingerprint time, the combined set must match at least one file. |
-| `scope.exclude` | list of globs | no | Removes files from the `source` set. Does not apply to `dependencies`. |
+| `scope.source` | list of globs | yes | At least one glob. Matched files are hashed. At fingerprint time, each glob must match at least one file (before `exclude`), and the set left after `exclude` must not be empty. |
+| `scope.exclude` | list of globs | no | Removes files from the `source` set. Does not apply to `dependencies`. A glob may match nothing. |
 | `scope.dependencies` | list of globs | no | Lockfiles and manifests. Each glob must match at least one file at fingerprint time. |
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
 | `environment.env` | list of strings | no | Environment variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
@@ -87,6 +87,9 @@ the same rules.
 - `**` is only allowed as a whole segment and matches zero or more segments.
   `src/**/*.go` matches `src/a.go` and `src/x/y/a.go`. `**` alone matches
   every file. `foo**` or `**.go` are rejected.
+- In `exclude`, a trailing `**` means the files under a directory: a file
+  named `build` that only `build/**` would exclude fails fingerprinting
+  (see "Fail-closed errors"). Exclude such a file by name (`build`).
 - Globs match files only, never directories. To include a directory's
   contents, write `dir/**`.
 - The order of globs does not matter.
@@ -167,9 +170,12 @@ same executable file fingerprint differently.
 
 Paths are hashed as the bytes the filesystem returns, never normalized. The
 NFC and NFD spellings of the same visible name (`café.go`) are different
-inputs, and so are `A.go` and `a.go`. A checkout whose filesystem rewrites
-names (case folding, Unicode normalization) can therefore miss; it never
-hits for a different tree.
+inputs, and so are `A.go` and `a.go`. Globs match those bytes
+case-sensitively and without normalization. A literal glob that differs from
+the on-disk name only by case or Unicode form (`Makefile` vs `makefile`)
+matches nothing, so fingerprinting fails (see "Fail-closed errors"). A
+wildcard glob that matches other files (`**/Makefile`) still leaves such a
+file out of scope, like any undeclared file.
 
 ### What does not go in
 
@@ -188,11 +194,13 @@ hits for a different tree.
 
 Declared scope means some relevant changes are invisible by design
 (invariant 2 in `AGENTS.md`). A test that depends on one of these can reuse a
-result it should not. Each is either pinned by a `gap` row in the false-hit
-corpus (`internal/fingerprint/corpus_test.go`), which asserts the
-fingerprint does *not* change, or by the matching manifest rule above:
+result it should not. The first two are pinned by `gap` rows in the
+false-hit corpus (`internal/fingerprint/corpus_test.go`), which assert the
+fingerprint does *not* change; the others follow from what the manifest
+hashes (see above):
 
-- A file the test reads but `scope` does not match (corpus row).
+- A file the test reads but `scope` does not match (corpus row), including
+  a name that differs from a wildcard glob by case or Unicode form.
 - An environment variable the test reads but `environment.env` does not
   list (corpus row).
 - Content behind a declared name: a container tag such as `postgres:16`
@@ -216,8 +224,9 @@ field, re-included excludes) changes the fingerprint; an irrelevant one
 (out-of-scope or excluded files, `.git`, checkout path, ordering,
 duplicates, timestamps, non-exec permission bits, YAML formatting) does not;
 an unprovable one (see "Fail-closed errors") fails closed. The test fails if
-a manifest section is changed by no row, so a new fingerprint rule must come
-with corpus cases.
+a manifest section is changed by no differ row, so a new section must come
+with corpus cases; a new attribute in an existing section or a new contract
+field needs its row added by review.
 
 ### Fail-closed errors
 
@@ -226,7 +235,14 @@ test must run. `aval run` reports the reason (outcome `error`) and runs the
 test without recording it; `aval run --fingerprint-only`, `--explain`,
 `aval verify` and `aval push` exit with code 1. The cases:
 
+- `source glob "<glob>" matched no files`: every `source` glob must match
+  at least one file before `exclude` is applied. A typo or a name that
+  differs by case or Unicode form would otherwise silently drop a declared
+  input.
 - `scope.source matched no files` (after applying `exclude`).
+- `source "<path>" is excluded only by a trailing "**"`: an `exclude` glob
+  such as `build/**` matches a file named `build` only because `**` matches
+  zero segments. Exclude the file by name or narrow the glob.
 - `dependency glob "<glob>" matched no files`: every `dependencies` glob
   must match at least one file.
 - A file in scope is not a regular file (symlink, device, socket, ...):

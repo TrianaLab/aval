@@ -88,7 +88,7 @@ func TestMatch(t *testing.T) {
 		{"a/**/z", "a/b/c/z", true},
 		{"**", "a/b/c", true},
 		{"**/z", "z", true},
-		{"a/**", "a", true}, // ** matches zero segments: over-inclusion is safe
+		{"a/**", "a", true}, // ** matches zero segments; exclude refuses this (MatchContents)
 		{"a/**", "a/b", true},
 		{"**/*.go", ".hidden.go", true},
 		{"**/*.go", ".gen/x.go", true},
@@ -105,6 +105,27 @@ func TestMatch(t *testing.T) {
 	for _, tc := range cases {
 		if got := Match(tc.glob, tc.name); got != tc.want {
 			t.Errorf("Match(%q, %q) = %v, want %v", tc.glob, tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestMatchContents(t *testing.T) {
+	cases := []struct {
+		glob, name string
+		want       bool
+	}{
+		{"a/**", "a", false}, // a file named a is not under a/
+		{"a/**", "a/b", true},
+		{"**/build/**", "build/build", true},
+		{"**/build/**", "x/build", false},
+		{"a/**/z", "a/z", true}, // only a trailing ** needs a segment
+		{"**", "a", true},
+		{"a/**", "../a/b", false},
+		{"*.go", "x.txt", false},
+	}
+	for _, tc := range cases {
+		if got := MatchContents(tc.glob, tc.name); got != tc.want {
+			t.Errorf("MatchContents(%q, %q) = %v, want %v", tc.glob, tc.name, got, tc.want)
 		}
 	}
 }
