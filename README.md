@@ -45,7 +45,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml   # exit 0 
 
 ## Status: pre-alpha
 
-Only the contract and fingerprinting work today: `aval run --fingerprint-only` prints the fingerprint, `--explain` prints what was hashed. Lookup, signing, push and verify return "not implemented" (exit 6); `aval verify` without `--policy` reports a miss (exit 4).
+Only the contract and fingerprinting work today: `aval run --fingerprint-only` prints the fingerprint, `--explain` prints what was hashed. Signing (keyless and key-based, `internal/attest`) is implemented but not wired into the CLI yet. Lookup, push and verify return "not implemented" (exit 6); `aval verify` without `--policy` reports a miss (exit 4).
 
 ## Docs
 

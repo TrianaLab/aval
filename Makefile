@@ -75,7 +75,7 @@ vuln:
 
 # One golangci-lint version for local runs and CI (ci.yaml installs the same
 # one; tests/architecture enforces it).
-GOLANGCI_LINT_VERSION := v2.13.0
+GOLANGCI_LINT_VERSION := v2.15.0
 
 lint:
 	go vet ./...

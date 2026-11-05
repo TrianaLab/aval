@@ -2,10 +2,32 @@ package attest
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
+	"fmt"
+	"math/big"
+	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+
+	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	protorekor "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
+	"github.com/sigstore/sigstore-go/pkg/sign"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
@@ -57,10 +79,321 @@ func TestNewStatementRejectsBadPredicates(t *testing.T) {
 	}
 }
 
-// Milestone-2 stub: until signing is implemented it must never return an envelope.
-func TestSignIsNotImplemented(t *testing.T) {
-	env, err := Sign(context.Background(), &evidence.Statement{}, SignOptions{})
-	if env != nil || !errors.Is(err, evidence.ErrNotImplemented) {
-		t.Fatalf("Sign = %v, %v; want nil, ErrNotImplemented", env, err)
+const (
+	ghIssuer = "https://token.actions.githubusercontent.com"
+	ciSAN    = "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"
+)
+
+// fakeFulcio certifies the keypair's public key for a fixed identity,
+// standing in for Fulcio so no test talks to the network.
+type fakeFulcio struct {
+	issuer  string // OIDC issuer extension; empty omits it
+	raw     []byte // returned instead of a certificate when set
+	err     error
+	gotTok  string
+	extOver []pkix.Extension
+}
+
+func (f *fakeFulcio) GetCertificate(_ context.Context, kp sign.Keypair, o *sign.CertificateProviderOptions) ([]byte, error) {
+	f.gotTok = o.IDToken
+	if f.err != nil || f.raw != nil {
+		return f.raw, f.err
+	}
+	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	san, _ := url.Parse(ciSAN)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotBefore:    time.Now().Add(-time.Minute),
+		NotAfter:     time.Now().Add(10 * time.Minute),
+		URIs:         []*url.URL{san},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+	}
+	if f.issuer != "" {
+		v, _ := asn1.MarshalWithParams(f.issuer, "utf8")
+		tmpl.ExtraExtensions = append(tmpl.ExtraExtensions, pkix.Extension{Id: certificate.OIDIssuerV2, Value: v})
+	}
+	tmpl.ExtraExtensions = append(tmpl.ExtraExtensions, f.extOver...)
+	return x509.CreateCertificate(rand.Reader, tmpl, tmpl, kp.GetPublicKey(), caKey)
+}
+
+// fakeRekor records that a transparency log entry was requested.
+type fakeRekor struct{ calls int }
+
+func (r *fakeRekor) GetTransparencyLogEntry(_ context.Context, _ []byte, b *protobundle.Bundle) error {
+	r.calls++
+	b.VerificationMaterial.TlogEntries = append(b.VerificationMaterial.TlogEntries, &protorekor.TransparencyLogEntry{LogIndex: 42})
+	return nil
+}
+
+type seams struct {
+	fulcio              *fakeFulcio
+	rekor               *fakeRekor
+	fulcioURL, rekorURL string
+}
+
+func useFakes(t *testing.T) *seams {
+	t.Helper()
+	s := &seams{fulcio: &fakeFulcio{issuer: ghIssuer}, rekor: &fakeRekor{}}
+	oldF, oldR := newFulcio, newRekor
+	newFulcio = func(u string) sign.CertificateProvider { s.fulcioURL = u; return s.fulcio }
+	newRekor = func(u string) sign.Transparency { s.rekorURL = u; return s.rekor }
+	t.Cleanup(func() { newFulcio, newRekor = oldF, oldR })
+	return s
+}
+
+func statement(t *testing.T) *evidence.Statement {
+	t.Helper()
+	s, err := NewStatement(predicate())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func writePEM(t *testing.T, key any) string {
+	t.Helper()
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "key.pem")
+	if err := os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// checkEnvelope verifies the DSSE signature with pub and that the payload
+// round-trips through evidence.Parse back to the signed predicate.
+func checkEnvelope(t *testing.T, env *evidence.Envelope, pub *ecdsa.PublicKey) {
+	t.Helper()
+	// The envelope also survives its own JSON encoding (base64 payload/sig).
+	raw, err := json.Marshal(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back evidence.Envelope
+	if err := json.Unmarshal(raw, &back); err != nil {
+		t.Fatal(err)
+	}
+	if back.PayloadType != evidence.PayloadType || len(back.Signatures) != 1 {
+		t.Fatalf("unexpected envelope: %+v", back)
+	}
+	pae := fmt.Sprintf("DSSEv1 %d %s %d %s", len(back.PayloadType), back.PayloadType, len(back.Payload), back.Payload)
+	digest := sha256.Sum256([]byte(pae))
+	if !ecdsa.VerifyASN1(pub, digest[:], back.Signatures[0].Sig) {
+		t.Fatal("DSSE signature does not verify with the signing key")
+	}
+	var st evidence.Statement
+	if err := json.Unmarshal(back.Payload, &st); err != nil {
+		t.Fatal(err)
+	}
+	if st.Type != evidence.StatementType || st.PredicateType != evidence.PredicateType {
+		t.Fatalf("payload is not an Aval statement: %+v", st)
+	}
+	p, err := evidence.Parse(st.Predicate)
+	if err != nil {
+		t.Fatalf("predicate does not round-trip through evidence.Parse: %v", err)
+	}
+	if p.Test.ID != predicate().Test.ID || p.Execution.Fingerprint != predicate().Execution.Fingerprint {
+		t.Fatalf("round-tripped predicate differs: %+v", p)
+	}
+}
+
+func parseBundle(t *testing.T, raw []byte) *protobundle.Bundle {
+	t.Helper()
+	var b protobundle.Bundle
+	if err := protojson.Unmarshal(raw, &b); err != nil {
+		t.Fatal(err)
+	}
+	return &b
+}
+
+func TestSignKeyBased(t *testing.T) {
+	s := useFakes(t)
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	out, err := Sign(context.Background(), statement(t), SignOptions{Key: writePEM(t, key)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkEnvelope(t, out.Envelope, &key.PublicKey)
+	if out.Signer.Issuer != "" || out.Signer.Subject != "" || out.Signer.KeyID == "" {
+		t.Fatalf("key-based signer must be the key: %+v", out.Signer)
+	}
+	b := parseBundle(t, out.Bundle)
+	if b.GetVerificationMaterial().GetPublicKey().GetHint() != out.Signer.KeyID {
+		t.Fatal("bundle must carry the key hint")
+	}
+	if s.rekor.calls != 0 || s.fulcioURL != "" || len(b.GetVerificationMaterial().GetTlogEntries()) != 0 {
+		t.Fatal("key-based signing without RekorURL must not contact Fulcio or Rekor")
+	}
+	// The same key always yields the same KeyID.
+	again, err := Sign(context.Background(), statement(t), SignOptions{Key: writePEM(t, key)})
+	if err != nil || again.Signer.KeyID != out.Signer.KeyID {
+		t.Fatalf("KeyID not stable: %v %q %q", err, again.Signer.KeyID, out.Signer.KeyID)
+	}
+}
+
+func TestSignKeyBasedWithRekor(t *testing.T) {
+	s := useFakes(t)
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	out, err := Sign(context.Background(), statement(t), SignOptions{Key: writePEM(t, key), RekorURL: "https://rekor.example"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.rekorURL != "https://rekor.example" || s.rekor.calls != 1 || len(parseBundle(t, out.Bundle).GetVerificationMaterial().GetTlogEntries()) != 1 {
+		t.Fatal("RekorURL must record a transparency log entry")
+	}
+}
+
+func TestSignKeyless(t *testing.T) {
+	s := useFakes(t)
+	out, err := Sign(context.Background(), statement(t), SignOptions{IDToken: "oidc-token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.fulcioURL != DefaultFulcioURL || s.rekorURL != DefaultRekorURL || s.fulcio.gotTok != "oidc-token" {
+		t.Fatalf("keyless must use Fulcio and Rekor with the token: %+v", s)
+	}
+	if out.Signer != (Signer{Issuer: ghIssuer, Subject: ciSAN}) {
+		t.Fatalf("signer must come from the certificate: %+v", out.Signer)
+	}
+	b := parseBundle(t, out.Bundle)
+	cert, err := x509.ParseCertificate(b.GetVerificationMaterial().GetCertificate().GetRawBytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkEnvelope(t, out.Envelope, cert.PublicKey.(*ecdsa.PublicKey))
+	if len(b.GetVerificationMaterial().GetTlogEntries()) != 1 {
+		t.Fatal("keyless bundle must carry the Rekor entry")
+	}
+
+	// Custom instances override the public-good defaults.
+	if _, err := Sign(context.Background(), statement(t), SignOptions{IDToken: "t", FulcioURL: "https://f.example", RekorURL: "https://r.example"}); err != nil {
+		t.Fatal(err)
+	}
+	if s.fulcioURL != "https://f.example" || s.rekorURL != "https://r.example" {
+		t.Fatalf("custom URLs ignored: %+v", s)
+	}
+}
+
+// The trust level comes from who signed, matched against the policy. The
+// predicate claims isolated (3) in every case below; that claim is ignored.
+func TestTrustLevelComesFromSignerNotPredicate(t *testing.T) {
+	useFakes(t)
+	st := predicate()
+	st.Runner = evidence.Runner{Identity: ciSAN, Issuer: ghIssuer, TrustLevel: evidence.TrustIsolated}
+	stmt, err := NewStatement(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyless, err := Sign(context.Background(), stmt, SignOptions{IDToken: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dev := []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: `https://github\.com/acme/.*`, TrustLevel: evidence.TrustDeveloper}}
+	if id, lvl := keyless.Signer.TrustLevel(dev); lvl != evidence.TrustDeveloper || id.SubjectRegexp != dev[0].SubjectRegexp {
+		t.Fatalf("got %v from %+v, want developer from the policy", lvl, id)
+	}
+	other := []evidence.Identity{{Issuer: "https://other.example", SubjectRegexp: `.*`, TrustLevel: evidence.TrustIsolated}}
+	if _, lvl := keyless.Signer.TrustLevel(other); lvl != evidence.TrustUnknown {
+		t.Fatalf("unmatched signer got %v, want unknown", lvl)
+	}
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	keyed, err := Sign(context.Background(), stmt, SignOptions{Key: writePEM(t, key)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wildcard := []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: `.*`, TrustLevel: evidence.TrustIsolated}}
+	if _, lvl := keyed.Signer.TrustLevel(wildcard); lvl != evidence.TrustUnknown {
+		t.Fatalf("key-based signer got %v from a keyless identity, want unknown", lvl)
+	}
+}
+
+func TestSignRejects(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	garbage := filepath.Join(dir, "garbage.pem")
+	_ = os.WriteFile(garbage, []byte("not a key"), 0o600)
+	p384, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	_, ed, _ := ed25519.GenerateKey(rand.Reader)
+	badRaw := statement(t)
+	badRaw.Predicate = json.RawMessage(`{`)
+	wrongType := statement(t)
+	wrongType.PredicateType = "https://example.com/other"
+
+	cases := []struct {
+		name string
+		st   *evidence.Statement
+		opts SignOptions
+		set  func(*seams)
+	}{
+		{"nil statement", nil, SignOptions{IDToken: "t"}, nil},
+		{"foreign predicate type", wrongType, SignOptions{IDToken: "t"}, nil},
+		{"unencodable statement", badRaw, SignOptions{IDToken: "t"}, nil},
+		{"keyless without token", statement(t), SignOptions{}, nil},
+		{"missing key file", statement(t), SignOptions{Key: filepath.Join(dir, "nope.pem")}, nil},
+		{"unparsable key", statement(t), SignOptions{Key: garbage}, nil},
+		{"non-P-256 ECDSA key", statement(t), SignOptions{Key: writePEM(t, p384)}, nil},
+		{"non-ECDSA key", statement(t), SignOptions{Key: writePEM(t, ed)}, nil},
+		{"Fulcio error", statement(t), SignOptions{IDToken: "t"}, func(s *seams) { s.fulcio.err = errors.New("fulcio down") }},
+		{"certificate is not X.509", statement(t), SignOptions{IDToken: "t"}, func(s *seams) { s.fulcio.raw = []byte("junk") }},
+		{"certificate without OIDC issuer", statement(t), SignOptions{IDToken: "t"}, func(s *seams) { s.fulcio.issuer = "" }},
+		{"certificate with malformed issuer", statement(t), SignOptions{IDToken: "t"}, func(s *seams) {
+			s.fulcio.issuer = ""
+			s.fulcio.extOver = []pkix.Extension{{Id: certificate.OIDIssuerV2, Value: []byte{0xff}}}
+		}},
+	}
+	for _, c := range cases {
+		s := useFakes(t)
+		if c.set != nil {
+			c.set(s)
+		}
+		if out, err := Sign(ctx, c.st, c.opts); err == nil || out != nil {
+			t.Errorf("%s: got %v, %v; want an error", c.name, out, err)
+		}
+	}
+}
+
+func TestSignSurfacesInternalFailures(t *testing.T) {
+	useFakes(t)
+	oldE, oldM := newEphemeralKeypair, marshalBundle
+	t.Cleanup(func() { newEphemeralKeypair, marshalBundle = oldE, oldM })
+
+	newEphemeralKeypair = func() (sign.Keypair, error) { return nil, errors.New("no entropy") }
+	if _, err := Sign(context.Background(), statement(t), SignOptions{IDToken: "t"}); err == nil {
+		t.Error("keypair failure must surface")
+	}
+	newEphemeralKeypair = oldE
+	marshalBundle = func(proto.Message) ([]byte, error) { return nil, errors.New("boom") }
+	if _, err := Sign(context.Background(), statement(t), SignOptions{IDToken: "t"}); err == nil {
+		t.Error("bundle encoding failure must surface")
+	}
+}
+
+// The production seams build real sigstore-go clients without contacting
+// anything until they are used.
+func TestDefaultSeams(t *testing.T) {
+	if newFulcio(DefaultFulcioURL) == nil || newRekor(DefaultRekorURL) == nil {
+		t.Fatal("default clients must be constructed")
+	}
+	if kp, err := newEphemeralKeypair(); err != nil || kp == nil {
+		t.Fatalf("ephemeral keypair: %v", err)
+	}
+}
+
+// Metadata sigstore-go reads from a key (Fulcio requests, verifiers).
+func TestKeyPairMetadata(t *testing.T) {
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	kp, err := loadKey(writePEM(t, key))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kp.GetSigningAlgorithm() != protocommon.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256 || kp.GetKeyAlgorithm() != "ECDSA" {
+		t.Fatalf("unexpected algorithm: %v %v", kp.GetSigningAlgorithm(), kp.GetKeyAlgorithm())
+	}
+	if !key.PublicKey.Equal(kp.GetPublicKey()) {
+		t.Fatal("public key differs from the loaded key")
 	}
 }

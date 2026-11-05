@@ -1,7 +1,8 @@
 # Trust model
 
 Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
-Signing, lookup, verification and policy loading are milestone-2 stubs that
+Signing (`attest.Sign`) is implemented but not yet wired into the CLI.
+Lookup, verification and policy loading are milestone-2 stubs that
 return "not implemented" (exit code 6). This document describes the model
 the code is built around; where behavior is not implemented yet, it says so.
 
@@ -37,7 +38,31 @@ fingerprint and test id match what we computed locally".
 `runner.identity`, `runner.issuer` and `runner.trustLevel` inside the
 predicate are what the signer *claims*. The authoritative identity is the
 verified signer, and the trust level is the one the policy grants to that
-signer, not the one written in the predicate.
+signer, not the one written in the predicate. In code: `attest.Sign` returns
+the `Signer` read from the Fulcio certificate (OIDC issuer and subject), and
+`Signer.TrustLevel` / `evidence.MatchIdentity` look that identity up in the
+policy's `Identities`. A key-based signer matches no keyless identity and
+gets level 0 (unknown) until key identities land in the policy format
+(milestone 2, #8).
+
+## Signing
+
+`attest.Sign` (sigstore-go) signs the in-toto statement as a DSSE envelope
+in one of two modes:
+
+- **Keyless** (CI): an ephemeral key, a short-lived Fulcio certificate for
+  the OIDC token the caller passes in, and a Rekor entry (always recorded,
+  since the certificate expires in minutes and Rekor's timestamp is what
+  makes it verifiable later). Defaults to the Sigstore public-good instance;
+  any Fulcio and Rekor can be configured. Obtaining the OIDC token is the
+  caller's job, so no CI vendor or issuer is assumed.
+- **Key-based** (local): an unencrypted ECDSA P-256 PEM key. No Rekor entry
+  unless a Rekor URL is given. Expect policies to grant such signatures at
+  most level 1.
+
+Besides the envelope, `Sign` returns the Sigstore bundle (v0.3 JSON) with the
+verification material (certificate or key hint, Rekor entry). Where the
+bundle is stored in the registry is milestone 2 (#7).
 
 ## Trust levels
 
