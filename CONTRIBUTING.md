@@ -99,6 +99,30 @@ complexity cap stays at 15, and that every relative link and heading anchor in
 the Markdown resolves (external URLs are not fetched, so the gate stays
 offline).
 
+#### Which aval a CI job runs
+
+A job that tests the PR's code builds `aval` from source: `ci-e2e` (`make
+ci-e2e`, the same command as locally) and `dogfood-fingerprint`, which checks
+the PR's fingerprinting. A job that uses Aval as a user would runs a pinned
+release instead: the demo (`example-go-compose`), the shadow run
+(`dogfood-shadow`) and the publish step (`dogfood-publish`). The suites those
+jobs run still build and test the PR's code; only the `aval` that looks up,
+verifies, records and pushes results is the release. `ci-e2e` could use the
+release for the same reason, but it would need a `Makefile` change, and the
+`Makefile` is in the e2e contract's scope.
+
+`ci.yaml` pins the release as `AVAL_VERSION` and `AVAL_SHA256` (the sha256 of
+`aval_<version>_linux_amd64.tar.gz`). `.github/aval/install.sh` checks the
+archive against that sha256, so a re-tagged release cannot change what runs,
+verifies the keyless signature of `checksums.txt` with cosign for the exact
+release workflow identity at that tag, and checks that `checksums.txt` lists
+the archive with the same sha256. Any failure fails the job before `aval` is
+installed. To move the pin, take the sha256 from the new release's verified
+`checksums.txt` (see [Changesets and releases](#changesets-and-releases)) and
+update both values; `tests/architecture` checks that the version has a
+`CHANGELOG.md` section and that each of these jobs installs the release and
+builds nothing.
+
 Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
 marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint
 every Markdown file except `.agents/`, `.claude/`, `CLAUDE.md`, `.changeset/` and the generated `CHANGELOG.md`.
@@ -159,6 +183,9 @@ cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
 sha256sum --ignore-missing -c checksums.txt
 gh attestation verify aval_<version>_linux_amd64.tar.gz --repo TrianaLab/aval
 ```
+
+CI runs the first two checks, plus a pinned archive sha256, before it uses a
+release (see [Which aval a CI job runs](#which-aval-a-ci-job-runs)).
 
 ## Pull requests and issues
 

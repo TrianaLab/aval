@@ -4,8 +4,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -299,6 +301,105 @@ func TestDogfoodScopeCheckCatchesUndeclaredReads(t *testing.T) {
 	for _, want := range []string{"pkg/evidence/testdata/report.golden.json", "docs/cli-reference.md", "aval.yaml", "examples/go-compose/aval.yaml"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("undeclared read of %s not reported (got %v)", want, got)
+		}
+	}
+}
+
+// releaseJobs use Aval as a user would, so they run the pinned release that
+// .github/aval/install.sh verifies, never a binary built from the PR.
+var releaseJobs = []string{"example-go-compose", "dogfood-shadow", "dogfood-publish"}
+
+var (
+	pinVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
+	pinSHA256  = regexp.MustCompile(`^[0-9a-f]{64}$`)
+)
+
+// releasePinProblems: ci.yaml pins a released aval version (a CHANGELOG.md
+// section) and a sha256, and each release job installs cosign, then runs
+// install.sh before any aval step, and builds nothing. Offline, this cannot
+// prove the sha256 belongs to the version; install.sh checks that at run
+// time against the signed checksums.txt.
+func releasePinProblems(ci, changelog []byte) ([]string, error) {
+	var wf struct {
+		Env  map[string]string  `yaml:"env"`
+		Jobs map[string]permJob `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(ci, &wf); err != nil {
+		return nil, err
+	}
+	var problems []string
+	v := wf.Env["AVAL_VERSION"]
+	if !pinVersion.MatchString(v) || !slices.Contains(strings.Split(string(changelog), "\n"), "## "+v) {
+		problems = append(problems, "AVAL_VERSION "+strconv.Quote(v)+" is not a released version in CHANGELOG.md")
+	}
+	if !pinSHA256.MatchString(wf.Env["AVAL_SHA256"]) {
+		problems = append(problems, "AVAL_SHA256 is not a sha256")
+	}
+	for _, name := range releaseJobs {
+		cosign, installed := false, false
+		for _, s := range wf.Jobs[name].Steps {
+			switch {
+			case strings.HasPrefix(s.Uses, "sigstore/cosign-installer@"):
+				cosign = true
+			case strings.TrimSpace(s.Run) == ".github/aval/install.sh":
+				if !cosign {
+					problems = append(problems, name+": install.sh before cosign is installed")
+				}
+				installed = true
+			case strings.Contains(s.Run, "make build") || strings.Contains(s.Run, "bin/aval"):
+				problems = append(problems, name+": builds aval instead of using the release")
+			case strings.Contains(s.Run, "aval ") && !installed:
+				problems = append(problems, name+": runs aval before installing the release")
+			}
+		}
+		if !installed {
+			problems = append(problems, name+": does not install the pinned release")
+		}
+	}
+	slices.Sort(problems)
+	return problems, nil
+}
+
+func TestCIPinsVerifiedRelease(t *testing.T) {
+	changelog, err := os.ReadFile(filepath.Join(root, "CHANGELOG.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	problems, err := releasePinProblems(readCI(t), changelog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range problems {
+		t.Error(p)
+	}
+}
+
+func TestReleasePinCheckCatchesDrift(t *testing.T) {
+	changelog := []byte("# aval\n\n## 0.1.0\n")
+	sha := strings.Repeat("a", 64)
+	install := "[{uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}, {run: aval run}]"
+	wf := func(version, sha, steps string) []byte {
+		s := "env: {AVAL_VERSION: " + version + ", AVAL_SHA256: " + sha + "}\njobs:\n"
+		for _, j := range releaseJobs {
+			s += "  " + j + ": {steps: " + steps + "}\n"
+		}
+		return []byte(s)
+	}
+	if p, err := releasePinProblems(wf("0.1.0", sha, install), changelog); err != nil || len(p) != 0 {
+		t.Fatalf("valid workflow reported %v (%v)", p, err)
+	}
+	bad := map[string][]byte{
+		"unreleased version":  wf("0.2.0", sha, install),
+		"version with v":      wf("v0.1.0", sha, install),
+		"short sha":           wf("0.1.0", "abc", install),
+		"no install":          wf("0.1.0", sha, "[{run: aval run}]"),
+		"no cosign":           wf("0.1.0", sha, "[{run: .github/aval/install.sh}]"),
+		"builds from source":  wf("0.1.0", sha, "[{uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}, {run: make build}]"),
+		"aval before install": wf("0.1.0", sha, "[{run: aval run}, {uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}]"),
+	}
+	for name, data := range bad {
+		if p, err := releasePinProblems(data, changelog); err != nil || len(p) == 0 {
+			t.Errorf("%s: no problem reported (%v)", name, err)
 		}
 	}
 }
