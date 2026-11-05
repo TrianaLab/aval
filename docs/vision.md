@@ -114,9 +114,9 @@ External tools consume Aval results through:
 
 - versioned artifact and predicate formats with Aval's own media types
   (provisional: predicate type
-  `https://aval.trianalab.io/attestation/execution/v1`, media type
-  `application/vnd.trianalab.aval.execution.v1+json`, artifact type
-  `application/vnd.trianalab.aval.execution.v1`, contract `apiVersion`
+  `https://aval.trianalab.io/attestation/execution/v2`, media type
+  `application/vnd.trianalab.aval.execution.v2+json`, artifact type
+  `application/vnd.trianalab.aval.execution.v2`, contract `apiVersion`
   `aval.dev/v1alpha1`),
 - neutral predicate fields: `subject`, `test.id`, `result`,
   `execution.fingerprint`, `execution.environment`, `runner` identity,

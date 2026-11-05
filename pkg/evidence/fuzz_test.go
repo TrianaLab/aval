@@ -12,7 +12,7 @@ func FuzzParse(f *testing.F) {
 	f.Add([]byte(validPredicate))
 	f.Add([]byte(strings.Replace(validPredicate, `"result": "passed"`, `"result": "skipped"`, 1)))
 	f.Add([]byte(strings.Replace(validPredicate, `"sha256:`, `"sha512:`, 1)))
-	f.Add([]byte(`{"schemaVersion": "v1"}`))
+	f.Add([]byte(`{"schemaVersion": "v2"}`))
 	f.Add([]byte(`null`))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		p, err := Parse(data)

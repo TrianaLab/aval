@@ -1,0 +1,20 @@
+{
+  "version": "aval.dev/verify-report/v1alpha1",
+  "outcome": "verified",
+  "testId": "orders-integration",
+  "fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "reference": "ghcr.io/acme/orders-aval@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "result": "passed",
+  "signer": {
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subjectRegexp": "^https://github.com/acme/orders/",
+    "trustLevel": 2
+  },
+  "rejected": [
+    {
+      "reference": "ghcr.io/acme/orders-aval@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "outcome": "verification-failed",
+      "reason": "verification failed: signer not allowed by policy"
+    }
+  ]
+}

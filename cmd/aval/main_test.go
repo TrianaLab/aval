@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -131,24 +133,53 @@ func TestVerifyJSONReport(t *testing.T) {
 	}
 }
 
-// fakeVerify replaces the milestone-2 seams for one test.
+// fakeVerify replaces the milestone-2 seams for one test with a single
+// candidate.
 func fakeVerify(t *testing.T, lookupErr, fetchErr, verifyErr error) {
+	t.Helper()
+	fakeCandidates(t, lookupErr, map[string]candidate{"sha256:feed": {fetchErr: fetchErr, verifyErr: verifyErr, trust: evidence.TrustRunner}})
+}
+
+type candidate struct {
+	fetchErr, verifyErr error
+	trust               evidence.TrustLevel
+	failed              bool // verifies with result failed instead of passed
+}
+
+// fakeCandidates makes lookup return the given candidates, sorted by digest,
+// each fetching and verifying as described.
+func fakeCandidates(t *testing.T, lookupErr error, cands map[string]candidate) {
 	t.Helper()
 	l, lk, f, v := loadPolicy, lookup, fetch, verifyEnvelope
 	t.Cleanup(func() { loadPolicy, lookup, fetch, verifyEnvelope = l, lk, f, v })
 	loadPolicy = func(string) (*policy.Policy, error) { return &policy.Policy{}, nil }
-	lookup = func(_ context.Context, repo, fp string) (registry.Descriptor, error) {
-		return registry.Descriptor{Repository: repo, Digest: "sha256:feed"}, lookupErr
+	lookup = func(_ context.Context, repo, fp string) ([]registry.Descriptor, error) {
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
+		var ds []registry.Descriptor
+		for _, dg := range slices.Sorted(maps.Keys(cands)) {
+			ds = append(ds, registry.Descriptor{Repository: repo, Digest: dg})
+		}
+		return ds, nil
 	}
-	fetch = func(context.Context, registry.Descriptor) (*evidence.Envelope, error) {
-		return &evidence.Envelope{}, fetchErr
+	fetch = func(_ context.Context, d registry.Descriptor) (*registry.Attestation, error) {
+		if err := cands[d.Digest].fetchErr; err != nil {
+			return nil, err
+		}
+		// The digest travels in the envelope so verify knows the candidate.
+		return &registry.Attestation{Envelope: &evidence.Envelope{Payload: []byte(d.Digest)}}, nil
 	}
-	verifyEnvelope = func(_ context.Context, _ *evidence.Envelope, o evidence.VerifyOptions) (*evidence.Verification, error) {
-		if verifyErr != nil {
-			return nil, verifyErr
+	verifyEnvelope = func(_ context.Context, env *evidence.Envelope, o evidence.VerifyOptions) (*evidence.Verification, error) {
+		c := cands[string(env.Payload)]
+		if c.verifyErr != nil {
+			return nil, c.verifyErr
 		}
 		p := &evidence.Predicate{Test: evidence.Test{ID: o.ExpectedTestID}, Result: evidence.ResultPassed}
-		return &evidence.Verification{Predicate: p, Signer: evidence.Identity{Issuer: "https://issuer.example"}}, nil
+		if c.failed {
+			p.Result = evidence.ResultFailed
+		}
+		return &evidence.Verification{Predicate: p, Signer: evidence.Identity{Issuer: "https://issuer.example", TrustLevel: c.trust}}, nil
 	}
 }
 
@@ -189,6 +220,14 @@ type failWriter struct{}
 
 func (failWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
 
+func TestTextReportListsRejected(t *testing.T) {
+	var b strings.Builder
+	r := evidence.Report{Outcome: evidence.OutcomeVerified, Rejected: []evidence.Rejection{{Reference: "r@sha256:ff", Outcome: evidence.OutcomeVerificationFailed, Reason: "untrusted"}}}
+	if err := writeReport(&b, "text", r); err != nil || !strings.Contains(b.String(), "rejected: r@sha256:ff verification-failed: untrusted\n") {
+		t.Fatalf("text report %q, %v", b.String(), err)
+	}
+}
+
 func TestWriteReportPropagatesWriteErrors(t *testing.T) {
 	if err := writeReport(failWriter{}, "json", evidence.Report{}); err == nil {
 		t.Fatal("json write error must be returned")
@@ -198,5 +237,115 @@ func TestWriteReportPropagatesWriteErrors(t *testing.T) {
 	root.SetArgs([]string{"verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "-o", "json"})
 	if err := root.Execute(); err == nil || errors.Is(err, evidence.ErrNotFound) {
 		t.Fatalf("report write failure must win over the outcome, got %v", err)
+	}
+}
+
+// Several attestations per fingerprint: the policy picks the verified one with
+// the highest trust; rejected candidates are listed in the report and on
+// stderr, and a verification failure is never hidden behind a plain error or
+// a verified sibling (invariant 4). A candidate that could not be evaluated
+// blocks reuse of any sibling (invariant 3).
+func TestVerifyPicksAmongCandidates(t *testing.T) {
+	untrusted := &evidence.VerificationError{Reason: "untrusted signer"}
+	down := errors.New("registry down")
+	// What registry.Fetch returns for a malformed or tampered manifest.
+	malformed := fmt.Errorf("registry.Fetch r@sha256:aa: %w", &evidence.VerificationError{Reason: "malformed attestation: not an Aval attestation"})
+	cases := []struct {
+		name    string
+		lookup  error
+		cands   map[string]candidate
+		code    int
+		outcome evidence.Outcome
+		ref     string
+		result  evidence.Result
+		// rejected is the outcome of each rejected candidate, in lookup order.
+		rejected []evidence.Outcome
+	}{
+		{"highest trust wins", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustDeveloper},
+			"sha256:bb": {trust: evidence.TrustIsolated},
+			"sha256:cc": {trust: evidence.TrustRunner},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, nil},
+		{"tie keeps lookup order", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustRunner},
+			"sha256:bb": {trust: evidence.TrustRunner},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", evidence.ResultPassed, nil},
+		{"tie prefers a failed result", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustRunner},
+			"sha256:bb": {trust: evidence.TrustRunner, failed: true},
+			"sha256:cc": {trust: evidence.TrustRunner},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultFailed, nil},
+		{"higher trust pass beats lower trust fail", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustDeveloper, failed: true},
+			"sha256:bb": {trust: evidence.TrustIsolated},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, nil},
+		{"later untrusted push does not replace a trusted result", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustRunner},
+			"sha256:ff": {verifyErr: untrusted},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
+		{"error on a sibling fails closed", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: down},
+			"sha256:bb": {trust: evidence.TrustRunner},
+		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"unreachable trusted failure does not let a pass through", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustRunner},
+			"sha256:bb": {fetchErr: down},
+		}, ExitError, evidence.OutcomeError, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"verify error on a sibling fails closed", nil, map[string]candidate{
+			"sha256:aa": {trust: evidence.TrustIsolated},
+			"sha256:bb": {verifyErr: down},
+		}, ExitError, evidence.OutcomeError, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"verification failure outranks a sibling error beside a verified one", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: down},
+			"sha256:bb": {trust: evidence.TrustRunner},
+			"sha256:cc": {verifyErr: untrusted},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:cc", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed}},
+		{"untrusted push does not become a hit", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: down},
+			"sha256:ff": {verifyErr: untrusted},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:ff", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed}},
+		{"verification failure outranks an earlier error", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: down},
+			"sha256:bb": {verifyErr: untrusted},
+			"sha256:cc": {verifyErr: down},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed, evidence.OutcomeError}},
+		{"only errors", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: down},
+		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"only malformed candidates are a verification failure, not a miss", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: malformed},
+			"sha256:bb": {fetchErr: malformed},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeVerificationFailed, evidence.OutcomeVerificationFailed}},
+		{"malformed candidate is reported beside a verified one", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: malformed},
+			"sha256:bb": {trust: evidence.TrustRunner},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
+		{"empty answer is a miss", nil, map[string]candidate{}, ExitMiss, evidence.OutcomeMiss, "", "", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeCandidates(t, tc.lookup, tc.cands)
+			code, stdout, stderr := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "--policy", "p.yaml", "-o", "json")
+			var r evidence.Report
+			if err := json.Unmarshal([]byte(stdout), &r); err != nil {
+				t.Fatal(err)
+			}
+			if code != tc.code || r.Outcome != tc.outcome || r.Reference != tc.ref || r.Result != tc.result {
+				t.Fatalf("exit %d outcome %q ref %q result %q; want %d %q %q %q", code, r.Outcome, r.Reference, r.Result, tc.code, tc.outcome, tc.ref, tc.result)
+			}
+			var got []evidence.Outcome
+			for _, rj := range r.Rejected {
+				if !strings.HasPrefix(rj.Reference, "r@sha256:") || rj.Reason == "" {
+					t.Fatalf("incomplete rejection %+v", rj)
+				}
+				got = append(got, rj.Outcome)
+			}
+			if !slices.Equal(got, tc.rejected) {
+				t.Fatalf("rejected outcomes %v, want %v; report %s", got, tc.rejected, stdout)
+			}
+			if n := strings.Count(stderr, "warning: rejected attestation"); n != len(tc.rejected) {
+				t.Fatalf("%d rejection warnings, want %d; stderr %q", n, len(tc.rejected), stderr)
+			}
+		})
 	}
 }

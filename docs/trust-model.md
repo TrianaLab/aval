@@ -2,7 +2,8 @@
 
 Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
 Signing (`attest.Sign`) is implemented but not yet wired into the CLI.
-Lookup, verification and policy loading are milestone-2 stubs that
+Push, lookup and fetch against an OCI registry (`internal/registry`) are
+implemented. Verification and policy loading are milestone-2 stubs that
 return "not implemented" (exit code 6). This document describes the model
 the code is built around; where behavior is not implemented yet, it says so.
 
@@ -61,8 +62,9 @@ in one of two modes:
   most level 1.
 
 Besides the envelope, `Sign` returns the Sigstore bundle (v0.3 JSON) with the
-verification material (certificate or key hint, Rekor entry). Where the
-bundle is stored in the registry is milestone 2 (#7).
+verification material (certificate or key hint, Rekor entry). `registry.Push`
+stores it next to the envelope as an optional layer of the execution manifest
+(see [artifact-format.md](artifact-format.md#oci-layout)).
 
 ## Trust levels
 
@@ -111,13 +113,25 @@ the test runs.
 - **Fingerprint errors** (empty source scope, missing or mismatched
   dependency, symlink in scope, unreadable file): input equivalence cannot
   be proven, so there is nothing to look up. Run the test.
-- **Registry errors** (unreachable, auth failure, malformed manifest):
-  outcome `error`, exit 1. For execution purposes this is a miss: run the
-  test.
+- **Registry errors** (unreachable, auth failure): outcome `error`, exit 1.
+  For execution purposes this is a miss: run the test. A malformed
+  attestation manifest, or a fingerprint tag that does not point at the
+  fingerprint anchor, is a verification failure (exit 5).
 - **Consume by digest.** `registry.Lookup` resolves the tag
-  `sha256-<fingerprint hex>` to a manifest digest; everything after that
-  (fetch, verify, report `reference`) uses `repo@sha256:...`. The tag is
-  only an index for lookup. It is mutable and is never trusted on its own.
+  `sha256-<fingerprint hex>`, checks that it points at the fingerprint's
+  deterministic anchor manifest (a moved tag is a verification failure), and
+  returns the anchor's referrers as candidate manifest digests; everything
+  after that (fetch, verify, report `reference`) uses `repo@sha256:...`. The
+  tag is only an index for lookup. It is mutable and is never trusted on its
+  own.
+- **No silent replacement.** Pushes only add referrers to the anchor; a later
+  push for the same fingerprint cannot replace an earlier attestation. Every
+  candidate is verified and the policy picks the verified one with the
+  highest trust level. A candidate that fails verification never decides the
+  outcome while another verifies, and is listed in `rejected` in the verify
+  report (and on stderr), so the security event stays visible. A candidate
+  that cannot be fetched or checked blocks reuse (the test runs), because it
+  might have outranked the verified one.
 - **Unknown or missing fields** in `aval.yaml` are rejected (exit 2) rather
   than ignored.
 
@@ -165,8 +179,8 @@ declared class.
 | Threat | Mitigation |
 |---|---|
 | Compromised developer key | Policy grants developer identities level 1 at most; CI sets `MinTrustLevel` >= 2, so a stolen developer key cannot satisfy CI. It can still poison that developer's own reuse. Prefer keyless (short-lived Fulcio certs, Rekor log) over long-lived keys (milestone 2). |
-| Tag swapping (`sha256-<fp>` repointed to another manifest) | Tag is lookup only; fetch and verify are by digest. A swapped tag pointing at an untrusted or mismatched attestation yields `verification-failed`, not reuse. A swapped tag pointing at a different *validly signed* attestation for the same fingerprint and test id is equivalent evidence. |
+| Tag swapping (`sha256-<fp>` repointed to another manifest) | Tag is lookup only and must resolve to the fingerprint's deterministic anchor manifest; any other target is `verification-failed`. Candidates are the anchor's referrers, fetched and verified by digest. |
 | Replay of a passing result for a different fingerprint or test id | `Verify` requires `execution.fingerprint == ExpectedFingerprint` and `test.id == ExpectedTestID`, both computed locally. The signed predicate cannot be re-labeled without breaking the signature. Mismatch is `verification-failed`. |
 | Undeclared input changed (file outside scope, unlisted env var, network service) | Out of scope for detection in v0: the fingerprint only covers declared inputs. Mitigated by contract review, `external-dependencies` / `non-deterministic` classes not being reusable by default, and the false-hit suite (roadmap item 4). Observed-input tracing is future work. |
-| Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`. It can delete attestations (forcing misses, i.e. re-runs) or deny service (`error`, re-run). Availability is out of scope. |
+| Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with outcome `verification-failed` in the verify report (and a warning on stderr). It can delete attestations (forcing misses, i.e. re-runs) or deny service (`error`, re-run). Availability is out of scope. |
 | Dishonest but trusted signer (ran a modified test and signed "passed") | Out of scope for Aval. A signature proves who claims it, not that the test ran honestly. Limit which identities get which level; level 3 (isolated) exists for this. |

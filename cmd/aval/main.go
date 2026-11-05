@@ -214,7 +214,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event).`,
 			if err != nil {
 				return err
 			}
-			report, err := verify(cmd.Context(), c, fp, repo, policyFile)
+			report, err := verify(cmd.Context(), cmd.ErrOrStderr(), c, fp, repo, policyFile)
 			if werr := writeReport(cmd.OutOrStdout(), output, report); werr != nil {
 				return werr
 			}
@@ -229,18 +229,10 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event).`,
 	return cmd
 }
 
-func verify(ctx context.Context, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
+func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
 	r := evidence.Report{Version: evidence.ReportVersion, TestID: c.Metadata.Name, Fingerprint: fp.Digest}
 	fail := func(err error) (evidence.Report, error) {
-		r.Reason = err.Error()
-		switch {
-		case errors.Is(err, evidence.ErrVerification):
-			r.Outcome = evidence.OutcomeVerificationFailed
-		case errors.Is(err, evidence.ErrNotFound):
-			r.Outcome = evidence.OutcomeMiss
-		default:
-			r.Outcome = evidence.OutcomeError
-		}
+		r.Reason, r.Outcome = err.Error(), outcomeOf(err)
 		return r, err
 	}
 
@@ -253,21 +245,82 @@ func verify(ctx context.Context, c *contract.Contract, fp fingerprint.Fingerprin
 	if err != nil {
 		return fail(err)
 	}
-	desc, err := lookup(ctx, repo, fp.Digest)
+	cands, err := lookup(ctx, repo, fp.Digest)
+	if err == nil && len(cands) == 0 {
+		err = evidence.ErrNotFound // fail closed on an empty answer
+	}
 	if err != nil {
 		return fail(err)
 	}
-	r.Reference = desc.Reference()
-	env, err := fetch(ctx, desc)
+	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest))
+	r.Reference, r.Rejected = ref, rejected
 	if err != nil {
 		return fail(err)
 	}
-	v, err := verifyEnvelope(ctx, env, pol.VerifyOptions(c.Metadata.Name, fp.Digest))
-	if err != nil {
-		return fail(err)
-	}
-	r.Outcome, r.Result, r.Signer, r.Predicate = evidence.OutcomeVerified, v.Predicate.Result, &v.Signer, v.Predicate
+	r.Outcome, r.Result, r.Signer, r.Predicate = evidence.OutcomeVerified, best.Predicate.Result, &best.Signer, best.Predicate
 	return r, nil
+}
+
+// outcomeOf maps an error to its report outcome; miss and verification
+// failure stay distinct (invariant 4).
+func outcomeOf(err error) evidence.Outcome {
+	switch {
+	case errors.Is(err, evidence.ErrVerification):
+		return evidence.OutcomeVerificationFailed
+	case errors.Is(err, evidence.ErrNotFound):
+		return evidence.OutcomeMiss
+	default:
+		return evidence.OutcomeError
+	}
+}
+
+// pick verifies every candidate and lets the policy choose: the verified one
+// with the highest trust level wins. On a tie a non-passed result wins, then
+// the lowest digest (the lookup order), so disagreeing trusted runs never
+// reuse a pass by accident (fail closed). Candidates that fail verification
+// never decide the outcome while another verifies; a candidate that ends in
+// any other error makes the outcome an error (run the test), because it might
+// have outranked or contradicted the verified one (invariant 3). Rejected
+// candidates are returned for the report and printed on warn, never dropped
+// (invariant 4). Whenever no candidate is reused it returns the reference and
+// error of the first verification failure, which outranks any other error: it
+// is the security event that must surface.
+func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions) (*evidence.Verification, string, []evidence.Rejection, error) {
+	var (
+		best             *evidence.Verification
+		bestRef, failRef string
+		failErr          error
+		unknown          bool // a candidate could not be evaluated
+		rejected         []evidence.Rejection
+	)
+	for _, d := range cands {
+		v, err := verifyCandidate(ctx, d, opts)
+		if err == nil {
+			if best == nil || v.Signer.TrustLevel > best.Signer.TrustLevel ||
+				(v.Signer.TrustLevel == best.Signer.TrustLevel && best.Predicate.Result == evidence.ResultPassed && v.Predicate.Result != evidence.ResultPassed) {
+				best, bestRef = v, d.Reference()
+			}
+			continue
+		}
+		if failErr == nil || (errors.Is(err, evidence.ErrVerification) && !errors.Is(failErr, evidence.ErrVerification)) {
+			failErr, failRef = err, d.Reference()
+		}
+		unknown = unknown || !errors.Is(err, evidence.ErrVerification)
+		rejected = append(rejected, evidence.Rejection{Reference: d.Reference(), Outcome: outcomeOf(err), Reason: err.Error()})
+		fmt.Fprintf(warn, "aval: warning: rejected attestation %s: %v\n", d.Reference(), err)
+	}
+	if best == nil || unknown {
+		return nil, failRef, rejected, failErr
+	}
+	return best, bestRef, rejected, nil
+}
+
+func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions) (*evidence.Verification, error) {
+	a, err := fetch(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	return verifyEnvelope(ctx, a.Envelope, opts)
 }
 
 func writeReport(w io.Writer, format string, r evidence.Report) error {
@@ -279,6 +332,9 @@ func writeReport(w io.Writer, format string, r evidence.Report) error {
 	fmt.Fprintf(w, "%s %s %s\n", r.Outcome, r.TestID, r.Fingerprint)
 	if r.Reason != "" {
 		fmt.Fprintf(w, "reason: %s\n", r.Reason)
+	}
+	for _, rj := range r.Rejected {
+		fmt.Fprintf(w, "rejected: %s %s: %s\n", rj.Reference, rj.Outcome, rj.Reason)
 	}
 	return nil
 }
