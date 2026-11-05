@@ -130,7 +130,9 @@ the commit (`make build`) and install nothing; `tests/architecture` enforces
 that too. On `main` that is the code being released, so `dogfood-publish`
 writes the e2e attestation in the format the `release.yaml` gate (also a
 source build) verifies. Moving the pin to the first release that reads
-`aval.trianalab.io/v1` makes the test require `install.sh` again.
+`aval.trianalab.io/v1` makes the test require `install.sh` again. The
+transition may outlive one release only: once `CHANGELOG.md` lists two
+releases newer than `0.1.0`, `tests/architecture` fails until the pin moves.
 
 Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
 marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint

@@ -40,7 +40,11 @@ annotation key is frozen.
 Related identifiers from other packages: the fingerprint manifest format is
 `aval-fingerprint/v1` (`internal/fingerprint`), and the contract and policy
 `apiVersion` is `aval.trianalab.io/v1` (`internal/contract`, see
-[contract.md](contract.md#versioning)). Both are frozen.
+[contract.md](contract.md#versioning)). Both are frozen. The fingerprint
+manifest version is a format tag, not a namespaced identifier: it names the
+canonical manifest layout and hash, not a resource, so it stays outside
+`aval.trianalab.io` and is frozen as `aval-fingerprint/v1`; a breaking change
+mints `aval-fingerprint/v2`.
 
 ## OCI layout
 
@@ -468,8 +472,11 @@ is announced in the release notes of the release that removes it.
 `pkg/evidence/testdata/verify-report-v1.golden.json` set every field of the
 statement, predicate and verify report. A test decodes each strictly into the
 current types and requires the same JSON back, so dropping, renaming or
-retyping a field, or adding a required one, fails. The files are
-append-only: never edit or delete one; a new version adds a new file next to
+retyping a field, or adding a required one, fails. Another test requires
+every JSON field of those types to be set in its golden file, so a new field
+fails until it is added there. Golden files only grow: an existing field or
+value is never removed or changed, an additive change adds its new field to
+the golden file of its version, and a new version adds a new file next to
 the old ones.
 
 ### History

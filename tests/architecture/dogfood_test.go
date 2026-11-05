@@ -314,7 +314,12 @@ var releaseJobs = []string{"example-go-compose", "dogfood-shadow", "dogfood-publ
 // aval.trianalab.io/v1 contracts and policies. While ci.yaml pins it, the
 // release jobs build aval from the checked-out commit instead, and must not
 // install it. Pinning any later release ends the transition: they must
-// install the pinned release again.
+// install the pinned release again. The transition may outlive at most one
+// release: once CHANGELOG.md lists two releases newer than the pin, the
+// check fails until the pin moves (the version PR of the first one cannot
+// pin it yet, its sha256 does not exist before the release).
+// TODO(milestone-3): pin the first release that reads aval.trianalab.io/v1
+// in ci.yaml (AVAL_VERSION, AVAL_SHA256) to end this transition.
 const lastPreFreezeRelease = "0.1.0"
 
 var (
@@ -342,6 +347,9 @@ func releasePinProblems(ci, changelog []byte) ([]string, error) {
 	if !pinVersion.MatchString(v) || !slices.Contains(strings.Split(string(changelog), "\n"), "## "+v) {
 		problems = append(problems, "AVAL_VERSION "+strconv.Quote(v)+" is not a released version in CHANGELOG.md")
 	}
+	if v == lastPreFreezeRelease && releasesNewerThan(changelog, v) > 1 {
+		problems = append(problems, "AVAL_VERSION "+v+" is pinned after a newer release shipped: pin the release that reads aval.trianalab.io/v1")
+	}
 	if !pinSHA256.MatchString(wf.Env["AVAL_SHA256"]) {
 		problems = append(problems, "AVAL_SHA256 is not a sha256")
 	}
@@ -350,6 +358,21 @@ func releasePinProblems(ci, changelog []byte) ([]string, error) {
 	}
 	slices.Sort(problems)
 	return problems, nil
+}
+
+// releasesNewerThan counts the CHANGELOG.md release sections above "## v"
+// (changesets writes the newest first).
+func releasesNewerThan(changelog []byte, v string) int {
+	n := 0
+	for _, line := range strings.Split(string(changelog), "\n") {
+		if line == "## "+v {
+			break
+		}
+		if r, ok := strings.CutPrefix(line, "## "); ok && pinVersion.MatchString(r) {
+			n++
+		}
+	}
+	return n
 }
 
 // buildsAval reports whether a step builds or runs a source-built aval.
@@ -444,5 +467,10 @@ func TestReleasePinCheckCatchesDrift(t *testing.T) {
 		if p, err := releasePinProblems(data, changelog); err != nil || len(p) == 0 {
 			t.Errorf("%s: no problem reported (%v)", name, err)
 		}
+	}
+	// The transition outlives one release (its version PR), not two.
+	later := []byte("# aval\n\n## 0.3.0\n\n## 0.2.0\n\n## 0.1.0\n")
+	if p, err := releasePinProblems(wf(lastPreFreezeRelease, sha, build), later); err != nil || len(p) == 0 {
+		t.Errorf("transition after two newer releases: no problem reported (%v)", err)
 	}
 }

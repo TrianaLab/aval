@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 )
 
 // Golden files freeze the JSON shape of each format version (AGENTS.md
 // invariant 10, docs/artifact-format.md "Versioning and compatibility").
-// They are append-only: a file is never edited or deleted, a new version
-// adds a new file. Each sets every field, so dropping, renaming or retyping
-// one fails here, while a new omitempty field (additive) passes.
+// They only grow: an existing field or value is never removed or changed, an
+// additive change adds its new field to the golden file of its version, and
+// a new version adds a new file next to the old ones. Each sets every field
+// (TestGoldensSetEveryField), so dropping, renaming or retyping one fails
+// here, and so does a new field missing from its golden file.
 var goldens = map[string]string{
 	PredicateType: "testdata/statement-execution-v2.golden.json",
 	ReportVersion: "testdata/verify-report-v1.golden.json",
@@ -83,6 +87,94 @@ func TestReportGolden(t *testing.T) {
 	}
 	if r.Version != ReportVersion || r.Predicate == nil || r.Predicate.Validate() != nil {
 		t.Fatalf("golden report: version %q, predicate %+v", r.Version, r.Predicate)
+	}
+	// Fields documented as always present must not become omitempty.
+	b, err := json.Marshal(Report{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"version", "outcome", "testId", "fingerprint"} {
+		if !bytes.Contains(b, []byte(`"`+k+`"`)) {
+			t.Errorf("%s must always be present", k)
+		}
+	}
+}
+
+// Every JSON field of the frozen types is set in its golden file, so a new
+// field is guarded from the change that adds it.
+func TestGoldensSetEveryField(t *testing.T) {
+	var st, r map[string]any
+	if err := json.Unmarshal(readGolden(t, PredicateType), &st); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(readGolden(t, ReportVersion), &r); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range [][]string{
+		missingFields("statement", reflect.TypeOf(Statement{}), st),
+		missingFields("predicate", reflect.TypeOf(Predicate{}), st["predicate"]),
+		missingFields("report", reflect.TypeOf(Report{}), r),
+	} {
+		for _, f := range m {
+			t.Errorf("%s: not set in the golden file", f)
+		}
+	}
+}
+
+// missingFields lists the JSON fields of typ, recursively, that the decoded
+// document v does not set. Slices are checked through their first element.
+func missingFields(path string, typ reflect.Type, v any) []string {
+	for typ.Kind() == reflect.Pointer || typ.Kind() == reflect.Slice {
+		typ = typ.Elem()
+		if s, ok := v.([]any); ok && len(s) > 0 {
+			v = s[0]
+		}
+	}
+	if typ.Kind() != reflect.Struct || typ == reflect.TypeOf(time.Time{}) {
+		return nil
+	}
+	m, _ := v.(map[string]any)
+	var missing []string
+	for i := range typ.NumField() {
+		f := typ.Field(i)
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if name == "-" || !f.IsExported() {
+			continue
+		}
+		if name == "" {
+			name = f.Name
+		}
+		fv, ok := m[name]
+		if !ok {
+			missing = append(missing, path+"."+name)
+			continue
+		}
+		missing = append(missing, missingFields(path+"."+name, f.Type, fv)...)
+	}
+	return missing
+}
+
+func TestMissingFieldsCatchesNewField(t *testing.T) {
+	type inner struct {
+		A string `json:"a"`
+		B string `json:"b,omitempty"`
+	}
+	type doc struct {
+		Items []*inner `json:"items"`
+		Extra string   `json:"extra,omitempty"`
+		Skip  string   `json:"-"`
+		Plain string
+		Bare  string
+		low   string
+	}
+	var v any
+	if err := json.Unmarshal([]byte(`{"items":[{"a":"x"}],"Plain":"p"}`), &v); err != nil {
+		t.Fatal(err)
+	}
+	got := missingFields("doc", reflect.TypeOf(doc{low: ""}), v)
+	want := []string{"doc.items.b", "doc.extra", "doc.Bare"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
 	}
 }
 
