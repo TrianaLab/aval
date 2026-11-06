@@ -6,6 +6,7 @@
 - [golangci-lint](https://golangci-lint.run) at the exact version `GOLANGCI_LINT_VERSION` in the `Makefile` (CI installs the same one; `make lint` refuses any other). Config in `.golangci.yml`, including the cyclomatic complexity cap of 15.
 - For `make test-release`: [syft](https://github.com/anchore/syft) on `PATH` (CI pins the version). GoReleaser is installed into `bin/` at `GORELEASER_VERSION`.
 - For `make docs-lint`: Node.js (`npx` fetches markdownlint-cli2 at the pinned `MARKDOWNLINT_CLI2_VERSION`) and [Vale](https://vale.sh) at the exact `VALE_VERSION` in the `Makefile`.
+- For `make docs-site`: Python 3.12 and the hash-pinned tools, `pip install --require-hashes -r docs/requirements.txt` (regenerate that file from `docs/requirements.in`, command in its header).
 
 ```sh
 make build   # bin/aval
@@ -14,6 +15,7 @@ make lint    # go vet + golangci-lint
 make fmt     # gofmt -w .
 make docs-lint  # markdownlint + vale over every Markdown file
 make docs-cli   # regenerate docs/cli-reference.md after changing a command or flag
+make docs-site  # strict build of the MkDocs site into site/; preview with `mkdocs serve`
 ```
 
 ## Testing
@@ -64,7 +66,7 @@ Two more rules once you have picked:
 | `ci-release` | level 5 against a snapshot dry-run of the release build |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
 | `ci-security` | govulncheck on both modules (needs network) |
-| `ci-docs` | markdownlint and vale (`make docs-lint`), and `docs/cli-reference.md` matches the cobra commands |
+| `ci-docs` | markdownlint and vale (`make docs-lint`), `docs/cli-reference.md` matches the cobra commands, and the site builds with `--strict` (`make docs-site`) |
 
 CI also dogfoods Aval (#28). `dogfood-fingerprint` and `dogfood-compare`
 check that Aval's own contracts (`aval.yaml`, `aval.e2e.yaml`) fingerprint
@@ -147,6 +149,19 @@ every Markdown file except `.agents/`, `.claude/`, `CLAUDE.md`, `.changeset/` an
 [Conventional Commits](https://www.conventionalcommits.org): `<type>[(scope)][!]: <description>`, with type one of `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`, `perf`, `build`, `style`. Scope is optional, e.g. `feat(fingerprint): ...`; `!` marks a breaking change.
 
 PRs are squash-merged with the PR title as the commit message, so the `pr-title` CI job rejects a PR whose title is not in that format. Editing the title reruns CI.
+
+## Docs site
+
+`mkdocs.yml` builds `docs/` into a MkDocs Material site. Every page in `docs/`
+needs an entry in its `nav`; `make docs-site` fails otherwise.
+`.github/workflows/docs.yaml` publishes it to GitHub Pages with mike: a push to
+`main` deploys version `main`, a release tag `v<version>` deploys `<version>`
+with the `latest` alias.
+
+One-time human step: enable Pages with source "GitHub Actions" (Settings >
+Pages), and let release tags `v*` deploy to the `github-pages` environment
+(Settings > Environments > github-pages > Deployment branches and tags). Until
+Pages is enabled, the workflow skips the deploy with a notice.
 
 ## Changesets and releases
 
