@@ -419,7 +419,7 @@ Exit codes: 0 statistics printed, 1 error, 2 usage.
 | `since` | RFC 3339 timestamp | with `--since` | Records made before it are left out (not counted, not skipped). |
 | `total` | object | always | Run statistics over every test in `tests`. |
 | `tests` | array | always | One `{"testId", "stats"}` per test with records, sorted by test id; `[]` when there are none. |
-| `repositories` | array | with `--by repository` | One `{"repository", "stats"}` per source repository, sorted; records without a repository are under `unknown`. `[]` when there are no records. |
+| `repositories` | array | with `--by repository` | One `{"repository", "stats"}` per source repository, sorted; records without a repository are under `unknown`. Omitted when there are no records. |
 | `skipped` | integer | always | Records read but not counted (see above). |
 | `truncated` | string | when a bound was hit | Which bound, e.g. `more than 1000 run records`. |
 
@@ -784,4 +784,4 @@ the old ones.
   inconsistent records (a reuse with an outcome other than `verified` or
   with test time, a `verifiedResult` without outcome `verified`). Tightening
   validation is breaking for a frozen format; the identifier stays because
-  it is provisional and no record `aval` writes is affected.
+  it is provisional and no record `aval` writes is affected (#88).

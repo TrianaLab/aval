@@ -30,7 +30,7 @@ const (
 // filter); a variable so tests do not push a thousand records.
 var maxRecords = 1000
 
-// errBound stops a listing at a read bound.
+// errBound stops a listing at a read bound, or once it is past what it needs.
 var errBound = errors.New("read bound")
 
 // RecordSet is what ReadRecords read.
@@ -112,12 +112,19 @@ func bounded(err error, set *RecordSet, listing string) error {
 }
 
 // statsTests lists the test ids of the repository's stats anchors, sorted.
+// Tags list in lexical order (OCI distribution spec), so the listing starts
+// after "stats", which sorts just before every stats-<id>, and stops at the
+// first tag past the prefix: sha256-* tags never use up the page bound. A
+// registry that ignores last still works, with the page bound as the limit.
 func statsTests(ctx context.Context, r *remote.Repository, set *RecordSet) ([]string, error) {
 	var ids []string
-	err := r.Tags(context.WithValue(ctx, pageCount{}, new(int)), "", func(tags []string) error {
+	prefix := StatsTag("")
+	err := r.Tags(context.WithValue(ctx, pageCount{}, new(int)), strings.TrimSuffix(prefix, "-"), func(tags []string) error {
 		for _, t := range tags {
-			if id, ok := strings.CutPrefix(t, StatsTag("")); ok && id != "" {
+			if id, ok := strings.CutPrefix(t, prefix); ok && id != "" {
 				ids = append(ids, id)
+			} else if !ok && t > prefix {
+				return errBound // past every stats-<id> tag
 			}
 		}
 		return nil

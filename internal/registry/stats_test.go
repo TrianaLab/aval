@@ -121,6 +121,45 @@ func TestReadRecordsCapsRecords(t *testing.T) {
 	}
 }
 
+// stats-* tags sort after the sha256-* tags of every fingerprint: the tag
+// listing starts after them (last=stats) and stops past the prefix, so many
+// sha256-* tags never push the stats tags beyond the page bound.
+func TestReadRecordsSkipsFingerprintTags(t *testing.T) {
+	ctx := context.Background()
+	tags := []string{StatsTag("unit"), "v1"}
+	for i := range 2 * maxReferrerPages {
+		tags = append(tags, fmt.Sprintf("sha256-%04d", i))
+	}
+	slices.Sort(tags)
+	pages := 0
+	// One tag per page with a next link, honouring last as the spec says.
+	repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
+		if !strings.HasSuffix(r.URL.Path, "/tags/list") {
+			return false
+		}
+		pages++
+		rest := tags
+		if last := r.URL.Query().Get("last"); last != "" {
+			rest = tags[len(tags):]
+			if i := slices.IndexFunc(tags, func(t string) bool { return t > last }); i >= 0 {
+				rest = tags[i:]
+			}
+		}
+		if len(rest) > 1 {
+			w.Header().Set("Link", fmt.Sprintf(`<%s?last=%s>; rel="next"`, r.URL.Path, rest[0]))
+		}
+		_ = json.NewEncoder(w).Encode(map[string][]string{"tags": rest[:min(1, len(rest))]})
+		return true
+	})
+	if _, err := Record(ctx, repo, runRecord("unit")); err != nil {
+		t.Fatal(err)
+	}
+	set, err := ReadRecords(ctx, repo, nil)
+	if err != nil || set.Truncated != "" || len(set.Records) != 1 || pages != 2 {
+		t.Fatalf("ReadRecords = %+v, %v after %d tag pages", set, err, pages)
+	}
+}
+
 // A registry that keeps answering pages with a next link ends the tag or
 // referrers listing after maxReferrerPages requests, as a truncation.
 func TestReadRecordsCapsPages(t *testing.T) {

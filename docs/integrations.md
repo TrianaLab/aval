@@ -50,7 +50,7 @@ public Go API. It exposes:
 | `ErrVerification` | An attestation exists but failed signature or policy checks. Security event. `*VerificationError` wraps it with a reason. |
 | `Report`, `ReportVersion` | The document printed by `aval verify --output json`. |
 | `RunRecord`, `RunRecordVersion`, `ParseRunRecord(data []byte) (*RunRecord, error)` | A run record published by `aval run --record` (see [artifact-format.md](artifact-format.md#run-records)). Unsigned statistics: never a basis for reuse or trust. `ParseRunRecord` checks the version, `testId`, the closed sets and consistency (`reused` requires outcome `verified` and `testDurationMs` 0; `verifiedResult` requires outcome `verified`). |
-| `StatsReport`, `TestStats`, `RunStats`, `MissCauses`, `StatsReportVersion` | The document printed by `aval stats --output json` (see [artifact-format.md](artifact-format.md#stats-report-json)). Informational, from unsigned records. |
+| `StatsReport`, `TestStats`, `RepositoryStats`, `RunStats`, `MissCauses`, `StatsReportVersion`, `StatsUnknownRepository` | The document printed by `aval stats --output json` (see [artifact-format.md](artifact-format.md#stats-report-json)). Informational, from unsigned records. |
 
 Trust levels, from the [trust model](trust-model.md#trust-levels):
 

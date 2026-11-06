@@ -160,6 +160,12 @@ func TestStatsNoRecords(t *testing.T) {
 	if !strings.Contains(stdout, `"tests": []`) {
 		t.Fatalf("json without records: %s", stdout)
 	}
+	// repositories is omitted, not [], when there are no records.
+	_, stdout, _ = runCLI("stats", "--registry", "registry.example/acme/stats", "--by", "repository", "-o", "json")
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(stdout), &doc); err != nil || doc["repositories"] != nil || doc["total"] == nil {
+		t.Fatalf("--by repository json without records: %v %s", err, stdout)
+	}
 }
 
 func TestStatsErrors(t *testing.T) {
