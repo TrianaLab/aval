@@ -3,7 +3,7 @@
    Sora headings, Manrope body, JetBrains Mono for code and labels, emerald
    accents, and the 2:1 isometric grid of the logo used sparingly. Material
    still owns navigation, search and layout; this file repaints it.
-   The brand colours come from stylesheets/brand.css (docs/brand.md); the other
+   The brand colours come from stylesheets/brand.css; the other
    colours below are tokens in this file. On light, text in the accent takes
    the link emerald (#047857), because the mark emerald (#059669) is below
    4.5:1 on white.

@@ -22,7 +22,9 @@
     ".edgeLabel,.edgeLabel p,.edgeLabel rect,.labelBkg{background-color:var(--c-bg);fill:var(--c-bg);color:var(--c-text-2)}",
     ".cluster rect{fill:var(--c-bg-2);stroke:var(--c-border)}",
     ".cluster-label .nodeLabel,.cluster-label span{color:var(--c-text-3)}",
-    // The diagram vocabulary (docs/brand.md): ok, warn, err, muted.
+    // The diagram vocabulary, used as Mermaid classes (`b([verified]):::ok`):
+    // ok = reuse, verified; warn = error, Aval could not decide;
+    // err = verification-failed, a security event; muted = a side step, miss.
     ".node.ok rect,.node.ok polygon,.node.ok circle,.node.ok path{fill:var(--c-accent-soft);stroke:var(--c-accent)}",
     ".node.warn rect,.node.warn polygon,.node.warn circle,.node.warn path{stroke:var(--c-warn)}",
     ".node.err rect,.node.err polygon,.node.err circle,.node.err path{stroke:var(--c-err);stroke-width:2px}",
