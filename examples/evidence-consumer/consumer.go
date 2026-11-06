@@ -63,6 +63,9 @@ func PAE(payloadType string, payload []byte) []byte {
 	return fmt.Appendf(nil, "DSSEv1 %d %s %d %s", len(payloadType), payloadType, len(payload), payload)
 }
 
+// docs/guides/go-consumer.md includes this section.
+// --8<-- [start:check]
+
 // Check returns the verified predicate of a DSSE envelope fetched by digest.
 // nil envBytes means the lookup found nothing: evidence.ErrNotFound, a miss.
 // Every other failure wraps evidence.ErrVerification, a security event. The
@@ -81,6 +84,8 @@ func Check(ctx context.Context, envBytes []byte, opts evidence.VerifyOptions) (*
 	}
 	return v.Predicate, nil
 }
+
+// --8<-- [end:check]
 
 // Reuse reads an `aval verify --output json` report and says whether its
 // passed result may be reused. It accepts only the report version it knows.
