@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -191,19 +193,25 @@ func loadAndFingerprint(file string, outputs ...string) (*contract.Contract, fin
 
 // isInput reports whether the output path p holds an input of the test that
 // fingerprint.Compute would skip: the scope of c, rooted at dir, includes p,
-// and p is not missing nor one of Aval's own results or reports (a
-// whole-tree scope finds those on the next run, #63). Anything else there,
-// including what cannot be read, counts as an input (fail closed).
+// and p holds something other than Aval's own result or report (a
+// whole-tree scope finds those on the next run, #63).
 // ponytail: an input that is itself a valid Aval result or report (a test
 // fixture) is taken for an output; name such a fixture as --result and the
 // run overwrites it anyway.
 func isInput(dir string, c *contract.Contract, p string) bool {
-	if !inScope(dir, c, p) {
+	return inScope(dir, c, p) && existsNonAvalOutput(p)
+}
+
+// existsNonAvalOutput reports whether something other than Aval's own
+// result or report sits at p. Anything that cannot be read or is not a
+// regular file counts (fail closed).
+func existsNonAvalOutput(p string) bool {
+	if p == "" {
 		return false
 	}
 	fi, err := os.Lstat(p)
-	if errors.Is(err, fs.ErrNotExist) {
-		return false
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+		return false // nothing there; writing it fails on its own
 	}
 	if err != nil || !fi.Mode().IsRegular() {
 		return true
@@ -212,14 +220,42 @@ func isInput(dir string, c *contract.Contract, p string) bool {
 	return err != nil || !isAvalOutput(raw)
 }
 
-// isAvalOutput reports whether raw is a result recorded by 'aval run' or a
-// verify report.
+// isAvalOutput reports whether raw is exactly a result recorded by 'aval
+// run' or a verify report: strict JSON (no unknown fields, nothing after
+// it) with the mandatory fields set, so an arbitrary input file is not
+// mistaken for one and dropped from the fingerprint.
 func isAvalOutput(raw []byte) bool {
-	if _, err := evidence.Parse(raw); err == nil {
+	var p evidence.Predicate
+	if decodeStrict(raw, &p) == nil && p.Validate() == nil {
 		return true
 	}
 	var r evidence.Report
-	return json.Unmarshal(raw, &r) == nil && r.Version == evidence.ReportVersion
+	if decodeStrict(raw, &r) != nil || r.Version != evidence.ReportVersion || r.TestID == "" {
+		return false
+	}
+	switch r.Outcome {
+	case evidence.OutcomeVerified, evidence.OutcomeMiss, evidence.OutcomeVerificationFailed:
+		return r.Fingerprint != ""
+	case evidence.OutcomeError:
+		// 'aval run --report' writes an error report without a fingerprint
+		// when it could not compute one.
+		return true
+	}
+	return false
+}
+
+// decodeStrict decodes one JSON value from raw into v, rejecting unknown
+// fields and trailing data.
+func decodeStrict(raw []byte, v any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		return err
+	}
+	if dec.Decode(&struct{}{}) != io.EOF {
+		return errors.New("trailing data after the JSON value")
+	}
+	return nil
 }
 
 // inScope reports whether the scope of c, rooted at dir, would hash the file

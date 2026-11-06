@@ -143,9 +143,22 @@ func loadsAsP256(path string) error {
 	return nil
 }
 
+// checkOutputs refuses to overwrite an existing file at --result or
+// --report that is not an Aval output, wherever it lies: the scope check
+// cannot see through aliases (a symlinked root, a case-insensitive file
+// system). --fingerprint-only writes nothing.
+func (o runFlags) checkOutputs() error {
+	for _, p := range []string{o.resultFile, o.reportFile} {
+		if !o.fingerprintOnly && existsNonAvalOutput(p) {
+			return usageError{fmt.Errorf("output %s (--result or --report) exists and holds neither an Aval result nor a report; Aval does not overwrite it: choose another path or remove the file", p)}
+		}
+	}
+	return nil
+}
+
 func runTest(cmd *cobra.Command, o runFlags) error {
-	// Read the signing token once and keep it out of the environment, so
-	// neither runner.command nor anything else started later inherits it.
+	// Read the signing token once, before validation needs it, and keep it
+	// out of the environment of anything that runs later.
 	token := os.Getenv(idTokenEnv)
 	_ = os.Unsetenv(idTokenEnv) // ponytail: only fails on an invalid name
 	if err := o.validate(token); err != nil {
@@ -154,6 +167,9 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	c, fp, fpErr := loadAndFingerprint(o.file, o.resultFile, o.reportFile)
 	if c == nil {
 		return fpErr
+	}
+	if err := o.checkOutputs(); err != nil {
+		return err
 	}
 	ctx, out, warn := cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr()
 	if o.explain || o.fingerprintOnly {
@@ -166,10 +182,8 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	// No I/O failure may skip the test or hide a verification failure
 	// (invariants 3, 4): errors are collected, never returned early.
 	var errs []error
-	if o.reportFile != "" {
-		if err := writeReportFile(o.reportFile, r); err != nil {
-			errs = append(errs, err)
-		}
+	if err := writeReportFile(o.reportFile, r); err != nil {
+		errs = append(errs, err)
 	}
 	if r.Outcome == evidence.OutcomeVerified && !o.shadow && len(errs) == 0 {
 		fmt.Fprintf(out, "reused %s result %s\n", r.Result, r.Reference)
@@ -307,7 +321,11 @@ func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr error
 	return nil
 }
 
+// writeReportFile writes r to path, unless no --report was asked for.
 func writeReportFile(path string, r evidence.Report) error {
+	if path == "" {
+		return nil
+	}
 	if err := writeJSON(path, r); err != nil {
 		return fmt.Errorf("writing report: %w", err)
 	}

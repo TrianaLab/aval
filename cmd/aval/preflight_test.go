@@ -141,13 +141,10 @@ func TestInScope(t *testing.T) {
 	}
 }
 
-// What sits at an in-scope output path decides: nothing, or Aval's own result
-// or report, is an output; anything else is an input (fail closed).
-func TestIsInput(t *testing.T) {
-	dir := t.TempDir()
-	c := &contract.Contract{Scope: contract.Scope{Source: []string{"**"}}}
-	report, _ := json.Marshal(evidence.Report{Version: evidence.ReportVersion, Outcome: evidence.OutcomeMiss})
-	pred := &evidence.Predicate{
+// validResult is a predicate that 'aval run' could have recorded.
+func validResult(t *testing.T) *evidence.Predicate {
+	t.Helper()
+	p := &evidence.Predicate{
 		SchemaVersion: evidence.SchemaVersion,
 		Subject:       evidence.Subject{Name: "unit", Digest: map[string]string{"sha256": strings.Repeat("a", 64)}},
 		Test:          evidence.Test{ID: "unit", Cacheability: "hermetic"},
@@ -157,14 +154,63 @@ func TestIsInput(t *testing.T) {
 		StartedAt:     time.Unix(1, 0).UTC(),
 		FinishedAt:    time.Unix(2, 0).UTC(),
 	}
-	if err := pred.Validate(); err != nil {
+	if err := p.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	result, _ := json.Marshal(pred)
-	files := map[string][]byte{"src.go": []byte("package x"), "result.json": result, "report.json": report, "other-report.json": []byte(`{"version":"v0"}`)}
-	for name, b := range files {
-		if err := os.WriteFile(filepath.Join(dir, name), b, 0o600); err != nil {
-			t.Fatal(err)
+	return p
+}
+
+// withField sets (or, with a nil v, deletes) a top-level field of the JSON
+// object raw.
+func withField(t *testing.T, raw []byte, k string, v any) []byte {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	if v == nil {
+		delete(m, k)
+	} else {
+		m[k] = v
+	}
+	b, _ := json.Marshal(m)
+	return b
+}
+
+// What sits at an in-scope output path decides: nothing, or exactly Aval's
+// own result or report, is an output; anything else is an input (fail
+// closed), including JSON that merely looks like a report or a result.
+func TestIsInput(t *testing.T) {
+	dir := t.TempDir()
+	c := &contract.Contract{Scope: contract.Scope{Source: []string{"**"}}}
+	report, _ := json.Marshal(evidence.Report{Version: evidence.ReportVersion, Outcome: evidence.OutcomeMiss, TestID: "unit", Fingerprint: "sha256:" + strings.Repeat("b", 64)})
+	errReport, _ := json.Marshal(evidence.Report{Version: evidence.ReportVersion, Outcome: evidence.OutcomeError, TestID: "unit", Reason: "no fingerprint"})
+	result, _ := json.Marshal(validResult(t))
+	outputs := map[string][]byte{
+		"result.json":       result,
+		"report.json":       report,
+		"error-report.json": errReport, // written when the fingerprint failed
+	}
+	inputs := map[string][]byte{
+		"src.go":                []byte("package x"),
+		"other-report.json":     []byte(`{"version":"v0"}`),
+		"version-only.json":     []byte(`{"version":"` + evidence.ReportVersion + `"}`),
+		"report-extra.json":     withField(t, report, "extra", "x"),
+		"report-no-test.json":   withField(t, report, "testId", nil),
+		"report-no-fp.json":     withField(t, report, "fingerprint", nil),
+		"report-no-out.json":    withField(t, report, "outcome", nil),
+		"report-bad-out.json":   withField(t, report, "outcome", "reused"),
+		"report-trailing.json":  append(append([]byte{}, report...), " {}"...),
+		"result-extra.json":     withField(t, result, "extra", "x"),
+		"result-no-runner.json": withField(t, result, "runner", nil),
+	}
+	want := map[string]bool{"missing.json": false, "link": true, "sub": true}
+	for files, isIn := range map[*map[string][]byte]bool{&outputs: false, &inputs: true} {
+		for name, b := range *files {
+			if err := os.WriteFile(filepath.Join(dir, name), b, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			want[name] = isIn
 		}
 	}
 	if err := os.Symlink("src.go", filepath.Join(dir, "link")); err != nil {
@@ -173,15 +219,7 @@ func TestIsInput(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for name, want := range map[string]bool{
-		"missing.json":      false,
-		"result.json":       false,
-		"report.json":       false,
-		"src.go":            true,
-		"other-report.json": true,
-		"link":              true,
-		"sub":               true,
-	} {
+	for name, want := range want {
 		if got := isInput(dir, c, filepath.Join(dir, name)); got != want {
 			t.Errorf("isInput(%q) = %v, want %v", name, got, want)
 		}
@@ -193,7 +231,85 @@ func TestIsInput(t *testing.T) {
 	if _, err := os.ReadFile(unreadable); err != nil && !isInput(dir, c, unreadable) {
 		t.Error("an unreadable file is an input")
 	}
-	if isInput(dir, &contract.Contract{Scope: contract.Scope{Source: []string{"*.go"}}}, filepath.Join(dir, "result.json")) {
+	if isInput(dir, &contract.Contract{Scope: contract.Scope{Source: []string{"*.go"}}}, filepath.Join(dir, "report-extra.json")) {
 		t.Error("an out-of-scope path is never an input")
+	}
+	if existsNonAvalOutput("") || existsNonAvalOutput(filepath.Join(dir, "missing.json")) || !existsNonAvalOutput(filepath.Join(dir, "report-extra.json")) {
+		t.Error("existsNonAvalOutput: only an existing file that is not an Aval output counts")
+	}
+}
+
+// False hit: an in-scope file that only looks like a report must never be
+// dropped from the fingerprint by naming it as --report. Changing it either
+// changes the fingerprint or the run refuses the path and leaves it alone.
+func TestLookalikeReportStaysAnInput(t *testing.T) {
+	noLookup(t)
+	c := writeContract(t, "hermetic")
+	in := filepath.Join(filepath.Dir(c), "fake.txt") // matched by scope.source
+	base, _ := json.Marshal(evidence.Report{Version: evidence.ReportVersion, Outcome: evidence.OutcomeMiss, TestID: "unit", Fingerprint: "sha256:" + strings.Repeat("b", 64)})
+	noTest, noFP := withField(t, base, "testId", nil), withField(t, base, "fingerprint", nil)
+	for _, pair := range [][2][]byte{
+		{withField(t, base, "extra", "1"), withField(t, base, "extra", "2")},
+		{noTest, withField(t, noTest, "reason", "changed")},
+		{noFP, withField(t, noFP, "reason", "changed")},
+	} {
+		var fps []string
+		for _, content := range pair {
+			if err := os.WriteFile(in, content, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			code, stdout, _ := runCLI("run", "-f", c, "--fingerprint-only", "--report", in)
+			if code == ExitUsage {
+				if b, _ := os.ReadFile(in); string(b) != string(content) {
+					t.Fatalf("a refused run changed the input: %q", b)
+				}
+				continue
+			}
+			fps = append(fps, stdout)
+		}
+		if len(fps) == 2 && fps[0] == fps[1] {
+			t.Errorf("changing %s kept fingerprint %s", pair[0], fps[0])
+		}
+	}
+}
+
+// Aliased output paths (a symlinked contract directory, a different-case
+// name on a case-insensitive file system) slip past the scope check; the run
+// still refuses, before the test runs, to overwrite a file that is not an
+// Aval output.
+func TestAliasedOutputIsNotOverwritten(t *testing.T) {
+	noLookup(t)
+	argv, ran := marker(t, 0)
+	c := contractWith(t, "hermetic", argv...)
+	real := filepath.Dir(c)
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	in := filepath.Join(real, "in.txt")
+	cases := [][]string{
+		{"run", "-f", filepath.Join(link, "aval.yaml"), "--result", in},
+		{"run", "-f", c, "--report", filepath.Join(link, "in.txt")},
+	}
+	if _, err := os.Stat(filepath.Join(real, "IN.TXT")); err == nil {
+		cases = append(cases, []string{"run", "-f", c, "--result", filepath.Join(real, "IN.TXT")})
+	} else {
+		t.Log("case-sensitive file system: the different-case alias is not exercised")
+	}
+	for _, args := range cases {
+		code, _, stderr := runCLI(args...)
+		if code != ExitUsage || ran() || !strings.Contains(stderr, "holds neither an Aval result nor a report") {
+			t.Errorf("%v: exit %d ran %v, stderr %q", args, code, ran(), stderr)
+		}
+		if b, _ := os.ReadFile(in); string(b) != "x" {
+			t.Fatalf("%v overwrote the input: %q", args, b)
+		}
+	}
+	// Aval's own result outside the scope is overwritten as before.
+	out := filepath.Join(t.TempDir(), "r.json")
+	for i := range 2 {
+		if code, _, stderr := runCLI("run", "-f", c, "--result", out); code != ExitOK || !ran() {
+			t.Fatalf("run %d: exit %d, stderr %s", i+1, code, stderr)
+		}
 	}
 }
