@@ -90,7 +90,7 @@ func TestRunOutcomes(t *testing.T) {
 		{"verification failure runs and exits 5", map[string]candidate{"sha256:aa": {verifyErr: untrusted}}, nil, 0, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "ran unit: passed", "SECURITY"},
 		{"verification failure outranks a failed test", map[string]candidate{"sha256:aa": {verifyErr: untrusted}}, nil, 1, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "ran unit: failed", "SECURITY"},
 		{"signed cacheability differs from the contract", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, cacheability: "external-dependencies"}}, nil, 0, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "cacheability", "SECURITY"},
-		{"reuse beside an untrusted sibling still warns", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, nil, 1, false, ExitOK, false, evidence.OutcomeVerified, "rejected: reg.example/r@sha256:ff verification-failed", "SECURITY: rejected attestation reg.example/r@sha256:ff"},
+		{"reuse beside an untrusted sibling still warns", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, nil, 1, false, ExitOK, false, evidence.OutcomeVerified, "rejected: reg.example/r@sha256:ff verification-failed", "SECURITY: 1 attestation(s) for unit failed"},
 		{"shadow agrees", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, 0, true, ExitOK, true, evidence.OutcomeVerified, "shadow: reuse of reg.example/r@sha256:aa would have been correct (passed)", ""},
 		{"shadow agrees on a failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: true}}, nil, 1, true, ExitTestFailed, true, evidence.OutcomeVerified, "would have been correct (failed)", ""},
 		{"shadow false hit: reused pass, real failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, 1, true, ExitError, true, evidence.OutcomeVerified, "ran unit: failed", "FALSE HIT"},
@@ -402,10 +402,17 @@ func TestRunPush(t *testing.T) {
 	}
 }
 
-// End to end with real signing, the real policy file and verifier; only the
-// registry is in memory. A result published by run --push is reused by the
-// next run, which does not execute the test.
-func TestRunPushThenReuse(t *testing.T) {
+// pushed is a passing result that run --push signed with a developer key
+// and published to an in-memory registry, served as reg.example/r@sha256:aa.
+// dir holds the policy and the dev.pub it trusts.
+type pushed struct {
+	dir, contract, policy string
+	pub                   []byte
+	ran                   func() bool
+}
+
+func pushResult(t *testing.T) pushed {
+	t.Helper()
 	dir := t.TempDir()
 	keyFile, pub := devKey(t, dir, "dev")
 	if err := os.WriteFile(filepath.Join(dir, "dev.pub"), pub, 0o600); err != nil {
@@ -428,18 +435,55 @@ func TestRunPushThenReuse(t *testing.T) {
 		t.Fatalf("run --push: exit %d, stderr %q", code, stderr)
 	}
 	serve(t, stored)
-	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", pol, "--result", filepath.Join(dir, "r.json"))
-	if code != ExitOK || ran() || !strings.Contains(stdout, "reused passed result reg.example/r@sha256:aa") {
+	return pushed{dir: dir, contract: c, policy: pol, pub: pub, ran: ran}
+}
+
+// End to end with real signing, the real policy file and verifier; only the
+// registry is in memory. A result published by run --push is reused by the
+// next run, which does not execute the test, and text verify names the
+// signer, its trust level and the reference.
+func TestRunPushThenReuse(t *testing.T) {
+	s := pushResult(t)
+	code, stdout, stderr := runCLI("run", "-f", s.contract, "--registry", "reg.example/r", "--policy", s.policy, "--result", filepath.Join(s.dir, "r.json"))
+	if code != ExitOK || s.ran() || !strings.Contains(stdout, "reused passed result reg.example/r@sha256:aa") {
 		t.Fatalf("reuse: exit %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	kid, _ := evidence.PublicKeyID(string(s.pub))
+	code, stdout, _ = runCLI("verify", "-f", s.contract, "--registry", "reg.example/r", "--policy", s.policy)
+	if want := "signer: key " + kid + ", trust level developer\nreference: reg.example/r@sha256:aa\n"; code != ExitOK || !strings.Contains(stdout, want) {
+		t.Fatalf("verify: exit %d, stdout %q, want %q", code, stdout, want)
+	}
+}
+
+// A signer the policy does not list gets a plain reason naming its key id
+// and the policy file, printed once, plus a single SECURITY line.
+func TestSignerNotInPolicyReason(t *testing.T) {
+	s := pushResult(t)
+	kid, _ := evidence.PublicKeyID(string(s.pub))
+	_, otherPub := devKey(t, s.dir, "other")
+	if err := os.WriteFile(filepath.Join(s.dir, "dev.pub"), otherPub, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reason := fmt.Sprintf("signer key id %q is not in the trust policy (trust policy %s)", kid, s.policy)
+	for _, args := range [][]string{{"verify"}, {"run", "--result", filepath.Join(s.dir, "r.json")}} {
+		code, stdout, stderr := runCLI(append(args, "-f", s.contract, "--registry", "reg.example/r", "--policy", s.policy)...)
+		all := stdout + stderr
+		if code != ExitVerificationFailed || strings.Count(all, reason) != 1 || strings.Count(all, "SECURITY") != 1 || strings.Count(stderr, "\n") != 1 {
+			t.Fatalf("%s: exit %d, want the reason %q once and one SECURITY line; stdout %q stderr %q", args[0], code, reason, stdout, stderr)
+		}
 	}
 }
 
 // Reasons can carry attacker-chosen text from an untrusted attestation. Every
 // line aval prints stays one line with control characters escaped, so such
 // text cannot start a line of its own (a CI log command, a terminal escape).
+// The report on stdout carries the verification failure's reason; stderr
+// carries the warning for a deleted candidate, whose text the registry chose.
 func TestUntrustedTextCannotStartALine(t *testing.T) {
-	forged := &evidence.VerificationError{Reason: "bad\n::error::forged\r\x1b[31m"}
-	fakeCandidates(t, nil, map[string]candidate{"sha256:aa": {verifyErr: forged}, "sha256:bb": {verifyErr: forged}})
+	text := "bad\n::error::forged\r\x1b[31m"
+	forged := &evidence.VerificationError{Reason: text}
+	gone := fmt.Errorf("%s: %w", text, evidence.ErrNotFound)
+	fakeCandidates(t, nil, map[string]candidate{"sha256:aa": {fetchErr: gone}, "sha256:bb": {verifyErr: forged}, "sha256:cc": {verifyErr: forged}})
 	argv, _ := marker(t, 0)
 	dir := t.TempDir()
 	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(dir, "result.json"))

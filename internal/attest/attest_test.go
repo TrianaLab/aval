@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -363,7 +364,7 @@ func TestSignRejects(t *testing.T) {
 		if c.set != nil {
 			c.set(s)
 		}
-		if out, err := Sign(ctx, c.st, c.opts); err == nil || out != nil {
+		if out, err := Sign(ctx, c.st, c.opts); err == nil || out != nil || strings.HasPrefix(err.Error(), "attest.") {
 			t.Errorf("%s: got %v, %v; want an error", c.name, out, err)
 		}
 	}

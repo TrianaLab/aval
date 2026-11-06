@@ -117,15 +117,15 @@ renaming a test produces a new fingerprint.
 | `hermetic` | Result depends only on declared files and toolchain. | yes |
 | `controlled-environment` | Depends on services/images whose versions are pinned inside the scope (e.g. a compose file with image digests). | yes |
 | `external-dependencies` | Talks to things outside the scope (SaaS APIs, shared databases). | no, only with explicit policy opt-in |
-| `non-deterministic` | Results vary between runs with identical inputs. | no |
+| `non-deterministic` | Results vary between runs with identical inputs. | never |
 
 "Reusable by default" only means the class does not block reuse. A result
 is still reused only if a valid, signed attestation exists and the trust
 policy accepts its signer (see [trust-model.md](trust-model.md#policy)).
 Without a policy nothing is accepted.
-`aval run` prints `cacheability <class>: not reusable by default` for the
-last two classes. A `non-deterministic` test is never looked up: it always
-runs.
+`aval run` prints `cacheability external-dependencies: not reusable by
+default (the policy may allow it)` and `cacheability non-deterministic: never
+reusable`. A `non-deterministic` test is never looked up: it always runs.
 
 ## What goes into the fingerprint
 

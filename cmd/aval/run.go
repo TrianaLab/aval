@@ -217,10 +217,10 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 		}
 		return nil
 	}
-	// A security event: run the test, then exit 5 (invariant 4).
+	// A security event: run the test, then exit 5 (invariant 4). verify
+	// printed the SECURITY line and the report the reason.
 	if errors.Is(lookupErr, evidence.ErrVerification) {
-		fmt.Fprintf(warn, "aval: SECURITY: attestation verification failed for %s: %v; running the test\n", c.Metadata.Name, oneLine(lookupErr.Error()))
-		errs = append(errs, lookupErr)
+		errs = append(errs, shown{lookupErr})
 	}
 	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), fp)
 	if err != nil {
@@ -271,17 +271,20 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 	if fpErr == nil {
 		fmt.Fprintf(out, "test %s fingerprint %s\n", c.Metadata.Name, fp.Digest)
 	}
-	if !c.Cacheability.ReusableByDefault() {
-		fmt.Fprintf(out, "cacheability %s: not reusable by default\n", c.Cacheability)
+	switch c.Cacheability {
+	case contract.NonDeterministic:
+		fmt.Fprintf(out, "cacheability %s: never reusable\n", c.Cacheability)
+	case contract.ExternalDependencies:
+		fmt.Fprintf(out, "cacheability %s: not reusable by default (the policy may allow it)\n", c.Cacheability)
 	}
 	r := newReport(c, fp)
 	switch {
 	case fpErr != nil:
 		return failReport(r, fpErr)
 	case o.noReuse:
-		return failReport(r, fmt.Errorf("reuse disabled (--no-reuse): %w", evidence.ErrNotFound))
+		return failReport(r, skipped("reuse disabled (--no-reuse)"))
 	case o.repo == "":
-		return failReport(r, fmt.Errorf("no registry configured (--registry): %w", evidence.ErrNotFound))
+		return failReport(r, skipped("no registry configured: pass --registry to reuse verified results"))
 	}
 	// The deadline bounds the registry, never runner.command.
 	ctx, cancel := context.WithTimeout(ctx, o.registryTimeout)

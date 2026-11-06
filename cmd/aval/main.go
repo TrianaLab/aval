@@ -17,6 +17,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	orasregistry "oras.land/oras-go/v2/registry"
@@ -46,6 +47,23 @@ const (
 var version = "dev"
 
 type usageError struct{ error }
+
+func (u usageError) Unwrap() error { return u.error }
+
+// shown marks an error whose reason the command already printed (in the
+// report): run prints no aval: line for it. The exit code still follows it.
+// Only return shown directly or as an errors.Join member; wrapping it hides
+// the prefix too.
+type shown struct{ error }
+
+func (s shown) Unwrap() error { return s.error }
+
+// skipped is a miss where no lookup ran. It is evidence.ErrNotFound for exit
+// codes and outcomes, but its message is only its cause.
+type skipped string
+
+func (s skipped) Error() string      { return string(s) }
+func (skipped) Is(target error) bool { return target == evidence.ErrNotFound }
 
 // ponytail: package-level seams so tests can drive every outcome without a
 // registry or Sigstore; inject dependencies if the CLI grows a library API.
@@ -86,9 +104,44 @@ func run(args []string, stdout, stderr io.Writer) int {
 	root.SetErr(stderr)
 	err := root.Execute()
 	if err != nil {
-		fmt.Fprintln(stderr, "aval:", oneLine(err.Error()))
+		for _, p := range errParts(err) {
+			fmt.Fprintln(stderr, "aval:", oneLine(p))
+		}
 	}
 	return exitCode(err)
+}
+
+// errParts splits err into one message per errors.Join member, each keeping
+// the prefix of the errors that wrap it, and drops members already shown.
+// Text inside a member is never split: it may come from an attestation.
+func errParts(err error) []string {
+	if _, ok := err.(shown); ok {
+		return nil
+	}
+	msg := err.Error()
+	if j, ok := err.(interface{ Unwrap() []error }); ok {
+		errs := j.Unwrap()
+		msgs := make([]string, len(errs))
+		for i, e := range errs {
+			msgs[i] = e.Error()
+		}
+		if msg == strings.Join(msgs, "\n") { // errors.Join, not fmt.Errorf with several %w
+			var parts []string
+			for _, e := range errs {
+				parts = append(parts, errParts(e)...)
+			}
+			return parts
+		}
+	}
+	if inner := errors.Unwrap(err); inner != nil && strings.HasSuffix(msg, inner.Error()) {
+		prefix := strings.TrimSuffix(msg, inner.Error())
+		parts := errParts(inner)
+		for i := range parts {
+			parts[i] = prefix + parts[i]
+		}
+		return parts
+	}
+	return []string{msg}
 }
 
 func exitCode(err error) int {
@@ -321,7 +374,10 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			if werr := writeReport(cmd.OutOrStdout(), output, report); werr != nil {
 				return werr
 			}
-			return err
+			if err != nil {
+				return shown{err} // the report carries the reason
+			}
+			return nil
 		},
 	}
 	f := cmd.Flags()
@@ -333,18 +389,41 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 	return cmd
 }
 
+// verify decides whether a trusted result exists. When any attestation
+// failed verification it prints one SECURITY line, even beside a verified
+// candidate (invariant 4); the reasons are in the report.
 func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
+	r, err := lookupAndVerify(ctx, warn, c, fp, repo, policyFile)
+	n := 0
+	for _, rj := range r.Rejected {
+		if rj.Outcome == evidence.OutcomeVerificationFailed {
+			n++
+		}
+	}
+	if n == 0 && r.Outcome == evidence.OutcomeVerificationFailed {
+		n = 1 // the lookup itself failed verification (a moved tag)
+	}
+	if n > 0 {
+		fmt.Fprintf(warn, "aval: SECURITY: %d attestation(s) for %s failed signature or policy verification; treat it as a security event, see %s\n", n, r.TestID, trustModelURL)
+	}
+	return r, err
+}
+
+// trustModelURL explains verification failures and how to respond to them.
+const trustModelURL = "https://github.com/TrianaLab/aval/blob/main/docs/trust-model.md"
+
+func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
 	r := newReport(c, fp)
 	fail := func(err error) (evidence.Report, error) { return failReport(r, err) }
 
 	// Never reusable, so there is nothing to look up (invariant 7).
 	if c.Cacheability == contract.NonDeterministic {
-		return fail(fmt.Errorf("cacheability %s is never reusable: %w", c.Cacheability, evidence.ErrNotFound))
+		return fail(skipped(fmt.Sprintf("cacheability %s is never reusable", c.Cacheability)))
 	}
 	// Without a policy nothing is trusted, so do not even look: report a miss
 	// instead of flagging every attestation found as a security event.
 	if policyFile == "" {
-		return fail(fmt.Errorf("no trust policy configured (--policy): %w", evidence.ErrNotFound))
+		return fail(skipped("no trust policy configured: pass --policy to reuse verified results"))
 	}
 	pol, err := loadPolicy(policyFile)
 	if err != nil {
@@ -353,7 +432,7 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 	// A class the policy does not allow is routine non-reuse, not a security
 	// event, so do not look (invariant 4).
 	if !c.Cacheability.ReusableByDefault() && !slices.Contains(pol.AllowedCacheability, string(c.Cacheability)) {
-		return fail(fmt.Errorf("cacheability %s is not reusable under the policy: %w", c.Cacheability, evidence.ErrNotFound))
+		return fail(skipped(fmt.Sprintf("cacheability %s is not in allowedCacheability of the trust policy %s", c.Cacheability, policyFile)))
 	}
 	sigs, err := newVerifier(pol.TrustedRoot, pol.Identities)
 	if err != nil {
@@ -366,7 +445,7 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 	if err != nil {
 		return fail(err)
 	}
-	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest), sigs, string(c.Cacheability))
+	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest), sigs, string(c.Cacheability), policyFile)
 	r.Reference, r.Rejected = ref, rejected
 	if err != nil {
 		return fail(err)
@@ -380,9 +459,12 @@ func newReport(c *contract.Contract, fp fingerprint.Fingerprint) evidence.Report
 }
 
 func failReport(r evidence.Report, err error) (evidence.Report, error) {
-	r.Reason, r.Outcome = err.Error(), outcomeOf(err)
+	r.Reason, r.Outcome = reason(err), outcomeOf(err)
 	return r, err
 }
+
+// reason is the report text for err: joined errors are separated by "; ".
+func reason(err error) string { return strings.Join(errParts(err), "; ") }
 
 // outcomeOf maps an error to its report outcome; miss and verification
 // failure stay distinct (invariant 4).
@@ -404,9 +486,8 @@ func outcomeOf(err error) evidence.Outcome {
 // never decide the outcome while another verifies; a candidate that ends in
 // any other error makes the outcome an error (run the test), because it might
 // have outranked or contradicted the verified one (invariant 3). Rejected
-// candidates are returned for the report and printed on warn, never dropped
-// (invariant 4); a verification failure is printed as SECURITY even beside a
-// verified candidate. A candidate below the policy's minimum trust level is
+// candidates are returned for the report, never dropped (invariant 4); verify
+// prints a SECURITY line for them even beside a verified candidate. A candidate below the policy's minimum trust level is
 // rejected as a miss: it was evaluated, so it does not block a sibling. A
 // listed candidate whose manifest is gone (deleted from the registry) is
 // absent: it is skipped with a warning, and when every candidate is gone the
@@ -414,7 +495,7 @@ func outcomeOf(err error) evidence.Outcome {
 // and error of the first verification failure, else of the first error, else
 // of the first below-minimum candidate: the security event must surface, and
 // an undecidable candidate outranks routine non-reuse.
-func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, string, []evidence.Rejection, error) {
+func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability, policyFile string) (*evidence.Verification, string, []evidence.Rejection, error) {
 	var (
 		best             *evidence.Verification
 		bestRef, failRef string
@@ -423,7 +504,7 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 		rejected         []evidence.Rejection
 	)
 	for _, d := range cands {
-		v, err := verifyCandidate(ctx, d, opts, sigs, cacheability)
+		v, err := verifyCandidate(ctx, d, opts, sigs, cacheability, policyFile)
 		if errors.Is(err, evidence.ErrNotFound) && !errors.Is(err, evidence.ErrVerification) {
 			fmt.Fprintf(warn, "aval: warning: listed attestation %s is gone, skipping it: %s\n", d.Reference(), oneLine(err.Error()))
 			continue
@@ -441,12 +522,7 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 		// below-minimum signer) lets a verified sibling win; anything else
 		// might have outranked it (invariant 3).
 		unknown = unknown || (!errors.Is(err, evidence.ErrVerification) && !errors.Is(err, errBelowMinTrust))
-		rejected = append(rejected, evidence.Rejection{Reference: d.Reference(), Outcome: outcomeOf(err), Reason: err.Error()})
-		prefix := "warning"
-		if errors.Is(err, evidence.ErrVerification) {
-			prefix = "SECURITY"
-		}
-		fmt.Fprintf(warn, "aval: %s: rejected attestation %s: %s\n", prefix, d.Reference(), oneLine(err.Error()))
+		rejected = append(rejected, evidence.Rejection{Reference: d.Reference(), Outcome: outcomeOf(err), Reason: reason(err)})
 	}
 	if best == nil && failErr == nil {
 		return nil, "", nil, fmt.Errorf("every listed attestation is gone: %w", evidence.ErrNotFound)
@@ -470,8 +546,17 @@ func outranks(v, best *evidence.Verification) bool {
 // under the same fingerprint is a lie, never a hit (invariant 7). The policy's
 // minimum trust level is checked last: an authentic attestation from a listed
 // signer below it is routine non-reuse (errBelowMinTrust, a miss), but only
-// once every claim checks out; a false claim stays a verification failure.
-func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, error) {
+// once every claim checks out; a false claim stays a verification failure,
+// and names the policy file it was checked against.
+func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability, policyFile string) (*evidence.Verification, error) {
+	v, err := checkCandidate(ctx, d, opts, sigs, cacheability)
+	if errors.Is(err, evidence.ErrVerification) {
+		err = fmt.Errorf("%w (trust policy %s)", err, policyFile)
+	}
+	return v, err
+}
+
+func checkCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, error) {
 	a, err := fetch(ctx, d)
 	if err != nil {
 		return nil, err
@@ -514,20 +599,46 @@ func writeReport(w io.Writer, format string, r evidence.Report) error {
 		return enc.Encode(r)
 	}
 	fmt.Fprintf(w, "%s %s %s\n", r.Outcome, r.TestID, r.Fingerprint)
+	if s := r.Signer; s != nil {
+		who := "key " + s.KeyID
+		if s.KeyID == "" {
+			who = fmt.Sprintf("%s (issuer %s)", s.Subject, s.Issuer)
+		}
+		fmt.Fprintf(w, "signer: %s, trust level %s\n", oneLine(who), s.TrustLevel)
+	}
+	if r.Reference != "" {
+		fmt.Fprintf(w, "reference: %s\n", r.Reference)
+	}
 	if r.Reason != "" {
 		fmt.Fprintf(w, "reason: %s\n", oneLine(r.Reason))
 	}
 	for _, rj := range r.Rejected {
+		if rj.Reference == r.Reference && rj.Reason == r.Reason {
+			continue // printed above as the reference and reason
+		}
 		fmt.Fprintf(w, "rejected: %s %s: %s\n", rj.Reference, rj.Outcome, oneLine(rj.Reason))
 	}
 	return nil
 }
 
-// oneLine applies Go string literal escapes, without the surrounding quotes:
-// newlines, control and non-printable characters, quotes and backslashes. Reasons can carry text from an untrusted
-// attestation; escaped, it cannot start a line of its own in a log, where a
-// CI system might read it as a command, or move a terminal cursor.
+// oneLine replaces newlines, control and other non-printable characters,
+// and invalid UTF-8, with Go escapes (\n, \x1b, \u2028); everything else,
+// quotes and backslashes included, stays as is. Reasons can carry text from
+// an untrusted attestation; escaped, it cannot start a line of its own in a
+// log, where a CI system might read it as a command, or move a terminal
+// cursor.
 func oneLine(s string) string {
-	q := strconv.Quote(s)
-	return q[1 : len(q)-1]
+	var b strings.Builder
+	for i, r := range s {
+		switch {
+		case r == utf8.RuneError && !strings.HasPrefix(s[i:], "\uFFFD"):
+			fmt.Fprintf(&b, `\x%02x`, s[i]) // an invalid byte
+		case strconv.IsPrint(r):
+			b.WriteRune(r)
+		default:
+			q := strconv.QuoteRune(r)
+			b.WriteString(q[1 : len(q)-1])
+		}
+	}
+	return b.String()
 }

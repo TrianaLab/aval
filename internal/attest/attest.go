@@ -87,24 +87,24 @@ var (
 // depending on opts.
 func Sign(ctx context.Context, s *evidence.Statement, opts SignOptions) (*Signed, error) {
 	if s == nil || s.Type != evidence.StatementType || s.PredicateType != evidence.PredicateType {
-		return nil, errors.New("attest.Sign: not an Aval in-toto statement")
+		return nil, errors.New("not an Aval in-toto statement")
 	}
 	payload, err := json.Marshal(s)
 	if err != nil {
-		return nil, fmt.Errorf("attest.Sign: encoding statement: %w", err)
+		return nil, fmt.Errorf("encoding statement: %w", err)
 	}
 	bo := sign.BundleOptions{Context: ctx}
 	var keypair sign.Keypair
 	if opts.Key != "" {
 		if keypair, err = loadKey(opts.Key); err != nil {
-			return nil, fmt.Errorf("attest.Sign: %w", err)
+			return nil, err
 		}
 	} else {
 		if opts.IDToken == "" {
-			return nil, errors.New("attest.Sign: keyless signing needs an OIDC token")
+			return nil, errors.New("keyless signing needs an OIDC token")
 		}
 		if keypair, err = newEphemeralKeypair(); err != nil {
-			return nil, fmt.Errorf("attest.Sign: %w", err)
+			return nil, err
 		}
 		// The Rekor entry is always recorded: the short-lived certificate
 		// cannot be verified later without its timestamp.
@@ -114,11 +114,11 @@ func Sign(ctx context.Context, s *evidence.Statement, opts SignOptions) (*Signed
 	}
 	b, err := sign.Bundle(&sign.DSSEData{Data: payload, PayloadType: evidence.PayloadType}, keypair, bo)
 	if err != nil {
-		return nil, fmt.Errorf("attest.Sign: %w", err)
+		return nil, err
 	}
 	if opts.Key == "" {
 		if err := checkCert(b.GetVerificationMaterial().GetCertificate().GetRawBytes()); err != nil {
-			return nil, fmt.Errorf("attest.Sign: signing certificate: %w", err)
+			return nil, fmt.Errorf("signing certificate: %w", err)
 		}
 	}
 	raw, _ := protojson.Marshal(b) // ponytail: a bundle sigstore-go just built, cannot fail

@@ -218,21 +218,21 @@ func checkFingerprint(fingerprint string) error {
 // re-checks, a few times, before it fails.
 func Push(ctx context.Context, repo, fingerprint string, a Attestation) (Descriptor, error) {
 	if err := checkFingerprint(fingerprint); err != nil {
-		return Descriptor{}, fmt.Errorf("registry.Push: %w", err)
+		return Descriptor{}, err
 	}
 	if a.Envelope == nil {
-		return Descriptor{}, errors.New("registry.Push: no envelope")
+		return Descriptor{}, errors.New("no envelope")
 	}
 	if !json.Valid(a.Bundle) {
-		return Descriptor{}, errors.New("registry.Push: no valid Sigstore bundle; an attestation without one can never verify")
+		return Descriptor{}, errors.New("no valid Sigstore bundle; an attestation without one can never verify")
 	}
 	r, err := newRepository(repo)
 	if err != nil {
-		return Descriptor{}, fmt.Errorf("registry.Push: %w", err)
+		return Descriptor{}, err
 	}
 	d, err := push(ctx, r, fingerprint, a)
 	if err != nil {
-		return Descriptor{}, fmt.Errorf("registry.Push %s: %w", repo, err)
+		return Descriptor{}, fmt.Errorf("%s: %w", repo, err)
 	}
 	return Descriptor{Repository: repo, Digest: d.Digest.String()}, nil
 }
@@ -304,15 +304,15 @@ func pushBlob(ctx context.Context, r *remote.Repository, mediaType string, data 
 // trust policy pick; they fetch by digest, never by tag.
 func Lookup(ctx context.Context, repo, fingerprint string) ([]Descriptor, error) {
 	if err := checkFingerprint(fingerprint); err != nil {
-		return nil, fmt.Errorf("registry.Lookup: %w", err)
+		return nil, err
 	}
 	r, err := newRepository(repo)
 	if err != nil {
-		return nil, fmt.Errorf("registry.Lookup: %w", err)
+		return nil, err
 	}
 	ds, err := lookup(ctx, r, fingerprint)
 	if err != nil {
-		return nil, fmt.Errorf("registry.Lookup %s: %w", repo, err)
+		return nil, fmt.Errorf("%s: %w", repo, err)
 	}
 	out := make([]Descriptor, 0, len(ds))
 	for _, d := range ds {
@@ -369,15 +369,15 @@ func Fetch(ctx context.Context, d Descriptor) (*Attestation, error) {
 		err = fmt.Errorf("algorithm %s", dg.Algorithm())
 	}
 	if err != nil {
-		return nil, fmt.Errorf("registry.Fetch %s: %w", d.Reference(), malformed("digest: %v", err))
+		return nil, fmt.Errorf("%s: %w", d.Reference(), malformed("digest: %v", err))
 	}
 	r, err := newRepository(d.Repository)
 	if err != nil {
-		return nil, fmt.Errorf("registry.Fetch: %w", err)
+		return nil, err
 	}
 	a, err := fetch(ctx, r, dg)
 	if err != nil {
-		return nil, fmt.Errorf("registry.Fetch %s: %w", d.Reference(), err)
+		return nil, fmt.Errorf("%s: %w", d.Reference(), err)
 	}
 	return a, nil
 }

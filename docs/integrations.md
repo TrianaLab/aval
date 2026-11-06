@@ -190,8 +190,11 @@ major module path, even when the format it described is retired.
 
 `aval verify` computes the fingerprint from `aval.yaml`, looks up the
 attestation, verifies it against the trust policy and runs nothing. With
-`--output json` (`-o json`) it prints an `evidence.Report` on stdout; the error
-message, if any, goes to stderr.
+`--output json` (`-o json`) it prints an `evidence.Report` on stdout. Once
+the report is printed its `reason` is the only copy of the error message;
+stderr adds one `aval: SECURITY: ...` line when an attestation failed
+verification. Errors before there is a report (flags, `aval.yaml`) go to
+stderr.
 
 ```json
 {
@@ -273,8 +276,8 @@ The policy file format (`--policy`) is described in
   does this) and `version == "aval.trianalab.io/verify-report/v1"` on reports.
   Reject versions you do not know. Within a version, ignore unknown fields:
   changes are additive.
-- **Respect cacheability.** `non-deterministic` results are never reusable by
-  default; do not widen that in your adapter.
+- **Respect cacheability.** `non-deterministic` results are never reusable;
+  do not widen that in your adapter.
 
 ### Example: Pacto as an external consumer
 

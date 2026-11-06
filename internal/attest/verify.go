@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
@@ -24,7 +25,8 @@ import (
 // key-based ones against the public keys the policy accepts. It returns the
 // signer; evidence.Verify applies the rest of the policy.
 type Verifier struct {
-	keyed *verify.Verifier // nil when the policy accepts no keys
+	keyed  *verify.Verifier // nil when the policy accepts no keys
+	keyIDs map[string]bool  // the key ids keyed accepts
 	// The keyless verifier needs the trusted root, which may be fetched with
 	// TUF (network, writes under $HOME), so it is built on first use: only
 	// when a candidate's bundle carries a certificate.
@@ -58,7 +60,7 @@ var (
 // (fetched with TUF) when it is empty. The trusted root is loaded by For,
 // the first time a bundle carries a certificate.
 func NewVerifier(trustedRoot string, ids []evidence.Identity) (*Verifier, error) {
-	v := &Verifier{trustedRoot: trustedRoot}
+	v := &Verifier{trustedRoot: trustedRoot, keyIDs: map[string]bool{}}
 	keys := map[string]*root.ExpiringKey{}
 	for _, id := range ids {
 		if id.PublicKey == "" {
@@ -75,6 +77,7 @@ func NewVerifier(trustedRoot string, ids []evidence.Identity) (*Verifier, error)
 			return nil, fmt.Errorf("public key: %w", err)
 		}
 		keys[kid] = root.NewExpiringKey(sv, time.Time{}, time.Time{})
+		v.keyIDs[kid] = true
 	}
 	var err error
 	if len(keys) > 0 {
@@ -178,8 +181,9 @@ func signsEnvelope(e verify.SignedEntity, env *evidence.Envelope) error {
 }
 
 func (v *Verifier) verifyKeyed(e verify.SignedEntity, hint string) (evidence.Signer, error) {
-	if v.keyed == nil {
-		return evidence.Signer{}, errors.New("key-based signature, but the policy accepts no keys")
+	// The hint is only a claim: a listed key still has to verify below.
+	if !v.keyIDs[hint] {
+		return evidence.Signer{}, fmt.Errorf("signer key id %q is not in the trust policy", hint)
 	}
 	if _, err := v.keyed.Verify(e, verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithKey())); err != nil {
 		return evidence.Signer{}, err
@@ -190,7 +194,14 @@ func (v *Verifier) verifyKeyed(e verify.SignedEntity, hint string) (evidence.Sig
 
 func (v *Verifier) verifyKeyless(e verify.SignedEntity) (evidence.Signer, error) {
 	if !v.wantKeyless {
-		return evidence.Signer{}, errors.New("certificate signature, but the policy accepts no keyless identities")
+		// The certificate is unverified here; it only names the claimed signer.
+		who := "certificate signer"
+		if vc, err := e.VerificationContent(); err == nil && vc.Certificate() != nil {
+			if s, err := certificate.SummarizeCertificate(vc.Certificate()); err == nil {
+				who = fmt.Sprintf("signer %q (issuer %q)", s.SubjectAlternativeName, s.Issuer)
+			}
+		}
+		return evidence.Signer{}, fmt.Errorf("%s is not accepted by the policy: it lists no keyless identities", who)
 	}
 	if err := v.loadKeyless(); err != nil {
 		return evidence.Signer{}, err

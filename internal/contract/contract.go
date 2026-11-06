@@ -55,7 +55,7 @@ const (
 	// shared databases). Reuse only if policy explicitly allows it.
 	ExternalDependencies Cacheability = "external-dependencies"
 	// NonDeterministic: results vary between runs with identical inputs.
-	// Never reusable by default.
+	// Never reusable, whatever the policy says.
 	NonDeterministic Cacheability = "non-deterministic"
 )
 

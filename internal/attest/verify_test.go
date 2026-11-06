@@ -90,6 +90,13 @@ func TestVerifyRejectsBadKeyBasedBundles(t *testing.T) {
 	forgedEnv := *s.Envelope
 	forgedEnv.Payload = []byte(forged)
 
+	// The hint claims a key the policy lists, but another key signed: the
+	// listed key must still verify the signature.
+	otherKid, _ := evidence.PublicKeyID(otherPub)
+	claimed := parseBundle(t, s.Bundle)
+	claimed.GetVerificationMaterial().GetPublicKey().Hint = otherKid
+	claimedBundle, _ := protojson.Marshal(claimed)
+
 	editedEnv := *s.Envelope
 	editedEnv.Payload = []byte(strings.Replace(string(s.Envelope.Payload), "passed", "failed", 1))
 
@@ -100,12 +107,13 @@ func TestVerifyRejectsBadKeyBasedBundles(t *testing.T) {
 		bundle []byte
 		want   string
 	}{
-		{"untrusted key", []evidence.Identity{{PublicKey: otherPub, TrustLevel: evidence.TrustRunner}}, s.Envelope, s.Bundle, "signature:"},
+		{"untrusted key", []evidence.Identity{{PublicKey: otherPub, TrustLevel: evidence.TrustRunner}}, s.Envelope, s.Bundle, "is not in the trust policy"},
 		{"no bundle", []evidence.Identity{trusted}, s.Envelope, nil, "no Sigstore bundle"},
 		{"garbage bundle", []evidence.Identity{trusted}, s.Envelope, []byte("{}"), "decoding Sigstore bundle"},
 		{"envelope edited after signing", []evidence.Identity{trusted}, &editedEnv, s.Bundle, "different envelope"},
 		{"payload forged in bundle and envelope", []evidence.Identity{trusted}, &forgedEnv, forgedBundle, "signature:"},
-		{"policy has no keys", []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: ".*", TrustLevel: evidence.TrustRunner}}, s.Envelope, s.Bundle, "accepts no keys"},
+		{"hint claims a listed key", []evidence.Identity{{PublicKey: otherPub, TrustLevel: evidence.TrustRunner}}, s.Envelope, claimedBundle, "signature: failed to verify signature"},
+		{"policy has no keys", []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: ".*", TrustLevel: evidence.TrustRunner}}, s.Envelope, s.Bundle, "is not in the trust policy"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -199,8 +207,12 @@ func TestVerifyKeyless(t *testing.T) {
 	// A keyless signature against a key-only policy.
 	_, pub := keySigned(t)
 	keyOnly, _ := NewVerifier("", []evidence.Identity{{PublicKey: pub, TrustLevel: evidence.TrustRunner}})
-	if _, err := keyOnly.verifyEntity(e, env); err == nil || !strings.Contains(err.Error(), "no keyless") {
+	if _, err := keyOnly.verifyEntity(e, env); err == nil || !strings.Contains(err.Error(), `signer "`+ciSAN+`" (issuer "`+ghIssuer+`") is not accepted by the policy`) {
 		t.Fatalf("keyless signature against key-only policy: %v", err)
+	}
+	// Without readable certificate content the reason still names the signer kind.
+	if _, err := keyOnly.verifyKeyless(brokenEntity{SignedEntity: e, vcErr: errors.New("no vc")}); err == nil || !strings.Contains(err.Error(), "certificate signer is not accepted by the policy") {
+		t.Fatalf("keyless signature without content against key-only policy: %v", err)
 	}
 	// A message signature (no DSSE envelope) is not an attestation.
 	msg, _ := vs.Sign(ciSAN, ghIssuer, env.Payload)

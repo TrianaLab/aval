@@ -100,7 +100,7 @@ environment is valid in another.
    executions, and policy and reporting need to tell the two apart.
 6. **Cacheability classes.** `hermetic` and `controlled-environment` are
    reusable by default. `external-dependencies` needs an explicit policy
-   opt-in. `non-deterministic` is never reusable by default. *Rationale:* a
+   opt-in. `non-deterministic` is never reusable. *Rationale:* a
    matching fingerprint only means something if the result depends on the
    declared inputs.
 7. **Language-, framework- and CI-agnostic.** v0 ships only a generic runner:
