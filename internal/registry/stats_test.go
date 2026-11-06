@@ -115,9 +115,9 @@ func TestReadRecordsCapsRecords(t *testing.T) {
 		t.Fatalf("ReadRecords = %d records, %q, %v", len(set.Records), set.Truncated, err)
 	}
 	// Once truncated, later tests are not listed at all.
-	set, err = ReadRecords(ctx, repo, []string{"b", "a"})
+	set, err = ReadRecords(ctx, repo, []string{"b", "a", "c"})
 	if err != nil || len(set.Records) != 2 || set.Records[0].TestID != "b" || set.Truncated == "" {
-		t.Fatalf("ReadRecords(b, a) = %+v, %v", set, err)
+		t.Fatalf("ReadRecords(b, a, c) = %+v, %v", set, err)
 	}
 }
 
@@ -149,6 +149,10 @@ func TestReadRecordsCapsPages(t *testing.T) {
 			set, err := ReadRecords(ctx, repo, nil)
 			if err != nil || !strings.Contains(set.Truncated, fmt.Sprintf("more than %d pages", maxReferrerPages)) || pages > maxReferrerPages {
 				t.Fatalf("ReadRecords = %+v, %v after %d pages", set, err, pages)
+			}
+			// The tests found before the tag bound are still read.
+			if listing == "/tags/list" && len(set.Records) != 1 {
+				t.Fatalf("ReadRecords read %d records, want the 1 of stats-unit", len(set.Records))
 			}
 		})
 	}

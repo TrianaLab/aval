@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -65,7 +66,7 @@ func ReadRecords(ctx context.Context, repo string, testIDs []string) (RecordSet,
 	}
 	listed := 0
 	for _, id := range testIDs {
-		if set.Truncated != "" {
+		if listed > maxRecords {
 			break
 		}
 		_, anchorDesc := statsAnchor(id)
@@ -73,7 +74,7 @@ func ReadRecords(ctx context.Context, repo string, testIDs []string) (RecordSet,
 		err := r.Referrers(context.WithValue(ctx, pageCount{}, new(int)), anchorDesc, evidence.ArtifactTypeRun, func(refs []ocispec.Descriptor) error {
 			for _, d := range refs {
 				if listed++; listed > maxRecords {
-					set.Truncated = fmt.Sprintf("more than %d run records", maxRecords)
+					set.Truncated = cmp.Or(set.Truncated, fmt.Sprintf("more than %d run records", maxRecords))
 					return errBound
 				}
 				ds = append(ds, d.Digest)
@@ -104,7 +105,7 @@ func bounded(err error, set *RecordSet, listing string) error {
 	case errors.Is(err, errBound):
 		return nil
 	case errors.Is(err, errPages):
-		set.Truncated = fmt.Sprintf("more than %d pages listing %s", maxReferrerPages, listing)
+		set.Truncated = cmp.Or(set.Truncated, fmt.Sprintf("more than %d pages listing %s", maxReferrerPages, listing))
 		return nil
 	}
 	return err

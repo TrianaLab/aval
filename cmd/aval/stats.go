@@ -86,10 +86,18 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.`,
 // parseSince turns --since into a time: a positive Go duration or a number
 // of days back from now, an RFC 3339 time or a date (UTC midnight).
 func parseSince(s string, now time.Time) (time.Time, error) {
+	t, err := parseSinceTime(s, now)
+	if err == nil && (t.Year() < 1 || t.Year() > 9999) {
+		return time.Time{}, fmt.Errorf("--since %q is outside the years 1 to 9999", s)
+	}
+	return t, err
+}
+
+func parseSinceTime(s string, now time.Time) (time.Time, error) {
 	if d, err := time.ParseDuration(s); err == nil && d > 0 {
 		return now.Add(-d), nil
 	}
-	if n, err := strconv.Atoi(strings.TrimSuffix(s, "d")); err == nil && n > 0 && strings.HasSuffix(s, "d") {
+	if n, err := strconv.Atoi(strings.TrimSuffix(s, "d")); err == nil && n > 0 && n <= 36500 && strings.HasSuffix(s, "d") {
 		return now.AddDate(0, 0, -n), nil
 	}
 	for _, layout := range []string{time.RFC3339, time.DateOnly} {
@@ -97,7 +105,7 @@ func parseSince(s string, now time.Time) (time.Time, error) {
 			return t, nil
 		}
 	}
-	return time.Time{}, fmt.Errorf("--since %q is neither a positive duration (168h, 30d) nor a date (2026-11-01, RFC 3339)", s)
+	return time.Time{}, fmt.Errorf("--since %q is neither a positive duration (168h, 30d, at most 36500d) nor a date (2026-11-01, RFC 3339)", s)
 }
 
 // aggregate turns the records read into the stats report. Records made

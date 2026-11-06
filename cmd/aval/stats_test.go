@@ -146,7 +146,7 @@ func TestParseSince(t *testing.T) {
 			t.Errorf("%s: %v %v, want %v", in, got, err, want)
 		}
 	}
-	for _, in := range []string{"-1h", "0s", "0d", "-3d", "d", "x", "2026-13-01"} {
+	for _, in := range []string{"-1h", "0s", "0d", "-3d", "d", "x", "2026-13-01", "36501d", "9999999d", "999999999999999999d", "0000-06-01"} {
 		if _, err := parseSince(in, n); err == nil {
 			t.Errorf("%s: accepted", in)
 		}
