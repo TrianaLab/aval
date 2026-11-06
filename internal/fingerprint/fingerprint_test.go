@@ -79,6 +79,14 @@ func TestUnreadableInputsFailClosed(t *testing.T) {
 	if _, err := f.compute(); err == nil {
 		t.Error("unreadable file in scope must fail")
 	}
+	// An unreadable directory could hide scoped files: the walk must fail,
+	// not skip it.
+	f = newFixture(t)
+	f.chmod("pkg", 0)
+	t.Cleanup(func() { _ = os.Chmod(f.path("pkg"), 0o755) })
+	if _, err := f.compute(); err == nil {
+		t.Error("unreadable directory must fail")
+	}
 }
 
 // canonicalContract discards the json.Marshal error; guard against it ever

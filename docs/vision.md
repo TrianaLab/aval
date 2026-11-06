@@ -181,14 +181,19 @@ These formats are frozen; within a version they change additively only (see
    `main` `dogfood-publish` signs and pushes both results to
    `ghcr.io/trianalab/aval-attestations`. A release requires a verified e2e
    attestation for its commit. See [CONTRIBUTING.md](../CONTRIBUTING.md#ci-quality-gates).
-4. **False-hit suite.** Exit criterion: an automated suite that applies every
-   known kind of relevant change (source, dependency, toolchain, env var,
-   exec bit, contract edit, symlink, file rename) and asserts that none of
-   them can reuse a previous execution.
-   *In progress:* the table-driven corpus in
-   `internal/fingerprint/corpus_test.go` covers these kinds and pins the
-   known gaps (see [contract.md](contract.md#known-gaps)); running it as a
-   dedicated CI gate is #15.
+4. **False-hit suite.** *Implemented.* Exit criterion: an automated suite
+   that applies every known kind of relevant change (source, dependency,
+   toolchain, env var, exec bit, contract edit, symlink, file rename) and
+   asserts that none of them can reuse a previous execution.
+   The table-driven corpus in `internal/fingerprint/corpus_test.go` covers
+   these kinds and pins the known gaps (see
+   [contract.md](contract.md#known-gaps)). The `ci-false-hit` CI job runs it
+   on every PR and push, together with golden manifests of a fixed tree that
+   fail on any change to them without an `aval-fingerprint/vN` bump (a
+   mutation sweep of the manifest code found no manifest-changing mutant
+   that passes; see [contract.md](contract.md#false-hit-corpus)).
+   Committed goldens are append-only, so the golden cannot be rewritten
+   instead.
 5. **Stable consumption contract for external integrations.** Exit criterion:
    the predicate type, media types, predicate fields, `pkg/evidence` API and
    `aval verify --output json` report are declared stable and versioned,
