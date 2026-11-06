@@ -87,7 +87,7 @@ func TestRunOutcomes(t *testing.T) {
 		{"verification failure runs and exits 5", map[string]candidate{"sha256:aa": {verifyErr: untrusted}}, nil, 0, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "ran unit: passed", "SECURITY"},
 		{"verification failure outranks a failed test", map[string]candidate{"sha256:aa": {verifyErr: untrusted}}, nil, 1, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "ran unit: failed", "SECURITY"},
 		{"signed cacheability differs from the contract", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, cacheability: "external-dependencies"}}, nil, 0, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "cacheability", "SECURITY"},
-		{"reuse beside an untrusted sibling still warns", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, nil, 1, false, ExitOK, false, evidence.OutcomeVerified, "rejected: r@sha256:ff verification-failed", "warning: rejected attestation r@sha256:ff"},
+		{"reuse beside an untrusted sibling still warns", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, nil, 1, false, ExitOK, false, evidence.OutcomeVerified, "rejected: r@sha256:ff verification-failed", "SECURITY: rejected attestation r@sha256:ff"},
 		{"shadow agrees", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, 0, true, ExitOK, true, evidence.OutcomeVerified, "shadow: reuse of r@sha256:aa would have been correct (passed)", ""},
 		{"shadow agrees on a failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: true}}, nil, 1, true, ExitTestFailed, true, evidence.OutcomeVerified, "would have been correct (failed)", ""},
 		{"shadow false hit: reused pass, real failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, 1, true, ExitError, true, evidence.OutcomeVerified, "ran unit: failed", "FALSE HIT"},
@@ -121,6 +121,23 @@ func TestRunOutcomes(t *testing.T) {
 
 // Nothing is looked up when reuse is impossible or disabled; the test runs
 // and the report says why (invariants 3, 7).
+// Issue #65: a below-minimum candidate is never reused by aval run, even when
+// it records a pass and the real test fails; it is a miss, not exit 5.
+func TestRunBelowMinTrust(t *testing.T) {
+	fakeCandidates(t, nil, map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper}})
+	policyMin(evidence.TrustRunner)
+	argv, ran := marker(t, 1)
+	dir := t.TempDir()
+	report := filepath.Join(dir, "report.json")
+	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", argv...), "--registry", "r", "--policy", "p.yaml", "--result", filepath.Join(dir, "result.json"), "--report", report)
+	if code != ExitTestFailed || !ran() || strings.Contains(stdout, "reused") || strings.Contains(stderr, "SECURITY") {
+		t.Fatalf("exit %d ran %v; stdout %q stderr %q", code, ran(), stdout, stderr)
+	}
+	if r := readReport(t, report); r.Outcome != evidence.OutcomeMiss || len(r.Rejected) != 1 || r.Rejected[0].Outcome != evidence.OutcomeMiss {
+		t.Fatalf("report %+v", r)
+	}
+}
+
 func TestRunWithoutLookup(t *testing.T) {
 	cases := []struct {
 		name, class, reason string

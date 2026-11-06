@@ -185,12 +185,16 @@ Several executions can produce the same fingerprint (a developer run and a CI
 run, or a re-run). All of them stay listed as referrers of the anchor, so a
 later push cannot hide or replace an earlier one. `aval verify` verifies every
 candidate: the verified one with the highest trust level wins (ties go to a
-non-passed result, then the lowest digest). Candidates that fail are listed in
-the report's `rejected` field and printed as warnings on stderr. A candidate
+non-passed result, then the lowest digest). Candidates that are not used are
+listed in the report's `rejected` field and on stderr: a verification failure
+as `aval: SECURITY: ...`, anything else as `aval: warning: ...`. A candidate
 that cannot be fetched or checked (outcome `error`) might have outranked the
-verified one, so it blocks reuse and the test runs. When nothing is reused,
-the outcome is `verification-failed` when any candidate failed verification,
-otherwise `error`.
+verified one, so it blocks reuse and the test runs. A candidate that passes
+every check but whose signer the policy lists below `minTrustLevel` is
+rejected as `miss`: it was fully evaluated, so it does not block a verified
+sibling. When nothing is reused, the outcome is `verification-failed` when
+any candidate failed verification, otherwise `error` when any could not be
+checked, otherwise `miss`.
 
 ## DSSE envelope
 
@@ -340,14 +344,14 @@ This is the stable machine interface for CI scripts and external tools.
 | `signer` | object | `verified` only | Accepted policy identity that matched (`issuer`, `subjectRegexp`, `trustLevel`) plus the identity the signature actually carried: `subject`, the certificate subject (SAN) for keyless signatures, or `keyId`, `base64(sha256(DER public key))` for key-based ones. `subject` and `keyId` are omitted when empty. |
 | `predicate` | object | `verified` only | Full verified predicate. |
 | `reason` | string | non-`verified` outcomes | Human-readable cause. |
-| `rejected` | array | when a candidate was not used | Each `{reference, outcome, reason}`; `outcome` is `verification-failed` or `error`. A `verification-failed` entry is a security event even when `outcome` is `verified`: alert. |
+| `rejected` | array | when a candidate was not used | Each `{reference, outcome, reason}`; `outcome` is `verification-failed`, `error` or `miss`. A `verification-failed` entry is a security event even when `outcome` is `verified`: alert. A `miss` entry is an authentic attestation whose signer the policy lists below `minTrustLevel`: routine non-reuse, no alert. |
 
 Outcomes and exit codes:
 
 | `outcome` | Meaning | What the caller does | Exit code |
 |---|---|---|---|
 | `verified` | Valid attestation satisfies the policy. | Reuse `result`. | 0 |
-| `miss` | No attestation for this fingerprint. | Run the test. | 4 |
+| `miss` | No attestation for this fingerprint that the policy can reuse: none found, or only authentic ones whose signer the policy lists below `minTrustLevel`. | Run the test. | 4 |
 | `verification-failed` | Attestation exists but fails signature or policy. | Run the test **and** alert. Never hide this. | 5 |
 | `error` | Aval could not decide (registry unreachable, bad policy file, trusted root unavailable). | Treat as a miss: run the test (fail closed). | 1 |
 

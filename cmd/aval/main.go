@@ -2,6 +2,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -30,7 +31,7 @@ const (
 	ExitError              = 1 // unexpected error (registry down, I/O, ...), or a false hit in run --shadow
 	ExitUsage              = 2 // bad flags or invalid aval.yaml
 	ExitTestFailed         = 3 // the test ran and failed, or run reused a verified failing result
-	ExitMiss               = 4 // no attestation for this fingerprint
+	ExitMiss               = 4 // no attestation for this fingerprint that the policy can reuse
 	ExitVerificationFailed = 5 // attestation exists but failed signature/policy: security event
 	ExitNotImplemented     = 6 // feature lands in a later milestone
 )
@@ -59,6 +60,10 @@ var (
 	// errFalseHit: run --shadow found a verified result that disagrees with
 	// the real run.
 	errFalseHit = errors.New("false hit: the verified result disagrees with the real run")
+	// errBelowMinTrust: an authentic attestation from a signer the policy
+	// lists, below its minTrustLevel. Routine non-reuse, a miss, never a
+	// security event (invariant 4).
+	errBelowMinTrust = errors.New("not reusable under the trust policy")
 )
 
 // main stays one line: the coverage gate (make coverage-check) excludes
@@ -89,7 +94,7 @@ func exitCode(err error) int {
 		return ExitVerificationFailed
 	case errors.Is(err, errTestFailed):
 		return ExitTestFailed
-	case errors.Is(err, evidence.ErrNotFound):
+	case errors.Is(err, evidence.ErrNotFound), errors.Is(err, errBelowMinTrust):
 		return ExitMiss
 	case errors.Is(err, evidence.ErrNotImplemented):
 		return ExitNotImplemented
@@ -236,7 +241,7 @@ func outcomeOf(err error) evidence.Outcome {
 	switch {
 	case errors.Is(err, evidence.ErrVerification):
 		return evidence.OutcomeVerificationFailed
-	case errors.Is(err, evidence.ErrNotFound):
+	case errors.Is(err, evidence.ErrNotFound), errors.Is(err, errBelowMinTrust):
 		return evidence.OutcomeMiss
 	default:
 		return evidence.OutcomeError
@@ -251,9 +256,13 @@ func outcomeOf(err error) evidence.Outcome {
 // any other error makes the outcome an error (run the test), because it might
 // have outranked or contradicted the verified one (invariant 3). Rejected
 // candidates are returned for the report and printed on warn, never dropped
-// (invariant 4). Whenever no candidate is reused it returns the reference and
-// error of the first verification failure, which outranks any other error: it
-// is the security event that must surface.
+// (invariant 4); a verification failure is printed as SECURITY even beside a
+// verified candidate. A candidate below the policy's minimum trust level is
+// rejected as a miss: it was evaluated, so it does not block a sibling.
+// Whenever no candidate is reused it returns the reference and error of the
+// first verification failure, else of the first error, else of the first
+// below-minimum candidate: the security event must surface, and an
+// undecidable candidate outranks routine non-reuse.
 func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, string, []evidence.Rejection, error) {
 	var (
 		best             *evidence.Verification
@@ -271,12 +280,16 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 			}
 			continue
 		}
-		if failErr == nil || (errors.Is(err, evidence.ErrVerification) && !errors.Is(failErr, evidence.ErrVerification)) {
+		if failErr == nil || severity(err) > severity(failErr) {
 			failErr, failRef = err, d.Reference()
 		}
-		unknown = unknown || !errors.Is(err, evidence.ErrVerification)
+		unknown = unknown || outcomeOf(err) == evidence.OutcomeError
 		rejected = append(rejected, evidence.Rejection{Reference: d.Reference(), Outcome: outcomeOf(err), Reason: err.Error()})
-		fmt.Fprintf(warn, "aval: warning: rejected attestation %s: %s\n", d.Reference(), oneLine(err.Error()))
+		prefix := "warning"
+		if errors.Is(err, evidence.ErrVerification) {
+			prefix = "SECURITY"
+		}
+		fmt.Fprintf(warn, "aval: %s: rejected attestation %s: %s\n", prefix, d.Reference(), oneLine(err.Error()))
 	}
 	if best == nil || unknown {
 		return nil, failRef, rejected, failErr
@@ -287,18 +300,40 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 // verifyCandidate fetches one attestation and verifies it with the Sigstore
 // bundle stored next to its envelope. The signed cacheability must equal the
 // local contract's: the fingerprint covers the contract, so a different class
-// under the same fingerprint is a lie, never a hit (invariant 7).
+// under the same fingerprint is a lie, never a hit (invariant 7). The policy's
+// minimum trust level is checked last: an authentic attestation from a listed
+// signer below it is routine non-reuse (errBelowMinTrust, a miss), but only
+// once every claim checks out; a false claim stays a verification failure.
 func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, error) {
 	a, err := fetch(ctx, d)
 	if err != nil {
 		return nil, err
 	}
 	opts.Signature = sigs.For(a.Bundle)
+	need := max(opts.MinTrustLevel, evidence.TrustDeveloper)
+	opts.MinTrustLevel = evidence.TrustDeveloper // Verify still rejects levels outside developer..isolated
 	v, err := verifyEnvelope(ctx, a.Envelope, opts)
-	if err == nil && v.Predicate.Test.Cacheability != cacheability {
-		v, err = nil, &evidence.VerificationError{Reason: fmt.Sprintf("cacheability %q, want %q", v.Predicate.Test.Cacheability, cacheability)}
+	switch {
+	case err != nil:
+		return nil, err
+	case v.Predicate.Test.Cacheability != cacheability:
+		return nil, &evidence.VerificationError{Reason: fmt.Sprintf("cacheability %q, want %q", v.Predicate.Test.Cacheability, cacheability)}
+	case v.Signer.TrustLevel < need:
+		return nil, fmt.Errorf("%w: signer %q has trust level %s, policy requires at least %s", errBelowMinTrust, cmp.Or(v.Signer.KeyID, v.Signer.Subject), v.Signer.TrustLevel, need)
 	}
-	return v, err
+	return v, nil
+}
+
+// severity ranks why a candidate was rejected: a verification failure, then
+// an error, then a miss (below the minimum trust level).
+func severity(err error) int {
+	switch outcomeOf(err) {
+	case evidence.OutcomeVerificationFailed:
+		return 2
+	case evidence.OutcomeError:
+		return 1
+	}
+	return 0
 }
 
 func writeReport(w io.Writer, format string, r evidence.Report) error {

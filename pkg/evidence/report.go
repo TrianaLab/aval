@@ -9,7 +9,9 @@ type Outcome string
 const (
 	// OutcomeVerified: a valid attestation satisfies the policy; reuse it.
 	OutcomeVerified Outcome = "verified"
-	// OutcomeMiss: no attestation exists for the fingerprint; run the test.
+	// OutcomeMiss: no attestation for the fingerprint that the policy can
+	// reuse (none exists, or only authentic ones whose signer the policy
+	// lists below its minimum trust level); run the test.
 	OutcomeMiss Outcome = "miss"
 	// OutcomeVerificationFailed: an attestation exists but is not trusted.
 	// Security event: run the test AND alert.
@@ -35,14 +37,15 @@ type Report struct {
 	Reason string `json:"reason,omitempty"`
 	// Rejected lists candidate attestations for the fingerprint that were
 	// not used, with why. An entry with outcome verification-failed is a
-	// security event even when Outcome is verified.
+	// security event even when Outcome is verified; one with outcome miss is
+	// a signer below the policy's minimum trust level, routine non-reuse.
 	Rejected []Rejection `json:"rejected,omitempty"`
 }
 
 // Rejection is a candidate attestation that did not verify.
 type Rejection struct {
 	Reference string `json:"reference"`
-	// Outcome is OutcomeVerificationFailed or OutcomeError.
+	// Outcome is OutcomeVerificationFailed, OutcomeError or OutcomeMiss.
 	Outcome Outcome `json:"outcome"`
 	Reason  string  `json:"reason"`
 }

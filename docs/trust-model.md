@@ -100,9 +100,20 @@ is `policy.Policy` (`internal/policy`), converted to
 that the granted level is at least `MinTrustLevel`, that the payload is an
 Aval in-toto statement whose subject equals the predicate's, the predicate
 structure, the expected fingerprint and test id, and the cacheability. Any
-failure is a `*VerificationError` (`ErrVerification`, exit 5). The verified
+failure is a `*VerificationError` (`ErrVerification`). The verified
 `Signer` is the policy entry that matched, plus the `subject` or `keyId` the
 signature actually carried, so the verify report shows who really signed.
+
+The CLI (`aval verify`, `aval run`) checks the minimum level last instead:
+it calls `evidence.Verify` with `MinTrustLevel` developer, then checks the
+signed cacheability against the contract, then the policy's
+`minTrustLevel`. An attestation that passes every other check but whose
+signer the policy lists below `minTrustLevel` is routine non-reuse, like a
+developer result under a CI policy: outcome `miss` (exit 4), listed in
+`rejected` with outcome `miss`, never reused and never a security event. Any
+other failure, including a false claim from such a signer, is
+`verification-failed` (exit 5). Library callers of `evidence.Verify` still
+get `ErrVerification` for a level below `MinTrustLevel`.
 
 `attest.Verifier` checks signatures with sigstore-go against the Sigstore
 bundle stored next to the envelope. A keyless signature must chain to a
@@ -117,8 +128,9 @@ Without `--policy` nothing is trusted. Aval does not even query the
 registry: the outcome is `miss` (exit 4) with the reason "no trust policy
 configured", and the test runs. This avoids reporting every attestation it
 finds as a verification failure just because no policy exists. Once a policy
-is configured, an attestation from a signer it does not accept *is* a
-verification failure (exit 5). A policy file that cannot be loaded, or a
+is configured, an attestation from a signer it does not list *is* a
+verification failure (exit 5); one from a signer it lists below
+`minTrustLevel` is a miss (exit 4). A policy file that cannot be loaded, or a
 trusted root that cannot be loaded, is outcome `error` (exit 1): the test
 runs and nothing is looked up.
 
@@ -171,7 +183,8 @@ the test runs.
   candidate is verified and the policy picks the verified one with the
   highest trust level. A candidate that fails verification never decides the
   outcome while another verifies, and is listed in `rejected` in the verify
-  report (and on stderr), so the security event stays visible. A candidate
+  report (and on stderr as `aval: SECURITY: ...`), so the security event
+  stays visible. A candidate
   that cannot be fetched or checked blocks reuse (the test runs), because it
   might have outranked the verified one.
 - **Unknown or missing fields** in `aval.yaml` are rejected (exit 2) rather
@@ -190,7 +203,7 @@ directory:
 |---|---|---|
 | `verified`, result `passed` | reuse, do not run | 0 |
 | `verified`, result `failed` | reuse the failure, do not run | 3 |
-| `miss` (also: no `--registry`, no `--policy`, `--no-reuse`, `non-deterministic`, `external-dependencies` not in `AllowedCacheability`) | run | test result: 0 or 3 |
+| `miss` (also: no `--registry`, no `--policy`, `--no-reuse`, `non-deterministic`, `external-dependencies` not in `AllowedCacheability`, only signers below `minTrustLevel`) | run | test result: 0 or 3 |
 | `error` (registry, policy or fingerprint error) | run | test result: 0 or 3 |
 | `verification-failed` | run, print `aval: SECURITY: ...` on stderr | 5, whatever the test result |
 
@@ -236,6 +249,7 @@ These are different outcomes, in code and in exit codes:
 |---|---|---|---|
 | valid attestation, policy satisfied | `verified` | 0 | nil |
 | no attestation for this fingerprint | `miss` | 4 | wraps `evidence.ErrNotFound` |
+| only authentic attestations whose signer the policy lists below `minTrustLevel` | `miss` | 4 | CLI only (see [Policy](#policy)) |
 | attestation exists but fails signature or policy | `verification-failed` | 5 | wraps `evidence.ErrVerification` (`*evidence.VerificationError` carries the reason) |
 | Aval could not decide (registry down, I/O) | `error` | 1 | other |
 
