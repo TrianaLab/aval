@@ -1,4 +1,4 @@
-# Aval
+# ![Aval](docs/assets/images/wordmark.svg#gh-light-mode-only)![Aval](docs/assets/images/wordmark-dark.svg#gh-dark-mode-only)
 
 Test results as signed, verifiable OCI artifacts.
 
