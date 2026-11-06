@@ -40,6 +40,8 @@ Install `aval` in an earlier step with the
 2. If a trusted result exists, the test does not run (outcome `verified`).
 3. Otherwise the test runs. The step then asks GitHub for an OIDC token and
    `aval push` signs the result with it and publishes it.
+4. If the test fails (exit 3) or a result does not verify (exit 5), the step
+   fails and nothing is pushed.
 
 The policy for this job trusts only this workflow on `main`:
 

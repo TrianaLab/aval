@@ -55,7 +55,7 @@ change the fingerprint. If the test reads it, add it to `scope`.
     One line per input: kind, sha256, `x` for an executable file, path.
 
     ```text
-    --8<-- "internal/fingerprint/testdata/golden/aval-fingerprint-v1.manifest:1:27"
+    --8<-- "internal/fingerprint/testdata/golden/aval-fingerprint-v1.manifest:1:26"
     ```
 
 ??? info "Globs that match nothing"
