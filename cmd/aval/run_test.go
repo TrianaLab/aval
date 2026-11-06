@@ -119,8 +119,6 @@ func TestRunOutcomes(t *testing.T) {
 	}
 }
 
-// Nothing is looked up when reuse is impossible or disabled; the test runs
-// and the report says why (invariants 3, 7).
 // Issue #65: a below-minimum candidate is never reused by aval run, even when
 // it records a pass and the real test fails; it is a miss, not exit 5.
 func TestRunBelowMinTrust(t *testing.T) {
@@ -138,6 +136,8 @@ func TestRunBelowMinTrust(t *testing.T) {
 	}
 }
 
+// Nothing is looked up when reuse is impossible or disabled; the test runs
+// and the report says why (invariants 3, 7).
 func TestRunWithoutLookup(t *testing.T) {
 	cases := []struct {
 		name, class, reason string

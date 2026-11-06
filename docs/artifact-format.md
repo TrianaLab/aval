@@ -494,3 +494,7 @@ the old ones.
   `aval.trianalab.io/v1`, without other changes. The contract hash covers
   `apiVersion`, so every fingerprint changed: results published before
   are misses and the tests run once.
+- Within `verify-report/v1` (#65), a signer the policy lists below
+  `minTrustLevel` became `miss` instead of `verification-failed`, and
+  `rejected[].outcome` may now also be `miss`. No new value, field or exit
+  code; the maintainers confirmed this as additive, so the version stays.

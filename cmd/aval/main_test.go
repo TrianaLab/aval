@@ -303,6 +303,10 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:bb": {fetchErr: down},
 		}, ExitError, evidence.OutcomeError, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"vanished candidate beside a verified one fails closed", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: fmt.Errorf("registry.Fetch r@sha256:aa: %w", evidence.ErrNotFound)},
+			"sha256:bb": {trust: evidence.TrustRunner},
+		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
 		{"verify error on a sibling fails closed", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustIsolated},
 			"sha256:bb": {verifyErr: down},

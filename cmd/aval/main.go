@@ -283,7 +283,10 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 		if failErr == nil || severity(err) > severity(failErr) {
 			failErr, failRef = err, d.Reference()
 		}
-		unknown = unknown || outcomeOf(err) == evidence.OutcomeError
+		// Only a fully evaluated rejection (a verification failure or a
+		// below-minimum signer) lets a verified sibling win; anything else
+		// might have outranked it (invariant 3).
+		unknown = unknown || (!errors.Is(err, evidence.ErrVerification) && !errors.Is(err, errBelowMinTrust))
 		rejected = append(rejected, evidence.Rejection{Reference: d.Reference(), Outcome: outcomeOf(err), Reason: err.Error()})
 		prefix := "warning"
 		if errors.Is(err, evidence.ErrVerification) {
@@ -306,6 +309,11 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 // once every claim checks out; a false claim stays a verification failure.
 func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, error) {
 	a, err := fetch(ctx, d)
+	if errors.Is(err, evidence.ErrNotFound) {
+		// The lookup listed it, so this is not a miss; %v drops ErrNotFound
+		// and reports it as an error (fail closed).
+		return nil, fmt.Errorf("candidate listed but not fetchable: %v", err)
+	}
 	if err != nil {
 		return nil, err
 	}
