@@ -154,10 +154,10 @@ extra_javascript:
   # pages that have one.
   - javascripts/diagrams.js
 
-# A reader's path: user pages first (Get started, Concepts, Guides), then
-# the pages to look things up. The dense design documents live under
-# Reference -> Specs and are no section's entry point. Every page under docs/
-# has exactly one entry.
+# A reader's path: user pages first (Get started, Concepts, and Guides once
+# #75 lands), then the pages to look things up. The dense design documents
+# live under Reference -> Specs and are no section's entry point. Every page
+# under docs/ has exactly one entry.
 nav:
   - Home: index.md
   - Get started:

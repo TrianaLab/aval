@@ -317,8 +317,7 @@ These are different outcomes, in code and in exit codes:
 | attestation exists but fails signature or policy | `verification-failed` | wraps `evidence.ErrVerification` (`*evidence.VerificationError` carries the reason) |
 | Aval could not decide (registry down, I/O) | `error` | other |
 
-Each outcome has its own exit code (see
-[the table above](#what-aval-run-does-with-each-outcome)).
+Each outcome has its own exit code; see the [exit codes](cli-reference.md#exit-codes).
 
 A miss is routine: inputs changed, nobody ran this yet. Run the test.
 

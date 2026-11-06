@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	// A fenced block, possibly indented (admonitions, tabs): indent, info string, body.
-	docFence   = regexp.MustCompile("(?ms)^([ \t]*)```([^\n]*)\n(.*?)^[ \t]*```")
+	// A backtick or tilde fenced block, possibly indented (admonitions, tabs):
+	// indent, then info string and body in groups 2-3 (backticks) or 4-5 (tildes).
+	docFence   = regexp.MustCompile("(?ms)^([ \t]*)(?:```([^\n]*)\n(.*?)^[ \t]*```|~~~([^\n]*)\n(.*?)^[ \t]*~~~)")
 	heredoc    = regexp.MustCompile(`<<-?\s*['"]?(\w+)['"]?\s*$`)
 	docKind    = regexp.MustCompile(`(?m)^kind:\s*(\S+)`)
 	docAval    = regexp.MustCompile(`(?m)^apiVersion:\s*aval\.`)
@@ -32,11 +33,12 @@ var (
 func yamlDocs(md string) []string {
 	var out []string
 	for _, m := range docFence.FindAllStringSubmatch(md, -1) {
-		lines := strings.Split(m[3], "\n")
+		info, body := m[2]+m[4], m[3]+m[5]
+		lines := strings.Split(body, "\n")
 		for i, l := range lines {
 			lines[i] = strings.TrimPrefix(l, m[1])
 		}
-		if lang := strings.Fields(m[2] + " x")[0]; lang == "yaml" || lang == "yml" {
+		if lang := strings.Fields(info + " x")[0]; lang == "yaml" || lang == "yml" {
 			out = append(out, strings.Join(lines, "\n"))
 			continue
 		}
@@ -150,9 +152,10 @@ func TestDocExamplesCatchInvalid(t *testing.T) {
 		"!!! note\n    ```yaml\n    apiVersion: aval.trianalab.io/v1\n    kind: Policy\n    minTrustLevel: root\n" +
 		"    identities:\n      - publicKey: ../../etc/k.pub\n        trustLevel: runner\n    ```\n" +
 		"```yaml\napiVersion: aval.trianalab.io/v1\nkind: Tset\n```\n" +
-		"```yaml\nscope:\n  source: [\"x\"]\n```\n"
+		"```yaml\nscope:\n  source: [\"x\"]\n```\n" +
+		"~~~yaml\napiVersion: aval.trianalab.io/v1\nkind: Test\nbogus: 1\n~~~\n"
 	got := exampleProblems(t, "x.md", md, t.TempDir())
-	want := []string{"example 2 (kind Test)", "example 4 (kind Policy)", "example 5 (kind Tset)"}
+	want := []string{"example 2 (kind Test)", "example 4 (kind Policy)", "example 5 (kind Tset)", "example 7 (kind Test)"}
 	if len(got) != len(want) {
 		t.Fatalf("problems %q, want %d: %q", got, len(want), want)
 	}
@@ -165,7 +168,7 @@ func TestDocExamplesCatchInvalid(t *testing.T) {
 
 // exitCodeTable matches the header row of a Markdown table with an exit-code
 // column.
-var exitCodeTable = regexp.MustCompile(`(?mi)^\|[^\n]*\bexit codes?\b[^\n]*\|\n\|[-| :]+\|$`)
+var exitCodeTable = regexp.MustCompile(`(?mi)^\|[^\n]*\b(exit( codes?)?|code)\b[^\n]*\|\n\|[-| :]+\|$`)
 
 // One exit-code table, generated into docs/cli-reference.md; every other page
 // includes it with `--8<-- "docs/cli-reference.md:exit-codes"` (#76).
@@ -175,14 +178,30 @@ func TestOneExitCodeTable(t *testing.T) {
 			t.Errorf("%s: has its own exit-code table; include docs/cli-reference.md:exit-codes instead", doc)
 		}
 	}
-	if !exitCodeTable.MatchString("| Situation | Exit code |\n|---|---|\n") {
-		t.Error("exitCodeTable no longer matches an exit-code table")
+	for _, table := range []string{
+		"| Situation | Exit code |\n|---|---|\n",
+		"| Code | `aval run` | `aval verify` |\n|---|---|---|\n",
+		"| Exit | Meaning |\n|---|---|\n",
+	} {
+		if !exitCodeTable.MatchString(table) {
+			t.Errorf("exitCodeTable no longer matches %q", table)
+		}
 	}
 }
 
+// siteDeepLink matches a link to a page of aval.run. The site is versioned
+// with mike, so only paths under a version (main/, latest/) resolve.
+var siteDeepLink = regexp.MustCompile(`aval\.run/([a-z][^\s)]*)`)
+
 // The README is a front door into the site, not a copy of it (#76).
 func TestReadmeIsShort(t *testing.T) {
-	if n := strings.Count(readFile(t, "README.md"), "\n"); n >= 150 {
+	readme := readFile(t, "README.md")
+	if n := strings.Count(readme, "\n"); n >= 150 {
 		t.Errorf("README.md: %d lines, keep it under 150 and link into the site", n)
+	}
+	for _, m := range siteDeepLink.FindAllStringSubmatch(readme, -1) {
+		if !strings.HasPrefix(m[1], "main/") && !strings.HasPrefix(m[1], "latest/") {
+			t.Errorf("README.md: https://aval.run/%s has no version and returns 404; link https://aval.run/main/%s", m[1], m[1])
+		}
 	}
 }

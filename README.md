@@ -10,9 +10,9 @@ cannot prove that reuse is safe, the test runs.
 No server or database: ORAS, Cosign and OCI 1.1 referrers do the work, in the
 OCI registry you already have.
 
-**Docs: [aval.run](https://aval.run/)**: [how it works](https://aval.run/concepts/),
-[trust](https://aval.run/concepts/trust/), [outcomes](https://aval.run/concepts/outcomes/),
-[CLI reference](https://aval.run/cli-reference/) and the specs.
+**Docs: [aval.run](https://aval.run/)**: [how it works](https://aval.run/main/concepts/),
+[trust](https://aval.run/main/concepts/trust/), [outcomes](https://aval.run/main/concepts/outcomes/),
+[CLI reference](https://aval.run/main/cli-reference/) and the specs.
 
 ## Install
 
@@ -22,7 +22,7 @@ aval --version
 ```
 
 Windows, release archives, `go install` and what the installers check:
-[Install](https://aval.run/install/).
+[Install](https://aval.run/main/install/).
 
 ## Try it on your laptop
 
@@ -105,21 +105,21 @@ changes, so it reports `miss` and exits 4. Stop the registry with
 In CI, sign without a key: leave out `--key` and put an OIDC token in
 `$SIGSTORE_ID_TOKEN` (on GitHub Actions, request `id-token: write`). The
 policy then trusts the CI identity instead of a key file; see the
-[policy file](https://aval.run/trust-model/#policy-file) and
-[registry credentials](https://aval.run/artifact-format/#registry-credentials).
+[policy file](https://aval.run/main/trust-model/#policy-file) and
+[registry credentials](https://aval.run/main/artifact-format/#registry-credentials).
 
 ```sh
 aval run --push --registry ghcr.io/acme/orders-aval --policy policy.yaml
 ```
 
-Every exit code is in the [CLI reference](https://aval.run/cli-reference/#exit-codes).
+Every exit code is in the [CLI reference](https://aval.run/main/cli-reference/#exit-codes).
 
 ## Status: pre-alpha
 
 Formats are frozen at `aval.trianalab.io/v1` (contract and verify report) and
 predicate `execution/v2`; see the
-[compatibility rules](https://aval.run/artifact-format/#versioning-and-compatibility)
-and the [roadmap](https://aval.run/vision/#roadmap).
+[compatibility rules](https://aval.run/main/artifact-format/#versioning-and-compatibility)
+and the [roadmap](https://aval.run/main/vision/#roadmap).
 
 ## Contributing
 

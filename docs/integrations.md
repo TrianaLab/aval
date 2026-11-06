@@ -205,6 +205,13 @@ prints no report, and neither does exit 1 when fingerprinting failed:
 
 --8<-- "docs/cli-reference.md:exit-codes"
 
+Exit 2 also covers: a `--registry` that is not an OCI repository
+(`ghcr.io/acme/orders-aval`, no scheme, tag or digest); `--push` or `aval push`
+with a `--key` that does not load, or with neither a key nor
+`$SIGSTORE_ID_TOKEN`; a `--result` or `--report` path that holds an input of
+the test or, for `aval run`, any existing file that is not an Aval result or
+report.
+
 CI snippet that keeps miss and verification failure apart:
 
 ```sh
