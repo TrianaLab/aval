@@ -1,0 +1,2871 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.">
+      
+      
+      
+        <link rel="canonical" href="https://trianalab.github.io/aval/main/artifact-format/">
+      
+      
+        <link rel="prev" href="../cli-reference/">
+      
+      
+        <link rel="next" href="../changelog/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Artifact format - Aval</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/brand.css">
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#artifact-format" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You are viewing an old version of these docs.
+  <a href="../.."><strong>Go to the latest version.</strong></a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("..",location),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Aval" class="md-header__button md-logo" aria-label="Aval" data-md-component="logo">
+      
+<svg class="aval-wordmark" viewBox="1 2.5 66.5 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="aval-wordmark__mark"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></g><g class="aval-wordmark__word"><circle cx="34" cy="12" r="4"/><path d="M38 8v8"/><path d="m42 8 4 8 4-8"/><circle cx="57.5" cy="12" r="4"/><path d="M61.5 8v8"/><path d="M66.5 4.5V16"/></g></svg>
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Aval
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Artifact format
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/TrianaLab/aval" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TrianaLab/aval
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../vision/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../integrations/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../trust-model/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../cli-reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../changelog/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Aval" class="md-nav__button md-logo" aria-label="Aval" data-md-component="logo">
+      
+<svg class="aval-wordmark" viewBox="1 2.5 66.5 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="aval-wordmark__mark"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></g><g class="aval-wordmark__word"><circle cx="34" cy="12" r="4"/><path d="M38 8v8"/><path d="m42 8 4 8 4-8"/><circle cx="57.5" cy="12" r="4"/><path d="M61.5 8v8"/><path d="M66.5 4.5V16"/></g></svg>
+    </a>
+    Aval
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/TrianaLab/aval" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TrianaLab/aval
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Aval
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume Aval evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The test contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact format
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#identifiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Identifiers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oci-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OCI layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OCI layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#push" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lookup-and-consumption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lookup and consumption
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#registry-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registry credentials
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiple-attestations-per-fingerprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple attestations per fingerprint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-64-candidate-cap-and-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 64-candidate cap and cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run records
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Run records">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#record-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Record JSON
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dsse-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DSSE envelope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-toto-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        in-toto Statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#predicate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Predicate
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Predicate">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#annotations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Annotations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify report
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning-and-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning and compatibility
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Versioning and compatibility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#additive-changes-same-identifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additive changes (same identifier)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#breaking-changes-new-identifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Breaking changes (new identifier)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-consumers-treat-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How consumers treat versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deprecation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deprecation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#golden-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Golden files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        History
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../brand/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Brand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/SECURITY.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/CODE_OF_CONDUCT.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code of conduct
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#identifiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Identifiers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oci-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OCI layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OCI layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#push" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lookup-and-consumption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lookup and consumption
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#registry-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registry credentials
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiple-attestations-per-fingerprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple attestations per fingerprint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-64-candidate-cap-and-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 64-candidate cap and cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run records
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Run records">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#record-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Record JSON
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dsse-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DSSE envelope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-toto-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        in-toto Statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#predicate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Predicate
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Predicate">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#annotations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Annotations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify report
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning-and-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning and compatibility
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Versioning and compatibility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#additive-changes-same-identifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additive changes (same identifier)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#breaking-changes-new-identifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Breaking changes (new identifier)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-consumers-treat-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How consumers treat versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deprecation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deprecation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#golden-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Golden files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        History
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href=".." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../cli-reference/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Reference
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/TrianaLab/aval/edit/main/docs/artifact-format.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="artifact-format">Artifact format<a class="headerlink" href="#artifact-format" title="Anchor link">&para;</a></h1>
+<p>This document describes how Aval stores an execution result in an OCI
+registry, the attestation it signs, and the JSON that <code>aval verify --output json</code>
+prints. It is the contract external tools consume through <code>pkg/evidence</code>.</p>
+<p>Status: pre-alpha. The Go types in <code>pkg/evidence</code> are the source of truth.
+Signing, push, lookup, fetch, verification and the policy file are
+implemented (<code>attest.Sign</code>, <code>registry.Push</code>, <code>registry.Lookup</code>,
+<code>registry.Fetch</code>, <code>evidence.Verify</code>, <code>policy.Load</code>). <code>aval verify</code>,
+<code>aval run</code> and <code>aval push</code> use them.</p>
+<p>The identifiers below and the JSON shape of the statement, predicate and
+verify report are <strong>frozen</strong>. Within a version they change additively only;
+see <a href="#versioning-and-compatibility">Versioning and compatibility</a>.</p>
+<h2 id="identifiers">Identifiers<a class="headerlink" href="#identifiers" title="Anchor link">&para;</a></h2>
+<p>All constants live in <code>pkg/evidence</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Value</th>
+<th>Used for</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ArtifactType</code></td>
+<td><code>application/vnd.trianalab.aval.execution.v2</code></td>
+<td><code>artifactType</code> of the OCI manifest</td>
+<td>frozen</td>
+</tr>
+<tr>
+<td><code>ArtifactTypeFingerprint</code></td>
+<td><code>application/vnd.trianalab.aval.fingerprint.v1</code></td>
+<td><code>artifactType</code> of the per-fingerprint anchor manifest</td>
+<td>frozen</td>
+</tr>
+<tr>
+<td><code>MediaTypeDSSE</code></td>
+<td><code>application/vnd.dsse.envelope.v1+json</code></td>
+<td>Media type of the signed DSSE envelope layer</td>
+<td>DSSE standard</td>
+</tr>
+<tr>
+<td><code>MediaTypeExecution</code></td>
+<td><code>application/vnd.trianalab.aval.execution.v2+json</code></td>
+<td>Media type of the raw predicate JSON, when carried on its own</td>
+<td>frozen</td>
+</tr>
+<tr>
+<td><code>PayloadType</code></td>
+<td><code>application/vnd.in-toto+json</code></td>
+<td>DSSE <code>payloadType</code></td>
+<td>in-toto standard</td>
+</tr>
+<tr>
+<td><code>StatementType</code></td>
+<td><code>https://in-toto.io/Statement/v1</code></td>
+<td>in-toto Statement <code>_type</code></td>
+<td>in-toto standard</td>
+</tr>
+<tr>
+<td><code>PredicateType</code></td>
+<td><code>https://aval.trianalab.io/attestation/execution/v2</code></td>
+<td>in-toto <code>predicateType</code></td>
+<td>frozen</td>
+</tr>
+<tr>
+<td><code>SchemaVersion</code></td>
+<td><code>v2</code></td>
+<td>Predicate <code>schemaVersion</code></td>
+<td>frozen</td>
+</tr>
+<tr>
+<td><code>ReportVersion</code></td>
+<td><code>aval.trianalab.io/verify-report/v1</code></td>
+<td><code>version</code> of the verify report</td>
+<td>frozen</td>
+</tr>
+<tr>
+<td><code>RunRecordVersion</code></td>
+<td><code>aval.trianalab.io/run-record/v1</code></td>
+<td><code>version</code> of a run record</td>
+<td>provisional</td>
+</tr>
+<tr>
+<td><code>ArtifactTypeRun</code></td>
+<td><code>application/vnd.trianalab.aval.run.v1</code></td>
+<td><code>artifactType</code> of a run record manifest</td>
+<td>provisional</td>
+</tr>
+<tr>
+<td><code>MediaTypeRun</code></td>
+<td><code>application/vnd.trianalab.aval.run.v1+json</code></td>
+<td>Media type of the run record layer</td>
+<td>provisional</td>
+</tr>
+<tr>
+<td><code>ArtifactTypeStats</code></td>
+<td><code>application/vnd.trianalab.aval.stats.v1</code></td>
+<td><code>artifactType</code> of the per-test stats anchor manifest</td>
+<td>provisional</td>
+</tr>
+</tbody>
+</table>
+<p>Registry identifiers (<code>internal/registry</code>): the bundle layer uses the
+Sigstore media type <code>application/vnd.dev.sigstore.bundle.v0.3+json</code>
+(<code>MediaTypeSigstoreBundle</code>), and manifests carry the annotation
+<code>io.trianalab.aval.fingerprint</code> (<code>AnnotationFingerprint</code>, informational:
+verification reads the fingerprint from the signed predicate). The
+annotation key is frozen. The stats anchor carries <code>io.trianalab.aval.test</code>
+(<code>AnnotationTest</code>, provisional) with the test id.</p>
+<p>Related identifiers from other packages: the fingerprint manifest format is
+<code>aval-fingerprint/v1</code> (<code>internal/fingerprint</code>), and the contract and policy
+<code>apiVersion</code> is <code>aval.trianalab.io/v1</code> (<code>internal/contract</code>, see
+<a href="../contract/#versioning">contract.md</a>). Both are frozen. The fingerprint
+manifest version is a format tag, not a namespaced identifier: it names the
+canonical manifest layout and hash, not a resource, so it stays outside
+<code>aval.trianalab.io</code> and is frozen as <code>aval-fingerprint/v1</code>; a breaking change
+mints <code>aval-fingerprint/v2</code>.</p>
+<h2 id="oci-layout">OCI layout<a class="headerlink" href="#oci-layout" title="Anchor link">&para;</a></h2>
+<p>There is no Aval server or database. The registry is the only index.</p>
+<p>Per fingerprint there is one <strong>anchor</strong> manifest, and one <strong>execution</strong>
+manifest per execution whose <code>subject</code> is the anchor, so the OCI 1.1
+referrers API lists every execution for a fingerprint.</p>
+<p>The anchor is deterministic: its bytes, and so its digest, depend only on the
+fingerprint. It is tagged <code>sha256-&lt;fingerprint hex&gt;</code> (<code>registry.Tag</code>):</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"schemaVersion"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"mediaType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.oci.image.manifest.v1+json"</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">"artifactType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.trianalab.aval.fingerprint.v1"</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">"mediaType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.oci.empty.v1+json"</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">"size"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="s2">"e30="</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">"layers"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="p">{</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">      </span><span class="nt">"mediaType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.oci.empty.v1+json"</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">      </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"</span><span class="p">,</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">      </span><span class="nt">"size"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">      </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="s2">"e30="</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="p">],</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="nt">"annotations"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">    </span><span class="nt">"io.trianalab.aval.fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:&lt;fingerprint hex&gt;"</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>One execution = one OCI 1.1 image manifest, following the OCI 1.1 artifact
+guidance (<code>artifactType</code> set, empty config):</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"schemaVersion"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"mediaType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.oci.image.manifest.v1+json"</span><span class="p">,</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">"artifactType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.trianalab.aval.execution.v2"</span><span class="p">,</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">"mediaType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.oci.empty.v1+json"</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"</span><span class="p">,</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">"size"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="s2">"e30="</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="nt">"layers"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="p">{</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="nt">"mediaType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.dsse.envelope.v1+json"</span><span class="p">,</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">      </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:&lt;envelope digest&gt;"</span><span class="p">,</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">      </span><span class="nt">"size"</span><span class="p">:</span><span class="w"> </span><span class="mi">1834</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="p">{</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">      </span><span class="nt">"mediaType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.dev.sigstore.bundle.v0.3+json"</span><span class="p">,</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">      </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:&lt;bundle digest&gt;"</span><span class="p">,</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">      </span><span class="nt">"size"</span><span class="p">:</span><span class="w"> </span><span class="mi">4210</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">  </span><span class="p">],</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">  </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">    </span><span class="nt">"mediaType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.oci.image.manifest.v1+json"</span><span class="p">,</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">    </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:&lt;anchor digest&gt;"</span><span class="p">,</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">    </span><span class="nt">"size"</span><span class="p">:</span><span class="w"> </span><span class="mi">512</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="w">  </span><span class="nt">"annotations"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="w">    </span><span class="nt">"io.trianalab.aval.fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:&lt;fingerprint hex&gt;"</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>config</strong>: the OCI empty descriptor (<code>{}</code>, media type
+  <code>application/vnd.oci.empty.v1+json</code>).</li>
+<li><strong>layers</strong>: the signed DSSE envelope (see below), then the Sigstore
+  bundle with the verification material. <code>registry.Push</code> refuses an
+  attestation whose bundle is missing or is not valid JSON. If
+  <code>registry.Fetch</code> reads a manifest without a bundle layer, the attestation
+  can never verify, so it ends as a verification failure.
+  <code>registry.Fetch</code> rejects any other layer, a repeated layer, or a missing
+  envelope as a verification failure, and so a manifest that is not
+  sha256-addressed, is larger than 4 MiB, or does not match the digest it
+  was fetched by.</li>
+<li><strong>subject</strong>: always the anchor of the execution's fingerprint. The tested
+  revision or artifact is recorded inside the statement (<code>subject</code>), not in
+  the manifest, so the referrers of a tested image do not list its evidence.</li>
+</ul>
+<p>The <code>execution.v2</code> identifiers replace <code>execution.v1</code>, whose manifest had the
+tested artifact as an optional <code>subject</code> and exactly one layer. Aval no
+longer reads or writes v1: there is no accept window, and a v1 artifact is
+never a candidate.</p>
+<h3 id="push">Push<a class="headerlink" href="#push" title="Anchor link">&para;</a></h3>
+<p><code>registry.Push</code> uploads the blobs, pushes the anchor and (re)tags it, then
+pushes the execution manifest by digest. It never moves or replaces an
+earlier execution: pushing the same bytes again is a no-op, and anything else
+becomes one more referrer of the anchor. Re-tagging the deterministic anchor
+also repairs a tag that was moved.</p>
+<p>Registries without the referrers API (for example GHCR) are supported: oras
+maintains the OCI referrers tag schema (<code>sha256-&lt;anchor hex&gt;</code> index) on push
+and reads it on lookup. That index is rewritten on every push, so two concurrent
+pushes for the same fingerprint can drop one entry from it. Push therefore
+lists the anchor's referrers after pushing and returns only once the new
+digest is among them; if it is not, it pushes the manifest again (which
+re-adds it to the index) and lists again, three attempts in total, one second
+apart. If the digest is still not listed, <code>aval push</code> and <code>aval run --push</code>
+fail (exit 1). A registry that indexes referrers asynchronously for longer
+than about two seconds also fails the push; rerun it. Once a fingerprint has more than 64 attestations the
+confirmation listing fails too, so push exits 1. A dropped execution is never
+a candidate, so even then it never makes an unsigned or untrusted result
+reusable. Aval does not
+delete the previous referrers index after rewriting it, so pushing does not
+need DELETE rights.</p>
+<h3 id="lookup-and-consumption">Lookup and consumption<a class="headerlink" href="#lookup-and-consumption" title="Anchor link">&para;</a></h3>
+<ol>
+<li>Compute the fingerprint locally (<code>aval run --fingerprint-only</code>), e.g.
+   <code>sha256:3f9a...</code>.</li>
+<li>Resolve the tag <code>sha256-&lt;fingerprint hex&gt;</code> in the repository passed via
+   <code>--registry</code>. It must point at the anchor digest Aval computes locally for
+   that fingerprint; anything else is a verification failure (the tag was
+   moved).</li>
+<li>List the anchor's referrers with <code>artifactType</code>
+   <code>application/vnd.trianalab.aval.execution.v2</code>. Each one is a candidate,
+   identified by its manifest <strong>digest</strong>, even when the referrer entry is
+   malformed (not an image manifest, not sha256): Fetch then rejects it as a
+   verification failure, so it never turns into a miss.</li>
+<li>Fetch each candidate by digest (<code>repo@sha256:...</code>). Never fetch by tag:
+   tags are mutable, digests aren't.</li>
+<li>Verify each envelope and apply the trust policy (see below).</li>
+</ol>
+<p>Lookup accepts at most 64 candidates per fingerprint and makes at most 64
+requests to list referrers, whatever paths the registry's <code>Link</code> headers
+point at. Above either limit it fails with outcome <code>error</code> (run the
+test), so whoever can push, or a buggy registry, cannot make <code>aval verify</code>
+fetch an unbounded number of manifests or pages.</p>
+<p>A listed candidate whose manifest the registry answers with 404 (deleted,
+for example by an "untagged manifests" retention policy) is absent: it is
+skipped with a warning on stderr and is not part of <code>rejected</code>. If every
+candidate is absent, the outcome is a miss. Absence never hides a
+verification failure of another candidate.</p>
+<p>Every registry call of one command runs under <code>--registry-timeout</code> (default
+<code>1m</code>): lookup and every fetch share one deadline, and push has its own. A
+registry that stalls past it is outcome <code>error</code> (exit 1), so <code>aval run</code> runs
+the test; <code>runner.command</code> is never under this deadline. One credential store
+and one auth token cache are shared by all registry calls of a process.</p>
+<p>A missing tag, or an anchor without executions, is a <strong>miss</strong>
+(<code>evidence.ErrNotFound</code>, exit code 4). An artifact that exists but is
+malformed or fails signature or policy checks is a <strong>verification failure</strong>
+(<code>evidence.ErrVerification</code>, exit code 5) and is a security event.</p>
+<h3 id="registry-credentials">Registry credentials<a class="headerlink" href="#registry-credentials" title="Anchor link">&para;</a></h3>
+<p>Aval reads registry credentials the way Docker does: from
+<code>$DOCKER_CONFIG/config.json</code>, or <code>~/.docker/config.json</code> when <code>DOCKER_CONFIG</code>
+is not set, including the credential helpers it names (<code>credsStore</code>,
+<code>credHelpers</code>, for example <code>docker-credential-osxkeychain</code> or
+<code>docker-credential-ecr-login</code>). Log in with <code>docker login &lt;registry&gt;</code> (or
+<code>oras login</code>, which writes the same file). Without an entry for the registry,
+Aval connects anonymously, which is enough to read a public repository.
+Every registry call runs under <code>--registry-timeout</code> (default <code>1m</code>; see
+<a href="#lookup-and-consumption">Lookup and consumption</a>).</p>
+<p>A config file that cannot be parsed, or a helper that fails, is outcome
+<code>error</code> (exit 1): <code>aval run</code> runs the test and nothing is reused. Loopback
+registries (<code>localhost</code>, <code>127.0.0.1</code>, <code>::1</code>) use plain HTTP; every other
+registry uses HTTPS.</p>
+<h3 id="multiple-attestations-per-fingerprint">Multiple attestations per fingerprint<a class="headerlink" href="#multiple-attestations-per-fingerprint" title="Anchor link">&para;</a></h3>
+<p>Several executions can produce the same fingerprint (a developer run and a CI
+run, or a re-run). All of them stay listed as referrers of the anchor, so a
+later push cannot hide or replace an earlier one. <code>aval verify</code> verifies every
+candidate: the verified one with the highest trust level wins (ties go to a
+non-passed result, then the lowest digest). Candidates that are not used are
+listed in the report's <code>rejected</code> field and on stderr: a verification failure
+as <code>aval: SECURITY: ...</code>, anything else as <code>aval: warning: ...</code>. A candidate
+that cannot be fetched or checked (outcome <code>error</code>) might have outranked the
+verified one, so it blocks reuse and the test runs. A candidate that passes
+every check but whose signer the policy lists below <code>minTrustLevel</code> is
+rejected as <code>miss</code>: it was fully evaluated, so it does not block a verified
+sibling. When nothing is reused, the outcome is <code>verification-failed</code> when
+any candidate failed verification, otherwise <code>error</code> when any could not be
+checked, otherwise <code>miss</code>.</p>
+<h3 id="the-64-candidate-cap-and-cleanup">The 64-candidate cap and cleanup<a class="headerlink" href="#the-64-candidate-cap-and-cleanup" title="Anchor link">&para;</a></h3>
+<p>Every push adds one execution, even for the same inputs: the hostname and
+timestamps in the predicate differ. Aval never deletes one. Once a
+fingerprint has more than 64 executions, every lookup for it is outcome
+<code>error</code>: the test always runs. Every push for it still adds an execution,
+then fails its confirmation and exits 1. It stays
+that way until someone deletes executions. Other fingerprints are not
+affected, so the next change to an input also ends it.</p>
+<p>To stay below the cap, push from one place (for example CI on the main
+branch). <code>aval run --push</code> does not push after it reuses a result, but
+<code>aval run --shadow --push</code> runs and pushes every time.</p>
+<p>To clean up a fingerprint, list its executions and delete the ones you no
+longer need, for example with <a href="https://oras.land">ORAS</a>:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--fingerprint-only<span class="w">            </span><span class="c1"># prints sha256:&lt;hex&gt;</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>oras<span class="w"> </span>discover<span class="w"> </span>--artifact-type<span class="w"> </span>application/vnd.trianalab.aval.execution.v2<span class="w"> </span>&lt;repo&gt;:sha256-&lt;hex&gt;
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>oras<span class="w"> </span>manifest<span class="w"> </span>delete<span class="w"> </span>&lt;repo&gt;@sha256:&lt;execution<span class="w"> </span>digest&gt;
+</span></code></pre></div>
+<p>The registry must allow deletes (<code>registry:2</code> needs
+<code>REGISTRY_STORAGE_DELETE_ENABLED=true</code>; on GHCR, delete the package
+versions). Deleting executions is safe: it can make a result stop being
+reusable, never make an untrusted one reusable. Keep the one you still want
+to reuse, and keep any execution that failed verification until you have
+looked into it.</p>
+<h2 id="run-records">Run records<a class="headerlink" href="#run-records" title="Anchor link">&para;</a></h2>
+<p><code>aval run --record</code> publishes one run record per run, for every outcome
+(<code>verified</code>, <code>miss</code>, <code>error</code>, <code>verification-failed</code>), so reuse can be
+measured from the registry alone. <code>--record-file &lt;path&gt;</code> writes the same
+record to a file, and <code>aval record --record-file &lt;path&gt;</code> publishes it later,
+for example from a CI job that has write credentials but runs no tests.</p>
+<p>Records are <strong>statistics, never evidence</strong>. They are unsigned and
+informational. <code>aval run</code> and <code>aval verify</code> never fetch or read them, so a
+record, forged or not, cannot cause reuse, change an outcome or count toward
+the 64-candidate cap.</p>
+<p>Recording is best-effort: a record that cannot be published (no write
+credentials, registry down, past <code>--registry-timeout</code>) or written prints
+<code>aval: warning: run record not ...</code> on stderr and never changes the exit
+code. Publishing has its own <code>--registry-timeout</code> deadline, so it cannot
+hold the command longer. <code>--record</code> needs <code>--registry</code>. Aval keeps no local
+state; a record file exists only when <code>--record-file</code> asks for one. An
+existing file at <code>--record-file</code> that is not an Aval result, report or valid
+run record is never overwritten: the run warns and goes on, and inside the
+contract scope that file stays an input of the fingerprint. A <code>--record-file</code>
+that is also <code>--result</code> or <code>--report</code> is not written either.</p>
+<h3 id="layout">Layout<a class="headerlink" href="#layout" title="Anchor link">&para;</a></h3>
+<p>Per test there is one <strong>stats anchor</strong>, separate from every fingerprint
+anchor. It is deterministic (its digest depends on the test id alone) and
+tagged <code>stats-&lt;test id&gt;</code> (<code>registry.StatsTag</code>); fingerprint tags and OCI
+referrers tag schema tags start with <code>sha256-</code>, so the tags cannot collide.
+It has the same shape as the fingerprint anchor, with
+<code>"artifactType": "application/vnd.trianalab.aval.stats.v1"</code> and the
+annotation <code>"io.trianalab.aval.test": "&lt;test id&gt;"</code>.</p>
+<p>Each record is an OCI 1.1 image manifest with
+<code>"artifactType": "application/vnd.trianalab.aval.run.v1"</code>, the empty config,
+one layer of media type <code>application/vnd.trianalab.aval.run.v1+json</code> holding
+the record JSON, and the stats anchor as <code>subject</code>. Records are listed by the
+stats anchor's referrers. Unlike <code>registry.Push</code>, publishing a record does
+not confirm the referrers listing, so on a registry without the referrers
+API two concurrent records for one test can drop one of them.
+On such registries all records of a test also share one referrers index,
+which grows with every record; once it exceeds the registry's manifest size
+limit, publishing a record fails with a warning. Pruning old records is future work (Epic 9, #88).</p>
+<h3 id="record-json">Record JSON<a class="headerlink" href="#record-json" title="Anchor link">&para;</a></h3>
+<p><code>evidence.RunRecord</code>, parsed by <code>evidence.ParseRunRecord</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Present</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>version</code></td>
+<td>string</td>
+<td>always</td>
+<td><code>aval.trianalab.io/run-record/v1</code>.</td>
+</tr>
+<tr>
+<td><code>testId</code></td>
+<td>string</td>
+<td>always</td>
+<td><code>metadata.name</code> from the contract.</td>
+</tr>
+<tr>
+<td><code>fingerprint</code></td>
+<td>string</td>
+<td>always</td>
+<td><code>sha256:&lt;hex&gt;</code>; empty when the fingerprint could not be computed.</td>
+</tr>
+<tr>
+<td><code>outcome</code></td>
+<td>string</td>
+<td>always</td>
+<td>The lookup decision, as in the verify report.</td>
+</tr>
+<tr>
+<td><code>reused</code></td>
+<td>bool</td>
+<td>always</td>
+<td><code>true</code> when a verified result was reused and the test did not run. With <code>--shadow</code>, or when <code>--report</code> cannot be written, it is <code>false</code>.</td>
+</tr>
+<tr>
+<td><code>result</code></td>
+<td>string</td>
+<td>when known</td>
+<td>The reused or the real <code>passed</code> / <code>failed</code>; omitted when <code>runner.command</code> could not start.</td>
+</tr>
+<tr>
+<td><code>testDurationMs</code></td>
+<td>integer</td>
+<td>always</td>
+<td>How long <code>runner.command</code> ran, in milliseconds; <code>0</code> when it did not run.</td>
+</tr>
+<tr>
+<td><code>savedDurationMs</code></td>
+<td>integer</td>
+<td>always</td>
+<td>On reuse, the test duration recorded in the reused attestation (<code>finishedAt - startedAt</code>); <code>0</code> otherwise.</td>
+</tr>
+<tr>
+<td><code>avalVersion</code></td>
+<td>string</td>
+<td>always</td>
+<td>Version of the <code>aval</code> binary that ran.</td>
+</tr>
+<tr>
+<td><code>recordedAt</code></td>
+<td>RFC 3339 timestamp</td>
+<td>always</td>
+<td>When the record was made.</td>
+</tr>
+<tr>
+<td><code>ciRunUrl</code></td>
+<td>string</td>
+<td>when passed</td>
+<td><code>--ci-run-url</code>, a link to the CI run. Aval does not derive it from any CI vendor.</td>
+</tr>
+</tbody>
+</table>
+<p>Example:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval.trianalab.io/run-record/v1"</span><span class="p">,</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">"testId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-integration"</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">"reused"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">"testDurationMs"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">"savedDurationMs"</span><span class="p">:</span><span class="w"> </span><span class="mi">1184000</span><span class="p">,</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span><span class="nt">"avalVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.3.0"</span><span class="p">,</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">"recordedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-06T09:00:00Z"</span><span class="p">,</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nt">"ciRunUrl"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://ci.example.com/acme/orders/runs/42"</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="p">}</span>
+</span></code></pre></div>
+<h2 id="dsse-envelope">DSSE envelope<a class="headerlink" href="#dsse-envelope" title="Anchor link">&para;</a></h2>
+<p>The layer is a DSSE envelope (<code>evidence.Envelope</code>):</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">"payloadType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.in-toto+json"</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">"payload"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;base64 of the in-toto Statement JSON&gt;"</span><span class="p">,</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">"signatures"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">"keyid"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w"> </span><span class="nt">"sig"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;base64 signature&gt;"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="p">]</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Signing uses sigstore-go (<code>attest.Sign</code>, keyless with a Fulcio certificate
+and Rekor entry, or key-based; see <a href="../trust-model/#signing">trust-model.md</a>).
+It also produces a Sigstore bundle (<code>application/vnd.dev.sigstore.bundle.v0.3+json</code>)
+carrying the certificate or key hint and the Rekor entry; it is stored as the
+second layer of the execution manifest. <code>registry.Push</code> requires it:
+<code>aval verify</code> checks the signature through the bundle (<code>attest.Verifier</code>),
+so an attestation without one could only ever be a verification failure.</p>
+<h2 id="in-toto-statement">in-toto Statement<a class="headerlink" href="#in-toto-statement" title="Anchor link">&para;</a></h2>
+<p>The envelope payload is an in-toto Statement v1 (<code>evidence.Statement</code>). Its
+<code>subject</code> is the tested revision or artifact, the same one recorded in
+<code>predicate.subject</code>.</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://in-toto.io/Statement/v1"</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="p">{</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"git+https://github.com/acme/orders"</span><span class="p">,</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"gitCommit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="p">],</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">"predicateType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://aval.trianalab.io/attestation/execution/v2"</span><span class="p">,</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="nt">"predicate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"see below"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>For an image, use <code>"digest": {"sha256": "&lt;hex&gt;"}</code> with the image reference as
+<code>name</code>.</p>
+<p><code>aval run</code> records <code>name</code> = the test id and <code>digest</code> = <code>{"sha256": "&lt;fingerprint
+hex&gt;"}</code> (the declared inputs), <code>runner.identity</code> = the host name (a claim;
+trust comes from the signer), <code>runner.trustLevel</code> = 0, and
+<code>execution.environment</code> = <code>os</code> and <code>arch</code> plus the declared toolchain.
+Recording a git commit or image as the subject is milestone 3 work.</p>
+<h2 id="predicate">Predicate<a class="headerlink" href="#predicate" title="Anchor link">&para;</a></h2>
+<p><code>evidence.Predicate</code>, JSON tags exactly as below. Required fields are the ones
+checked by <code>Predicate.Validate</code> (called by <code>evidence.Parse</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schemaVersion</code></td>
+<td>string</td>
+<td>yes, must be <code>v2</code></td>
+<td>Predicate schema version.</td>
+</tr>
+<tr>
+<td><code>subject</code></td>
+<td>object</td>
+<td>yes</td>
+<td>Tested revision/artifact.</td>
+</tr>
+<tr>
+<td><code>subject.name</code></td>
+<td>string</td>
+<td>yes</td>
+<td>e.g. <code>git+https://github.com/acme/orders</code> or an image reference.</td>
+</tr>
+<tr>
+<td><code>subject.digest</code></td>
+<td>map string to string</td>
+<td>yes, non-empty</td>
+<td>e.g. <code>{"gitCommit": "..."}</code> or <code>{"sha256": "..."}</code>.</td>
+</tr>
+<tr>
+<td><code>test</code></td>
+<td>object</td>
+<td></td>
+<td>Test identity: <em>what</em> was checked, independent of inputs.</td>
+</tr>
+<tr>
+<td><code>test.id</code></td>
+<td>string</td>
+<td>yes</td>
+<td><code>metadata.name</code> from <code>aval.yaml</code>.</td>
+</tr>
+<tr>
+<td><code>test.cacheability</code></td>
+<td>string</td>
+<td></td>
+<td>Class declared in the contract: <code>hermetic</code>, <code>controlled-environment</code>, <code>external-dependencies</code>, <code>non-deterministic</code>.</td>
+</tr>
+<tr>
+<td><code>result</code></td>
+<td>string</td>
+<td>yes</td>
+<td><code>passed</code> or <code>failed</code>.</td>
+</tr>
+<tr>
+<td><code>execution</code></td>
+<td>object</td>
+<td></td>
+<td>This run: its inputs and conditions.</td>
+</tr>
+<tr>
+<td><code>execution.fingerprint</code></td>
+<td>string</td>
+<td>yes, <code>sha256:&lt;64 hex&gt;</code></td>
+<td>Fingerprint over the declared inputs.</td>
+</tr>
+<tr>
+<td><code>execution.fingerprintVersion</code></td>
+<td>string</td>
+<td></td>
+<td>Manifest format, e.g. <code>aval-fingerprint/v1</code>.</td>
+</tr>
+<tr>
+<td><code>execution.environment</code></td>
+<td>map string to string</td>
+<td>no (omitted when empty)</td>
+<td>Conditions of the run (toolchain, OS/arch). Only keys declared under <code>environment.toolchain</code> in <code>aval.yaml</code> are part of the fingerprint; anything else here is informational.</td>
+</tr>
+<tr>
+<td><code>execution.exitCode</code></td>
+<td>integer</td>
+<td></td>
+<td>Exit code of <code>runner.command</code>.</td>
+</tr>
+<tr>
+<td><code>runner</code></td>
+<td>object</td>
+<td></td>
+<td>Who produced the result, <strong>as claimed</strong>.</td>
+</tr>
+<tr>
+<td><code>runner.identity</code></td>
+<td>string</td>
+<td>yes</td>
+<td>Claimed producer identity.</td>
+</tr>
+<tr>
+<td><code>runner.issuer</code></td>
+<td>string</td>
+<td>no (omitted when empty)</td>
+<td>Claimed identity issuer, e.g. an OIDC issuer URL.</td>
+</tr>
+<tr>
+<td><code>runner.trustLevel</code></td>
+<td>integer</td>
+<td></td>
+<td><code>0</code> unknown, <code>1</code> developer, <code>2</code> runner, <code>3</code> isolated.</td>
+</tr>
+<tr>
+<td><code>startedAt</code></td>
+<td>RFC 3339 timestamp</td>
+<td>yes</td>
+<td>Execution start.</td>
+</tr>
+<tr>
+<td><code>finishedAt</code></td>
+<td>RFC 3339 timestamp</td>
+<td>yes, not before <code>startedAt</code></td>
+<td>Execution end.</td>
+</tr>
+<tr>
+<td><code>annotations</code></td>
+<td>map string to string</td>
+<td>no (omitted when empty)</td>
+<td>Free third-party metadata. Aval never reads it.</td>
+</tr>
+</tbody>
+</table>
+<p><code>runner.identity</code>, <code>runner.issuer</code> and <code>runner.trustLevel</code> are claims written
+by whoever produced the predicate. The authoritative identity and trust level
+are those of the <strong>verified signer</strong>, matched against the policy's accepted
+identities (<code>evidence.Verification.Signer</code> and its <code>TrustLevel</code>). Consumers
+must not make trust decisions from the <code>runner</code> block. The Go fields
+<code>Runner.Issuer</code>, <code>Runner.TrustLevel</code> and <code>Verification.TrustLevel</code> are
+deprecated: Aval leaves the first two empty, and the third duplicates
+<code>Verification.Signer.TrustLevel</code>.</p>
+<p><code>evidence.Parse</code> only checks structure. A parsed predicate is a claim, not
+evidence; use <code>evidence.Verify</code> to get something you can rely on.</p>
+<h3 id="annotations">Annotations<a class="headerlink" href="#annotations" title="Anchor link">&para;</a></h3>
+<p>Keys use reverse-DNS of the owner, e.g. <code>com.example.team</code>,
+<code>com.acme.ticket</code>. Aval does not define, validate or interpret any key. Do not
+put secrets there: the predicate is published to the registry.</p>
+<h3 id="example">Example<a class="headerlink" href="#example" title="Anchor link">&para;</a></h3>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"schemaVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"v2"</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"git+https://github.com/acme/orders"</span><span class="p">,</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"gitCommit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nt">"test"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-integration"</span><span class="p">,</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">    </span><span class="nt">"cacheability"</span><span class="p">:</span><span class="w"> </span><span class="s2">"controlled-environment"</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">  </span><span class="nt">"execution"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">    </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">    </span><span class="nt">"fingerprintVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval-fingerprint/v1"</span><span class="p">,</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="w">    </span><span class="nt">"environment"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="w">      </span><span class="nt">"go"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.23.4"</span><span class="p">,</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="w">      </span><span class="nt">"os"</span><span class="p">:</span><span class="w"> </span><span class="s2">"linux"</span><span class="p">,</span>
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="w">      </span><span class="nt">"arch"</span><span class="p">:</span><span class="w"> </span><span class="s2">"amd64"</span>
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="w">    </span><span class="nt">"exitCode"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="w">  </span><span class="nt">"runner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="w">    </span><span class="nt">"identity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"</span><span class="p">,</span>
+</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="w">    </span><span class="nt">"issuer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="p">,</span>
+</span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a><span class="w">    </span><span class="nt">"trustLevel"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span>
+</span><span id="__span-6-26"><a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-6-27"><a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a><span class="w">  </span><span class="nt">"startedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-05T10:12:03Z"</span><span class="p">,</span>
+</span><span id="__span-6-28"><a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a><span class="w">  </span><span class="nt">"finishedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-05T10:31:47Z"</span><span class="p">,</span>
+</span><span id="__span-6-29"><a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a><span class="w">  </span><span class="nt">"annotations"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-30"><a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a><span class="w">    </span><span class="nt">"com.acme.team"</span><span class="p">:</span><span class="w"> </span><span class="s2">"payments"</span>
+</span><span id="__span-6-31"><a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-6-32"><a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a><span class="p">}</span>
+</span></code></pre></div>
+<h2 id="verify-report">Verify report<a class="headerlink" href="#verify-report" title="Anchor link">&para;</a></h2>
+<p><code>aval verify --output json</code> prints one <code>evidence.Report</code> to stdout, and
+<code>aval run --report &lt;file&gt;</code> writes the same document for its lookup decision.
+This is the stable machine interface for CI scripts and external tools.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Present</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>version</code></td>
+<td>string</td>
+<td>always</td>
+<td><code>aval.trianalab.io/verify-report/v1</code>.</td>
+</tr>
+<tr>
+<td><code>outcome</code></td>
+<td>string</td>
+<td>always</td>
+<td>See outcomes below.</td>
+</tr>
+<tr>
+<td><code>testId</code></td>
+<td>string</td>
+<td>always</td>
+<td><code>metadata.name</code> from the contract.</td>
+</tr>
+<tr>
+<td><code>fingerprint</code></td>
+<td>string</td>
+<td>always</td>
+<td>Locally computed <code>sha256:&lt;hex&gt;</code>.</td>
+</tr>
+<tr>
+<td><code>reference</code></td>
+<td>string</td>
+<td>when an attestation was found</td>
+<td>Immutable <code>repo@sha256:&lt;manifest digest&gt;</code>.</td>
+</tr>
+<tr>
+<td><code>result</code></td>
+<td>string</td>
+<td><code>verified</code> only</td>
+<td><code>passed</code> or <code>failed</code> from the verified predicate.</td>
+</tr>
+<tr>
+<td><code>signer</code></td>
+<td>object</td>
+<td><code>verified</code> only</td>
+<td>Accepted policy identity that matched (<code>issuer</code>, <code>subjectRegexp</code>, <code>trustLevel</code>) plus the identity the signature actually carried: <code>subject</code>, the certificate subject (SAN) for keyless signatures, or <code>keyId</code>, <code>base64(sha256(DER public key))</code> for key-based ones. <code>subject</code> and <code>keyId</code> are omitted when empty.</td>
+</tr>
+<tr>
+<td><code>predicate</code></td>
+<td>object</td>
+<td><code>verified</code> only</td>
+<td>Full verified predicate.</td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td>string</td>
+<td>non-<code>verified</code> outcomes</td>
+<td>Human-readable cause.</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td>array</td>
+<td>when a candidate was not used</td>
+<td>Each <code>{reference, outcome, reason}</code>; <code>outcome</code> is <code>verification-failed</code>, <code>error</code> or <code>miss</code>. A <code>verification-failed</code> entry is a security event even when <code>outcome</code> is <code>verified</code>: alert. A <code>miss</code> entry is an authentic attestation whose signer the policy lists below <code>minTrustLevel</code>: routine non-reuse, no alert.</td>
+</tr>
+</tbody>
+</table>
+<p>Outcomes and exit codes:</p>
+<table>
+<thead>
+<tr>
+<th><code>outcome</code></th>
+<th>Meaning</th>
+<th>What the caller does</th>
+<th>Exit code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>verified</code></td>
+<td>Valid attestation satisfies the policy.</td>
+<td>Reuse <code>result</code>.</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>miss</code></td>
+<td>No attestation for this fingerprint that the policy can reuse: none found, or only authentic ones whose signer the policy lists below <code>minTrustLevel</code>.</td>
+<td>Run the test.</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>verification-failed</code></td>
+<td>Attestation exists but fails signature or policy.</td>
+<td>Run the test <strong>and</strong> alert. Never hide this.</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>Aval could not decide (registry unreachable, bad policy file, trusted root unavailable).</td>
+<td>Treat as a miss: run the test (fail closed).</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>These are the <code>aval verify</code> exit codes. <code>aval run</code> acts on the outcome and
+exits with the result instead; see
+<a href="../trust-model/#what-aval-run-does-with-each-outcome">trust-model.md</a>.</p>
+<p>If the fingerprint cannot be computed (empty scope, missing dependency,
+symlink, control characters in a path, I/O error), <code>aval verify</code> prints no
+report and exits 1; bad flags or an invalid contract print no report and exit 2.
+<code>aval run --report</code> still writes one in that case, with outcome <code>error</code>, the
+reason, and an empty <code>fingerprint</code>, and then runs the test.</p>
+<p>Without <code>--policy</code>, <code>aval verify</code> skips the lookup and reports <code>outcome: "miss"</code>
+(exit 4), and so it does for a <code>non-deterministic</code> contract. With <code>--policy</code>, a policy file that cannot be loaded is
+<code>outcome: "error"</code> (exit 1) and no lookup is made. A trusted root that
+cannot be loaded is <code>outcome: "error"</code> (exit 1) once a candidate with a
+certificate needs it.</p>
+<p>Example (<code>verified</code>):</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval.trianalab.io/verify-report/v1"</span><span class="p">,</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">"testId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-integration"</span><span class="p">,</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">"reference"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ghcr.io/acme/orders-aval@sha256:8c1d4e5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7a8b9c0"</span><span class="p">,</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="nt">"signer"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">"issuer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="p">,</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="nt">"subjectRegexp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"^https://github.com/acme/orders/\\.github/workflows/ci\\.yaml@refs/heads/main$"</span><span class="p">,</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="nt">"trustLevel"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">  </span><span class="nt">"predicate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"as in the predicate example"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Example (<code>miss</code>):</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval.trianalab.io/verify-report/v1"</span><span class="p">,</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"miss"</span><span class="p">,</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">"testId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-integration"</span><span class="p">,</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">"reason"</span><span class="p">:</span><span class="w"> </span><span class="s2">"no attestation found for fingerprint"</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<h2 id="versioning-and-compatibility">Versioning and compatibility<a class="headerlink" href="#versioning-and-compatibility" title="Anchor link">&para;</a></h2>
+<p>These rules apply to every frozen format:</p>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Version identifiers (move together)</th>
+<th>Frozen at</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Statement and predicate</td>
+<td><code>PredicateType</code>, <code>SchemaVersion</code>, <code>MediaTypeExecution</code>, <code>ArtifactType</code></td>
+<td><code>.../execution/v2</code>, <code>v2</code>, <code>execution.v2</code></td>
+</tr>
+<tr>
+<td>Fingerprint anchor</td>
+<td><code>ArtifactTypeFingerprint</code></td>
+<td><code>fingerprint.v1</code></td>
+</tr>
+<tr>
+<td>Verify report, outcomes and exit codes</td>
+<td><code>ReportVersion</code></td>
+<td><code>aval.trianalab.io/verify-report/v1</code></td>
+</tr>
+<tr>
+<td>Run record and stats anchor</td>
+<td><code>RunRecordVersion</code>, <code>ArtifactTypeRun</code>, <code>MediaTypeRun</code>, <code>ArtifactTypeStats</code></td>
+<td><code>run-record/v1</code>, <code>run.v1</code>, <code>stats.v1</code> (provisional)</td>
+</tr>
+<tr>
+<td>Contract and policy file</td>
+<td><code>apiVersion</code></td>
+<td><code>aval.trianalab.io/v1</code></td>
+</tr>
+<tr>
+<td>Fingerprint manifest</td>
+<td>header line, <code>execution.fingerprintVersion</code></td>
+<td><code>aval-fingerprint/v1</code></td>
+</tr>
+</tbody>
+</table>
+<p>The predicate keeps <code>v2</code>: <code>v1</code> was used before and an identifier is never
+recycled, and <code>v2</code> is already under <code>aval.trianalab.io</code> and is what v0.1.0
+writes, so attestations published by v0.1.0 stay readable. The report and the
+contract moved from the pre-freeze <code>aval.dev/.../v1alpha1</code> names to
+<code>aval.trianalab.io</code> at <code>v1</code>. There is no accept window for the old names: a
+contract or policy file with <code>aval.dev/v1alpha1</code> is invalid.</p>
+<h3 id="additive-changes-same-identifier">Additive changes (same identifier)<a class="headerlink" href="#additive-changes-same-identifier" title="Anchor link">&para;</a></h3>
+<ul>
+<li>A new optional field, omitted when empty, whose absence means what it
+  meant before.</li>
+<li>A new key under <code>annotations</code>.</li>
+<li>A new optional contract field. Older <code>aval</code> binaries reject a contract
+  that uses it (unknown fields are rejected), which fails closed.</li>
+</ul>
+<p>Existing fields keep their name, JSON tag, type and meaning.</p>
+<h3 id="breaking-changes-new-identifier">Breaking changes (new identifier)<a class="headerlink" href="#breaking-changes-new-identifier" title="Anchor link">&para;</a></h3>
+<ul>
+<li>Renaming or removing a field, changing its type or its meaning.</li>
+<li>Making an optional field required, or tightening validation of an
+  existing one.</li>
+<li>A new value of a closed set: <code>outcome</code>, <code>result</code>, <code>trustLevel</code>,
+  cacheability class, or an exit code.</li>
+<li>A change to what the fingerprint covers or how it is hashed: a new
+  <code>aval-fingerprint/vN</code>. There is no accept window: old attestations become
+  misses, never false hits.</li>
+</ul>
+<p>A new predicate version changes <code>PredicateType</code>, <code>SchemaVersion</code>,
+<code>MediaTypeExecution</code> and <code>ArtifactType</code> together (<code>execution/v3</code>,
+<code>execution.v3</code>). Old and new artifacts can coexist in one repository.</p>
+<h3 id="how-consumers-treat-versions">How consumers treat versions<a class="headerlink" href="#how-consumers-treat-versions" title="Anchor link">&para;</a></h3>
+<ul>
+<li><strong>Unknown version: not evidence.</strong> Reject a <code>predicateType</code>,
+  <code>schemaVersion</code>, report <code>version</code> or <code>artifactType</code> you do not know, and
+  run the test. <code>evidence.Verify</code> does this for predicates.</li>
+<li><strong>Unknown fields: ignore them</strong> within a version you know. Do not decode
+  Aval documents strictly. <code>evidence.Parse</code> ignores unknown fields.</li>
+<li><strong>Unknown values of a closed set: fail closed.</strong> An <code>outcome</code> other than
+  the four listed above, a <code>result</code> other than <code>passed</code> or <code>failed</code>, or an
+  unknown trust level or cacheability class means "not verified": run the
+  test. Within a version such a value can only come from a bug or tampering.</li>
+<li><strong>No field grants trust.</strong> Trust comes from the verified signer and the
+  policy (see <a href="../trust-model/">trust-model.md</a>), never from a field that is
+  new or that you do not understand.</li>
+</ul>
+<h3 id="deprecation">Deprecation<a class="headerlink" href="#deprecation" title="Anchor link">&para;</a></h3>
+<p>Aval writes only the newest version of each format. When a breaking change
+mints a new version, the release notes say whether Aval keeps reading the
+old one for a transition. If it does, the old parser stays next to the new
+one, dispatching on the identifier, and old documents get no more trust than
+new ones; any identifier Aval does not know fails closed. Ending a transition
+is announced in the release notes of the release that removes it.</p>
+<h3 id="golden-files">Golden files<a class="headerlink" href="#golden-files" title="Anchor link">&para;</a></h3>
+<p><code>pkg/evidence/testdata/statement-execution-v2.golden.json</code>,
+<code>pkg/evidence/testdata/verify-report-v1.golden.json</code> and
+<code>pkg/evidence/testdata/run-record-v1.golden.json</code> set every field of the
+statement, predicate, verify report and run record. A test decodes each strictly into the
+current types and requires the same JSON back, so dropping, renaming or
+retyping a field, or adding a required one, fails. Another test requires
+every JSON field of those types to be set in its golden file, so a new field
+fails until it is added there. Golden files only grow: an existing field or
+value is never removed or changed, an additive change adds its new field to
+the golden file of its version, and a new version adds a new file next to
+the old ones.</p>
+<h3 id="history">History<a class="headerlink" href="#history" title="Anchor link">&para;</a></h3>
+<ul>
+<li>Predicate <code>v1</code> became <code>v2</code> when the execution manifest's <code>subject</code> changed
+  from the tested artifact to the fingerprint anchor and the optional
+  Sigstore bundle layer was added.</li>
+<li>At the freeze (#17), the verify report moved from
+  <code>aval.dev/verify-report/v1alpha1</code> to <code>aval.trianalab.io/verify-report/v1</code>
+  and the contract and policy <code>apiVersion</code> from <code>aval.dev/v1alpha1</code> to
+  <code>aval.trianalab.io/v1</code>, without other changes. The contract hash covers
+  <code>apiVersion</code>, so every fingerprint changed: results published before
+  are misses and the tests run once.</li>
+<li>Within <code>verify-report/v1</code> (#65), a signer the policy lists below
+  <code>minTrustLevel</code> became <code>miss</code> instead of <code>verification-failed</code>, and
+  <code>rejected[].outcome</code> may now also be <code>miss</code>. No new value, field or exit
+  code; the maintainers confirmed this as additive, so the version stays.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../cli-reference/" class="md-footer__link md-footer__link--prev" aria-label="Previous: CLI reference">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                CLI reference
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../changelog/" class="md-footer__link md-footer__link--next" aria-label="Next: Changelog">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Changelog
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      
+<div class="md-copyright aval-footer">
+  <svg class="aval-footer__mark" viewBox="1 2.5 22 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></svg>
+  <span>Aval · <a href="https://github.com/TrianaLab/aval/blob/main/LICENSE">Apache-2.0</a> · © 2026 TrianaLab</span>
+  <span class="aval-footer__links">
+    <a href="https://github.com/TrianaLab/aval">GitHub</a>
+    <a href="../changelog/">Changelog</a>
+    <span>Made with <a href="https://squidfunk.github.io/mkdocs-material/">Material for MkDocs</a></span>
+  </span>
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/version-selector.js"></script>
+      
+    
+  </body>
+</html>

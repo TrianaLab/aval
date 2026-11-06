@@ -1,0 +1,565 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.">
+      
+      
+      
+        <link rel="canonical" href="https://trianalab.github.io/aval/main/">
+      
+      
+      
+        <link rel="next" href="vision/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Aval</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="stylesheets/brand.css">
+    
+      <link rel="stylesheet" href="stylesheets/extra.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#run-a-heavy-test-once-reuse-the-result-safely-everywhere" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You are viewing an old version of these docs.
+  <a href="../."><strong>Go to the latest version.</strong></a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL(".",location),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="." title="Aval" class="md-header__button md-logo" aria-label="Aval" data-md-component="logo">
+      
+<svg class="aval-wordmark" viewBox="1 2.5 66.5 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="aval-wordmark__mark"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></g><g class="aval-wordmark__word"><circle cx="34" cy="12" r="4"/><path d="M38 8v8"/><path d="m42 8 4 8 4-8"/><circle cx="57.5" cy="12" r="4"/><path d="M61.5 8v8"/><path d="M66.5 4.5V16"/></g></svg>
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Aval
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Home
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/TrianaLab/aval" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TrianaLab/aval
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="vision/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="integrations/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="trust-model/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="cli-reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="changelog/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+<div class="aval-home">
+
+<section class="aval-hero" aria-labelledby="aval-hero-title">
+  <div class="aval-hero__grid" aria-hidden="true"></div>
+  <div class="aval-wrap aval-hero__inner">
+    <div class="aval-hero__copy">
+      <span class="aval-kicker"><i></i>signed test results for CI</span>
+      
+      <h1 class="aval-hero__title" id="aval-hero-title">Run a heavy test once.<br><em>Reuse</em> the result safely everywhere.</h1>
+      <p class="aval-hero__lead">Aval signs a passing test result and ties it to the exact inputs it used. When another job has the same inputs and trusts the signer, it skips the test.</p>
+      <div class="aval-hero__cta">
+        <a class="aval-btn aval-btn--primary" href="vision/">Get started</a>
+        <a class="aval-btn" href="trust-model/">How trust works</a>
+      </div>
+      
+      <div class="aval-install"><b aria-hidden="true">$</b><code>curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh | bash</code></div>
+      <p class="aval-install__alt">Windows: a PowerShell installer is in <a href="install/">Install</a>.</p>
+    </div>
+    <div class="aval-hero__art">
+      
+      <svg class="aval-stack" viewBox="0 0 440 486" role="img" aria-label="Three stacked layers, inputs, result and policy, with a verified result lifted off the top layer">
+        <g><path class="side" d="M150 400 L280 465 L280 478 L150 413 Z"/><path class="side dk" d="M280 465 L410 400 L410 413 L280 478 Z"/><path class="top" d="M280 335 L410 400 L280 465 L150 400 Z"/><path class="edge" d="M280 335 L410 400 L280 465 L150 400 Z M150 400 V413 L280 478 L410 413 V400 M280 465 V478"/></g>
+        <g><path class="side" d="M150 362 L280 427 L280 440 L150 375 Z"/><path class="side dk" d="M280 427 L410 362 L410 375 L280 440 Z"/><path class="top" d="M280 297 L410 362 L280 427 L150 362 Z"/><path class="edge" d="M280 297 L410 362 L280 427 L150 362 Z M150 362 V375 L280 440 L410 375 V362 M280 427 V440"/></g>
+        <g><path class="side" d="M150 324 L280 389 L280 402 L150 337 Z"/><path class="side dk" d="M280 389 L410 324 L410 337 L280 402 Z"/><path class="top" d="M280 259 L410 324 L280 389 L150 324 Z"/><path class="glow" d="M280 288 L352 324 L280 360 L208 324 Z"/><path class="edge" d="M280 259 L410 324 L280 389 L150 324 Z M150 324 V337 L280 402 L410 337 V324 M280 389 V402"/></g>
+        <path class="drop" d="M239.8 251.1 v93 M306.8 217.6 v93"/><circle class="dot" cx="239.8" cy="344.1" r="2.5"/><circle class="dot" cx="306.8" cy="310.6" r="2.5"/>
+        <circle class="dot" cx="150" cy="324" r="3.5"/><path class="ldr" d="M145 324 H120"/><text x="113" y="321" text-anchor="end"><tspan class="em">policy</tspan></text><text x="113" y="338" text-anchor="end">trusted signer</text>
+        <circle class="dot" cx="150" cy="362" r="3.5"/><path class="ldr" d="M145 362 H120"/><text x="113" y="359" text-anchor="end"><tspan class="em">result</tspan></text><text x="113" y="376" text-anchor="end">signed</text>
+        <circle class="dot" cx="150" cy="400" r="3.5"/><path class="ldr" d="M145 400 H120"/><text x="113" y="397" text-anchor="end"><tspan class="em">inputs</tspan></text><text x="113" y="414" text-anchor="end">fingerprint</text>
+        <g class="lift"><g transform="matrix(.8944 -.4472 0 1 168.2 120.9)">
+          <path class="paper" d="M0 0 L5 4 L10 0 L15 4 L20 0 L25 4 L30 0 L35 4 L40 0 L45 4 L50 0 L55 4 L60 0 L65 4 L70 0 L75 4 L80 0 L85 4 L90 0 L95 4 L100 0 L105 4 L110 0 L115 4 L120 0 L125 4 L130 0 L135 4 L140 0 L145 4 L150 0 L155 4 L160 0 L165 4 L170 0 L175 4 L180 0 L185 4 L190 0 L195 4 L200 0 L205 4 L210 0 L215 4 L220 0 L225 4 L230 0 L235 4 L240 0 L245 4 L250 0 L250 166 L245 162 L240 166 L235 162 L230 166 L225 162 L220 166 L215 162 L210 166 L205 162 L200 166 L195 162 L190 166 L185 162 L180 166 L175 162 L170 166 L165 162 L160 166 L155 162 L150 166 L145 162 L140 166 L135 162 L130 166 L125 162 L120 166 L115 162 L110 166 L105 162 L100 166 L95 162 L90 166 L85 162 L80 166 L75 162 L70 166 L65 162 L60 166 L55 162 L50 166 L45 162 L40 166 L35 162 L30 166 L25 162 L20 166 L15 162 L10 166 L5 162 L0 166 Z"/>
+          <text class="t" x="20" y="31">integration</text><text class="s" x="230" y="30" text-anchor="end">verify report</text>
+          <path class="rule" d="M20 44 H230"/>
+          <text class="k" x="20" y="66">fingerprint</text><text class="v" x="112" y="66">sha256:b40e9fac…</text>
+          <text class="k" x="20" y="86">result</text><text class="v" x="112" y="86">passed · exit 0</text>
+          <text class="k" x="20" y="106">signer</text><text class="v" x="112" y="106">keyId cLcaE8Mw…</text>
+          <text class="k" x="20" y="126">trust level</text><text class="v" x="112" y="126">2 · runner</text>
+          <g class="stamp" transform="rotate(-6 178 164)"><rect x="112" y="146" width="132" height="36" rx="2"/><rect class="in" x="116" y="150" width="124" height="28" rx="1"/><text x="178" y="170" text-anchor="middle">✓ VERIFIED</text></g>
+        </g></g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section class="aval-run" aria-labelledby="aval-run-title">
+  <div class="aval-wrap aval-run__inner">
+    
+    <figure class="aval-term" aria-label="Terminal: the first aval run misses, runs the test and pushes a signed result; the second, with the same inputs, verifies it and reuses the passed result.">
+      <div class="aval-term__bar" aria-hidden="true"><i></i><i></i><i></i><span>ci / integration</span><span class="aval-term__tag">aval.yaml</span></div>
+<pre><span class="c"># REG=localhost:5055/acme/orders-aval</span>
+<span class="c"># first job: nothing signed for these inputs yet</span>
+<span class="pr">$</span> <span class="w">aval run</span> --push --key keys/ci.pem --registry $REG --policy policy.yaml
+<span class="d">test integration fingerprint sha256:b40e9fac…</span>
+<span class="y">miss</span> integration sha256:b40e9fac…
+<span class="d">reason: registry.Lookup …: no attestation found for fingerprint</span>
+ran integration: <span class="g">passed</span> (exit 0)
+<span class="w">pushed</span> localhost:5055/acme/orders-aval@sha256:2496759a…
+<span class="sep"></span><span class="c"># another job, same inputs</span>
+<span class="pr">$</span> <span class="w">aval run</span> --registry $REG --policy policy.yaml
+<span class="d">test integration fingerprint sha256:b40e9fac…</span>
+<span class="hit"><span class="g">verified</span> integration sha256:b40e9fac…
+<span class="w">reused passed result</span> …/orders-aval@sha256:2496759a…</span><span class="pr">$</span> <span class="cur"></span></pre>
+    </figure>
+    <div class="aval-run__explain">
+      <p class="aval-eyebrow">// see it run</p>
+      <h2 id="aval-run-title">A miss runs the test. A match skips it.</h2>
+      <ol>
+        <li><b>Fingerprint.</b> Aval hashes the inputs you list in <code>aval.yaml</code>.</li>
+        <li><b>Miss.</b> No signed result for that fingerprint, so the test runs and <code>--push</code> signs the pass.</li>
+        <li><b>Verified.</b> Same fingerprint, valid signature, a signer your policy trusts: the run is skipped and exits 0.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="aval-metrics" aria-label="Example numbers">
+  <div class="aval-wrap aval-metrics__inner">
+    <div class="aval-metric"><div class="aval-metric__n">1<small>run</small></div><div><p><b>Integration suite</b> ran once on main and was signed.</p><div class="aval-metric__bar" aria-hidden="true"><i class="on"></i></div></div></div>
+    <div class="aval-metric"><div class="aval-metric__n">37<small>×</small></div><div><p><b>Reused</b> by pull requests with the same inputs.</p><div class="aval-metric__bar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
+    <div class="aval-metric"><div class="aval-metric__n">4<small>h</small></div><div><p><b>CI time saved</b> this week. No result trusted blindly.</p><div class="aval-metric__bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div></div>
+  </div>
+  <p class="aval-metrics__note">Example numbers.</p>
+</section>
+
+<section class="aval-how" id="how-it-works" aria-labelledby="aval-how-title">
+  <div class="aval-wrap">
+    <p class="aval-eyebrow">// how it works</p>
+    <h2 id="aval-how-title">Three steps. No server to run.</h2>
+    <div class="aval-steps">
+      <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/></svg><span>01 · declare</span></div><h3>List the inputs</h3><p>Write the files and tools your test reads in <code>aval.yaml</code>. Aval hashes them into one fingerprint.</p></div>
+      <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m2 15 10 5.5L22 15"/></svg><span>02 · sign</span></div><h3>Run once, sign the result</h3><p>On a miss the test runs. Aval signs the result and pushes it to your own OCI registry.</p></div>
+      <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></svg><span>03 · reuse</span></div><h3>Verify, then skip</h3><p>Same fingerprint and a trusted signer? The run is skipped. Anything unclear, the test runs.</p></div>
+    </div>
+    <p class="aval-failclosed">If Aval cannot prove reuse is safe, the test runs. A bad signature fails with exit 5, never a silent miss.</p>
+  </div>
+</section>
+
+</div>
+
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+        
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" hidden>
+        
+        
+          
+          <a href="vision/" class="md-footer__link md-footer__link--next" aria-label="Next: Why Aval">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Why Aval
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      
+<div class="md-copyright aval-footer">
+  <svg class="aval-footer__mark" viewBox="1 2.5 22 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></svg>
+  <span>Aval · <a href="https://github.com/TrianaLab/aval/blob/main/LICENSE">Apache-2.0</a> · © 2026 TrianaLab</span>
+  <span class="aval-footer__links">
+    <a href="https://github.com/TrianaLab/aval">GitHub</a>
+    <a href="changelog/">Changelog</a>
+    <span>Made with <a href="https://squidfunk.github.io/mkdocs-material/">Material for MkDocs</a></span>
+  </span>
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "provider": "mike"}}</script>
+    
+    
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="javascripts/version-selector.js"></script>
+      
+    
+  </body>
+</html>
