@@ -138,18 +138,18 @@ extra_javascript:
   # Opens the mike version selector on click instead of hover (see extra.css).
   - javascripts/version-selector.js
 
-# A reader's path: what Aval is, the ideas it rests on, how to use it, then
+# A reader's path: what Aval is, how to use it, the ideas it rests on, then
 # the pages to look things up. Every page under docs/ has exactly one entry.
 nav:
   - Home: index.md
   - Get started:
       - Why Aval: vision.md
       - Install: install.md
+  - Guides:
+      - Consume Aval evidence: integrations.md
   - Concepts:
       - Trust model: trust-model.md
       - The test contract: contract.md
-  - Guides:
-      - Consume Aval evidence: integrations.md
   - Reference:
       - CLI reference: cli-reference.md
       - Artifact format: artifact-format.md

@@ -20,10 +20,9 @@
         <a class="aval-btn aval-btn--primary" href="{{ 'vision/' | url }}">Get started</a>
         <a class="aval-btn" href="{{ 'trust-model/' | url }}">How trust works</a>
       </div>
-      {# The one-line curl and PowerShell installers are story 8.8 (#90). Until
-         they ship, the install line that works today. #}
-      <div class="aval-install"><b aria-hidden="true">$</b><code>go install github.com/TrianaLab/aval/cmd/aval@latest</code></div>
-      <p class="aval-install__alt">Or download a binary for Linux, macOS or Windows from the <a href="{{ config.repo_url }}/releases">releases</a>.</p>
+      {# The verified installers from #94; docs/install.md has the flags and the go install fallback. #}
+      <div class="aval-install"><b aria-hidden="true">$</b><code>curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh | bash</code></div>
+      <p class="aval-install__alt">Windows: a PowerShell installer is in <a href="{{ 'install/' | url }}">Install</a>.</p>
     </div>
     <div class="aval-hero__art">
       {# One 2:1 isometric projection: three layers and a verify report standing

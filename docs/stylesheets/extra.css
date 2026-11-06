@@ -709,17 +709,19 @@
   background: var(--c-bg);
   color: var(--c-text-2);
   font: 500 13.5px var(--font-mono);
-  overflow-x: auto;
-  white-space: nowrap;
 }
 .aval-install b {
   margin-right: 10px;
   color: var(--c-accent-fill);
   font-weight: 500;
 }
+/* The installer line is longer than the hero column at every width. Wrap it
+   the way a terminal does, filling each line, so `| bash` stays visible
+   instead of hiding behind a scrollbar. Copying it still gives one line. */
 .aval-install code {
   font: inherit;
   font-variant-ligatures: none;
+  word-break: break-all;
 }
 .aval-install__alt {
   margin-top: 8px;
@@ -1136,6 +1138,10 @@
   .aval-steps {
     grid-template-columns: 1fr;
   }
+  /* The one-line title is wider than the column from here down. */
+  .aval-hero__title {
+    white-space: normal;
+  }
 }
 @media (max-width: 560px) {
   .aval-home {
@@ -1147,7 +1153,6 @@
   }
   .aval-hero__title {
     font-size: 31px;
-    white-space: normal;
   }
   .aval-hero__lead {
     font-size: 16.5px;
@@ -1155,10 +1160,6 @@
   .aval-install {
     display: flex;
     font-size: 11.5px;
-  }
-  .aval-install code {
-    white-space: normal;
-    overflow-wrap: anywhere;
   }
   .aval-term {
     border-radius: 12px;
