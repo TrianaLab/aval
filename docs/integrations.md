@@ -55,7 +55,7 @@ runner with verifiable identity, `3` isolated execution with verifiable
 attestation of the environment. `0` (unknown) is never accepted.
 
 A complete external consumer lives in
-[`examples/evidence-consumer`](../examples/evidence-consumer/consumer.go): its
+[`examples/evidence-consumer`](https://github.com/TrianaLab/aval/blob/main/examples/evidence-consumer/consumer.go): its
 own Go module that imports only `pkg/evidence` and the standard library,
 brings its own `SignatureVerifier` (ed25519 over the DSSE encoding), keeps a
 miss apart from a verification failure, and reads `aval verify` reports. CI
@@ -130,7 +130,7 @@ tagged v0 or v1), so its changeset sets the version explicitly rather than
 relying on a `major` bump from 0.x.
 
 This is enforced, not only documented. The exported surface is snapshotted in
-[`pkg/evidence/testdata/api-v1.txt`](../pkg/evidence/testdata/api-v1.txt),
+[`pkg/evidence/testdata/api-v1.txt`](https://github.com/TrianaLab/aval/blob/main/pkg/evidence/testdata/api-v1.txt),
 named after the major version in `go.mod`: one line per exported constant,
 variable, function, type, field (embedded fields included, with its struct
 tag: a changed JSON name or `omitempty` is breaking) and method, with types,

@@ -1,0 +1,160 @@
+site_name: Aval
+site_description: Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.
+# GitHub Pages project site. Publishing is .github/workflows/docs.yaml.
+site_url: https://trianalab.github.io/aval/
+repo_url: https://github.com/TrianaLab/aval
+repo_name: TrianaLab/aval
+edit_uri: edit/main/docs/
+copyright: >-
+  Apache-2.0 licensed —
+  <a href="https://github.com/TrianaLab/aval/blob/main/LICENSE">Copyright &copy; 2026 TrianaLab</a>
+
+docs_dir: docs
+
+theme:
+  name: material
+  # overrides/main.html: the banner on old mike versions.
+  custom_dir: overrides
+  # Placeholder SVGs until story 8.2 (#72) adds the logo.
+  logo: assets/images/logo.svg
+  favicon: favicon.svg
+  # No Google Fonts: nothing is fetched from a font CDN. stylesheets/extra.css
+  # names the faces and falls back to the system stack.
+  font: false
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      # custom: every colour comes from the tokens in stylesheets/extra.css.
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - content.action.edit
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - content.tooltips
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+
+# requirements.in is the input of the hashed requirements.txt, not a page.
+exclude_docs: |
+  requirements.in
+
+# Under --strict (make docs-site) every warning fails the build: a page left
+# out of the nav, a nav entry with no file, a broken link or a missing anchor.
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/TrianaLab/aval
+  version:
+    provider: mike
+    # Show the alias ("latest") next to the version in the selector.
+    alias: true
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Anchor link
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      base_path:
+        - .
+      # Without this a missing --8<-- path is dropped silently and the strict
+      # build still passes.
+      check_paths: true
+  # ponytail: Material loads the Mermaid runtime from unpkg in the reader's
+  # browser; vendor a pinned copy (as Pacto does) when the site needs to work
+  # offline or a CSP forbids it.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search
+
+extra_css:
+  - stylesheets/extra.css
+
+# A reader's path: what Aval is, the ideas it rests on, how to use it, then
+# the pages to look things up. Every page under docs/ has exactly one entry.
+nav:
+  - Home: index.md
+  - Get started:
+      - Why Aval: vision.md
+  - Concepts:
+      - Trust model: trust-model.md
+      - The test contract: contract.md
+  - Guides:
+      - Consume Aval evidence: integrations.md
+  - Reference:
+      - CLI reference: cli-reference.md
+      - Artifact format: artifact-format.md
+  - Project:
+      - Changelog: changelog.md
+      - Contributing: https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md
+      - Security policy: https://github.com/TrianaLab/aval/blob/main/SECURITY.md
+      - Code of conduct: https://github.com/TrianaLab/aval/blob/main/CODE_OF_CONDUCT.md

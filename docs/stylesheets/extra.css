@@ -1,0 +1,46 @@
+/* Aval docs theme. mkdocs.yml sets primary and accent to `custom`, so every
+   colour Material uses comes from the tokens below, in light and dark.
+   Material still owns navigation, search and layout. */
+
+:root {
+  /* No font CDN (theme.font: false): Material appends the system stack. */
+  --md-text-font: "Inter";
+  --md-code-font: "JetBrains Mono";
+}
+
+[data-md-color-scheme="default"] {
+  --c-primary: #2f5d8a;
+  --c-primary-light: #4a7bab;
+  --c-primary-dark: #1f4266;
+  --c-on-primary: #ffffff;
+  --c-accent: #0f8a6b;
+  --c-accent-bg: rgba(15, 138, 107, 0.1);
+}
+
+[data-md-color-scheme="slate"] {
+  --c-primary: #1c2a3a;
+  --c-primary-light: #2a3d52;
+  --c-primary-dark: #121c27;
+  --c-on-primary: #e8eef5;
+  --c-accent: #34c79e;
+  --c-accent-bg: rgba(52, 199, 158, 0.1);
+}
+
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: var(--c-primary);
+  --md-primary-fg-color--light: var(--c-primary-light);
+  --md-primary-fg-color--dark: var(--c-primary-dark);
+  --md-primary-bg-color: var(--c-on-primary);
+  --md-primary-bg-color--light: var(--c-on-primary);
+}
+
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: var(--c-accent);
+  --md-accent-fg-color--transparent: var(--c-accent-bg);
+  --md-accent-bg-color: var(--c-on-primary);
+}
+
+/* Links take the accent in dark mode, where the primary is too dark to read. */
+[data-md-color-scheme="slate"] .md-typeset a {
+  color: var(--c-accent);
+}

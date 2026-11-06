@@ -168,7 +168,7 @@ These formats are frozen; within a version they change additively only (see
    and re-executes, all visible in the workflow logs.
    *In progress:* the `example-go-compose` job in `.github/workflows/ci.yaml`
    runs this story for `examples/go-compose` in this repository on every
-   push to `main` (see [its README](../examples/go-compose/README.md)).
+   push to `main` (see [its README](https://github.com/TrianaLab/aval/blob/main/examples/go-compose/README.md)).
    The release pipeline for signed `aval` binaries (checksums, SBOMs, SLSA
    provenance) is in place and dry-runs on every PR. The example and the
    dogfood shadow and publish jobs install the pinned release, verified
@@ -180,7 +180,7 @@ These formats are frozen; within a version they change additively only (see
    `dogfood-shadow` runs the unit suite (`aval.yaml`) with `--shadow`, and on
    `main` `dogfood-publish` signs and pushes both results to
    `ghcr.io/trianalab/aval-attestations`. A release requires a verified e2e
-   attestation for its commit. See [CONTRIBUTING.md](../CONTRIBUTING.md#ci-quality-gates).
+   attestation for its commit. See [CONTRIBUTING.md](https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#ci-quality-gates).
 4. **False-hit suite.** *Implemented.* Exit criterion: an automated suite
    that applies every known kind of relevant change (source, dependency,
    toolchain, env var, exec bit, contract edit, symlink, file rename) and

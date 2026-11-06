@@ -1,0 +1,7 @@
+# Docs site tools (make docs-site, .github/workflows/docs.yaml). This is the
+# input; requirements.txt pins every package with sha256 hashes:
+#   uv pip compile --universal --python-version 3.12 --generate-hashes \
+#     --no-header docs/requirements.in -o docs/requirements.txt
+mkdocs==1.6.1
+mkdocs-material==9.7.7
+mike==2.1.3
