@@ -5,25 +5,22 @@ site_url: https://trianalab.github.io/aval/
 repo_url: https://github.com/TrianaLab/aval
 repo_name: TrianaLab/aval
 edit_uri: edit/main/docs/
-copyright: >-
-  Apache-2.0 licensed —
-  <a href="https://github.com/TrianaLab/aval/blob/main/LICENSE">Copyright &copy; 2026 TrianaLab</a>
 
 docs_dir: docs
 
 theme:
   name: material
-  # Ported from Pacto: overrides/main.html (banner on old mike versions),
-  # overrides/home.html (landing hero, opted in by docs/index.md) and
+  # overrides/: main.html (banner on old mike versions), home.html (the
+  # landing page, opted in by docs/index.md), partials/logo.html (the wordmark
+  # inlined), partials/copyright.html (the footer line) and
   # partials/javascripts/outdated.html.
   custom_dir: overrides
-  # The mark from story 8.2 (docs/brand.md); extra.css swaps in logo-dark.svg
-  # on dark.
+  # The mark from story 8.2 (docs/brand.md). The header and the drawer show
+  # the wordmark from partials/logo.html instead.
   logo: assets/images/logo.svg
   favicon: favicon.svg
-  # No Google Fonts: Source Serif 4 is bundled in docs/assets/fonts/; Inter and
-  # JetBrains Mono are named in stylesheets/extra.css and fall back to the
-  # system stack.
+  # No Google Fonts: Sora, Manrope and JetBrains Mono are bundled in
+  # docs/assets/fonts/ and declared in stylesheets/extra.css.
   font: false
   icon:
     repo: fontawesome/brands/github
@@ -83,10 +80,9 @@ validation:
     anchors: warn
 
 extra:
+  # overrides/partials/copyright.html renders the footer line, credit and
+  # GitHub link included.
   generator: false
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/TrianaLab/aval
   version:
     provider: mike
     # Show the alias ("latest") next to the version in the selector.
@@ -124,7 +120,7 @@ markdown_extensions:
       # build still passes.
       check_paths: true
   # ponytail: Material loads the Mermaid runtime from unpkg in the reader's
-  # browser; vendor a pinned copy (as Pacto does) when the site needs to work
+  # browser; vendor a pinned copy when the site needs to work
   # offline or a CSP forbids it.
   - pymdownx.superfences:
       custom_fences:

@@ -1,30 +1,17 @@
 ---
-# The hero (headline, kicker, buttons) lives in overrides/home.html. The hidden
-# h1 below repeats its headline so Material does not inject a "Home" h1.
+# overrides/home.html renders this page: the hero, the terminal, the steps.
+# The markdown below is not shown; it is what search indexes for the page.
 template: home.html
+hide:
+  - footer
 ---
 
-# Run a heavy test once. Reuse the result safely everywhere. { hidden=hidden }
+# Run a heavy test once. Reuse the result safely everywhere
 
-## How it works { #how-it-works }
+Aval signs a passing test result and ties it to the exact inputs it used. When another job has the same inputs and trusts the signer, it skips the test.
 
-A heavy test runs once. Aval signs the result and binds it to a fingerprint of the test's declared inputs. Another pipeline with the same fingerprint verifies the signature against its trust policy and skips the run.
+1. **List the inputs.** Write the files and tools your test reads in `aval.yaml`. Aval hashes them into one fingerprint.
+2. **Run once, sign the result.** On a miss the test runs. Aval signs the result and pushes it to your own OCI registry.
+3. **Verify, then skip.** Same fingerprint and a trusted signer? The run is skipped. Anything unclear, the test runs.
 
-```mermaid
-flowchart LR
-  A[Fingerprint inputs] --> B{Result for this fingerprint?}
-  B -- no --> R[Run the test]
-  B -- yes --> C{Signature and policy verify?}
-  C -- yes --> S[Reuse the result]
-  C -- no --> F[Run the test, report a security event]
-```
-
-!!! note "Fail closed"
-    If Aval cannot prove the inputs are the same, or cannot verify who signed the result, the test runs.
-
-## Where to start
-
-- [Why Aval](vision.md): the problem, the goals and the roadmap.
-- [Trust model](trust-model.md): what a signature proves and how policy decides.
-- [The test contract](contract.md): the `aval.yaml` file and what goes into the fingerprint.
-- [CLI reference](cli-reference.md): every command and flag.
+If Aval cannot prove reuse is safe, the test runs. A bad signature fails with exit 5, never a silent miss.

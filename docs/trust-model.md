@@ -227,6 +227,16 @@ verify text report (`--report <file>` also writes the JSON report). Only
 `verified` reuses; everything else runs `runner.command` in the contract's
 directory:
 
+```mermaid
+flowchart LR
+  A[Fingerprint inputs] --> B{Result for this fingerprint?}
+  B -- no --> R[Run the test]
+  B -- yes --> C{Signature and policy verify?}
+  C -- yes --> S[Reuse the result]
+  C -- signer below minTrustLevel --> R
+  C -- no --> F[Run the test, report a security event]
+```
+
 | Lookup outcome | `aval run` | Exit code |
 |---|---|---|
 | `verified`, result `passed` | reuse, do not run | 0 |
