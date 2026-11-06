@@ -162,6 +162,31 @@ neither, a `subjectRegexp` that does not compile alone and anchored, a
 unknown class in `allowedCacheability`. Relative `trustedRoot` and
 `publicKey` paths are resolved against the policy file's directory.
 
+### Keyless verification needs the network and a writable HOME
+
+A policy with an `issuer` identity and no `trustedRoot` uses the Sigstore
+public-good trusted root. sigstore-go fetches it with TUF from
+`tuf-repo-cdn.sigstore.dev` and caches it under `$HOME/.sigstore`. Aval loads
+it only when a candidate's Sigstore bundle carries a certificate, at most once
+per command. A miss or a key-based attestation never fetches it. Without
+network access, or with a HOME that cannot be written, the trusted root does
+not load: that candidate is outcome `error` (exit 1, never
+`verification-failed`), and `aval run` runs the test. Reuse is lost, never
+faked.
+
+To avoid the dependency, pin the trusted root in the policy:
+
+1. Get `trusted_root.json` once, on a machine with network access. After one
+   keyless `aval verify` there, sigstore-go has it at
+   `$HOME/.sigstore/root/tuf-repo-cdn.sigstore.dev/targets/trusted_root.json`.
+2. Commit it next to the policy and set `trustedRoot: trusted_root.json`
+   (relative to the policy file).
+3. Refresh it when Sigstore rotates keys: a stale root fails to verify new
+   certificates (outcome `verification-failed`), so watch for that after a
+   Sigstore announcement.
+
+Policies with only `publicKey` identities never fetch anything.
+
 ## Fail closed
 
 If Aval cannot prove that a previous execution is equivalent and trusted,

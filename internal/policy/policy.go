@@ -101,8 +101,8 @@ func Parse(data []byte, dir string) (*Policy, error) {
 
 	var errs []error
 	add := func(format string, a ...any) { errs = append(errs, fmt.Errorf(format, a...)) }
-	if f.APIVersion != contract.APIVersion {
-		add("apiVersion: got %q, want %q", f.APIVersion, contract.APIVersion)
+	if err := contract.CheckAPIVersion(f.APIVersion); err != nil {
+		errs = append(errs, err)
 	}
 	if f.Kind != Kind {
 		add("kind: got %q, want %q", f.Kind, Kind)

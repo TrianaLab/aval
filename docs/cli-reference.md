@@ -3,6 +3,21 @@
 Generated from the cobra command tree by `make docs-cli`. Do not edit by hand:
 `make ci-docs` fails when this file and the CLI disagree.
 
+## Exit codes
+
+| Code | `aval run` | `aval verify` | `aval push` |
+|---|---|---|---|
+| 0 | the test passed, or a verified passing result was reused | a verified result exists (passing or failing) | pushed |
+| 1 | error (the test still runs when it can), or a false hit in `--shadow` | error: registry, policy, trusted root or fingerprint | error: signing, registry or a result that does not match the current inputs |
+| 2 | bad flags or invalid `aval.yaml` | bad flags or invalid `aval.yaml` | bad flags or invalid `aval.yaml` |
+| 3 | the test failed, or a verified failing result was reused | not used | not used |
+| 4 | not used: a miss runs the test | miss: no result the policy can reuse | not used |
+| 5 | verification failed, after running the test: a security event | verification failed: a security event | not used |
+| 6 | reserved, never returned | reserved, never returned | reserved, never returned |
+
+A miss (4) is routine. A verification failure (5) means someone published a
+result the policy does not trust; never hide it or retry it away.
+
 ## aval
 
 Verifiable test execution reuse: signed test results as OCI artifacts
@@ -109,7 +124,8 @@ Flags:
 verify computes the fingerprint, looks up the attestation and verifies its
 signature and the trust policy, without running anything.
 
-Exit codes: 0 verified, 4 miss, 5 verification failed (security event).
+Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
+1 error (registry, policy or fingerprint), 2 usage or invalid aval.yaml.
 
 ```text
 Usage:

@@ -173,7 +173,8 @@ func newVerifyCmd() *cobra.Command {
 		Long: `verify computes the fingerprint, looks up the attestation and verifies its
 signature and the trust policy, without running anything.
 
-Exit codes: 0 verified, 4 miss, 5 verification failed (security event).`,
+Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
+1 error (registry, policy or fingerprint), 2 usage or invalid aval.yaml.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if output != "text" && output != "json" {

@@ -199,6 +199,23 @@ A missing tag, or an anchor without executions, is a **miss**
 malformed or fails signature or policy checks is a **verification failure**
 (`evidence.ErrVerification`, exit code 5) and is a security event.
 
+### Registry credentials
+
+Aval reads registry credentials the way Docker does: from
+`$DOCKER_CONFIG/config.json`, or `~/.docker/config.json` when `DOCKER_CONFIG`
+is not set, including the credential helpers it names (`credsStore`,
+`credHelpers`, for example `docker-credential-osxkeychain` or
+`docker-credential-ecr-login`). Log in with `docker login <registry>` (or
+`oras login`, which writes the same file). Without an entry for the registry,
+Aval connects anonymously, which is enough to read a public repository.
+Every registry call runs under `--registry-timeout` (default `1m`; see
+[Lookup and consumption](#lookup-and-consumption)).
+
+A config file that cannot be parsed, or a helper that fails, is outcome
+`error` (exit 1): `aval run` runs the test and nothing is reused. Loopback
+registries (`localhost`, `127.0.0.1`, `::1`) use plain HTTP; every other
+registry uses HTTPS.
+
 ### Multiple attestations per fingerprint
 
 Several executions can produce the same fingerprint (a developer run and a CI
@@ -215,6 +232,36 @@ rejected as `miss`: it was fully evaluated, so it does not block a verified
 sibling. When nothing is reused, the outcome is `verification-failed` when
 any candidate failed verification, otherwise `error` when any could not be
 checked, otherwise `miss`.
+
+### The 64-candidate cap and cleanup
+
+Every push adds one execution, even for the same inputs: the hostname and
+timestamps in the predicate differ. Aval never deletes one. Once a
+fingerprint has more than 64 executions, every lookup for it is outcome
+`error`: the test always runs. Every push for it still adds an execution,
+then fails its confirmation and exits 1. It stays
+that way until someone deletes executions. Other fingerprints are not
+affected, so the next change to an input also ends it.
+
+To stay below the cap, push from one place (for example CI on the main
+branch). `aval run --push` does not push after it reuses a result, but
+`aval run --shadow --push` runs and pushes every time.
+
+To clean up a fingerprint, list its executions and delete the ones you no
+longer need, for example with [ORAS](https://oras.land):
+
+```sh
+aval run --fingerprint-only            # prints sha256:<hex>
+oras discover --artifact-type application/vnd.trianalab.aval.execution.v2 <repo>:sha256-<hex>
+oras manifest delete <repo>@sha256:<execution digest>
+```
+
+The registry must allow deletes (`registry:2` needs
+`REGISTRY_STORAGE_DELETE_ENABLED=true`; on GHCR, delete the package
+versions). Deleting executions is safe: it can make a result stop being
+reusable, never make an untrusted one reusable. Keep the one you still want
+to reuse, and keep any execution that failed verification until you have
+looked into it.
 
 ## DSSE envelope
 

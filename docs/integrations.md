@@ -143,8 +143,10 @@ with the receiver (`T` or `*T`) they need. Interfaces are one line with
 their whole method set or type set. A struct that supports `==` also gets a
 `comparable <Type>` line. A constant of a type the package declares
 (`TrustLevel`, `Result`, `Outcome`) is rendered with its value, since
-consumers compare those values and policies store trust levels as numbers:
-renumbering `TrustRunner` is breaking. Untyped constants (the format
+consumers compare those values: policy files write trust levels by name,
+but verify reports and predicates carry them as numbers (the mapping is in
+[trust-model.md](trust-model.md#trust-levels)), so renumbering `TrustRunner`
+is breaking. Untyped constants (the format
 identifiers) are rendered without their value (see below).
 
 `make ci-gates` (`TestEvidenceAPIIsAppendOnly` in `tests/architecture`) fails
