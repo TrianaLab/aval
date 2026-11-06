@@ -21,7 +21,17 @@ No server or database: ORAS, Cosign and OCI 1.1 referrers do the work, and artif
 
 ## Install
 
-Download a release binary (Linux and macOS, amd64 or arm64; Windows has a zip):
+```sh
+curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh | bash
+aval --version
+```
+
+On Windows, in PowerShell: `irm https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/install.ps1 | iex`.
+Both installers check the sha256 against the release's `checksums.txt`, and the
+release signature and provenance when `cosign` or `gh` is installed; see
+[Install](docs/install.md) for options.
+
+Alternatives: download a release archive (Linux and macOS, amd64 or arm64; Windows has a zip):
 
 ```sh
 VERSION=0.2.0
@@ -30,7 +40,6 @@ ARCH=amd64      # or arm64
 curl -fsSLO "https://github.com/TrianaLab/aval/releases/download/v$VERSION/aval_${VERSION}_${OS}_${ARCH}.tar.gz"
 tar -xzf "aval_${VERSION}_${OS}_${ARCH}.tar.gz" aval
 sudo mv aval /usr/local/bin/
-aval --version
 ```
 
 Or build it with Go 1.27 or newer: `go install github.com/TrianaLab/aval/cmd/aval@latest`.
@@ -39,8 +48,8 @@ Or build it with Go 1.27 or newer: `go install github.com/TrianaLab/aval/cmd/ava
 ## Try it on your laptop
 
 This path runs a test, signs the result with a local key, pushes it to a local
-registry and verifies it. You need Docker and `openssl`. Copy each block into
-one shell, in order.
+registry and verifies it. You need `aval` (one line, see [Install](#install)),
+Docker and `openssl`. Copy each block into one shell, in order.
 
 <!-- quickstart:start (tests/acceptance/readme_test.go runs these blocks) -->
 
@@ -134,7 +143,7 @@ Contract, fingerprint, signing (keyless and key-based), push to and lookup in an
 
 ## Docs
 
-[Vision](docs/vision.md) · [Trust model](docs/trust-model.md) · [Artifact format](docs/artifact-format.md) · [Contract](docs/contract.md) · [Integrations](docs/integrations.md) · [CLI reference](docs/cli-reference.md) · [Example: Go + Compose](examples/go-compose)
+[Install](docs/install.md) · [Vision](docs/vision.md) · [Trust model](docs/trust-model.md) · [Artifact format](docs/artifact-format.md) · [Contract](docs/contract.md) · [Integrations](docs/integrations.md) · [CLI reference](docs/cli-reference.md) · [Example: Go + Compose](examples/go-compose)
 
 ## License
 
