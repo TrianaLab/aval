@@ -97,6 +97,26 @@ func concat(fps []Fingerprint) string {
 // goldenTree returns the fingerprints of goldenContracts, in order.
 func goldenTree(t *testing.T) []Fingerprint {
 	t.Helper()
+	dir := goldenDir(t)
+	var fps []Fingerprint
+	for _, name := range goldenContracts {
+		c, err := contract.Load(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		fp, err := Compute(dir, c, goldenEnv)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fps = append(fps, fp)
+	}
+	return fps
+}
+
+// goldenDir writes the golden tree, with its .git paths and modes, to a
+// temporary directory.
+func goldenDir(t *testing.T) string {
+	t.Helper()
 	dir := t.TempDir()
 	if err := os.CopyFS(dir, os.DirFS(filepath.Join("testdata", "golden", "tree"))); err != nil {
 		t.Fatal(err)
@@ -130,19 +150,7 @@ func goldenTree(t *testing.T) []Fingerprint {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	var fps []Fingerprint
-	for _, name := range goldenContracts {
-		c, err := contract.Load(filepath.Join(dir, name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		fp, err := Compute(dir, c, goldenEnv)
-		if err != nil {
-			t.Fatal(err)
-		}
-		fps = append(fps, fp)
-	}
-	return fps
+	return dir
 }
 
 // TestManifestGolden is the version gate (#15): the manifests of a fixed tree

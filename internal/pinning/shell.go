@@ -3,7 +3,7 @@ package pinning
 import (
 	"cmp"
 	"io"
-	"os"
+	"io/fs"
 	"path"
 	"regexp"
 	"slices"
@@ -30,8 +30,8 @@ var shebangRe = regexp.MustCompile(`^#!\s*\S*/(env\s+(-\S+\s+)*)?(ba|z|k|da)?sh\
 // ksh or dash shebang. Scan asks it for in-scope files without an extension
 // (./setup, bin/ci). A file it cannot open counts as a script, so Scan
 // reports the read error instead of skipping the file (fail closed).
-func isShellScript(p string) bool {
-	f, err := os.Open(p)
+func isShellScript(fsys fs.FS, p string) bool {
+	f, err := fsys.Open(p)
 	if err != nil {
 		return true
 	}

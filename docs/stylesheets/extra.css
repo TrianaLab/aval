@@ -995,6 +995,70 @@
     opacity: 0;
   }
 }
+/* "Try it" (javascripts/try-aval.js): the button, the live output, the
+   prompt and the note. The terminal stays dark in both schemes. */
+.aval-term__try {
+  margin-left: auto;
+  padding: 1px 10px;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  border-radius: 6px;
+  background: rgba(52, 211, 153, 0.12);
+  color: #34d399;
+  font: 600 12px/1.6 var(--font-mono);
+  cursor: pointer;
+}
+.aval-term__try:hover {
+  background: rgba(52, 211, 153, 0.22);
+}
+.aval-term__try:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}
+.aval-term__try:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+.aval-term pre.aval-term__out {
+  height: 26.25em;
+  overflow: auto;
+  padding-bottom: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  scrollbar-color: #273244 transparent;
+}
+.aval-term .r {
+  color: #f87171;
+}
+.aval-term__in label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 12px;
+  padding: 2px 8px;
+  border: 1px solid #1c2738;
+  border-radius: 6px;
+}
+.aval-term__in label:focus-within {
+  border-color: #34d399;
+}
+.aval-term__in input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #f1f5f9;
+  font: inherit;
+  caret-color: #34d399;
+}
+.aval-try {
+  padding: 10px 20px 14px;
+  border-top: 1px solid #1c2738;
+  color: #8193a8;
+  font-size: 12px;
+  line-height: 1.6;
+}
 .aval-run__explain ol {
   margin: 26px 0 0;
   padding: 0;
@@ -1221,6 +1285,9 @@
     padding: 14px 14px 16px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+  .aval-try {
+    padding: 10px 14px 12px;
   }
   .aval-term .hit {
     margin-right: -14px;

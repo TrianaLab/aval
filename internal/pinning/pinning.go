@@ -14,9 +14,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
+	"io/fs"
 	"path"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -83,10 +82,11 @@ var Detectors = []Detector{
 	cargo{}, java{}, ruby{}, php{}, gitmodules{},
 }
 
-// Scan reads the in-scope files (slash-separated, relative to dir) that some
+// Scan reads the in-scope files (slash-separated, relative to the root of
+// fsys) that some
 // detector applies to, and runner.command, and returns every finding sorted
 // by file and line.
-func Scan(dir string, files []string, command []string) []Finding {
+func Scan(fsys fs.FS, files []string, command []string) []Finding {
 	inScope := make(map[string]bool, len(files))
 	for _, f := range files {
 		inScope[f] = true
@@ -100,14 +100,13 @@ func Scan(dir string, files []string, command []string) []Finding {
 				ds = append(ds, d)
 			}
 		}
-		abs := filepath.Join(dir, filepath.FromSlash(rel))
-		if len(ds) == 0 && path.Ext(rel) == "" && isShellScript(abs) {
+		if len(ds) == 0 && path.Ext(rel) == "" && isShellScript(fsys, rel) {
 			ds = []Detector{shellScripts{}}
 		}
 		if len(ds) == 0 {
 			continue
 		}
-		data, err := readBounded(abs)
+		data, err := readBounded(fsys, rel)
 		if err != nil {
 			out = append(out, Finding{File: rel, Ecosystem: "scan", Ref: rel, Fix: err.Error() + ": Aval cannot check its references; shrink or split the file"})
 			continue
@@ -126,8 +125,8 @@ func Scan(dir string, files []string, command []string) []Finding {
 	return slices.CompactFunc(out, func(a, b Finding) bool { return a == b })
 }
 
-func readBounded(p string) ([]byte, error) {
-	f, err := os.Open(p)
+func readBounded(fsys fs.FS, p string) ([]byte, error) {
+	f, err := fsys.Open(p)
 	if err != nil {
 		return nil, err
 	}

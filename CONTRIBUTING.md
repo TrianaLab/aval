@@ -6,7 +6,8 @@
 - [golangci-lint](https://golangci-lint.run) at the exact version `GOLANGCI_LINT_VERSION` in the `Makefile` (CI installs the same one; `make lint` refuses any other). Config in `.golangci.yml`, including the cyclomatic complexity cap of 15.
 - For `make test-release`: [syft](https://github.com/anchore/syft) on `PATH` (CI pins the version). GoReleaser is installed into `bin/` at `GORELEASER_VERSION`.
 - For `make docs-lint`: Node.js (`npx` fetches markdownlint-cli2 at the pinned `MARKDOWNLINT_CLI2_VERSION`) and [Vale](https://vale.sh) at the exact `VALE_VERSION` in the `Makefile`.
-- For `make docs-site`: Python 3.12 and the hash-pinned tools, `pip install --require-hashes -r docs/requirements.txt` (regenerate that file from `docs/requirements.in`, command in its header).
+- For `make docs-site`: Python 3.12 and the hash-pinned tools, `pip install --require-hashes -r docs/requirements.txt` (regenerate that file from `docs/requirements.in`, command in its header). It also builds the home page's "Try it" terminal with Go (`make docs-wasm`).
+- For `make docs-demo-smoke`: Node.js and Chrome or Chromium (`CHROME=<path>` picks one).
 
 ```sh
 make build   # bin/aval
@@ -16,6 +17,7 @@ make fmt     # gofmt -w .
 make docs-lint  # markdownlint + vale over every Markdown file
 make docs-cli   # regenerate docs/cli-reference.md after changing a command or flag
 make docs-site  # strict build of the MkDocs site into site/; preview with `mkdocs serve`
+make docs-demo-smoke  # the "Try it" terminal in headless Chrome; SCREENSHOTS=<dir> saves screenshots
 ```
 
 ## Testing
@@ -66,7 +68,7 @@ Two more rules once you have picked:
 | `ci-release` | level 5 against a snapshot dry-run of the release build |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
 | `ci-security` | govulncheck on both modules (needs network) |
-| `ci-docs` | markdownlint and vale (`make docs-lint`), `docs/cli-reference.md` matches the cobra commands, the site builds with `--strict` (`make docs-site`), the mobile menu opens the site navigation on the home page and an inner page (`make docs-nav-smoke`), and `scripts/deploy-docs.sh` publishes the versions, default and root installers as expected (`make docs-deploy-test`); on a PR, the built site is uploaded for preview |
+| `ci-docs` | markdownlint and vale (`make docs-lint`), `docs/cli-reference.md` matches the cobra commands, the site builds with `--strict` (`make docs-site`), the "Try it" terminal works in headless Chrome (`make docs-demo-smoke`), the mobile menu opens the site navigation on the home page and an inner page (`make docs-nav-smoke`), and `scripts/deploy-docs.sh` publishes the versions, default and root installers as expected (`make docs-deploy-test`); on a PR, the built site is uploaded for preview |
 
 CI also dogfoods Aval (#28). `dogfood-fingerprint` and `dogfood-compare`
 check that Aval's own contracts (`aval.yaml`, `aval.e2e.yaml`) fingerprint

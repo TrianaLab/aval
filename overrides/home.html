@@ -41,9 +41,9 @@
           <path class="paper" d="M0 0 L5 4 L10 0 L15 4 L20 0 L25 4 L30 0 L35 4 L40 0 L45 4 L50 0 L55 4 L60 0 L65 4 L70 0 L75 4 L80 0 L85 4 L90 0 L95 4 L100 0 L105 4 L110 0 L115 4 L120 0 L125 4 L130 0 L135 4 L140 0 L145 4 L150 0 L155 4 L160 0 L165 4 L170 0 L175 4 L180 0 L185 4 L190 0 L195 4 L200 0 L205 4 L210 0 L215 4 L220 0 L225 4 L230 0 L235 4 L240 0 L245 4 L250 0 L250 166 L245 162 L240 166 L235 162 L230 166 L225 162 L220 166 L215 162 L210 166 L205 162 L200 166 L195 162 L190 166 L185 162 L180 166 L175 162 L170 166 L165 162 L160 166 L155 162 L150 166 L145 162 L140 166 L135 162 L130 166 L125 162 L120 166 L115 162 L110 166 L105 162 L100 166 L95 162 L90 166 L85 162 L80 166 L75 162 L70 166 L65 162 L60 166 L55 162 L50 166 L45 162 L40 166 L35 162 L30 166 L25 162 L20 166 L15 162 L10 166 L5 162 L0 166 Z"/>
           <text class="t" x="20" y="31">integration</text><text class="s" x="230" y="30" text-anchor="end">verify report</text>
           <path class="rule" d="M20 44 H230"/>
-          <text class="k" x="20" y="66">fingerprint</text><text class="v" x="112" y="66">sha256:b40e9fac…</text>
+          <text class="k" x="20" y="66">fingerprint</text><text class="v" x="112" y="66">sha256:7ebde18f…</text>
           <text class="k" x="20" y="86">result</text><text class="v" x="112" y="86">passed · exit 0</text>
-          <text class="k" x="20" y="106">signer</text><text class="v" x="112" y="106">keyId cLcaE8Mw…</text>
+          <text class="k" x="20" y="106">signer</text><text class="v" x="112" y="106">keyId cZ9tHqSn…</text>
           <text class="k" x="20" y="126">trust level</text><text class="v" x="112" y="126">2 · runner</text>
           <g class="stamp" transform="rotate(-6 178 164)"><rect x="112" y="146" width="132" height="36" rx="2"/><rect class="in" x="116" y="150" width="124" height="28" rx="1"/><text x="178" y="170" text-anchor="middle">✓ VERIFIED</text></g>
         </g></g>
@@ -56,22 +56,27 @@
   <div class="aval-wrap aval-run__inner">
     {# Real output of bin/aval against a local registry:2 with a key-based
        policy; hashes shortened with an ellipsis, the test's own output left
-       out. Exit 5 in the fail-closed line is from `aval run --help`. #}
-    <figure class="aval-term" aria-label="Terminal: the first aval run misses, runs the test and pushes a signed result; the second, with the same inputs, verifies it and reuses the passed result.">
-      <div class="aval-term__bar" aria-hidden="true"><i></i><i></i><i></i><span>ci / integration</span><span class="aval-term__tag">aval.yaml</span></div>
-<pre><span class="c"># REG=localhost:5055/acme/orders-aval</span>
+       out. "Try it" (javascripts/try-aval.js) swaps the transcript for the
+       real Aval compiled to WebAssembly (cmd/aval-wasm), fetched only on
+       click; without WebAssembly the transcript stays. #}
+    <figure class="aval-term" data-try aria-label="Terminal: the first aval run misses, runs the test and pushes a signed result; the second, with the same inputs, verifies it and reuses the passed result.">
+      <div class="aval-term__bar"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><span aria-hidden="true">ci / integration</span><button type="button" class="aval-term__try" hidden>Try it</button></div>
+<pre><span class="c"># REG=localhost:5055/acme/orders</span>
 <span class="c"># first job: nothing signed for these inputs yet</span>
 <span class="pr">$</span> <span class="w">aval run</span> --push --key keys/ci.pem --registry $REG --policy policy.yaml
-<span class="d">test integration fingerprint sha256:b40e9fac…</span>
-<span class="y">miss</span> integration sha256:b40e9fac…
-<span class="d">reason: registry.Lookup …: no attestation found for fingerprint</span>
+<span class="d">test integration fingerprint sha256:7ebde18f…</span>
+<span class="y">miss</span> integration sha256:7ebde18f…
+<span class="d">reason: localhost:5055/acme/orders: no attestation found for fingerprint</span>
 ran integration: <span class="g">passed</span> (exit 0)
-<span class="w">pushed</span> localhost:5055/acme/orders-aval@sha256:2496759a…
+<span class="w">pushed</span> localhost:5055/acme/orders@sha256:0a4a3ac9…
 <span class="sep"></span><span class="c"># another job, same inputs</span>
 <span class="pr">$</span> <span class="w">aval run</span> --registry $REG --policy policy.yaml
-<span class="d">test integration fingerprint sha256:b40e9fac…</span>
-<span class="hit"><span class="g">verified</span> integration sha256:b40e9fac…
-<span class="w">reused passed result</span> …/orders-aval@sha256:2496759a…</span><span class="pr">$</span> <span class="cur"></span></pre>
+<span class="d">test integration fingerprint sha256:7ebde18f…</span>
+<span class="hit"><span class="g">verified</span> integration sha256:7ebde18f…
+<span class="d">signer: key cZ9tHqSn…, trust level runner</span>
+<span class="d">reference: localhost:5055/acme/orders@sha256:0a4a3ac9…</span>
+<span class="w">reused passed result</span></span><span class="pr">$</span> <span class="cur"></span></pre>
+      <figcaption class="aval-try">Try it runs Aval compiled to WebAssembly entirely in your browser, with a simulated test, an in-memory registry and a throwaway key generated in this tab. Keyless signing is not available here. <span class="aval-try__status" role="status"></span></figcaption>
     </figure>
     <div class="aval-run__explain">
       <p class="aval-eyebrow">// see it run</p>

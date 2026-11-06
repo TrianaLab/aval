@@ -13,16 +13,15 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
-	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	orasregistry "oras.land/oras-go/v2/registry"
 
 	"github.com/TrianaLab/aval/internal/attest"
+	"github.com/TrianaLab/aval/internal/cliout"
 	"github.com/TrianaLab/aval/internal/contract"
 	"github.com/TrianaLab/aval/internal/fingerprint"
 	"github.com/TrianaLab/aval/internal/policy"
@@ -111,7 +110,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	err := root.Execute()
 	if err != nil {
 		for _, p := range errParts(err) {
-			fmt.Fprintln(stderr, "aval:", oneLine(p))
+			fmt.Fprintln(stderr, "aval:", cliout.OneLine(p))
 		}
 	}
 	return exitCode(err)
@@ -377,7 +376,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
 			report, err := verify(ctx, cmd.ErrOrStderr(), c, fp, repo, policyFile)
-			if werr := writeReport(cmd.OutOrStdout(), output, report); werr != nil {
+			if werr := cliout.WriteReport(cmd.OutOrStdout(), output, report); werr != nil {
 				return werr
 			}
 			if err != nil {
@@ -410,13 +409,10 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 		n = 1 // the lookup itself failed verification (a moved tag)
 	}
 	if n > 0 {
-		fmt.Fprintf(warn, "aval: SECURITY: %d attestation(s) for %s failed signature or policy verification; treat it as a security event, see %s\n", n, r.TestID, trustModelURL)
+		cliout.Security(warn, n, r.TestID)
 	}
 	return r, err
 }
-
-// trustModelURL explains verification failures and how to respond to them.
-const trustModelURL = "https://github.com/TrianaLab/aval/blob/main/docs/trust-model.md"
 
 func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
 	r := newReport(c, fp)
@@ -532,7 +528,7 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 	for _, d := range cands {
 		v, err := verifyCandidate(ctx, d, opts, sigs, cacheability, policyFile)
 		if errors.Is(err, evidence.ErrNotFound) && !errors.Is(err, evidence.ErrVerification) {
-			fmt.Fprintf(warn, "aval: warning: listed attestation %s is gone, skipping it: %s\n", d.Reference(), oneLine(err.Error()))
+			fmt.Fprintf(warn, "aval: warning: listed attestation %s is gone, skipping it: %s\n", d.Reference(), cliout.OneLine(err.Error()))
 			continue
 		}
 		if err == nil {
@@ -616,55 +612,4 @@ func severity(err error) int {
 		return 1
 	}
 	return 0
-}
-
-func writeReport(w io.Writer, format string, r evidence.Report) error {
-	if format == "json" {
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(r)
-	}
-	fmt.Fprintf(w, "%s %s %s\n", r.Outcome, r.TestID, r.Fingerprint)
-	if s := r.Signer; s != nil {
-		who := "key " + s.KeyID
-		if s.KeyID == "" {
-			who = fmt.Sprintf("%s (issuer %s)", s.Subject, s.Issuer)
-		}
-		fmt.Fprintf(w, "signer: %s, trust level %s\n", oneLine(who), s.TrustLevel)
-	}
-	if r.Reference != "" {
-		fmt.Fprintf(w, "reference: %s\n", r.Reference)
-	}
-	if r.Reason != "" {
-		fmt.Fprintf(w, "reason: %s\n", oneLine(r.Reason))
-	}
-	for _, rj := range r.Rejected {
-		if rj.Reference == r.Reference && rj.Reason == r.Reason {
-			continue // printed above as the reference and reason
-		}
-		fmt.Fprintf(w, "rejected: %s %s: %s\n", rj.Reference, rj.Outcome, oneLine(rj.Reason))
-	}
-	return nil
-}
-
-// oneLine replaces newlines, control and other non-printable characters,
-// and invalid UTF-8, with Go escapes (\n, \x1b, \u2028); everything else,
-// quotes and backslashes included, stays as is. Reasons can carry text from
-// an untrusted attestation; escaped, it cannot start a line of its own in a
-// log, where a CI system might read it as a command, or move a terminal
-// cursor.
-func oneLine(s string) string {
-	var b strings.Builder
-	for i, r := range s {
-		switch {
-		case r == utf8.RuneError && !strings.HasPrefix(s[i:], "\uFFFD"):
-			fmt.Fprintf(&b, `\x%02x`, s[i]) // an invalid byte
-		case strconv.IsPrint(r):
-			b.WriteRune(r)
-		default:
-			q := strconv.QuoteRune(r)
-			b.WriteString(q[1 : len(q)-1])
-		}
-	}
-	return b.String()
 }

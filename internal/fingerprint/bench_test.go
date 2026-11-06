@@ -37,7 +37,7 @@ func BenchmarkWalk(b *testing.B) {
 	include := splitGlobs([]string{"src/**/*.go", "go.mod"})
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := listFiles(dir, nil, include); err != nil {
+		if _, err := listFiles(os.DirFS(dir), nil, include); err != nil {
 			b.Fatal(err)
 		}
 	}

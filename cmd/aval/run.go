@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/TrianaLab/aval/internal/attest"
+	"github.com/TrianaLab/aval/internal/cliout"
 	"github.com/TrianaLab/aval/internal/contract"
 	"github.com/TrianaLab/aval/internal/fingerprint"
 	"github.com/TrianaLab/aval/internal/registry"
@@ -203,7 +204,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 		}
 	}
 	r, lookupErr := decide(ctx, out, warn, c, fp, fpErr, o)
-	_ = writeReport(out, "text", r) // text never fails, like the other lines printed
+	_ = cliout.WriteReport(out, "text", r) // text never fails, like the other lines printed
 	// No I/O failure may skip the test or hide a verification failure
 	// (invariants 3, 4): errors are collected, never returned early.
 	var errs []error
@@ -211,7 +212,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 		errs = append(errs, err)
 	}
 	if r.Outcome == evidence.OutcomeVerified && !o.shadow && len(errs) == 0 {
-		fmt.Fprintf(out, "reused %s result\n", r.Result) // writeReport printed the reference
+		fmt.Fprintf(out, "reused %s result\n", r.Result) // WriteReport printed the reference
 		recordRun(ctx, out, warn, o, r, true, nil)
 		if r.Result != evidence.ResultPassed {
 			return fmt.Errorf("reused result %s: %w", r.Result, errTestFailed)
@@ -255,7 +256,7 @@ func printFingerprint(out, warn io.Writer, fp fingerprint.Fingerprint, fpErr err
 // printFindings lists every mutable reference, acknowledged or not.
 func printFindings(w io.Writer, fp fingerprint.Fingerprint) {
 	for _, f := range fp.Findings {
-		fmt.Fprintf(w, "mutable: %s\n", oneLine(f.String()))
+		fmt.Fprintf(w, "mutable: %s\n", cliout.OneLine(f.String()))
 	}
 }
 
@@ -402,7 +403,7 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 		fmt.Fprintf(warn, "aval: warning: run record not written: %s (--record-file) exists and holds no Aval output; Aval does not overwrite it\n", o.recordFile)
 	case o.recordFile != "":
 		if err := writeJSON(o.recordFile, rec); err != nil {
-			fmt.Fprintf(warn, "aval: warning: run record not written: %s\n", oneLine(err.Error()))
+			fmt.Fprintf(warn, "aval: warning: run record not written: %s\n", cliout.OneLine(err.Error()))
 		}
 	}
 	if !o.record {
@@ -412,7 +413,7 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 	defer cancel()
 	d, err := pushRecord(ctx, o.repo, rec)
 	if err != nil {
-		fmt.Fprintf(warn, "aval: warning: run record not published: %s\n", oneLine(err.Error()))
+		fmt.Fprintf(warn, "aval: warning: run record not published: %s\n", cliout.OneLine(err.Error()))
 		return
 	}
 	fmt.Fprintf(out, "recorded %s\n", d.Reference())
