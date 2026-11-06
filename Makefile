@@ -1,6 +1,6 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
 	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-false-hit ci-e2e ci-release ci-fuzz ci-security \
-	docs-lint docs-cli ci-docs
+	docs-lint docs-cli ci-docs brand
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
 UNIT_PKGS = $(shell go list ./... | grep -v /tests/)
@@ -127,6 +127,12 @@ docs-lint:
 # Regenerate docs/cli-reference.md from the cobra command tree.
 docs-cli:
 	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval -update
+
+# Render the brand PNGs from their SVG sources (needs rsvg-convert, from librsvg).
+IMG := docs/assets/images
+brand:
+	rsvg-convert -w 32 -h 32 -o $(IMG)/favicon.png docs/favicon.svg
+	rsvg-convert -w 1280 -h 640 -o $(IMG)/social-preview.png $(IMG)/social-preview.svg
 
 # The example modules: go-compose, and evidence-consumer, a third party that
 # builds against this checkout's pkg/evidence only (#18).

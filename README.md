@@ -1,4 +1,4 @@
-# Aval
+# ![Aval](docs/assets/images/wordmark.svg#gh-light-mode-only)![Aval](docs/assets/images/wordmark-dark.svg#gh-dark-mode-only)
 
 Test results as signed, verifiable OCI artifacts.
 
@@ -49,7 +49,7 @@ Contract, fingerprint, signing (keyless and key-based), push to and lookup in an
 
 ## Docs
 
-[Vision](docs/vision.md) · [Trust model](docs/trust-model.md) · [Artifact format](docs/artifact-format.md) · [Contract](docs/contract.md) · [Integrations](docs/integrations.md) · [CLI reference](docs/cli-reference.md) · [Example: Go + Compose](examples/go-compose)
+[Vision](docs/vision.md) · [Trust model](docs/trust-model.md) · [Artifact format](docs/artifact-format.md) · [Contract](docs/contract.md) · [Integrations](docs/integrations.md) · [CLI reference](docs/cli-reference.md) · [Brand](docs/brand.md) · [Example: Go + Compose](examples/go-compose)
 
 ## License
 

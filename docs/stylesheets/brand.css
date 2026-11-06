@@ -1,0 +1,30 @@
+/* Aval brand tokens, taken from the logo (docs/brand.md). The mark is teal-600
+   on light pages and teal-400 on dark ones; the Material variables below map
+   those two colours onto links and accents. The header stays white (light) or
+   ink (dark) so the teal logo.svg shows on both. Include this file with
+   `extra_css` in mkdocs.yml. */
+
+:root {
+  --aval-teal: #0d9488;        /* logo.svg, favicon tile */
+  --aval-teal-light: #2dd4bf;  /* logo-dark.svg */
+  --aval-teal-deep: #0f766e;   /* links on white: 5.5:1, teal-600 is 3.7:1 */
+  --aval-ink: #0b1220;         /* social preview background */
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #ffffff;
+  --md-primary-fg-color--light: #ffffff;
+  --md-primary-fg-color--dark: var(--aval-teal-deep);
+  --md-primary-bg-color: var(--aval-ink);
+  --md-primary-bg-color--light: rgba(11, 18, 32, 0.7);
+  --md-accent-fg-color: var(--aval-teal-deep);
+  --md-typeset-a-color: var(--aval-teal-deep);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: var(--aval-ink);
+  --md-primary-fg-color--light: var(--aval-teal-light);
+  --md-primary-fg-color--dark: var(--aval-ink);
+  --md-accent-fg-color: var(--aval-teal-light);
+  --md-typeset-a-color: var(--aval-teal-light);
+}
