@@ -56,17 +56,30 @@ misses an input: fix the scope before you turn shadow mode off.
 
 ## Read the numbers
 
-`aval stats`, which sums the records of a test into a table of hits, misses
-and time saved, is in progress in
-[#88](https://github.com/TrianaLab/aval/issues/88). Until it lands, list the
-records yourself:
+`aval stats` reads the records back and sums them per test: hits, misses by
+cause, verification failures, shadow false hits and time saved.
 
-??? example "List run records with ORAS"
-    Records hang off the tag `stats-<test id>`:
+```sh
+aval stats --registry ghcr.io/acme/orders-aval --since 7d
+```
 
-    ```sh
-    oras discover --artifact-type application/vnd.trianalab.aval.run.v1 ghcr.io/acme/orders-aval:stats-orders-integration
-    ```
+```text
+run records in ghcr.io/acme/orders-aval since 2026-10-31T12:30:00Z
+orders-e2e: 2 runs, 0 reused (hit rate 0.0%), test time 1m1s, saved 0s
+  not reused: 1 no trusted result, 0 error, 1 verified but run (shadow)
+  verification failures: 0, shadow false hits: 0
+orders-unit: 1 runs, 1 reused (hit rate 100.0%), test time 0s, saved 1m30s
+  not reused: 0 no trusted result, 0 error, 0 verified but run (shadow)
+  verification failures: 0, shadow false hits: 0
+total: 3 runs, 1 reused (hit rate 33.3%), test time 1m1s, saved 1m30s
+  not reused: 1 no trusted result, 0 error, 1 verified but run (shadow)
+  verification failures: 0, shadow false hits: 0
+```
+
+`--test` limits it to one test, `--by repository` groups by source
+repository, and `-o json` prints the
+[stats report](../artifact-format.md#stats-report-json). `aval stats` writes
+nothing and never affects reuse.
 
 ??? info "Records are statistics, not evidence"
     Records are unsigned. `aval run` and `aval verify` never read them, so a
