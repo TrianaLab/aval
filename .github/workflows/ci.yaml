@@ -293,10 +293,13 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    # docs/guides/github-actions.md includes the gha-* sections.
+    # --8<-- [start:gha-permissions]
     permissions:
       contents: read
       packages: write
       id-token: write
+    # --8<-- [end:gha-permissions]
     env:
       REPO: ghcr.io/trianalab/aval-example-go-compose
       CONTRACT: examples/go-compose/aval.yaml
@@ -311,6 +314,7 @@ jobs:
       # commit while the pinned release cannot read its contracts.
       - name: Build aval from this commit
         run: make build && echo "$PWD/bin" >> "$GITHUB_PATH"
+      # --8<-- [start:gha-steps]
       - name: Log in to GHCR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -330,6 +334,7 @@ jobs:
             aval push -f "$CONTRACT" --registry "$REPO"
           fi
           echo "| publish | \`$(jq -r .outcome publish.json)\` |" >> "$GITHUB_STEP_SUMMARY"
+      # --8<-- [end:gha-steps]
       - name: Unchanged scope reuses (hit)
         run: |
           aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report hit.json
