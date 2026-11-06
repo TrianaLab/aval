@@ -38,7 +38,7 @@ const idTokenEnv = "SIGSTORE_ID_TOKEN"
 
 type runFlags struct {
 	file, repo, policyFile, resultFile, reportFile, key string
-	recordFile, ciRunURL                                string
+	recordFile, ciRunURL, repository                    string
 	push, noReuse, shadow, fingerprintOnly, explain     bool
 	record                                              bool
 	registryTimeout                                     time.Duration
@@ -88,6 +88,7 @@ runner.command never sees it.`,
 	f.BoolVar(&o.record, "record", false, "publish a run record for statistics after the run (needs --registry; best-effort)")
 	f.StringVar(&o.recordFile, "record-file", "", "also write the run record to this file, for 'aval record'")
 	f.StringVar(&o.ciRunURL, "ci-run-url", "", "link to the CI run, stored in the run record")
+	f.StringVar(&o.repository, "repository", "", "source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'")
 	registryTimeoutFlag(cmd, &o.registryTimeout)
 	return cmd
 }
@@ -381,6 +382,7 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 	rec := evidence.RunRecord{
 		Version: evidence.RunRecordVersion, TestID: r.TestID, Fingerprint: r.Fingerprint, Outcome: r.Outcome,
 		AvalVersion: version, RecordedAt: now().UTC(), CIRunURL: o.ciRunURL,
+		Repository: o.repository,
 	}
 	if r.Outcome == evidence.OutcomeVerified {
 		rec.VerifiedResult = r.Result
@@ -510,7 +512,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 }
 
 func newRecordCmd() *cobra.Command {
-	var repo, file string
+	var repo, file, repository string
 	var timeout time.Duration
 	cmd := &cobra.Command{
 		Use:   "record",
@@ -519,7 +521,7 @@ func newRecordCmd() *cobra.Command {
 test's stats anchor in the registry, as 'aval run --record' would have. Use it
 to publish, from a job with write credentials that runs no tests, the record
 of a run made without them. Run records are unsigned statistics: run and
-verify never read them.`,
+verify never read them. --repository sets the record's source repository.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if repo == "" || file == "" {
@@ -539,6 +541,7 @@ verify never read them.`,
 			if err != nil {
 				return fmt.Errorf("run record %s: %w", file, err)
 			}
+			rec.Repository = cmp.Or(repository, rec.Repository)
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
 			d, err := pushRecord(ctx, repo, *rec)
@@ -552,6 +555,7 @@ verify never read them.`,
 	f := cmd.Flags()
 	f.StringVar(&repo, "registry", "", "OCI repository for run records (required)")
 	f.StringVar(&file, "record-file", "", "run record written by 'aval run --record-file' (required)")
+	f.StringVar(&repository, "repository", "", "source repository (e.g. acme/orders); default: the one in the record")
 	registryTimeoutFlag(cmd, &timeout)
 	return cmd
 }

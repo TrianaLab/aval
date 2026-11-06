@@ -20,6 +20,10 @@ type StatsReport struct {
 	Total RunStats `json:"total"`
 	// Tests holds one entry per test with records, sorted by test id.
 	Tests []TestStats `json:"tests"`
+	// Repositories holds one entry per source repository, sorted, with
+	// `aval stats --by repository`; records without a repository are under
+	// StatsUnknownRepository. Omitted otherwise.
+	Repositories []RepositoryStats `json:"repositories,omitempty"`
 	// Skipped counts records that were read but not aggregated: malformed,
 	// oversized, inconsistent, unreadable, or for another test.
 	Skipped int `json:"skipped"`
@@ -33,6 +37,15 @@ type StatsReport struct {
 type TestStats struct {
 	TestID string   `json:"testId"`
 	Stats  RunStats `json:"stats"`
+}
+
+// StatsUnknownRepository is the repository of run records that carry none.
+const StatsUnknownRepository = "unknown"
+
+// RepositoryStats is the aggregate of one source repository's run records.
+type RepositoryStats struct {
+	Repository string   `json:"repository"`
+	Stats      RunStats `json:"stats"`
 }
 
 // RunStats aggregates run records. Runs is the sum of Reused,

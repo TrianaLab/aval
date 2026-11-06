@@ -166,3 +166,10 @@ type MissCauses struct
 type RunStats struct
 type StatsReport struct
 type TestStats struct
+comparable RepositoryStats
+const StatsUnknownRepository untyped string
+field RepositoryStats.Repository string "json:\"repository\""
+field RepositoryStats.Stats RunStats "json:\"stats\""
+field RunRecord.Repository string "json:\"repository,omitempty\""
+field StatsReport.Repositories []RepositoryStats "json:\"repositories,omitempty\""
+type RepositoryStats struct

@@ -84,7 +84,7 @@ func TestRunRecordsEveryOutcome(t *testing.T) {
 				recFile := filepath.Join(dir, "record.json")
 				c := contractWith(t, "hermetic", argv...)
 				args := []string{"run", "-f", c, "--registry", "registry.example/acme/stats", "--policy", "p.yaml",
-					"--result", filepath.Join(dir, "result.json"), "--record", "--record-file", recFile, "--ci-run-url", "https://ci.example/1"}
+					"--result", filepath.Join(dir, "result.json"), "--record", "--record-file", recFile, "--ci-run-url", "https://ci.example/1", "--repository", "acme/orders"}
 				if tc.shadow {
 					args = append(args, "--shadow")
 				}
@@ -101,7 +101,7 @@ func TestRunRecordsEveryOutcome(t *testing.T) {
 				rec := (*got)[0]
 				want := evidence.RunRecord{
 					Version: evidence.RunRecordVersion, TestID: "unit", Fingerprint: rec.Fingerprint, Outcome: tc.outcome, Reused: tc.reused, Result: tc.result, VerifiedResult: verifiedResult(tc.outcome, tc.cands),
-					TestDurationMs: rec.TestDurationMs, AvalVersion: version, RecordedAt: recordedAt, CIRunURL: "https://ci.example/1",
+					TestDurationMs: rec.TestDurationMs, AvalVersion: version, RecordedAt: recordedAt, CIRunURL: "https://ci.example/1", Repository: "acme/orders",
 				}
 				if rec != want || rec != readRecord(t, recFile) || !strings.HasPrefix(rec.Fingerprint, "sha256:") || (tc.reused && rec.TestDurationMs != 0) {
 					t.Fatalf("published %+v, wrote %+v, want %+v", rec, readRecord(t, recFile), want)
@@ -277,6 +277,12 @@ func TestRecordCommand(t *testing.T) {
 	code, stdout, stderr := runCLI("record", "--registry", "registry.example/acme/stats", "--record-file", recFile)
 	if code != ExitOK || !strings.Contains(stdout, "recorded registry.example/acme/stats@sha256:cc") || len(*got) != 1 || (*got)[0] != readRecord(t, recFile) {
 		t.Fatalf("exit %d, stdout %q, stderr %q, records %+v", code, stdout, stderr, *got)
+	}
+	// --repository sets the source repository; the record file keeps none.
+	got = fakeRecord(t, nil)
+	if code, _, stderr := runCLI("record", "--registry", "registry.example/acme/stats", "--record-file", recFile, "--repository", "acme/orders"); code != ExitOK || len(*got) != 1 ||
+		(*got)[0].Repository != "acme/orders" || readRecord(t, recFile).Repository != "" {
+		t.Fatalf("--repository: exit %d, stderr %q, records %+v", code, stderr, *got)
 	}
 
 	invalid := filepath.Join(t.TempDir(), "invalid.json")

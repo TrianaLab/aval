@@ -205,7 +205,7 @@ ci-false-hit:
 # it with `aval record` from a job that runs no tests.
 ci-e2e: build
 	bin/aval run -f aval.e2e.yaml --result .aval/e2e-result.json --report .aval/e2e-report.json \
-		--record-file .aval/e2e-record.json $${AVAL_CI_RUN_URL:+--ci-run-url "$$AVAL_CI_RUN_URL"} \
+		--record-file .aval/e2e-record.json $${AVAL_CI_RUN_URL:+--ci-run-url "$$AVAL_CI_RUN_URL"} $${AVAL_REPOSITORY:+--repository "$$AVAL_REPOSITORY"} \
 		$${AVAL_REGISTRY:+--registry "$$AVAL_REGISTRY"} $${AVAL_POLICY:+--policy "$$AVAL_POLICY"}
 ci-release: test-release
 ci-fuzz: fuzz

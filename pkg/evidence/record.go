@@ -57,6 +57,10 @@ type RunRecord struct {
 	RecordedAt  time.Time `json:"recordedAt"`
 	// CIRunURL links the CI run, when the caller passed one.
 	CIRunURL string `json:"ciRunUrl,omitempty"`
+	// Repository is the source repository of the run (e.g. acme/orders),
+	// when the caller passed one. Statistics count records without it as
+	// unknown.
+	Repository string `json:"repository,omitempty"`
 }
 
 // ParseRunRecord decodes a run record and checks its version, test id,

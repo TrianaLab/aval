@@ -93,7 +93,7 @@ record publishes a run record that 'aval run --record-file' wrote to the
 test's stats anchor in the registry, as 'aval run --record' would have. Use it
 to publish, from a job with write credentials that runs no tests, the record
 of a run made without them. Run records are unsigned statistics: run and
-verify never read them.
+verify never read them. --repository sets the record's source repository.
 
 ```text
 Usage:
@@ -104,6 +104,7 @@ Flags:
       --record-file string          run record written by 'aval run --record-file' (required)
       --registry string             OCI repository for run records (required)
       --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+      --repository string           source repository (e.g. acme/orders); default: the one in the record
 ```
 
 ## aval run
@@ -149,6 +150,7 @@ Flags:
       --registry string             OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
       --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
       --report string               also write the lookup decision as a verify report (JSON) to this file
+      --repository string           source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
       --result string               where to record the result for 'aval push' (default ".aval/result.json")
       --shadow                      verify, but run the test anyway and fail on a false hit
 ```
@@ -158,13 +160,15 @@ Flags:
 stats reads the run records that 'aval run --record' and 'aval record'
 published to the registry and aggregates them: runs, hit rate, misses by
 cause, verification failures, shadow false hits, and total and saved test
-time, per test and in total. It reads every test with a stats anchor, or only
---test. It writes nothing, locally or to the registry.
+time, per test (or per source repository with --by repository) and in total.
+It reads every test with a stats anchor, or only --test. It writes nothing,
+locally or to the registry.
 
 Run records are unsigned statistics: they never affect reuse. Records that
 cannot be read, are oversized, malformed or inconsistent are skipped and
 counted. Reading stops after 1000 records or 64 pages per listing, with a
-warning; prune old records to stay below it.
+warning; prune old records to stay below it. Records are read one at a time:
+raise --registry-timeout for many records.
 
 --since keeps records made at or after a time: a duration back from now
 (168h, 30d) or a date (2026-11-01, or RFC 3339).
@@ -176,6 +180,7 @@ Usage:
   aval stats [flags]
 
 Flags:
+      --by string                   group by test or repository (the run record's source repository) (default "test")
   -h, --help                        help for stats
   -o, --output string               output format: text or json (default "text")
       --registry string             OCI repository holding the run records (required)

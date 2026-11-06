@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
 	"os"
 	"slices"
 	"strings"
@@ -46,11 +49,14 @@ func TestStatsJSONIsTheGolden(t *testing.T) {
 	}
 	records = append(records,
 		rec(id, evidence.OutcomeError, false, p, e, d, 0, in),
-		rec(id, evidence.OutcomeVerified, false, f, p, d, 0, in), // shadow false hit
-		rec(id, evidence.OutcomeVerificationFailed, false, p, e, d, 0, in),
+		rec(id, evidence.OutcomeVerified, false, f, p, d, 0, in),           // shadow false hit
+		rec(id, evidence.OutcomeVerificationFailed, false, p, e, d, 0, in), // no repository: unknown
 	)
+	for i := range records[:len(records)-1] {
+		records[i].Repository = "acme/orders"
+	}
 	fakeRecords(t, registry.RecordSet{Records: records, Skipped: 2, Truncated: "more than 1000 run records"}, nil)
-	code, stdout, stderr := runCLI("stats", "--registry", "ghcr.io/acme/orders-aval", "--since", "2026-10-30", "-o", "json")
+	code, stdout, stderr := runCLI("stats", "--registry", "ghcr.io/acme/orders-aval", "--since", "2026-10-30", "--by", "repository", "-o", "json")
 	golden, err := os.ReadFile("../../pkg/evidence/testdata/stats-report-v1.golden.json")
 	if err != nil {
 		t.Fatal(err)
@@ -91,6 +97,56 @@ skipped 3 run records: unreadable, oversized, malformed, inconsistent or for ano
 	}
 }
 
+// --by repository groups by source repository, records without one under
+// unknown, and duration sums saturate instead of wrapping.
+func TestStatsByRepository(t *testing.T) {
+	at, p := recordedAt, evidence.ResultPassed
+	big := rec("unit", evidence.OutcomeVerified, true, p, p, 0, math.MaxInt64, at)
+	big.Repository = "acme/orders"
+	hand := rec("unit", evidence.OutcomeMiss, false, p, "", math.MaxInt64, 0, at)
+	hand.Repository = "acme/orders\nINJECTED"
+	fakeRecords(t, registry.RecordSet{Records: []evidence.RunRecord{big, big, hand, rec("e2e", evidence.OutcomeMiss, false, p, "", 2_000, 0, at)}}, nil)
+	code, stdout, stderr := runCLI("stats", "--registry", "registry.example/acme/stats", "--by", "repository")
+	want := `run records in registry.example/acme/stats
+acme/orders: 2 runs, 2 reused (hit rate 100.0%), test time 0s, saved 2562047h47m16s
+  not reused: 0 no trusted result, 0 error, 0 verified but run (shadow)
+  verification failures: 0, shadow false hits: 0
+acme/orders\nINJECTED: 1 runs, 0 reused (hit rate 0.0%), test time 2562047h47m16s, saved 0s
+  not reused: 1 no trusted result, 0 error, 0 verified but run (shadow)
+  verification failures: 0, shadow false hits: 0
+unknown: 1 runs, 0 reused (hit rate 0.0%), test time 2s, saved 0s
+  not reused: 1 no trusted result, 0 error, 0 verified but run (shadow)
+  verification failures: 0, shadow false hits: 0
+total: 4 runs, 2 reused (hit rate 50.0%), test time 2562047h47m16s, saved 2562047h47m16s
+  not reused: 2 no trusted result, 0 error, 0 verified but run (shadow)
+  verification failures: 0, shadow false hits: 0
+`
+	if code != ExitOK || stdout != want || stderr != "" {
+		t.Fatalf("exit %d, stderr %q, stdout:\n%s\nwant:\n%s", code, stderr, stdout, want)
+	}
+	_, stdout, _ = runCLI("stats", "--registry", "registry.example/acme/stats", "-o", "json")
+	var r evidence.StatsReport
+	if err := json.Unmarshal([]byte(stdout), &r); err != nil || r.Repositories != nil || r.Total.SavedDurationMs != math.MaxInt64 || r.Total.TestDurationMs != math.MaxInt64 || len(r.Tests) != 2 {
+		t.Fatalf("--by test JSON: %v %+v", err, r)
+	}
+}
+
+func TestAddMs(t *testing.T) {
+	for _, tc := range [][3]int64{{1, 2, 3}, {1, -5, 1}, {math.MaxInt64 - 1, 1, math.MaxInt64}, {math.MaxInt64, math.MaxInt64, math.MaxInt64}, {5, math.MinInt64, 5}} {
+		if got := addMs(tc[0], tc[1]); got != tc[2] {
+			t.Errorf("addMs(%d, %d) = %d, want %d", tc[0], tc[1], got, tc[2])
+		}
+	}
+}
+
+func TestStatsDeadline(t *testing.T) {
+	fakeRecords(t, registry.RecordSet{}, fmt.Errorf("reading the records of x: %w", context.DeadlineExceeded))
+	code, _, stderr := runCLI("stats", "--registry", "registry.example/acme/stats")
+	if code != ExitError || !strings.Contains(stderr, "context deadline exceeded; raise --registry-timeout") || !strings.Contains(stderr, "Pruning run records") {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+}
+
 func TestStatsNoRecords(t *testing.T) {
 	asked := fakeRecords(t, registry.RecordSet{Truncated: "more than 64 pages listing tags"}, nil)
 	code, stdout, stderr := runCLI("stats", "--registry", "registry.example/acme/stats")
@@ -116,6 +172,7 @@ func TestStatsErrors(t *testing.T) {
 		"no registry":    {[]string{"--registry", ""}, ExitUsage},
 		"bad registry":   {[]string{"--registry", "https://ghcr.io/acme/x"}, ExitUsage},
 		"bad output":     {[]string{"-o", "yaml"}, ExitUsage},
+		"bad by":         {[]string{"--by", "owner"}, ExitUsage},
 		"bad since":      {[]string{"--since", "last week"}, ExitUsage},
 		"bad timeout":    {[]string{"--registry-timeout", "0s"}, ExitUsage},
 		"stray argument": {[]string{"unit"}, ExitUsage},

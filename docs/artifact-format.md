@@ -342,6 +342,7 @@ limit, publishing a record fails with a warning; prune old records (see
 | `avalVersion` | string | always | Version of the `aval` binary that ran. |
 | `recordedAt` | RFC 3339 timestamp | always | When the record was made. |
 | `ciRunUrl` | string | when passed | `--ci-run-url`, a link to the CI run. Aval does not derive it from any CI vendor. |
+| `repository` | string | when passed | `--repository` on `aval run` (or `aval record`, which overrides the record's), the source repository, e.g. `acme/orders`. Aval does not derive it from any CI vendor. `aval stats --by repository` counts records without it (made before it was added, #88) as `unknown`. |
 
 Example:
 
@@ -358,7 +359,8 @@ Example:
   "savedDurationMs": 1184000,
   "avalVersion": "0.3.0",
   "recordedAt": "2026-11-06T09:00:00Z",
-  "ciRunUrl": "https://ci.example.com/acme/orders/runs/42"
+  "ciRunUrl": "https://ci.example.com/acme/orders/runs/42",
+  "repository": "acme/orders"
 }
 ```
 
@@ -371,13 +373,15 @@ refuses it and `aval stats` skips it.
 ### Statistics: `aval stats`
 
 `aval stats --registry <repo> [--test <id>] [--since <duration|date>]
-[--output text|json]` reads the run records and aggregates them on demand.
+[--by test|repository] [--output text|json]` reads the run records and aggregates them on demand.
 It lists the `stats-<test id>` tags of the repository (or takes `--test`),
 lists each stats anchor's referrers with artifact type
 `application/vnd.trianalab.aval.run.v1`, and fetches each record by digest.
 It writes nothing, locally or to the registry, and needs only read access.
 `--since` keeps records whose `recordedAt` is at or after a time: a duration
 back from now (`168h`, `30d`) or a date (`2026-11-01`, or RFC 3339).
+`--by` groups the records by test (default) or by `repository`, the source
+repository in each record; records without one count as `unknown`.
 
 Statistics are informational: records are unsigned, so anyone with push
 access can skew them, and they never affect reuse.
@@ -394,10 +398,13 @@ Registry data is untrusted, so reading is bounded:
   stderr and the JSON report sets `truncated`. Which records come first is up
   to the registry; prune old records to stay below the bound.
 - A listing that fails for any other reason (registry down, no read
-  access) is exit 1, and so is passing `--registry-timeout` while listing
+  access) is exit 1, and so is exceeding `--registry-timeout` while listing
   or fetching records: a deadline never shows up as skipped records.
 - `--since` filters after reading: the read bound, the timeout and
-  `skipped` cover every record listed, whatever its `recordedAt`.
+  `skipped` cover every record listed, whatever its `recordedAt`. Records
+  are fetched one at a time, two requests each (about 0.7 s per record on
+  GHCR), so the default `1m` timeout covers some 80 records; raise
+  `--registry-timeout` or prune old records.
 
 Exit codes: 0 statistics printed, 1 error, 2 usage.
 
@@ -412,11 +419,12 @@ Exit codes: 0 statistics printed, 1 error, 2 usage.
 | `since` | RFC 3339 timestamp | with `--since` | Records made before it are left out (not counted, not skipped). |
 | `total` | object | always | Run statistics over every test in `tests`. |
 | `tests` | array | always | One `{"testId", "stats"}` per test with records, sorted by test id; `[]` when there are none. |
+| `repositories` | array | with `--by repository` | One `{"repository", "stats"}` per source repository, sorted; records without a repository are under `unknown`. `[]` when there are no records. |
 | `skipped` | integer | always | Records read but not counted (see above). |
 | `truncated` | string | when a bound was hit | Which bound, e.g. `more than 1000 run records`. |
 
-Run statistics (`total`, `tests[].stats`); `runs` is the sum of `reused`,
-the three `misses` and `verificationFailures`:
+Run statistics (`total`, `tests[].stats`, `repositories[].stats`); `runs` is
+the sum of `reused`, the three `misses` and `verificationFailures`:
 
 | Field | Meaning |
 |---|---|
@@ -431,7 +439,8 @@ the three `misses` and `verificationFailures`:
 | `testDurationMs` | Sum of `testDurationMs`: time spent running tests. |
 | `savedDurationMs` | Sum of `savedDurationMs`: test time reuse saved. |
 
-A negative duration in a record (a clock jump, or an edit) counts as `0`.
+A negative duration in a record (a clock jump, or an edit) counts as `0`,
+and duration sums stop at the largest int64 instead of wrapping.
 The golden file is `pkg/evidence/testdata/stats-report-v1.golden.json`.
 
 ### Pruning run records
@@ -771,7 +780,7 @@ the old ones.
   `rejected[].outcome` may now also be `miss`. No new value, field or exit
   code; the maintainers confirmed this as additive, so the version stays.
 - Within the provisional `run-record/v1` (#88), records gained the optional
-  `verifiedResult`, and `evidence.ParseRunRecord` started rejecting
+  `verifiedResult` and `repository`, and `evidence.ParseRunRecord` started rejecting
   inconsistent records (a reuse with an outcome other than `verified` or
   with test time, a `verifiedResult` without outcome `verified`). Tightening
   validation is breaking for a frozen format; the identifier stays because
