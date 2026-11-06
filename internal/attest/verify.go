@@ -198,7 +198,7 @@ func (v *Verifier) verifyKeyless(e verify.SignedEntity) (evidence.Signer, error)
 		who := "certificate signer"
 		if vc, err := e.VerificationContent(); err == nil && vc.Certificate() != nil {
 			if s, err := certificate.SummarizeCertificate(vc.Certificate()); err == nil {
-				who = fmt.Sprintf("signer %q (issuer %q)", s.SubjectAlternativeName, s.Issuer)
+				who = fmt.Sprintf("certificate claiming signer %q (issuer %q)", s.SubjectAlternativeName, s.Issuer)
 			}
 		}
 		return evidence.Signer{}, fmt.Errorf("%s is not accepted by the policy: it lists no keyless identities", who)

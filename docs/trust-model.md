@@ -266,12 +266,13 @@ it. On a verification failure stderr gets a single `aval: SECURITY: ...`
 line that counts the attestations that failed and links here; a signer the
 policy does not list gets the reason `signer key id "<id>" is not in the trust
 policy (trust policy <file>)` (for a certificate, `signer "<subject>"
-(issuer "<issuer>") is not accepted by the policy (trust policy <file>)`,
-with `: it lists no keyless identities` before the policy file when the
-policy lists only keys).
+(issuer "<issuer>") is not accepted by the policy (trust policy <file>)`;
+when the policy lists only keys the certificate is not verified, so the
+reason is `certificate claiming signer "<subject>" (issuer "<issuer>") is not
+accepted by the policy: it lists no keyless identities (trust policy <file>)`).
 For a `verified` result the text report adds `signer:` (key id, or subject and issuer, with the trust level
-name) and `reference:` lines. Errors joined from several causes (an invalid
-contract or policy) print one `aval:` line per cause.
+name) and `reference:` lines. Errors joined from several causes print one `aval:` line per cause (an invalid
+`aval.yaml`); in a report (an invalid policy) the causes share the `reason:` line, separated by semicolons.
 
 `--record` publishes a run record for statistics after the decision, for
 every outcome (see [artifact-format.md](artifact-format.md#run-records)).

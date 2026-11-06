@@ -207,7 +207,7 @@ func TestVerifyKeyless(t *testing.T) {
 	// A keyless signature against a key-only policy.
 	_, pub := keySigned(t)
 	keyOnly, _ := NewVerifier("", []evidence.Identity{{PublicKey: pub, TrustLevel: evidence.TrustRunner}})
-	if _, err := keyOnly.verifyEntity(e, env); err == nil || !strings.Contains(err.Error(), `signer "`+ciSAN+`" (issuer "`+ghIssuer+`") is not accepted by the policy`) {
+	if _, err := keyOnly.verifyEntity(e, env); err == nil || !strings.Contains(err.Error(), `certificate claiming signer "`+ciSAN+`" (issuer "`+ghIssuer+`") is not accepted by the policy`) {
 		t.Fatalf("keyless signature against key-only policy: %v", err)
 	}
 	// Without readable certificate content the reason still names the signer kind.
