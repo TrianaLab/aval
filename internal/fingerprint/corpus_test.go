@@ -23,6 +23,10 @@ import (
 //     input). The row asserts the fingerprint stays the same, so the gap is
 //     documented here and in docs/contract.md, not hidden. If a future
 //     change closes a gap, flip the row to differ.
+//   - refused: a relevant change behind a declared name (a repushed tag).
+//     The fingerprint cannot see it, so the row asserts it stays the same
+//     and that Compute reports an unacknowledged mutable reference, which
+//     makes every lookup a miss (internal/pinning, docs/pinning.md).
 //
 // A new manifest section needs a differ row: TestFalseHitCorpus fails if a
 // section of the base manifest is changed by no differ row. A new attribute
@@ -35,6 +39,7 @@ const (
 	same
 	failClosed
 	gap
+	refused
 )
 
 // corpusYAML parses to exactly testContract(), with comments, odd
@@ -197,6 +202,12 @@ var corpus = []corpusCase{
 	{name: "scope.source glob added", change: func(f *fixture) { f.c.Scope.Source = append(f.c.Scope.Source, "main.go") }, want: differ},
 	{name: "scope.exclude glob added", change: func(f *fixture) { f.c.Scope.Exclude = append(f.c.Scope.Exclude, "none/**") }, want: differ},
 	{name: "scope.dependencies glob added", change: func(f *fixture) { f.c.Scope.Dependencies = append(f.c.Scope.Dependencies, "compose.yaml") }, want: differ},
+	{name: "scope.allowMutable added", change: func(f *fixture) {
+		f.c.Scope.AllowMutable = []contract.AllowMutable{{Ref: "postgres:16", Reason: "scanned nightly"}}
+	}, want: differ},
+	{name: "scope.allowMutable reason changed", setup: func(f *fixture) {
+		f.c.Scope.AllowMutable = []contract.AllowMutable{{Ref: "postgres:16", Reason: "a"}}
+	}, change: func(f *fixture) { f.c.Scope.AllowMutable[0].Reason = "b" }, want: differ},
 
 	// Irrelevant changes.
 	{name: "out-of-scope file edited", change: func(f *fixture) { f.write("README.md", "edited\n") }, want: same},
@@ -258,6 +269,11 @@ var corpus = []corpusCase{
 		f.c.Scope.Exclude, f.c.Environment.Toolchain = []string{}, map[string]string{}
 	}, want: same},
 	{name: "aval.yaml comments, formatting and key order", change: func(f *fixture) { f.parse(corpusYAML) }, want: same},
+	{name: "allowMutable order and duplicates", setup: func(f *fixture) {
+		f.c.Scope.AllowMutable = []contract.AllowMutable{{Ref: "a", Reason: "x"}, {Ref: "b", Reason: "y"}}
+	}, change: func(f *fixture) {
+		f.c.Scope.AllowMutable = []contract.AllowMutable{{Ref: "b", Reason: "y"}, {Ref: "a", Reason: "x"}, {Ref: "b", Reason: "y"}}
+	}, want: same},
 
 	// Fail closed.
 	{name: "dependency deleted", change: func(f *fixture) { f.remove("go.sum") }, want: failClosed},
@@ -309,6 +325,15 @@ var corpus = []corpusCase{
 	// design (invariant 2). See docs/contract.md, "Known gaps".
 	{name: "gap: undeclared file the test reads", change: func(f *fixture) { f.write("testdata/fixture.json", "{}") }, want: gap},
 	{name: "gap: undeclared env var the test reads", change: func(f *fixture) { f.env["GOFLAGS"] = "-tags=slow" }, want: gap},
+
+	// Content behind a declared name: postgres:16 is repushed in the
+	// registry, no byte in the scope changes. Closed by refusing reuse.
+	{name: "repushed image tag", setup: func(f *fixture) {
+		f.write("compose.yaml", "services:\n  db:\n    image: postgres:16\n")
+	}, change: func(*fixture) {}, want: refused},
+	{name: "repushed tag in runner.command", setup: func(f *fixture) {
+		f.c.Runner.Command = []string{"docker", "run", "--rm", "postgres:16"}
+	}, change: func(*fixture) {}, want: refused},
 }
 
 func TestFalseHitCorpus(t *testing.T) {
@@ -327,19 +352,7 @@ func TestFalseHitCorpus(t *testing.T) {
 			}
 			tc.change(f)
 			after, err := f.compute()
-			switch {
-			case tc.want == failClosed:
-				if err == nil {
-					t.Fatalf("want an error (fail closed), got %s", after.Digest)
-				}
-				return
-			case err != nil:
-				t.Fatal(err)
-			case tc.want == differ && after.Digest == before.Digest:
-				t.Fatalf("false hit: relevant change kept %s\n%s", after.Digest, after.Manifest)
-			case tc.want != differ && after.Digest != before.Digest:
-				t.Fatalf("irrelevant change altered the fingerprint\n--- before\n%s--- after\n%s", before.Manifest, after.Manifest)
-			}
+			checkRow(t, tc.want, before, after, err)
 			if tc.want == differ {
 				for _, s := range changedSections(before.Manifest, after.Manifest) {
 					sections[s] = true
@@ -349,6 +362,25 @@ func TestFalseHitCorpus(t *testing.T) {
 	}
 	if ran == len(corpus) { // -run or -skip may select some rows only
 		checkSectionsCovered(t, sections)
+	}
+}
+
+// checkRow fails the row unless the change had the outcome want.
+func checkRow(t *testing.T, want outcome, before, after Fingerprint, err error) {
+	t.Helper()
+	switch {
+	case want == failClosed:
+		if err == nil {
+			t.Fatalf("want an error (fail closed), got %s", after.Digest)
+		}
+	case err != nil:
+		t.Fatal(err)
+	case want == refused && (after.Digest != before.Digest || len(after.Unpinned()) == 0):
+		t.Fatalf("false hit: a repushed reference stays reusable (digest %s, findings %v)", after.Digest, after.Findings)
+	case want == differ && after.Digest == before.Digest:
+		t.Fatalf("false hit: relevant change kept %s\n%s", after.Digest, after.Manifest)
+	case want != differ && after.Digest != before.Digest:
+		t.Fatalf("irrelevant change altered the fingerprint\n--- before\n%s--- after\n%s", before.Manifest, after.Manifest)
 	}
 }
 

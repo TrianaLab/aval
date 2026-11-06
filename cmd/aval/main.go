@@ -90,6 +90,11 @@ var (
 	// lists, below its minTrustLevel. Routine non-reuse, a miss, never a
 	// security event (invariant 4).
 	errBelowMinTrust = errors.New("not reusable under the trust policy")
+	// errMutable: the inputs of a reusable class hold mutable references
+	// that scope.allowMutable does not acknowledge (internal/pinning). The
+	// fingerprint cannot prove what is behind them, so nothing is reused or
+	// published: a miss, never a security event (invariants 3, 4).
+	errMutable = errors.New("mutable references in the inputs")
 )
 
 // main stays one line: the coverage gate (make coverage-check) excludes
@@ -155,7 +160,7 @@ func exitCode(err error) int {
 		return ExitVerificationFailed
 	case errors.Is(err, errTestFailed):
 		return ExitTestFailed
-	case errors.Is(err, evidence.ErrNotFound), errors.Is(err, errBelowMinTrust):
+	case errors.Is(err, evidence.ErrNotFound), errors.Is(err, errBelowMinTrust), errors.Is(err, errMutable):
 		return ExitMiss
 	}
 	return ExitError
@@ -420,6 +425,9 @@ func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, 
 	if c.Cacheability == contract.NonDeterministic {
 		return fail(skipped(fmt.Sprintf("cacheability %s is never reusable", c.Cacheability)))
 	}
+	if err := mutable(c, fp); err != nil {
+		return fail(err)
+	}
 	// Without a policy nothing is trusted, so do not even look: report a miss
 	// instead of flagging every attestation found as a security event.
 	if policyFile == "" {
@@ -454,6 +462,23 @@ func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, 
 	return r, nil
 }
 
+// mutable returns errMutable, listing each reference, when c is of a class
+// reusable by default and its inputs hold mutable references that
+// scope.allowMutable does not acknowledge. For the other classes findings
+// are information only: they are not reusable by default anyway.
+func mutable(c *contract.Contract, fp fingerprint.Fingerprint) error {
+	u := fp.Unpinned()
+	if !c.Cacheability.ReusableByDefault() || len(u) == 0 {
+		return nil
+	}
+	refs := make([]string, len(u))
+	for i, f := range u {
+		refs[i] = f.String()
+	}
+	return fmt.Errorf("%w (%d), so the fingerprint cannot prove what is behind them: %s; pin each one or acknowledge it in scope.allowMutable (see docs/pinning.md)",
+		errMutable, len(u), strings.Join(refs, "; "))
+}
+
 func newReport(c *contract.Contract, fp fingerprint.Fingerprint) evidence.Report {
 	return evidence.Report{Version: evidence.ReportVersion, TestID: c.Metadata.Name, Fingerprint: fp.Digest}
 }
@@ -472,7 +497,7 @@ func outcomeOf(err error) evidence.Outcome {
 	switch {
 	case errors.Is(err, evidence.ErrVerification):
 		return evidence.OutcomeVerificationFailed
-	case errors.Is(err, evidence.ErrNotFound), errors.Is(err, errBelowMinTrust):
+	case errors.Is(err, evidence.ErrNotFound), errors.Is(err, errBelowMinTrust), errors.Is(err, errMutable):
 		return evidence.OutcomeMiss
 	default:
 		return evidence.OutcomeError

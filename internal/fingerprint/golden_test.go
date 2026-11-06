@@ -171,7 +171,7 @@ func TestManifestGolden(t *testing.T) {
 // that is present but empty declare the same inputs.
 func TestGoldenOmittedEqualsEmpty(t *testing.T) {
 	fps := goldenTree(t)
-	if fps[1] != fps[2] {
+	if fps[1].Digest != fps[2].Digest || fps[1].Manifest != fps[2].Manifest {
 		t.Fatalf("minimal.yaml and empty.yaml encode differently:\n%s\n%s", fps[1].Manifest, fps[2].Manifest)
 	}
 }

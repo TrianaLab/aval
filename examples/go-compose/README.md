@@ -100,8 +100,8 @@ registry with key-based signing.
 ## Notes
 
 - `cacheability: controlled-environment` is only honest if the service image is
-  pinned. `compose.yaml` pins by tag for readability; pin by digest for real
-  use, otherwise a re-pushed tag changes the test environment without changing
-  the fingerprint.
+  pinned, so `compose.yaml` pins it by digest. A re-pushed tag would change the
+  test environment without changing the fingerprint; with a tag only, Aval
+  reports the image as a mutable reference and never reuses the result.
 - `environment.toolchain` is a declaration: v0 does not check the installed Go
   version.

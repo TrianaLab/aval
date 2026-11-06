@@ -36,6 +36,9 @@ scope:
   dependencies:                 # optional, each glob must match >= 1 file
     - "go.mod"
     - "go.sum"
+  allowMutable:                 # optional, accepts a mutable reference on purpose
+    - ref: "postgres:16"
+      reason: "rebuilt and scanned nightly"
 
 environment:
   toolchain:                    # optional, declared, not detected (v0)
@@ -73,6 +76,7 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 | `scope.source` | list of globs | yes | At least one glob. Matched files are hashed. At fingerprint time, each glob must match at least one file (before `exclude`), and the set left after `exclude` must not be empty. |
 | `scope.exclude` | list of globs | no | Removes files from the `source` set. Does not apply to `dependencies`. A glob may match nothing. |
 | `scope.dependencies` | list of globs | no | Lockfiles and manifests. Each glob must match at least one file at fingerprint time. |
+| `scope.allowMutable` | list of `{ref, reason}` | no | Acknowledges a mutable reference that would otherwise block reuse (see [Pin your dependencies](pinning.md)). `ref` is the reference exactly as Aval reports it; `reason` says why it is acceptable. Both must be non-blank. An entry accepts every occurrence of that reference in the scope and in `runner.command`. Part of the contract hash. |
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
 | `environment.env` | list of strings | no | Environment variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
@@ -131,6 +135,14 @@ Without a policy nothing is accepted.
 default (the policy may allow it)` and `cacheability non-deterministic: never
 reusable`. A `non-deterministic` test is never looked up: it always runs.
 
+A `hermetic` or `controlled-environment` test whose scope or
+`runner.command` holds a mutable reference (a container tag, a manifest
+without a lockfile, a script fetched at run time) that `scope.allowMutable`
+does not acknowledge is never looked up either: the outcome is `miss`, the
+reason lists each reference, the test runs and its result is not published.
+For `external-dependencies` the references are printed as information. See
+[Pin your dependencies](pinning.md).
+
 ## What goes into the fingerprint
 
 The fingerprint is `sha256:<hex>` of a canonical, line-oriented manifest
@@ -150,12 +162,14 @@ env <NAME> <sha256 of value | unset>
   fingerprints from different formats never collide.
 - **contract**: SHA-256 of the contract serialized as JSON after parsing.
   Comments, formatting and YAML key order do not matter. Set-like lists
-  (`source`, `exclude`, `dependencies`, `env`) are sorted and deduplicated
-  first, so their order does not matter. `runner.command` is not sorted:
+  (`source`, `exclude`, `dependencies`, `env`, `allowMutable`) are sorted
+  and deduplicated first, so their order does not matter. `runner.command` is not sorted:
   argv order is semantic. Map keys (`toolchain`) are sorted by the JSON
   encoder. Every field is included, so changing `metadata.name`,
   `runner.command` or `cacheability` changes the fingerprint. An explicitly
   empty list or map (`exclude: []`) hashes the same as an omitted field.
+  `allowMutable` is left out of the JSON when empty, so contracts without
+  it hash as they did before the field existed.
 - **source**: one line per file that matches any `source` glob and no
   `exclude` glob.
 - **dependency**: one line per file that matches any `dependencies` glob.
@@ -232,9 +246,15 @@ hashes (see above):
   list (corpus row).
 - Content behind a declared name: a container tag such as `postgres:16`
   that is repushed, a dependency fetched from the network at run time, a
-  service reached over the network. Only the declared text is hashed. Pin
-  digests inside the scope (`controlled-environment`) or use
-  `external-dependencies`, which is not reusable by default.
+  service reached over the network. Only the declared text is hashed. The
+  references the mutable-reference scanner recognizes block reuse for
+  `hermetic` and `controlled-environment` (the `refused` corpus rows):
+  images without a digest, manifests without a lockfile, unpinned installs,
+  scripts piped from the network, branch-tracking git references. See
+  [Pin your dependencies](pinning.md) for the list and the fixes per
+  ecosystem. A reference the scanner does not recognize, and a service
+  reached over the network, remain invisible: use `external-dependencies`,
+  which is not reusable by default.
 - The installed toolchain, OS and architecture: `environment.toolchain` is
   trusted as written (see "Future work").
 
@@ -250,7 +270,11 @@ exec bit, lockfile, toolchain, env value or presence, command, any contract
 field, re-included excludes) changes the fingerprint; an irrelevant one
 (out-of-scope or excluded files, `.git`, Aval's own outputs, checkout path, ordering,
 duplicates, timestamps, non-exec permission bits, YAML formatting) does not;
-an unprovable one (see "Fail-closed errors") fails closed. The test fails if
+an unprovable one (see "Fail-closed errors") fails closed; a repushed
+image tag (in a compose file or in `runner.command`) keeps the fingerprint
+but is reported as an unacknowledged mutable reference, so it is refused.
+The scanner has its own false-hit table per ecosystem, mutable and pinned
+variants, in `internal/pinning`, and a fuzz target over every detector. The test fails if
 a manifest section is changed by no differ row, so a new section must come
 with corpus cases; a new attribute in an existing section or a new contract
 field needs its row added by review.

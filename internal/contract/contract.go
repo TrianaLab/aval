@@ -106,6 +106,19 @@ type Scope struct {
 	// Dependencies are lockfiles or manifests. Each glob must match at
 	// least one file, otherwise fingerprinting fails (fail closed).
 	Dependencies []string `yaml:"dependencies,omitempty" json:"dependencies"`
+	// AllowMutable acknowledges mutable references (a container tag, a
+	// manifest without a lockfile, a script fetched at run time) that the
+	// test may reuse anyway. It is part of the canonical contract, so
+	// adding or removing one changes the fingerprint. Omitted when empty,
+	// so contracts without it hash as before.
+	AllowMutable []AllowMutable `yaml:"allowMutable,omitempty" json:"allowMutable,omitempty"`
+}
+
+// AllowMutable accepts one mutable reference, by the exact text Aval reports
+// for it, with the reason it is acceptable.
+type AllowMutable struct {
+	Ref    string `yaml:"ref" json:"ref"`
+	Reason string `yaml:"reason" json:"reason"`
 }
 
 // Environment declares execution conditions that are part of the fingerprint.
@@ -187,6 +200,11 @@ func (c *Contract) Validate() error {
 			if err := ValidateGlob(g); err != nil {
 				add("%s[%d]: %v", field, i, err)
 			}
+		}
+	}
+	for i, a := range c.Scope.AllowMutable {
+		if strings.TrimSpace(a.Ref) == "" || strings.TrimSpace(a.Reason) == "" {
+			add("scope.allowMutable[%d]: ref and reason are both required", i)
 		}
 	}
 	c.Environment.validate(add)

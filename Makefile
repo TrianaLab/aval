@@ -154,7 +154,7 @@ DEMO_TAPES = miss hit changed-input tampered
 
 docs-demos: build
 	@dir=$$(mktemp -d); trap 'docker rm -f $(DEMO_REGISTRY) >/dev/null 2>&1; rm -rf "$$dir"' EXIT; \
-	docker run -d --name $(DEMO_REGISTRY) -p 5001:5000 registry:2 >/dev/null && \
+	docker run -d --name $(DEMO_REGISTRY) -p 5001:5000 registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373 >/dev/null && \
 	sh docs/assets/tapes/setup.sh "$$dir" && \
 	for t in $(DEMO_TAPES); do \
 		AVAL_DEMO_DIR="$$dir" AVAL_DEMO_BIN=$(CURDIR)/bin vhs docs/assets/tapes/$$t.tape || exit 1; \
