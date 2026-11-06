@@ -69,7 +69,7 @@ git grep -n -E 'ErrVerification|ErrNotFound|ExitMiss|ExitVerificationFailed' -- 
 # AGENTS.md "Work tracking": TODOs must name a milestone
 git grep -n -E 'TODO|FIXME|XXX' | grep -v -E 'TODO\(milestone-[0-9]+\)'
 # AGENTS.md "Style": frozen identifiers change only per aval-format-change
-# (any hit needs a new identifier and docs/artifact-format.md updated)
+# (a hit that changes an identifier value needs a new identifier and docs/artifact-format.md updated)
 git diff $base | grep -E '^-.*(trianalab\.io|vnd\.trianalab|aval-fingerprint/v)'
 ```
 

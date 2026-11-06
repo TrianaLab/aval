@@ -19,7 +19,7 @@ Find which identifiers the change touches. Each owns a version:
 
 | Format | Identifier | Lives in | Spec |
 |---|---|---|---|
-| Predicate / OCI artifact | `evidence.PredicateType`, `SchemaVersion`, `MediaTypeExecution`, `ArtifactType`, `MediaTypeDSSE` usage | `pkg/evidence/evidence.go` | `docs/artifact-format.md`, `docs/integrations.md` |
+| Predicate / OCI artifact | `evidence.PredicateType`, `SchemaVersion`, `MediaTypeExecution`, `ArtifactType`, `ArtifactTypeFingerprint`, `MediaTypeDSSE` usage | `pkg/evidence/evidence.go` | `docs/artifact-format.md`, `docs/integrations.md` |
 | Verify report | `evidence.ReportVersion`, `Report` fields, `Outcome` values | `pkg/evidence/report.go` | `docs/artifact-format.md`, `docs/integrations.md` |
 | Contract | `contract.APIVersion` | `internal/contract/contract.go` | `docs/contract.md` |
 | Fingerprint manifest | `fingerprint.Version` | `internal/fingerprint/fingerprint.go` | `docs/artifact-format.md`, `docs/contract.md` |
@@ -68,7 +68,9 @@ readiness, gates, delivery, EvidenceSet). That data belongs in `annotations`
 3. Golden files: `pkg/evidence/testdata/*.golden.json` only grow (see
    `docs/artifact-format.md` "Golden files"). An additive change adds its new
    field to the golden file of its version; a new version adds a new file
-   next to the old ones. Show the diff to the user.
+   next to the old ones. A touched format with no golden file yet (contract,
+   fingerprint manifest) gets one, with a test that compares marshalled output
+   to it. Show the diff to the user.
 4. Add unit tests: a document without the new field still parses, and one with
    it round-trips.
 5. Write a release-notes entry. There is no `CHANGELOG` file yet; put the note
@@ -78,7 +80,7 @@ readiness, gates, delivery, EvidenceSet). That data belongs in `annotations`
 ## 3b. Breaking path
 
 1. Mint a new identifier (e.g. `.../execution/v3`, `execution.v3`,
-   `verify-report/v2`, `aval.trianalab.io/v2`, `aval-fingerprint/v2`). Never
+   `fingerprint.v2`, `verify-report/v2`, `aval.trianalab.io/v2`, `aval-fingerprint/v2`). Never
    reuse or recycle an old identifier, not even one that was never released.
 2. Predicate and media types move together: new `PredicateType`,
    `MediaTypeExecution`, `ArtifactType` and `SchemaVersion` (see
@@ -98,8 +100,9 @@ readiness, gates, delivery, EvidenceSet). That data belongs in `annotations`
 
 ## 4. Frozen identifiers
 
-Since the freeze (#17) every identifier above is frozen under the
-`trianalab.io` namespace; the current values are in the "Versioning and
+Since the freeze (#17) every identifier above is frozen (predicate, media
+types, report and contract under the `trianalab.io` namespace, the manifest
+at `aval-fingerprint/v1`); the current values are in the "Versioning and
 compatibility" table of `docs/artifact-format.md`. A breaking change updates
 that table and its "History" list. The pre-freeze `aval.dev/.../v1alpha1`
 names are never reused and have no accept window. If a doc contradicts
