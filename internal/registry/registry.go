@@ -22,6 +22,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
@@ -52,7 +54,18 @@ const (
 	// of manifests. Over the cap lookup fails with a plain error (outcome
 	// error: run the test).
 	maxCandidates = 64
+	// maxReferrerPages caps the referrers pages one listing requests. oras
+	// follows Link headers without a limit and skips empty pages, so a
+	// buggy or hostile registry could otherwise keep a lookup looping.
+	maxReferrerPages = 64
+	// pushConfirmAttempts bounds how often Push re-puts its manifest and
+	// lists the referrers before giving up on seeing it there.
+	pushConfirmAttempts = 3
 )
+
+// pushConfirmDelay is the wait between push confirmation attempts; a
+// variable so tests do not sleep.
+var pushConfirmDelay = time.Second
 
 var fingerprintRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
@@ -84,6 +97,44 @@ var newCredentialStore = func() (credentials.Store, error) {
 	return credentials.NewStoreFromDocker(credentials.StoreOptions{})
 }
 
+// One credential store and one auth (token) cache per process, shared by
+// every Lookup, Fetch and Push. A failure to load the credentials is not
+// cached, so a later call retries.
+var (
+	clientMu sync.Mutex
+	client   remote.Client
+)
+
+func sharedClient() (remote.Client, error) {
+	clientMu.Lock()
+	defer clientMu.Unlock()
+	if client == nil {
+		store, err := newCredentialStore()
+		if err != nil {
+			return nil, fmt.Errorf("loading registry credentials: %w", err)
+		}
+		client = pagedClient{&auth.Client{Client: auth.DefaultClient.Client, Cache: auth.NewCache(), Credential: credentials.Credential(store)}}
+	}
+	return client, nil
+}
+
+// pageCount is the context key of the referrers page counter of one listing.
+type pageCount struct{}
+
+// pagedClient fails any request of a referrers listing once it has made
+// maxReferrerPages requests. Every request counts, whatever its path: oras
+// follows any same-origin Link, so a path filter could be bypassed.
+type pagedClient struct{ remote.Client }
+
+func (c pagedClient) Do(req *http.Request) (*http.Response, error) {
+	if n, ok := req.Context().Value(pageCount{}).(*int); ok {
+		if *n++; *n > maxReferrerPages {
+			return nil, fmt.Errorf("more than %d referrers pages", maxReferrerPages)
+		}
+	}
+	return c.Client.Do(req)
+}
+
 // newRepository opens a repository ("host/name", no tag or digest) with the
 // Docker credential configuration. Loopback registries use plain HTTP, the
 // same default Docker and containerd apply.
@@ -95,11 +146,9 @@ func newRepository(repo string) (*remote.Repository, error) {
 	if r.Reference.Reference != "" {
 		return nil, fmt.Errorf("repository %q must not carry a tag or digest", repo)
 	}
-	store, err := newCredentialStore()
-	if err != nil {
-		return nil, fmt.Errorf("loading registry credentials: %w", err)
+	if r.Client, err = sharedClient(); err != nil {
+		return nil, err
 	}
-	r.Client = &auth.Client{Client: auth.DefaultClient.Client, Cache: auth.NewCache(), Credential: credentials.Credential(store)}
 	r.PlainHTTP = isLoopback(r.Reference.Host())
 	// ponytail: in referrers-tag fallback mode a dangling old referrers index
 	// is harmless; deleting it needs DELETE rights that CI tokens often lack.
@@ -144,7 +193,10 @@ func checkFingerprint(fingerprint string) error {
 // Push uploads the attestation as an artifact that refers to the
 // fingerprint's anchor and returns its digest. It never moves or replaces an
 // earlier attestation: pushing the same bytes again is a no-op, anything else
-// becomes one more referrer.
+// becomes one more referrer. Push returns only once the new digest is listed
+// among the anchor's referrers: a concurrent push can drop it from a
+// registry's referrers tag index, so Push puts the manifest again and
+// re-checks, a few times, before it fails.
 func Push(ctx context.Context, repo, fingerprint string, a Attestation) (Descriptor, error) {
 	if err := checkFingerprint(fingerprint); err != nil {
 		return Descriptor{}, fmt.Errorf("registry.Push: %w", err)
@@ -197,10 +249,24 @@ func push(ctx context.Context, r *remote.Repository, fingerprint string, a Attes
 	}
 	raw, _ := json.Marshal(m) // ponytail: plain structs and strings, cannot fail
 	d := content.NewDescriptorFromBytes(ocispec.MediaTypeImageManifest, raw)
-	if err := r.Push(ctx, d, bytes.NewReader(raw)); err != nil && !errors.Is(err, errdef.ErrAlreadyExists) {
-		return ocispec.Descriptor{}, fmt.Errorf("pushing manifest: %w", err)
+	var listed error
+	for attempt := range pushConfirmAttempts {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return ocispec.Descriptor{}, fmt.Errorf("confirming manifest %s: %w (last listing: %v)", d.Digest, ctx.Err(), listed)
+			case <-time.After(pushConfirmDelay):
+			}
+		}
+		if err := r.Push(ctx, d, bytes.NewReader(raw)); err != nil && !errors.Is(err, errdef.ErrAlreadyExists) {
+			return ocispec.Descriptor{}, fmt.Errorf("pushing manifest: %w", err)
+		}
+		var ds []string
+		if ds, listed = lookup(ctx, r, fingerprint); listed == nil && slices.Contains(ds, d.Digest.String()) {
+			return d, nil
+		}
 	}
-	return d, nil
+	return ocispec.Descriptor{}, fmt.Errorf("manifest %s is not listed among the referrers of %s after %d attempts (last listing: %v)", d.Digest, Tag(fingerprint), pushConfirmAttempts, listed)
 }
 
 func pushBlob(ctx context.Context, r *remote.Repository, mediaType string, data []byte) (ocispec.Descriptor, error) {
@@ -249,7 +315,7 @@ func lookup(ctx context.Context, r *remote.Repository, fingerprint string) ([]st
 		return nil, &evidence.VerificationError{Reason: fmt.Sprintf("tag %s points at %s, not the fingerprint anchor %s", Tag(fingerprint), got.Digest, want.Digest)}
 	}
 	var ds []string
-	err = r.Referrers(ctx, want, evidence.ArtifactType, func(refs []ocispec.Descriptor) error {
+	err = r.Referrers(context.WithValue(ctx, pageCount{}, new(int)), want, evidence.ArtifactType, func(refs []ocispec.Descriptor) error {
 		for _, d := range refs {
 			// Registry data: every entry with our artifactType is a
 			// candidate. Fetch rejects anything that is not a sha256 image
@@ -275,7 +341,9 @@ func lookup(ctx context.Context, r *remote.Repository, fingerprint string) ([]st
 // Fetch downloads the attestation for a descriptor, by digest. A digest that
 // is not sha256, or a manifest that is oversized, does not match its digest
 // or is not a well-formed Aval attestation, is an error wrapping
-// evidence.ErrVerification.
+// evidence.ErrVerification. A manifest the registry reports as not found (a
+// listed attestation that was deleted) is an error wrapping
+// evidence.ErrNotFound: the candidate is absent.
 func Fetch(ctx context.Context, d Descriptor) (*Attestation, error) {
 	dg, err := digest.Parse(d.Digest)
 	if err == nil && dg.Algorithm() != digest.SHA256 {
@@ -353,6 +421,9 @@ func fetchManifest(ctx context.Context, r *remote.Repository, dg digest.Digest) 
 		return nil, fmt.Errorf("fetching manifest: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("fetching manifest %s: %s: %w", dg, resp.Status, evidence.ErrNotFound)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetching manifest %s: %s", dg, resp.Status)
 	}

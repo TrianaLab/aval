@@ -58,11 +58,12 @@ Usage:
   aval push [flags]
 
 Flags:
-  -f, --contract string   path to the test contract (default "aval.yaml")
-  -h, --help              help for push
-      --key string        signing key path (default: keyless OIDC)
-      --registry string   OCI repository for attestations (required)
-      --result string     result recorded by 'aval run' (default ".aval/result.json")
+  -f, --contract string             path to the test contract (default "aval.yaml")
+  -h, --help                        help for push
+      --key string                  signing key path (default: keyless OIDC)
+      --registry string             OCI repository for attestations (required)
+      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+      --result string               result recorded by 'aval run' (default ".aval/result.json")
 ```
 
 ## aval run
@@ -88,18 +89,19 @@ Usage:
   aval run [flags]
 
 Flags:
-  -f, --contract string    path to the test contract (default "aval.yaml")
-      --explain            print the fingerprint manifest (what was hashed)
-      --fingerprint-only   print the execution fingerprint and exit
-  -h, --help               help for run
-      --key string         signing key path for --push (default: keyless OIDC)
-      --no-reuse           always run, never reuse
-      --policy string      trust policy file (required for reuse; without it the test always runs)
-      --push               sign and publish the result after running (needs --registry)
-      --registry string    OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
-      --report string      also write the lookup decision as a verify report (JSON) to this file
-      --result string      where to record the result for 'aval push' (default ".aval/result.json")
-      --shadow             verify, but run the test anyway and fail on a false hit
+  -f, --contract string             path to the test contract (default "aval.yaml")
+      --explain                     print the fingerprint manifest (what was hashed)
+      --fingerprint-only            print the execution fingerprint and exit
+  -h, --help                        help for run
+      --key string                  signing key path for --push (default: keyless OIDC)
+      --no-reuse                    always run, never reuse
+      --policy string               trust policy file (required for reuse; without it the test always runs)
+      --push                        sign and publish the result after running (needs --registry)
+      --registry string             OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
+      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+      --report string               also write the lookup decision as a verify report (JSON) to this file
+      --result string               where to record the result for 'aval push' (default ".aval/result.json")
+      --shadow                      verify, but run the test anyway and fail on a false hit
 ```
 
 ## aval verify
@@ -114,9 +116,10 @@ Usage:
   aval verify [flags]
 
 Flags:
-  -f, --contract string   path to the test contract (default "aval.yaml")
-  -h, --help              help for verify
-  -o, --output string     output format: text or json (default "text")
-      --policy string     trust policy file (without it every lookup is a miss)
-      --registry string   OCI repository for attestations (required)
+  -f, --contract string             path to the test contract (default "aval.yaml")
+  -h, --help                        help for verify
+  -o, --output string               output format: text or json (default "text")
+      --policy string               trust policy file (without it every lookup is a miss)
+      --registry string             OCI repository for attestations (required)
+      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
 ```

@@ -7,12 +7,16 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
+	"math/big"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
@@ -60,7 +64,7 @@ func TestVerifyKeyBasedBundle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := evidence.Verify(context.Background(), s.Envelope, policyOpts(v.For(s.Bundle), id))
+	got, err := evidence.Verify(context.Background(), s.Envelope, policyOpts(mustFor(t, v, s.Bundle), id))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +114,7 @@ func TestVerifyRejectsBadKeyBasedBundles(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = evidence.Verify(context.Background(), tc.env, policyOpts(v.For(tc.bundle), tc.ids...))
+			_, err = evidence.Verify(context.Background(), tc.env, policyOpts(mustFor(t, v, tc.bundle), tc.ids...))
 			if !errors.Is(err, evidence.ErrVerification) || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("got %v, want ErrVerification mentioning %q", err, tc.want)
 			}
@@ -254,23 +258,97 @@ func TestNewVerifierErrors(t *testing.T) {
 		root string
 		ids  []evidence.Identity
 	}{
-		"bad public key":         {"", []evidence.Identity{{PublicKey: "nope"}}},
-		"unsupported key type":   {"", []evidence.Identity{{PublicKey: pubPEM(t, x.PublicKey())}}},
-		"missing trusted root":   {filepath.Join(t.TempDir(), "missing.json"), []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: ".*"}}},
-		"trusted root not fetch": {"", []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: ".*"}}},
+		"bad public key":       {"", []evidence.Identity{{PublicKey: "nope"}}},
+		"unsupported key type": {"", []evidence.Identity{{PublicKey: pubPEM(t, x.PublicKey())}}},
 	}
-	old := fetchPublicGood
-	t.Cleanup(func() { fetchPublicGood = old })
-	fetchPublicGood = func() (*root.TrustedRoot, error) { return nil, errors.New("offline") }
 	for name, tc := range cases {
 		if _, err := NewVerifier(tc.root, tc.ids); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
 	}
 	// No keyless identity: the trusted root is never needed, nor fetched.
-	if v, err := NewVerifier("", nil); err != nil || v.keyless != nil || v.keyed != nil {
+	if v, err := NewVerifier("", nil); err != nil || v.wantKeyless || v.keyed != nil {
 		t.Fatalf("empty policy: %+v, %v", v, err)
 	}
+}
+
+// certBundle is a well-formed keyless bundle: a self-signed certificate and a
+// DSSE envelope. It never verifies, but sigstore classifies it as keyless.
+var certBundle = keylessBundleJSON(`"certificate":{"rawBytes":%q}`)
+
+// keylessBundleJSON returns a v0.3 bundle whose verificationMaterial holds
+// material, with %q replaced by a base64 self-signed certificate.
+func keylessBundleJSON(material string) []byte {
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), NotAfter: time.Now().Add(time.Hour)}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		panic(err)
+	}
+	vm := fmt.Sprintf(material, base64.StdEncoding.EncodeToString(der))
+	return []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json","verificationMaterial":{` + vm +
+		`,"tlogEntries":[]},"dsseEnvelope":{"payload":"e30=","payloadType":"application/vnd.in-toto+json","signatures":[{"sig":"AA=="}]}}`)
+}
+
+// The trusted root (a TUF fetch for the public-good instance) is loaded only
+// when a bundle carries a certificate, once, and a failure to load it is a
+// plain error from For, never a verification failure.
+func TestKeylessTrustedRootIsLazy(t *testing.T) {
+	fetches := 0
+	old := fetchPublicGood
+	t.Cleanup(func() { fetchPublicGood = old })
+	fetchPublicGood = func() (*root.TrustedRoot, error) { fetches++; return nil, errors.New("offline") }
+	keyless := []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: ".*"}}
+	v, err := NewVerifier("", keyless)
+	if err != nil || fetches != 0 {
+		t.Fatalf("NewVerifier: %v, %d fetches", err, fetches)
+	}
+	s, _ := keySigned(t)
+	for _, b := range [][]byte{nil, []byte("not json"), s.Bundle, []byte(`{"verification_material":{"public_key":{"hint":"x"}}}`)} {
+		if _, err := v.For(b); err != nil || fetches != 0 {
+			t.Fatalf("For(%.40q): %v, %d fetches", b, err, fetches)
+		}
+	}
+	for _, b := range [][]byte{certBundle, keylessBundleJSON(`"publicKey":null,"certificate":{"rawBytes":%q}`)} {
+		if _, err := v.For(b); err == nil || errors.Is(err, evidence.ErrVerification) || !strings.Contains(err.Error(), "offline") {
+			t.Fatalf("For(certificate bundle) = %v, want the plain trusted root error", err)
+		}
+	}
+	if fetches != 1 {
+		t.Fatalf("%d fetches, want 1", fetches)
+	}
+	// Verifying without For still refuses, without a second fetch.
+	vs, _ := ca.NewVirtualSigstore()
+	e, env := keylessEntity(t, vs, ciSAN, ghIssuer)
+	if _, err := v.verifyEntity(e, env); err == nil || !strings.Contains(err.Error(), "offline") || fetches != 1 {
+		t.Fatalf("verifyEntity without a trusted root: %v, %d fetches", err, fetches)
+	}
+}
+
+func TestKeylessTrustedRootPinnedOrUnneeded(t *testing.T) {
+	// A pinned trusted root that is missing.
+	v, _ := NewVerifier(filepath.Join(t.TempDir(), "missing.json"), []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: ".*"}})
+	if _, err := v.For(certBundle); err == nil {
+		t.Fatal("missing trusted root accepted")
+	}
+	// A key-only policy never loads it, whatever the bundle.
+	old := loadTrustedRoot
+	t.Cleanup(func() { loadTrustedRoot = old })
+	loadTrustedRoot = func(string) (root.TrustedMaterial, error) { t.Fatal("trusted root loaded"); return nil, nil }
+	_, pub := keySigned(t)
+	v, _ = NewVerifier("", []evidence.Identity{{PublicKey: pub}})
+	if _, err := v.For(certBundle); err != nil {
+		t.Fatalf("key-only policy: %v", err)
+	}
+}
+
+func mustFor(t *testing.T, v *Verifier, bundle []byte) evidence.SignatureVerifier {
+	t.Helper()
+	sv, err := v.For(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sv
 }
 
 // A verifier that sigstore-go refuses to build is an error with its cause,
@@ -286,7 +364,11 @@ func TestNewVerifierSurfacesSigstoreErrors(t *testing.T) {
 		"key verifier":     {PublicKey: pubPEM(t, &k.PublicKey)},
 		"keyless verifier": {Issuer: ghIssuer, SubjectRegexp: ".*"},
 	} {
-		if _, err := NewVerifier("", []evidence.Identity{id}); err == nil || !strings.Contains(err.Error(), name) || !strings.Contains(err.Error(), "bad option") {
+		v, err := NewVerifier("", []evidence.Identity{id})
+		if err == nil {
+			_, err = v.For(certBundle)
+		}
+		if err == nil || !strings.Contains(err.Error(), name) || !strings.Contains(err.Error(), "bad option") {
 			t.Errorf("%s: error %v hides the cause", name, err)
 		}
 	}

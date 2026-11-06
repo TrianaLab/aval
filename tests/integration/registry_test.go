@@ -132,7 +132,9 @@ func TestPushFetchVerify(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		opts.Signature = v.For(a.Bundle)
+		if opts.Signature, err = v.For(a.Bundle); err != nil {
+			t.Fatal(err)
+		}
 		got, err := evidence.Verify(ctx, a.Envelope, opts)
 		switch s {
 		case trusted:

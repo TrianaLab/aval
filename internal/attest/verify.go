@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
@@ -23,7 +24,15 @@ import (
 // key-based ones against the public keys the policy accepts. It returns the
 // signer; evidence.Verify applies the rest of the policy.
 type Verifier struct {
-	keyless, keyed *verify.Verifier // nil when the policy accepts no such signer
+	keyed *verify.Verifier // nil when the policy accepts no keys
+	// The keyless verifier needs the trusted root, which may be fetched with
+	// TUF (network, writes under $HOME), so it is built on first use: only
+	// when a candidate's bundle carries a certificate.
+	wantKeyless bool
+	trustedRoot string
+	keylessOnce sync.Once
+	keyless     *verify.Verifier
+	keylessErr  error
 }
 
 // Seams for tests: where the trusted root comes from (a trusted_root.json
@@ -46,14 +55,14 @@ var (
 // NewVerifier builds a Verifier for the accepted identities. Key identities
 // carry their public key. Keyless identities need a trusted root: the
 // trusted_root.json file at trustedRoot, or the Sigstore public-good root
-// (fetched with TUF) when it is empty.
+// (fetched with TUF) when it is empty. The trusted root is loaded by For,
+// the first time a bundle carries a certificate.
 func NewVerifier(trustedRoot string, ids []evidence.Identity) (*Verifier, error) {
-	v := &Verifier{}
+	v := &Verifier{trustedRoot: trustedRoot}
 	keys := map[string]*root.ExpiringKey{}
-	keyless := false
 	for _, id := range ids {
 		if id.PublicKey == "" {
-			keyless = keyless || id.Issuer != ""
+			v.wantKeyless = v.wantKeyless || id.Issuer != ""
 			continue
 		}
 		kid, err := evidence.PublicKeyID(id.PublicKey)
@@ -73,22 +82,50 @@ func NewVerifier(trustedRoot string, ids []evidence.Identity) (*Verifier, error)
 			return nil, fmt.Errorf("key verifier: %w", err)
 		}
 	}
-	if keyless {
-		tm, err := loadTrustedRoot(trustedRoot)
-		if err != nil {
-			return nil, fmt.Errorf("sigstore trusted root: %w", err)
-		}
-		if v.keyless, err = verify.NewVerifier(tm, keylessOptions...); err != nil {
-			return nil, fmt.Errorf("keyless verifier: %w", err)
-		}
-	}
 	return v, nil
 }
 
+// loadKeyless builds the keyless verifier once; its error is kept.
+func (v *Verifier) loadKeyless() error {
+	v.keylessOnce.Do(func() {
+		tm, err := loadTrustedRoot(v.trustedRoot)
+		if err != nil {
+			v.keylessErr = fmt.Errorf("sigstore trusted root: %w", err)
+			return
+		}
+		if v.keyless, err = verify.NewVerifier(tm, keylessOptions...); err != nil {
+			v.keylessErr = fmt.Errorf("keyless verifier: %w", err)
+		}
+	})
+	return v.keylessErr
+}
+
 // For returns the evidence.SignatureVerifier for one attestation, given the
-// Sigstore bundle JSON stored with it. A missing bundle never verifies.
-func (v *Verifier) For(bundleJSON []byte) evidence.SignatureVerifier {
-	return bundleSignature{v: v, raw: bundleJSON}
+// Sigstore bundle JSON stored with it. A missing bundle never verifies. When
+// the policy accepts keyless identities and the bundle is not a key-based
+// one, For first loads the trusted root; failing to load it says nothing
+// about the attestation, so callers must not report it as a verification
+// failure.
+func (v *Verifier) For(bundleJSON []byte) (evidence.SignatureVerifier, error) {
+	if v.wantKeyless && !keyBased(bundleJSON) {
+		if err := v.loadKeyless(); err != nil {
+			return nil, err
+		}
+	}
+	return bundleSignature{v: v, raw: bundleJSON}, nil
+}
+
+// keyBased reports whether verifying the bundle can never need the trusted
+// root: it does not decode or carries no usable verification material (so it
+// never verifies), or it names a public key. It asks sigstore, which
+// VerifySignature uses too, instead of parsing the JSON by hand.
+func keyBased(raw []byte) bool {
+	var b bundle.Bundle
+	if b.UnmarshalJSON(raw) != nil {
+		return true
+	}
+	vc, err := b.VerificationContent()
+	return err != nil || vc.PublicKey() != nil
 }
 
 type bundleSignature struct {
@@ -152,8 +189,11 @@ func (v *Verifier) verifyKeyed(e verify.SignedEntity, hint string) (evidence.Sig
 }
 
 func (v *Verifier) verifyKeyless(e verify.SignedEntity) (evidence.Signer, error) {
-	if v.keyless == nil {
+	if !v.wantKeyless {
 		return evidence.Signer{}, errors.New("certificate signature, but the policy accepts no keyless identities")
+	}
+	if err := v.loadKeyless(); err != nil {
+		return evidence.Signer{}, err
 	}
 	// Identities are matched by evidence.Verify against the policy, using
 	// the certificate summary returned here.

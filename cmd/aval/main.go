@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -122,6 +123,21 @@ func newRootCmd() *cobra.Command {
 	return root
 }
 
+// registryTimeoutFlag adds --registry-timeout: the deadline for the registry
+// calls of one command (lookup and fetch together, push on its own). On
+// expiry the outcome is error, so run still runs the test (invariant 3).
+func registryTimeoutFlag(cmd *cobra.Command, d *time.Duration) {
+	cmd.Flags().DurationVar(d, "registry-timeout", time.Minute, "deadline for this command's registry calls (lookup and fetch share one; push has its own)")
+}
+
+// checkTimeout rejects a deadline that would fail every registry call.
+func checkTimeout(d time.Duration) error {
+	if d <= 0 {
+		return usageError{fmt.Errorf("--registry-timeout must be positive, got %s", d)}
+	}
+	return nil
+}
+
 // noArgs is cobra.NoArgs with exit code 2 (usage) instead of 1.
 func noArgs(c *cobra.Command, args []string) error {
 	if err := cobra.NoArgs(c, args); err != nil {
@@ -150,6 +166,7 @@ func loadAndFingerprint(file string, outputs ...string) (*contract.Contract, fin
 
 func newVerifyCmd() *cobra.Command {
 	var file, repo, policyFile, output string
+	var timeout time.Duration
 	cmd := &cobra.Command{
 		Use:   "verify",
 		Short: "Check whether a trusted result exists for the current inputs",
@@ -165,11 +182,16 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event).`,
 			if repo == "" {
 				return usageError{errors.New("--registry is required")}
 			}
+			if err := checkTimeout(timeout); err != nil {
+				return err
+			}
 			c, fp, err := loadAndFingerprint(file)
 			if err != nil {
 				return err
 			}
-			report, err := verify(cmd.Context(), cmd.ErrOrStderr(), c, fp, repo, policyFile)
+			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
+			defer cancel()
+			report, err := verify(ctx, cmd.ErrOrStderr(), c, fp, repo, policyFile)
 			if werr := writeReport(cmd.OutOrStdout(), output, report); werr != nil {
 				return werr
 			}
@@ -181,6 +203,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event).`,
 	f.StringVar(&repo, "registry", "", "OCI repository for attestations (required)")
 	f.StringVar(&policyFile, "policy", "", "trust policy file (without it every lookup is a miss)")
 	f.StringVarP(&output, "output", "o", "text", "output format: text or json")
+	registryTimeoutFlag(cmd, &timeout)
 	return cmd
 }
 
@@ -258,11 +281,13 @@ func outcomeOf(err error) evidence.Outcome {
 // candidates are returned for the report and printed on warn, never dropped
 // (invariant 4); a verification failure is printed as SECURITY even beside a
 // verified candidate. A candidate below the policy's minimum trust level is
-// rejected as a miss: it was evaluated, so it does not block a sibling.
-// Whenever no candidate is reused it returns the reference and error of the
-// first verification failure, else of the first error, else of the first
-// below-minimum candidate: the security event must surface, and an
-// undecidable candidate outranks routine non-reuse.
+// rejected as a miss: it was evaluated, so it does not block a sibling. A
+// listed candidate whose manifest is gone (deleted from the registry) is
+// absent: it is skipped with a warning, and when every candidate is gone the
+// outcome is a miss. Whenever no candidate is reused it returns the reference
+// and error of the first verification failure, else of the first error, else
+// of the first below-minimum candidate: the security event must surface, and
+// an undecidable candidate outranks routine non-reuse.
 func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, string, []evidence.Rejection, error) {
 	var (
 		best             *evidence.Verification
@@ -273,9 +298,12 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 	)
 	for _, d := range cands {
 		v, err := verifyCandidate(ctx, d, opts, sigs, cacheability)
+		if errors.Is(err, evidence.ErrNotFound) && !errors.Is(err, evidence.ErrVerification) {
+			fmt.Fprintf(warn, "aval: warning: listed attestation %s is gone, skipping it: %s\n", d.Reference(), oneLine(err.Error()))
+			continue
+		}
 		if err == nil {
-			if best == nil || v.Signer.TrustLevel > best.Signer.TrustLevel ||
-				(v.Signer.TrustLevel == best.Signer.TrustLevel && best.Predicate.Result == evidence.ResultPassed && v.Predicate.Result != evidence.ResultPassed) {
+			if outranks(v, best) {
 				best, bestRef = v, d.Reference()
 			}
 			continue
@@ -294,10 +322,20 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 		}
 		fmt.Fprintf(warn, "aval: %s: rejected attestation %s: %s\n", prefix, d.Reference(), oneLine(err.Error()))
 	}
+	if best == nil && failErr == nil {
+		return nil, "", nil, fmt.Errorf("every listed attestation is gone: %w", evidence.ErrNotFound)
+	}
 	if best == nil || unknown {
 		return nil, failRef, rejected, failErr
 	}
 	return best, bestRef, rejected, nil
+}
+
+// outranks reports whether v beats the best verified candidate so far: a
+// higher trust level, or the same level with a non-passed result over a pass.
+func outranks(v, best *evidence.Verification) bool {
+	return best == nil || v.Signer.TrustLevel > best.Signer.TrustLevel ||
+		(v.Signer.TrustLevel == best.Signer.TrustLevel && best.Predicate.Result == evidence.ResultPassed && v.Predicate.Result != evidence.ResultPassed)
 }
 
 // verifyCandidate fetches one attestation and verifies it with the Sigstore
@@ -309,15 +347,14 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 // once every claim checks out; a false claim stays a verification failure.
 func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, error) {
 	a, err := fetch(ctx, d)
-	if errors.Is(err, evidence.ErrNotFound) {
-		// The lookup listed it, so this is not a miss; %v drops ErrNotFound
-		// and reports it as an error (fail closed).
-		return nil, fmt.Errorf("candidate listed but not fetchable: %v", err)
-	}
 	if err != nil {
 		return nil, err
 	}
-	opts.Signature = sigs.For(a.Bundle)
+	// A trusted root that cannot be loaded says nothing about the
+	// candidate: outcome error, never verification-failed.
+	if opts.Signature, err = sigs.For(a.Bundle); err != nil {
+		return nil, fmt.Errorf("trust policy: %w", err)
+	}
 	need := max(opts.MinTrustLevel, evidence.TrustDeveloper)
 	opts.MinTrustLevel = evidence.TrustDeveloper // Verify still rejects levels outside developer..isolated
 	v, err := verifyEnvelope(ctx, a.Envelope, opts)

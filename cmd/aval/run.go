@@ -35,6 +35,7 @@ const idTokenEnv = "SIGSTORE_ID_TOKEN"
 type runFlags struct {
 	file, repo, policyFile, resultFile, reportFile, key string
 	push, noReuse, shadow, fingerprintOnly, explain     bool
+	registryTimeout                                     time.Duration
 }
 
 func newRunCmd() *cobra.Command {
@@ -72,6 +73,7 @@ runner.command never sees it.`,
 	f.BoolVar(&o.shadow, "shadow", false, "verify, but run the test anyway and fail on a false hit")
 	f.BoolVar(&o.fingerprintOnly, "fingerprint-only", false, "print the execution fingerprint and exit")
 	f.BoolVar(&o.explain, "explain", false, "print the fingerprint manifest (what was hashed)")
+	registryTimeoutFlag(cmd, &o.registryTimeout)
 	return cmd
 }
 
@@ -82,7 +84,7 @@ func (o runFlags) validate() error {
 	case o.shadow && o.noReuse:
 		return usageError{errors.New("--shadow and --no-reuse exclude each other")}
 	}
-	return nil
+	return checkTimeout(o.registryTimeout)
 }
 
 func runTest(cmd *cobra.Command, o runFlags) error {
@@ -184,6 +186,9 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 	case o.repo == "":
 		return failReport(r, fmt.Errorf("no registry configured (--registry): %w", evidence.ErrNotFound))
 	}
+	// The deadline bounds the registry, never runner.command.
+	ctx, cancel := context.WithTimeout(ctx, o.registryTimeout)
+	defer cancel()
 	return verify(ctx, warn, c, fp, o.repo, o.policyFile)
 }
 
@@ -238,7 +243,7 @@ func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr error
 	if !o.push {
 		return nil
 	}
-	ref, err := signAndPush(ctx, p, o.repo, o.key, token)
+	ref, err := signAndPush(ctx, p, o.repo, o.key, token, o.registryTimeout)
 	if err != nil {
 		return []error{err}
 	}
@@ -262,8 +267,8 @@ func writeJSON(path string, v any) error {
 }
 
 // signAndPush signs the predicate (key-based with key, else keyless with the
-// OIDC token) and publishes it under its fingerprint.
-func signAndPush(ctx context.Context, p *evidence.Predicate, repo, key, token string) (string, error) {
+// OIDC token) and publishes it under its fingerprint, within timeout.
+func signAndPush(ctx context.Context, p *evidence.Predicate, repo, key, token string, timeout time.Duration) (string, error) {
 	st, err := attest.NewStatement(p)
 	var s *attest.Signed
 	if err == nil {
@@ -272,6 +277,8 @@ func signAndPush(ctx context.Context, p *evidence.Predicate, repo, key, token st
 	if err != nil {
 		return "", fmt.Errorf("signing: %w", err)
 	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	d, err := publish(ctx, repo, p.Execution.Fingerprint, registry.Attestation{Envelope: s.Envelope, Bundle: s.Bundle})
 	if err != nil {
 		return "", fmt.Errorf("publishing: %w", err)
@@ -281,6 +288,7 @@ func signAndPush(ctx context.Context, p *evidence.Predicate, repo, key, token st
 
 func newPushCmd() *cobra.Command {
 	var file, repo, key, resultFile string
+	var timeout time.Duration
 	cmd := &cobra.Command{
 		Use:   "push",
 		Short: "Sign and publish a recorded execution result",
@@ -291,6 +299,9 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if repo == "" {
 				return usageError{errors.New("--registry is required")}
+			}
+			if err := checkTimeout(timeout); err != nil {
+				return err
 			}
 			c, fp, err := loadAndFingerprint(file, resultFile)
 			if err != nil {
@@ -308,7 +319,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 				return fmt.Errorf("recorded result is for test %q (%s) with fingerprint %s; the contract is %q (%s) with fingerprint %s: run the test again",
 					p.Test.ID, p.Test.Cacheability, p.Execution.Fingerprint, c.Metadata.Name, c.Cacheability, fp.Digest)
 			}
-			ref, err := signAndPush(cmd.Context(), p, repo, key, os.Getenv(idTokenEnv))
+			ref, err := signAndPush(cmd.Context(), p, repo, key, os.Getenv(idTokenEnv), timeout)
 			if err != nil {
 				return err
 			}
@@ -321,5 +332,6 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 	f.StringVar(&repo, "registry", "", "OCI repository for attestations (required)")
 	f.StringVar(&key, "key", "", "signing key path (default: keyless OIDC)")
 	f.StringVar(&resultFile, "result", defaultResult, "result recorded by 'aval run'")
+	registryTimeoutFlag(cmd, &timeout)
 	return cmd
 }

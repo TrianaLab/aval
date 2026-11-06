@@ -262,6 +262,8 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 	down := errors.New("registry down")
 	// What registry.Fetch returns for a malformed or tampered manifest.
 	malformed := fmt.Errorf("registry.Fetch r@sha256:aa: %w", &evidence.VerificationError{Reason: "malformed attestation: not an Aval attestation"})
+	// What registry.Fetch returns for a listed manifest the registry deleted.
+	gone := fmt.Errorf("registry.Fetch r@sha256:aa: fetching manifest: 404 Not Found: %w", evidence.ErrNotFound)
 	cases := []struct {
 		name    string
 		lookup  error
@@ -303,10 +305,6 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:bb": {fetchErr: down},
 		}, ExitError, evidence.OutcomeError, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
-		{"vanished candidate beside a verified one fails closed", nil, map[string]candidate{
-			"sha256:aa": {fetchErr: fmt.Errorf("registry.Fetch r@sha256:aa: %w", evidence.ErrNotFound)},
-			"sha256:bb": {trust: evidence.TrustRunner},
-		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
 		{"verify error on a sibling fails closed", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustIsolated},
 			"sha256:bb": {verifyErr: down},
@@ -325,6 +323,18 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			"sha256:bb": {verifyErr: untrusted},
 			"sha256:cc": {verifyErr: down},
 		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed, evidence.OutcomeError}},
+		{"a deleted manifest is absent and the remaining attestation is reused", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: gone},
+			"sha256:bb": {trust: evidence.TrustRunner},
+		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, nil},
+		{"every manifest deleted is a miss", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: gone},
+			"sha256:bb": {fetchErr: gone},
+		}, ExitMiss, evidence.OutcomeMiss, "", "", nil},
+		{"a deleted manifest does not hide a verification failure", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: gone},
+			"sha256:ff": {verifyErr: untrusted},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:ff", "", []evidence.Outcome{evidence.OutcomeVerificationFailed}},
 		{"only errors", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
@@ -406,6 +416,7 @@ func TestVerifyBelowMinTrust(t *testing.T) {
 		{"does not block a verified sibling", map[string]candidate{"sha256:aa": dev, "sha256:bb": {trust: evidence.TrustRunner}}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
 		{"below-minimum failure does not override a trusted pass", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, failed: true}, "sha256:bb": {trust: evidence.TrustRunner}}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
 		{"error outranks it", map[string]candidate{"sha256:aa": dev, "sha256:bb": {fetchErr: errors.New("registry down")}}, ExitError, evidence.OutcomeError, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeError}},
+		{"beside a deleted manifest is still a miss", map[string]candidate{"sha256:aa": {fetchErr: fmt.Errorf("fetching manifest: 404 Not Found: %w", evidence.ErrNotFound)}, "sha256:bb": dev}, ExitMiss, evidence.OutcomeMiss, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
 		{"verification failure outranks it", map[string]candidate{"sha256:aa": dev, "sha256:ff": {verifyErr: untrusted}}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:ff", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
 		{"verification failure stays visible beside a verified one", map[string]candidate{"sha256:aa": dev, "sha256:bb": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
 		{"signed cacheability lie stays a verification failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, cacheability: "external-dependencies"}}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:aa", []evidence.Outcome{evidence.OutcomeVerificationFailed}},

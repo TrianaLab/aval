@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TrianaLab/aval/internal/attest"
 	"github.com/TrianaLab/aval/internal/policy"
@@ -445,6 +448,54 @@ func TestUntrustedTextCannotStartALine(t *testing.T) {
 	for _, out := range []string{stdout, stderr} {
 		if strings.Contains(out, "\n::") || strings.ContainsAny(out, "\r\x1b") || !strings.Contains(out, `bad\n::error::forged\r\x1b[31m`) {
 			t.Fatalf("untrusted text not escaped: %q", out)
+		}
+	}
+}
+
+// A registry that accepts connections and never answers cannot keep aval run
+// from running the test: lookup and push give up at --registry-timeout with
+// outcome error (invariant 3), and verify does the same.
+func TestStalledRegistry(t *testing.T) {
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
+	t.Cleanup(srv.Close)
+	repo := strings.TrimPrefix(srv.URL, "http://") + "/acme/orders-aval"
+	dir := t.TempDir()
+	keyFile, pub := devKey(t, dir, "dev")
+	if err := os.WriteFile(filepath.Join(dir, "dev.pub"), pub, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pol := filepath.Join(dir, "policy.yaml")
+	if err := os.WriteFile(pol, []byte("apiVersion: aval.trianalab.io/v1\nkind: Policy\nminTrustLevel: developer\nidentities:\n  - publicKey: dev.pub\n    trustLevel: developer\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	argv, ran := marker(t, 0)
+	c := contractWith(t, "hermetic", argv...)
+	report := filepath.Join(dir, "report.json")
+	start := time.Now()
+	code, _, stderr := runCLI("run", "-f", c, "--registry", repo, "--policy", pol, "--registry-timeout", "200ms",
+		"--push", "--key", keyFile, "--report", report, "--result", filepath.Join(dir, "result.json"))
+	if code != ExitError || !ran() || readReport(t, report).Outcome != evidence.OutcomeError || !strings.Contains(stderr, "deadline exceeded") {
+		t.Fatalf("run: exit %d, ran %v, report %+v, stderr %q", code, ran(), readReport(t, report), stderr)
+	}
+	code, stdout, _ := runCLI("verify", "-f", c, "--registry", repo, "--policy", pol, "--registry-timeout", "200ms", "-o", "json")
+	if code != ExitError || !strings.Contains(stdout, `"outcome": "error"`) {
+		t.Fatalf("verify: exit %d, report %s", code, stdout)
+	}
+	if d := time.Since(start); d > 30*time.Second {
+		t.Fatalf("took %s", d)
+	}
+}
+
+func TestRegistryTimeoutMustBePositive(t *testing.T) {
+	c := writeContract(t, "hermetic")
+	for _, args := range [][]string{
+		{"run", "-f", c, "--registry-timeout", "0s"},
+		{"verify", "-f", c, "--registry", "r", "--registry-timeout", "-1s"},
+		{"push", "-f", c, "--registry", "r", "--registry-timeout", "0s"},
+	} {
+		if code, _, stderr := runCLI(args...); code != ExitUsage || !strings.Contains(stderr, "--registry-timeout") {
+			t.Errorf("%v: exit %d, stderr %q", args, code, stderr)
 		}
 	}
 }
