@@ -129,13 +129,15 @@ reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
 ran hello: passed (exit 0)
 ```
 
-## 7. A tampered attestation: exit 5
+## 7. A result from an untrusted signer: exit 5
 
-![a result signed with other.key is pushed; aval run prints SECURITY, verification-failed, runs the test and exits 5](assets/gifs/tampered.gif)
+![a result signed with a key the policy does not trust, other.key, is pushed; aval run prints SECURITY, verification-failed, runs the test and exits 5](assets/gifs/tampered.gif)
 
 Someone who can push to the registry, but has a key your policy does not
 trust, publishes a passing result for the new inputs. Aval rejects it, runs
-the test anyway and exits 5. Exit 5 is a security event, not a miss:
+the test anyway and exits 5. Exit 5 is a security event, not a miss.
+Changing the bytes of a signed result breaks its signature and ends the same
+way:
 
 ```sh
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out other.key
@@ -169,13 +171,14 @@ flowchart LR
   fp --> look{result for this<br>fingerprint?}
   look -- no --> miss([miss: run the test,<br>sign and push<br>steps 4 and 6]):::muted
   look -- "yes, signer in policy.yaml" --> ok([verified: reuse,<br>skip the test<br>step 5]):::ok
-  look -- "yes, any other signer" --> bad([verification-failed:<br>run the test, exit 5<br>step 7]):::err
+  look -- "yes, only untrusted signers" --> bad([verification-failed:<br>run the test, exit 5<br>step 7]):::err
 ```
 
 - The fingerprint covers only what `scope` lists. Change one byte there and
   it is a new fingerprint (step 6).
-- A result is reused only if its signer is in your policy (step 5). Any other
-  signer is rejected, loudly (step 7).
+- A result is reused only if its signer is in your policy (step 5). A result
+  from any other signer is reported as a security event. If no trusted result
+  exists, the test runs and Aval exits 5 (step 7).
 - When Aval cannot prove a result is safe to reuse, the test runs.
 
 Stop the registry when you are done:

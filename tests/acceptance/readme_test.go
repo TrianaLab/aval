@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -67,18 +68,19 @@ func quickstartSteps(t *testing.T, doc string) []quickstartStep {
 
 // runQuickstart runs the steps in order in one shell, against an in-process
 // registry that stands in for localhost:5001, and returns each step's
-// combined output. A step that fails does not stop the shell: its output is
-// what the page's text block is compared with. openssl must be on PATH.
-func runQuickstart(t *testing.T, steps []quickstartStep) (outs []string, host string) {
+// combined output. shFlags go to sh: with "-e" the first failing step fails
+// the test; without it a failing step does not stop the shell, and each
+// step's exit code is in codes. openssl must be on PATH.
+func runQuickstart(t *testing.T, steps []quickstartStep, shFlags ...string) (outs []string, codes []int, host string) {
 	t.Helper()
 	srv := httptest.NewServer(ggcr.New(ggcr.Logger(log.New(io.Discard, "", 0))))
 	t.Cleanup(srv.Close)
 	host = strings.TrimPrefix(srv.URL, "http://")
 	var body strings.Builder
 	for i, s := range steps {
-		fmt.Fprintf(&body, "echo '@@step %d@@'\n%s\n", i, strings.ReplaceAll(s.script, "localhost:5001", host))
+		fmt.Fprintf(&body, "echo '@@step %d@@'\n%s\necho \"@@exit $?@@\"\n", i, strings.ReplaceAll(s.script, "localhost:5001", host))
 	}
-	cmd := exec.Command("sh", "-c", body.String())
+	cmd := exec.Command("sh", append(shFlags, "-c", body.String())...)
 	cmd.Dir = t.TempDir()
 	cmd.Env = append(os.Environ(),
 		"PATH="+filepath.Dir(aval)+string(os.PathListSeparator)+os.Getenv("PATH"),
@@ -91,7 +93,24 @@ func runQuickstart(t *testing.T, steps []quickstartStep) (outs []string, host st
 	if len(parts) != len(steps)+1 {
 		t.Fatalf("quickstart output has %d steps, want %d\n%s", len(parts)-1, len(steps), out)
 	}
-	return parts[1:], host
+	exitRE := regexp.MustCompile(`(?m)^@@exit (\d+)@@\n\z`)
+	shownRE := regexp.MustCompile(`(?m)^exit code: (\d+)\n\z`)
+	for _, p := range parts[1:] {
+		m := exitRE.FindStringSubmatchIndex(p)
+		if m == nil {
+			t.Fatalf("step output lacks its exit marker:\n%s", p)
+		}
+		code := p[m[2]:m[3]]
+		p = p[:m[0]]
+		// A step that ends with `echo "exit code: $?"` shows the code of the
+		// command before it; that is the step's code.
+		if s := shownRE.FindStringSubmatch(p); s != nil {
+			code = s[1]
+		}
+		n, _ := strconv.Atoi(code)
+		outs, codes = append(outs, p), append(codes, n)
+	}
+	return outs, codes, host
 }
 
 // outputMatches compares output with a page's text block line by line; "..."
@@ -128,7 +147,7 @@ func TestOutputMatches(t *testing.T) {
 
 // The README "Try it on your laptop" path, run as written.
 func TestReadmeQuickstart(t *testing.T) {
-	outs, host := runQuickstart(t, quickstartSteps(t, "README.md"))
+	outs, _, host := runQuickstart(t, quickstartSteps(t, "README.md"), "-e")
 	out := strings.Join(outs, "")
 	repo := host + "/demo/hello-aval"
 	for _, want := range []string{
@@ -148,9 +167,13 @@ func TestReadmeQuickstart(t *testing.T) {
 // the commands print.
 func TestDocsQuickstart(t *testing.T) {
 	steps := quickstartSteps(t, "docs/quickstart.md")
-	outs, host := runQuickstart(t, steps)
+	outs, codes, host := runQuickstart(t, steps)
 	checked := 0
 	for i, s := range steps {
+		// Only the last step (an untrusted signer) exits non-zero, with 5.
+		if want := map[bool]int{true: 5}[i == len(steps)-1]; codes[i] != want {
+			t.Errorf("step %d exited %d, want %d\n%s", i+1, codes[i], want, outs[i])
+		}
 		if !s.hasOut {
 			if outs[i] != "" {
 				t.Errorf("step %d prints output the page does not show:\n%s", i+1, outs[i])
