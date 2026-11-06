@@ -73,6 +73,7 @@ A change that breaks one of these is wrong, even if tests pass.
 | `make ci-docs` | markdownlint, vale, CLI reference drift (`make docs-lint`; regenerate with `make docs-cli`) |
 | `make coverage` | unit tests plus an HTML report in `coverage.html` |
 | `make build` | `bin/aval` |
+| `make brand` | renders the brand PNGs in `docs/assets/images/` from their SVGs (pinned resvg-js CLI via npx) |
 
 Epic 0 grows `make ci` to Pacto's standard (coverage gate, integration,
 local acceptance, security, docs lint, fuzzing). When a target lands, add it to
