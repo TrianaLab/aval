@@ -219,7 +219,7 @@ Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Unfinished work
 
-Stubs return `evidence.ErrNotImplemented` (exit 6) and carry a `TODO(milestone-N): ...` comment naming the roadmap milestone that removes them (see [docs/vision.md](docs/vision.md)). Use the same convention; no bare `TODO`. Stubs still count toward the 100% coverage gate (`make coverage-check`): cover each with a test that asserts it returns `ErrNotImplemented`.
+Deferred work carries a `TODO(milestone-N): ...` comment naming the roadmap milestone that lands it (see [docs/vision.md](docs/vision.md)); no bare `TODO`. Nothing returns `evidence.ErrNotImplemented` (deprecated) and exit 6 stays reserved, never returned. Deferred code still counts toward the 100% coverage gate (`make coverage-check`).
 
 ## License
 

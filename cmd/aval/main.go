@@ -39,7 +39,7 @@ const (
 	ExitTestFailed         = 3 // the test ran and failed, or run reused a verified failing result
 	ExitMiss               = 4 // no attestation for this fingerprint that the policy can reuse
 	ExitVerificationFailed = 5 // attestation exists but failed signature/policy: security event
-	ExitNotImplemented     = 6 // feature lands in a later milestone
+	ExitNotImplemented     = 6 // reserved, never returned
 )
 
 // version is set at release build time (-ldflags "-X main.version=...").
@@ -102,8 +102,6 @@ func exitCode(err error) int {
 		return ExitTestFailed
 	case errors.Is(err, evidence.ErrNotFound), errors.Is(err, errBelowMinTrust):
 		return ExitMiss
-	case errors.Is(err, evidence.ErrNotImplemented): //nolint:staticcheck // deprecated, but exit 6 stays reserved for it
-		return ExitNotImplemented
 	}
 	return ExitError
 }

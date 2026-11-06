@@ -26,7 +26,6 @@ func TestExitCode(t *testing.T) {
 		fmt.Errorf("x: %w", evidence.ErrNotFound):        ExitMiss,
 		fmt.Errorf("%w: level", errBelowMinTrust):        ExitMiss,
 		&evidence.VerificationError{Reason: "untrusted"}: ExitVerificationFailed,
-		fmt.Errorf("x: %w", evidence.ErrNotImplemented):  ExitNotImplemented, //nolint:staticcheck // the reserved exit 6
 		errors.New("boom"):                               ExitError,
 	}
 	for err, want := range cases {
