@@ -45,8 +45,12 @@ var (
 	// The pipe may follow quotes, ; or & (a URL query string), but not
 	// another | (curl ... || sh fallback runs nothing it downloaded).
 	pipeShellRe = regexp.MustCompile(`\b(curl|wget)\b[^\n]*?[^|]\|\s*((sudo|env)\s+(-\S+\s+)*)?(\S*/)?(env\s+)?((ba|z|k|da|fi)?sh|python[0-9.]*|node|ruby|perl)\b`)
-	subShellRe  = regexp.MustCompile(`(^|\s)((ba|z|k|da)?sh|source|eval|\.)\s[^|;&]*?(<\(|\$\()\s*(curl|wget)\b`)
-	// checkoutRe is a commit id checked out (or fetched) on the same line.
+	subShellRe  = regexp.MustCompile(`(^|\s)((ba|z|k|da)?sh|source|eval|\.|python[0-9.]*|node|ruby|perl)\s[^|;&]*?(<\(|\$\()\s*(curl|wget)\b`)
+	// latestRe is a download of whatever release is newest.
+	latestRe = regexp.MustCompile(`\b(curl|wget)\b[^\n]*?/releases/latest\b\S*`)
+	// cloneRe is a clone; checkoutRe is a commit id checked out (or
+	// fetched) on the same line. Each clone needs its own.
+	cloneRe    = regexp.MustCompile(`\bclone\b`)
 	checkoutRe = regexp.MustCompile(`\b(checkout|reset\s+--hard|switch\s+--detach|fetch)\s+([^\s;&|]+\s+)*[0-9a-f]{40}\b`)
 	segmentSep = func(r rune) bool { return strings.ContainsRune("|;&()`\n", r) }
 )
@@ -77,6 +81,8 @@ func scanShell(file, text string, has func(string) bool) []Finding {
 			at("remote-script", m, "a script piped from the network changes upstream: vendor it into the scope or download a fixed version and check its sha256 before running it")
 		} else if m := subShellRe.FindString(s); m != "" {
 			at("remote-script", m, "a script run from the network changes upstream: vendor it into the scope or download a fixed version and check its sha256 before running it")
+		} else if m := latestRe.FindString(s); m != "" {
+			at("remote-script", m, "releases/latest is whatever release is newest: download a fixed version and check its sha256")
 		}
 		for _, seg := range strings.FieldsFunc(s, segmentSep) {
 			if argv := command(tokens(seg)); len(argv) > 0 {
@@ -170,6 +176,8 @@ var shellRules = map[string]func(shellCtx, []string){
 	"npx": dlxCmd, "bunx": dlxCmd, "pip": pipCmd, "pip3": pipCmd, "pipx": pipCmd,
 	"uv": uvCmd, "python": pythonCmd, "python3": pythonCmd,
 	"apt-get": osCmd, "apt": osCmd, "apk": osCmd,
+	"dnf": rpmCmd, "yum": rpmCmd, "microdnf": rpmCmd, "zypper": rpmCmd,
+	"kubectl": kubectlCmd, "helm": helmCmd,
 	"gem": gemCmd, "cargo": cargoCmd,
 	"docker": dockerCmd, "podman": dockerCmd, "nerdctl": dockerCmd, "docker-compose": composeCmd,
 	"git": gitCmd,
@@ -340,6 +348,64 @@ func osCmd(c shellCtx, t []string) {
 	}
 }
 
+// rpmVersionRe is a name-version-release pin (curl-7.76.1-26.el9).
+var rpmVersionRe = regexp.MustCompile(`-\d[\w.~^+]*-\d[\w.~^+]*$`)
+
+func rpmCmd(c shellCtx, t []string) {
+	if !sub(t, 1, "install", "in") {
+		return
+	}
+	for _, a := range args(t, 2, "-c", "--config", "--repo", "--repoid", "--enablerepo", "--disablerepo", "--setopt", "--releasever", "--installroot", "-x", "--exclude", "-r", "--from") {
+		if !rpmVersionRe.MatchString(a) && !strings.Contains(a, "=") && !strings.HasPrefix(a, ".") && !strings.HasPrefix(a, "/") {
+			c.at("os-package", a, "installs whatever version the mirror has today: pin it (name-1.2.3-1.el9) or bake it into an image pinned by digest")
+		}
+	}
+}
+
+// kubectlCmd checks the image of kubectl run and create --image.
+func kubectlCmd(c shellCtx, t []string) {
+	for i, a := range t {
+		v, ok := strings.CutPrefix(a, "--image=")
+		if a == "--image" && i+1 < len(t) {
+			v, ok = t[i+1], true
+		}
+		if ok {
+			for _, f := range image("", 0, v, nil) {
+				c.at(f.Ecosystem, f.Ref, f.Fix)
+			}
+		}
+	}
+}
+
+var helmValued = []string{"-n", "--namespace", "-f", "--values", "--set", "--set-string", "--set-file", "--set-json", "--version", "--repo", "--kube-context", "--kubeconfig", "--timeout", "-o", "--output", "--post-renderer", "--description", "--username", "--password", "--ca-file", "--cert-file", "--key-file", "--registry-config"}
+
+// helmCmd checks that helm install and upgrade of a chart that is not in
+// scope name an exact --version.
+func helmCmd(c shellCtx, t []string) {
+	if !sub(t, 1, "install", "upgrade") {
+		return
+	}
+	a := args(t, 2, helmValued...)
+	if len(a) == 0 {
+		return
+	}
+	chart := a[min(1, len(a)-1)] // install NAME CHART, upgrade RELEASE CHART, install CHART --generate-name
+	if c.has(path.Join(path.Clean(chart), "Chart.yaml")) || c.has(path.Clean(chart)) {
+		return // local code in scope
+	}
+	v := ""
+	for i, x := range t {
+		if x == "--version" && i+1 < len(t) {
+			v = t[i+1]
+		} else if s, ok := strings.CutPrefix(x, "--version="); ok {
+			v = s
+		}
+	}
+	if !semverRe.MatchString(strings.TrimPrefix(v, "v")) {
+		c.at("helm", chart, "a chart without an exact --version installs whatever release is newest: add --version 1.2.3 (or render the chart into the scope)")
+	}
+}
+
 func gemCmd(c shellCtx, t []string) {
 	if sub(t, 1, "install") && !slices.ContainsFunc(t, func(a string) bool { return a == "-v" || strings.HasPrefix(a, "--version") }) {
 		for _, a := range args(t, 2, "-i", "--install-dir", "-n", "--bindir", "--source") {
@@ -417,12 +483,14 @@ func composeCmd(c shellCtx, t []string) {
 
 func gitCmd(c shellCtx, t []string) {
 	switch {
-	case sub(t, 1, "clone") && !checkoutRe.MatchString(c.line):
+	case sub(t, 1, "clone") && len(cloneRe.FindAllString(c.line, -1)) > len(checkoutRe.FindAllString(c.line, -1)):
 		ref := "git clone"
 		if a := args(t, 2, "-b", "--branch", "--depth", "-o", "--origin", "-c", "--config", "--reference", "-j", "--jobs"); len(a) > 0 {
 			ref = a[0]
 		}
 		c.at("git", ref, "a clone follows a branch or tag that can move: check out a full commit id in the same command")
+	case sub(t, 1, "pull"):
+		c.at("git", "git pull", "a pull merges whatever the branch points to now: fetch and check out a full commit id")
 	case sub(t, 1, "submodule") && slices.Contains(t, "--remote"):
 		c.at("git", "git submodule update --remote", "--remote follows the tracked branch: use the commit recorded in the repository")
 	}

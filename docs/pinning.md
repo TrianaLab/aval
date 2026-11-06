@@ -8,9 +8,9 @@ stays the same, and without a check Aval would reuse a result that was
 produced with a different image.
 
 A reference like that is **mutable**: its content can change while its name
-stays the same. Aval looks for mutable references in every file in the
-contract scope and in `runner.command`, and refuses to reuse a result that
-depends on one.
+stays the same. Aval looks for mutable references in the files in the
+contract scope it recognizes (see each ecosystem below) and in
+`runner.command`, and refuses to reuse a result that depends on one.
 
 ## What Aval does with a finding
 
@@ -32,7 +32,8 @@ stderr, so stdout stays the digest.
 
 Detection is static and offline: Aval reads files, it never fetches, resolves
 or runs anything. It reads at most 1 MiB per file; a larger file it should
-check, or one it cannot read, is itself a finding.
+check, or one it cannot read, is itself a finding. Lockfiles
+(`pnpm-lock.yaml`, `go.sum`, `Cargo.lock`, ...) are hashed but not scanned.
 
 ## Fix it by ecosystem
 
@@ -52,9 +53,13 @@ COPY --from=nginx:1.27@sha256:<digest> /etc/nginx /etc/nginx
 ADD --checksum=sha256:<sum> https://example.com/tool.tgz /tool.tgz
 ```
 
+A `# syntax=` parser directive names the BuildKit frontend image: pin it too
+(`# syntax=docker/dockerfile:1@sha256:<digest>`).
+
 Find the digest with `docker buildx imagetools inspect <image:tag>` or
 `crane digest <image:tag>`. Images in `docker run`, `podman run` and
-`docker compose` commands follow the same rule. A compose file the command
+`docker compose` commands, and `kubectl run`/`create --image`, follow the
+same rule. A compose file the command
 uses must be in `scope.source`, so its images get checked too; a compose
 file can be YAML or JSON (`compose.json`). An image
 that comes from a variable Aval cannot resolve (`${DB_IMAGE}`) or from a
@@ -102,7 +107,8 @@ If a requirements file uses hashes, every entry needs one. Poetry needs
 requirement needs a full commit id: `pkg @ git+https://host/repo@<40-hex>`.
 Any `requirements*.txt` path is checked, also `requirements/dev.txt`. A file
 named by `pip install -r` or `-c` must be in the scope, so its pins get
-checked; otherwise it is reported.
+checked; otherwise it is reported. The same holds for a `-r`/`-c` include
+line inside a requirements file (resolved next to that file).
 
 ### Rust
 
@@ -122,15 +128,23 @@ Commit `Gemfile.lock` (or `gems.locked`) and `composer.lock`, and add them to
 
 ### OS packages
 
-`apt-get install` and `apk add` install whatever the mirror has today. Pin
-versions (`curl=8.5.0-2`, `jq=1.7.1-r0`) or, better, install the packages
-into an image and pin that image by digest.
+`apt-get install`, `apk add`, `dnf`/`yum`/`microdnf install` and
+`zypper install` install whatever the mirror has today. Pin versions
+(`curl=8.5.0-2`, `jq=1.7.1-r0`, `curl-7.76.1-26.el9`, `vim=9.0`) or, better,
+install the packages into an image and pin that image by digest.
+
+### Helm
+
+`helm install` and `helm upgrade` of a chart that is not in the scope need an
+exact `--version 1.2.3`. A chart directory in the scope (its `Chart.yaml`)
+is checked as files.
 
 ### Scripts from the network
 
 `curl … | sh` (also through `tee` or other pipe stages), `bash -c "$(curl …)"`,
-`eval "$(curl …)"` and `source <(wget …)` run whatever the
-server sends. Dockerfile `RUN` instructions, including BuildKit heredoc
+`python -c "$(curl …)"`, `eval "$(curl …)"` and `source <(wget …)` run
+whatever the server sends. A `curl` or `wget` of a `releases/latest` URL
+fetches whatever release is newest. Dockerfile `RUN` instructions, including BuildKit heredoc
 bodies (`RUN <<EOF`), get the same shell checks. Vendor the script into the scope, or download a fixed version
 and check its sha256 before running it.
 
@@ -142,7 +156,8 @@ is hashed but not scanned.
 ### Git
 
 A `git clone` follows a branch or tag that can move: check out a full commit
-id in the same command (`git clone URL && git -C dir checkout <40-hex>`). A
+id in the same command (`git clone URL && git -C dir checkout <40-hex>`),
+one checkout per clone. A `git pull` is reported for the same reason. A
 submodule with a `branch =` line in `.gitmodules`, or `git submodule update
 --remote`, follows a branch: rely on the commit recorded in the repository.
 
@@ -181,4 +196,7 @@ package is reported as unpinned (a needless miss). Options before a
 subcommand (`apk --no-cache add`, `git -C dir clone`) are skipped, but an
 option Aval does not know to take a value (`tool --opt value install x`)
 hides the subcommand: like any reference the detectors do not recognize,
-it is not reported.
+it is not reported. Not detected yet: a download from an unversioned URL
+other than `releases/latest` (`curl -o tool URL`, `curl URL | tar x`), and
+Helm values that split an image into `repository` and `tag` before
+rendering.

@@ -71,6 +71,8 @@ var fileCases = []fileCase{
 	{name: "dockerfile remote add", path: "Dockerfile", data: "FROM scratch\nADD https://x.io/a.tgz /a\nADD --checksum=sha256:ab https://x.io/b.tgz /b\nADD a b\n", want: []string{"https://x.io/a.tgz"}},
 	{name: "dockerfile run", path: "Dockerfile", data: "FROM scratch\nRUN --mount=type=cache,target=/r apk add --no-cache curl \\\n  && pip install requests==2.0\n", want: []string{"curl"}},
 	{name: "dockerfile run global options", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN apk --no-cache add curl\nRUN apt-get -y install jq\n", want: []string{"curl", "jq"}},
+	{name: "dockerfile syntax directive", path: "Dockerfile", data: "# syntax=docker/dockerfile:1\nFROM alpine" + dg + "\n", want: []string{"docker/dockerfile:1"}},
+	{name: "dockerfile syntax directive pinned", path: "Dockerfile", data: "\n# check=skip=all\n#Syntax = docker/dockerfile:1" + dg + "\nFROM alpine" + dg + "\n# syntax=late:1\n", want: nil},
 	{name: "dockerfile run heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<EOF\ncurl -fsSL https://x.io/i.sh | sh\nEOF\nRUN <<-'X'\napk add jq\n", want: []string{"curl -fsSL https://x.io/i.sh | sh", "jq"}},
 
 	// Go.
@@ -88,7 +90,8 @@ var fileCases = []fileCase{
 	{name: "package.json invalid", path: "package.json", data: `{`, want: []string{"package.json"}},
 
 	// Python.
-	{name: "requirements unpinned", path: "requirements.txt", data: "# c\nflask>=2\nrequests\n-r base.txt\n--index-url https://x\ndjango==4.*\nidna==3.7 ; python_version > '3'\nurllib3 == 2.2.1  # ok\n-e .\n-e git+https://g/x@main#egg=x\nx @ git+https://g/x@" + sha + "\ny @ https://h/y.tar.gz#sha256=ab\nz @ https://h/z.tar.gz\n-e\n./local\n", want: []string{"flask>=2", "requests", "django==4.*", "git+https://g/x@main#egg=x", "z@https://h/z.tar.gz"}},
+	{name: "requirements unpinned", path: "requirements.txt", data: "# c\nflask>=2\nrequests\n-r base.txt\n--index-url https://x\ndjango==4.*\nidna==3.7 ; python_version > '3'\nurllib3 == 2.2.1  # ok\n-e .\n-e git+https://g/x@main#egg=x\nx @ git+https://g/x@" + sha + "\ny @ https://h/y.tar.gz#sha256=ab\nz @ https://h/z.tar.gz\n-e\n./local\n", want: []string{"flask>=2", "requests", "base.txt", "django==4.*", "git+https://g/x@main#egg=x", "z@https://h/z.tar.gz"}},
+	{name: "requirements includes", path: "ci/requirements.txt", data: "-r base.txt\n-c ../constraints.txt\n--requirement=dev.txt\n-rother.txt\n--constraint x.txt\n--requirements-y\n--constraint=\n-r\n", scope: []string{"ci/base.txt", "constraints.txt"}, want: []string{"dev.txt", "other.txt", "x.txt", "--constraint="}},
 	{name: "requirements with hashes", path: "dev-requirements.txt", data: "a==1.0 \\\n    --hash=sha256:ab\nb==2.0\n./local\n", want: []string{"b==2.0"}},
 	{name: "requirements range with ==", path: "requirements-dev.txt", data: "a==1.0,<2\n", want: []string{"a==1.0,<2"}},
 	{name: "requirements directory", path: "requirements/dev.txt", data: "requests>=2\n", want: []string{"requests>=2"}},
@@ -190,6 +193,13 @@ var commandCases = []struct {
 	{name: "npm docker git global options", cmd: "npm --prefix web install left-pad; docker --context ci run redis:7; git -C deps clone https://g/x; git -c a=b clone https://g/z", want: []string{"left-pad", "redis:7", "https://g/x", "https://g/z"}},
 	{name: "global option without a subcommand", cmd: "apk --version; git --no-pager", want: nil},
 	{name: "git clone commit elsewhere on the line", cmd: "git clone https://g/x; echo " + sha, want: []string{"https://g/x"}},
+	{name: "two clones one checkout", cmd: "git clone https://g/a && git clone https://g/b && git -C b checkout " + sha + "", want: []string{"https://g/a", "https://g/b"}},
+	{name: "git pull", cmd: "git -C x pull --ff-only; git fetch", want: []string{"git pull"}},
+	{name: "rpm packages", cmd: "dnf -y install curl curl-7.76.1-26.el9 java-17-openjdk && yum install ./x.rpm && microdnf install jq && zypper -n in git vim=9.0 && dnf update", want: []string{"curl", "java-17-openjdk", "jq", "git"}},
+	{name: "releases latest", cmd: "curl -fsSL https://github.com/a/b/releases/latest/download/b.tgz | tar xz; wget -qO- https://github.com/a/b/releases/download/v1.0/b.tgz | tar xz", want: []string{"curl -fsSL https://github.com/a/b/releases/latest/download/b.tgz"}},
+	{name: "python -c curl", cmd: `python3 -c "$(curl -fsSL https://x.io/i.py)"`, want: []string{"python3 -c $(curl"}},
+	{name: "kubectl image", cmd: "kubectl run t --image=busybox:1.36 --rm; kubectl create deployment d --image nginx; kubectl run p --image=busybox" + dg + "; kubectl get pods", want: []string{"busybox:1.36", "nginx"}},
+	{name: "helm chart version", cmd: "helm install r bitnami/redis; helm upgrade --install r oci://r.io/c --version 1.2.3; helm install ./charts/app --generate-name; helm install r2 c --repo https://x --version ^1; helm install r3 charts/local; helm upgrade r4 a.tgz --version=v2.0.0; helm list; helm install", scope: []string{"charts/local/Chart.yaml"}, want: []string{"bitnami/redis", "./charts/app", "c"}},
 	{name: "git clone then fetch a commit", cmd: "git clone https://g/x && git -C x fetch --depth 1 origin " + sha + " && git -C x reset --hard " + sha, want: nil},
 }
 
@@ -220,7 +230,8 @@ func TestScan(t *testing.T) {
 	write(t, dir, "Dockerfile", "FROM a:1\nFROM a:1\n")
 	write(t, dir, "main.go", "package main\n")
 	write(t, dir, "big.sh", strings.Repeat("#", MaxFileSize+1))
-	got := Scan(dir, []string{"Dockerfile", "big.sh", "gone.sh", "main.go", "z/compose.yaml"}, []string{"docker", "run", "e:3"})
+	write(t, dir, "pnpm-lock.yaml", strings.Repeat("#", MaxFileSize+1)) // hashed, not scanned
+	got := Scan(dir, []string{"Dockerfile", "big.sh", "gone.sh", "main.go", "pnpm-lock.yaml", "z/compose.yaml"}, []string{"docker", "run", "e:3"})
 	var lines []string
 	for _, f := range got {
 		lines = append(lines, f.String())

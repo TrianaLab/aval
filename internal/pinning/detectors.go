@@ -1,6 +1,7 @@
 package pinning
 
 import (
+	"cmp"
 	"encoding/json"
 	"maps"
 	"path"
@@ -13,9 +14,16 @@ import (
 // rendered Helm manifests, CI service definitions.
 type composeImages struct{}
 
+// lockfiles are hashed but not scanned: they hold no image: keys, and a
+// large one would be an unacceptable scan finding.
+var lockfiles = []string{"pnpm-lock.yaml", "conda-lock.yml", "conda-lock.yaml"}
+
 func (composeImages) Applies(p string) bool {
-	e := path.Ext(p)
-	return e == ".yaml" || e == ".yml" || e == ".json" && strings.Contains(path.Base(p), "compose")
+	e, b := path.Ext(p), path.Base(p)
+	if slices.Contains(lockfiles, b) {
+		return false
+	}
+	return e == ".yaml" || e == ".yml" || e == ".json" && strings.Contains(b, "compose")
 }
 
 // yamlImageRe finds a block-style image: key (quoted or not); its value is
@@ -97,7 +105,15 @@ func (dockerfile) Detect(in Input) []Finding {
 	var heredoc string // the delimiter of an open RUN <<EOF body
 	var body []string
 	start := 0
+	directives := true // parser directives (# syntax=) come before anything else
 	for _, l := range lines {
+		if directives {
+			if m := syntaxRe.FindStringSubmatch(l.text); m != nil {
+				out = append(out, image(in.Path, l.n, m[1], nil)...)
+				continue
+			}
+			directives = strings.TrimSpace(l.text) == "" || isComment(strings.TrimSpace(l.text))
+		}
 		if heredoc != "" {
 			if strings.TrimSpace(l.text) == heredoc {
 				out = append(out, heredocFindings(in, start, body)...)
@@ -121,6 +137,9 @@ func (dockerfile) Detect(in Input) []Finding {
 	}
 	return out
 }
+
+// syntaxRe finds the BuildKit frontend image of a # syntax= directive.
+var syntaxRe = regexp.MustCompile(`(?i)^\s*#\s*syntax\s*=\s*(\S+)`)
 
 // heredocRe finds a BuildKit heredoc (RUN <<EOF, <<-"EOF") and its delimiter.
 var heredocRe = regexp.MustCompile(`<<-?\s*["']?([A-Za-z_][A-Za-z0-9_]*)["']?`)
@@ -279,6 +298,10 @@ func requirements(in Input) []Finding {
 	hashes := strings.Contains(string(in.Data), "--hash") || strings.Contains(string(in.Data), "--require-hashes")
 	var out []Finding
 	for _, l := range lines {
+		if f, ok := include(l.text); ok && !in.Has(path.Join(path.Dir(in.Path), f)) {
+			out = append(out, Finding{File: in.Path, Line: l.n, Ecosystem: "python", Ref: f, Fix: "the included requirements file is not in scope, so its pins are not checked: add it to scope.dependencies"})
+			continue
+		}
 		spec, opts := requirement(l.text)
 		switch {
 		case spec == "": // a comment, an option or only a marker
@@ -289,6 +312,25 @@ func requirements(in Input) []Finding {
 		}
 	}
 	return out
+}
+
+// include returns the file a -r, --requirement, -c or --constraint line
+// names, relative to the requirements file, as pip reads it.
+func include(s string) (string, bool) {
+	f := strings.Fields(s)
+	if len(f) == 0 {
+		return "", false
+	}
+	for _, o := range []string{"--requirement", "--constraint", "-r", "-c"} {
+		switch v, ok := strings.CutPrefix(f[0], o); {
+		case !ok:
+		case v == "" && len(f) > 1:
+			return f[1], true
+		case v != "" && (len(o) == 2 || v[0] == '='):
+			return cmp.Or(strings.TrimPrefix(v, "="), strings.TrimSpace(s)), true // an empty name is reported by its line
+		}
+	}
+	return "", false
 }
 
 // requirement splits one requirements line into the requirement, without

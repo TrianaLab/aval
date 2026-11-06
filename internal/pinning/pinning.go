@@ -37,7 +37,7 @@ type Finding struct {
 	// Line is 1-based; 0 when the finding is about the whole file.
 	Line int
 	// Ecosystem names the detector's domain: container, go, npm, python,
-	// rust, java, ruby, php, os-package, git, remote-script, scan.
+	// rust, java, ruby, php, os-package, helm, git, remote-script, scan.
 	Ecosystem string
 	// Ref is the reference as written. scope.allowMutable matches on it.
 	Ref string
