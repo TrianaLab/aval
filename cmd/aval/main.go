@@ -57,6 +57,8 @@ var (
 	newVerifier    = attest.NewVerifier
 	sign           = attest.Sign
 	publish        = registry.Push
+	pushRecord     = registry.Record
+	now            = time.Now
 )
 
 var (
@@ -122,7 +124,7 @@ func newRootCmd() *cobra.Command {
 		return nil
 	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
-	root.AddCommand(newRunCmd(), newPushCmd(), newVerifyCmd())
+	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newVerifyCmd())
 	return root
 }
 
@@ -168,8 +170,8 @@ func noArgs(c *cobra.Command, args []string) error {
 // loadAndFingerprint loads the contract and computes its fingerprint, rooted
 // at the contract's directory. When only the fingerprint fails it still
 // returns the contract, so run can execute the test. outputs are the files
-// the command writes or reads as Aval output (--result, --report); inside
-// the contract root they are not inputs.
+// the command writes or reads as Aval output (--result, --report,
+// --record-file); inside the contract root they are not inputs.
 func loadAndFingerprint(file string, outputs ...string) (*contract.Contract, fingerprint.Fingerprint, error) {
 	c, err := contract.Load(file)
 	if err != nil {
@@ -191,9 +193,9 @@ func loadAndFingerprint(file string, outputs ...string) (*contract.Contract, fin
 
 // isInput reports whether the output path p holds an input of the test that
 // fingerprint.Compute would skip: the scope of c, rooted at dir, includes p,
-// and p holds something other than Aval's own result or report (a
-// whole-tree scope finds those on the next run, #63).
-// ponytail: an input that is itself a valid Aval result or report (a test
+// and p holds something other than Aval's own result, report or run record
+// (a whole-tree scope finds those on the next run, #63).
+// ponytail: an input that is itself a valid Aval result, report or run record (a test
 // fixture) is taken for an output; name such a fixture as --result and the
 // run overwrites it anyway.
 func isInput(dir string, c *contract.Contract, p string) bool {
@@ -201,7 +203,7 @@ func isInput(dir string, c *contract.Contract, p string) bool {
 }
 
 // existsNonAvalOutput reports whether something other than Aval's own
-// result or report sits at p. Anything that cannot be read or is not a
+// result, report or run record sits at p. Anything that cannot be read or is not a
 // regular file counts (fail closed).
 func existsNonAvalOutput(p string) bool {
 	if p == "" {
@@ -219,13 +221,19 @@ func existsNonAvalOutput(p string) bool {
 }
 
 // isAvalOutput reports whether raw is exactly a result recorded by 'aval
-// run' or a verify report: strict JSON (no unknown fields, nothing after
+// run', a verify report or a run record: strict JSON (no unknown fields, nothing after
 // it) with the mandatory fields set, so an arbitrary input file is not
 // mistaken for one and dropped from the fingerprint.
 func isAvalOutput(raw []byte) bool {
 	var p evidence.Predicate
 	if decodeStrict(raw, &p) == nil && p.Validate() == nil {
 		return true
+	}
+	var rec evidence.RunRecord
+	if decodeStrict(raw, &rec) == nil {
+		if _, err := evidence.ParseRunRecord(raw); err == nil {
+			return true
+		}
 	}
 	var r evidence.Report
 	if decodeStrict(raw, &r) != nil || r.Version != evidence.ReportVersion || r.TestID == "" {

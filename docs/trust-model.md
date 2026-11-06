@@ -261,6 +261,12 @@ non-printable characters, quotes and backslashes): such text never
 starts a line of its own (a CI log command, a terminal escape). The JSON
 report keeps the reason as is.
 
+`--record` publishes a run record for statistics after the decision, for
+every outcome (see [artifact-format.md](artifact-format.md#run-records)).
+Records are unsigned, never read by `aval run` or `aval verify`, and never
+affect reuse or the exit code: a record that cannot be published is a
+warning.
+
 `--shadow` verifies and runs the test anyway. If a verified result disagrees
 with the real run, that is a false hit: `aval run` prints `aval: FALSE HIT:
 ...` on stderr and exits 1. If they agree, it says reuse would have been
@@ -321,4 +327,5 @@ declared class.
 | Replay of a passing result for a different fingerprint or test id | `Verify` requires `execution.fingerprint == ExpectedFingerprint` and `test.id == ExpectedTestID`, both computed locally. The signed predicate cannot be re-labeled without breaking the signature. Mismatch is `verification-failed`. |
 | Undeclared input changed (file outside scope, unlisted env var, network service) | Out of scope for detection in v0: the fingerprint only covers declared inputs. Mitigated by contract review, `external-dependencies` / `non-deterministic` classes not being reusable by default, and the false-hit suite (roadmap item 4). Observed-input tracing is future work. |
 | Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with outcome `verification-failed` in the verify report (and a warning on stderr). It can delete attestations (forcing misses, i.e. re-runs) or deny service (`error`, re-run). Availability is out of scope. |
+| Forged or tampered run records (anyone with push access) | Records are statistics, never evidence: unsigned, hung off a per-test stats anchor, and never fetched by `aval run` or `aval verify`, so they cannot cause reuse or count toward the candidate cap. A record crafted with a fingerprint anchor as its subject is filtered out by artifact type. They can skew statistics; treat them as informational. |
 | Dishonest but trusted signer (ran a modified test and signed "passed") | Out of scope for Aval. A signature proves who claims it, not that the test ran honestly. Limit which identities get which level; level 3 (isolated) exists for this. |

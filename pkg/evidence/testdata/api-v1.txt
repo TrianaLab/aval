@@ -119,3 +119,21 @@ type VerifyOptions struct
 var ErrNotFound error
 var ErrNotImplemented error
 var ErrVerification error
+comparable RunRecord
+const ArtifactTypeRun untyped string
+const ArtifactTypeStats untyped string
+const MediaTypeRun untyped string
+const RunRecordVersion untyped string
+field RunRecord.AvalVersion string "json:\"avalVersion\""
+field RunRecord.CIRunURL string "json:\"ciRunUrl,omitempty\""
+field RunRecord.Fingerprint string "json:\"fingerprint\""
+field RunRecord.Outcome Outcome "json:\"outcome\""
+field RunRecord.RecordedAt time.Time "json:\"recordedAt\""
+field RunRecord.Result Result "json:\"result,omitempty\""
+field RunRecord.Reused bool "json:\"reused\""
+field RunRecord.SavedDurationMs int64 "json:\"savedDurationMs\""
+field RunRecord.TestDurationMs int64 "json:\"testDurationMs\""
+field RunRecord.TestID string "json:\"testId\""
+field RunRecord.Version string "json:\"version\""
+func ParseRunRecord([]byte) (*RunRecord, error)
+type RunRecord struct

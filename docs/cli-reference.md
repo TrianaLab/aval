@@ -31,6 +31,7 @@ Available Commands:
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
   push        Sign and publish a recorded execution result
+  record      Publish a run record written by 'aval run --record-file'
   run         Reuse a verified result for the current inputs, or run the test
   verify      Check whether a trusted result exists for the current inputs
 
@@ -81,6 +82,25 @@ Flags:
       --result string               result recorded by 'aval run' (default ".aval/result.json")
 ```
 
+## aval record
+
+record publishes a run record that 'aval run --record-file' wrote to the
+test's stats anchor in the registry, as 'aval run --record' would have. Use it
+to publish, from a job with write credentials that runs no tests, the record
+of a run made without them. Run records are unsigned statistics: run and
+verify never read them.
+
+```text
+Usage:
+  aval record [flags]
+
+Flags:
+  -h, --help                        help for record
+      --record-file string          run record written by 'aval run --record-file' (required)
+      --registry string             OCI repository for run records (required)
+      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+```
+
 ## aval run
 
 run computes the execution fingerprint of the contract, looks for a signed
@@ -94,6 +114,12 @@ exits 5: it is a security event. A reused failing result exits 3, like a
 failing run. --shadow verifies and still runs the test; if the verified
 result disagrees with the run, that is a false hit and run exits 1.
 
+--record publishes a run record (outcome, reuse, durations) for statistics
+to the test's stats anchor in the registry, for every outcome. It is
+best-effort: a failure, such as missing write credentials, is a warning and
+never changes the exit code. Records are unsigned and never read by run or
+verify. --record-file writes the same record to a file for 'aval record'.
+
 Exit codes: 0 passed or reused a pass, 3 failed or reused a failure,
 5 verification failed (after running the test), 1 error or false hit,
 2 usage. Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN;
@@ -104,6 +130,7 @@ Usage:
   aval run [flags]
 
 Flags:
+      --ci-run-url string           link to the CI run, stored in the run record
   -f, --contract string             path to the test contract (default "aval.yaml")
       --explain                     print the fingerprint manifest (what was hashed)
       --fingerprint-only            print the execution fingerprint and exit
@@ -112,6 +139,8 @@ Flags:
       --no-reuse                    always run, never reuse
       --policy string               trust policy file (required for reuse; without it the test always runs)
       --push                        sign and publish the result after running (needs --registry)
+      --record                      publish a run record for statistics after the run (needs --registry; best-effort)
+      --record-file string          also write the run record to this file, for 'aval record'
       --registry string             OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
       --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
       --report string               also write the lookup decision as a verify report (JSON) to this file
