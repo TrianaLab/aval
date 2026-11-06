@@ -694,29 +694,36 @@ func TestStalledRegistryHonoursDeadline(t *testing.T) {
 // A registry that keeps answering empty referrers pages with a next link
 // ends the listing after maxReferrerPages requests, with a plain error.
 func TestLookupCapsReferrerPages(t *testing.T) {
-	ctx := context.Background()
-	pages := 0
-	armed := false
-	repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
-		if !armed || !strings.Contains(r.URL.Path, "/referrers/") {
-			return false
-		}
-		pages++
-		w.Header().Set("Content-Type", ocispec.MediaTypeImageIndex)
-		w.Header().Set("Link", fmt.Sprintf(`<%s?last=%d>; rel="next"`, r.URL.Path, pages))
-		_ = json.NewEncoder(w).Encode(ocispec.Index{Versioned: specs.Versioned{SchemaVersion: 2}, MediaType: ocispec.MediaTypeImageIndex, Manifests: []ocispec.Descriptor{}})
-		return true
-	})
-	if _, err := Push(ctx, repo, fpA, att("ci", nil)); err != nil {
-		t.Fatal(err)
-	}
-	armed = true
-	got, err := Lookup(ctx, repo, fpA)
-	if err == nil || errors.Is(err, evidence.ErrNotFound) || errors.Is(err, evidence.ErrVerification) || got != nil {
-		t.Fatalf("Lookup = %+v %v; want a plain error", got, err)
-	}
-	if pages != maxReferrerPages {
-		t.Fatalf("registry served %d pages, want %d", pages, maxReferrerPages)
+	for name, next := range map[string]func(path string, page int) string{
+		"same path":    func(path string, page int) string { return fmt.Sprintf("%s?last=%d", path, page) },
+		"another path": func(_ string, page int) string { return fmt.Sprintf("/v2/elsewhere?last=%d", page) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			pages := 0
+			armed := false
+			repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
+				if !armed || !strings.Contains(r.URL.Path, "/referrers/") && !strings.HasPrefix(r.URL.Path, "/v2/elsewhere") {
+					return false
+				}
+				pages++
+				w.Header().Set("Content-Type", ocispec.MediaTypeImageIndex)
+				w.Header().Set("Link", fmt.Sprintf(`<%s>; rel="next"`, next(r.URL.Path, pages)))
+				_ = json.NewEncoder(w).Encode(ocispec.Index{Versioned: specs.Versioned{SchemaVersion: 2}, MediaType: ocispec.MediaTypeImageIndex, Manifests: []ocispec.Descriptor{}})
+				return true
+			})
+			if _, err := Push(ctx, repo, fpA, att("ci", nil)); err != nil {
+				t.Fatal(err)
+			}
+			armed = true
+			got, err := Lookup(ctx, repo, fpA)
+			if err == nil || errors.Is(err, evidence.ErrNotFound) || errors.Is(err, evidence.ErrVerification) || got != nil {
+				t.Fatalf("Lookup = %+v %v; want a plain error", got, err)
+			}
+			if pages > maxReferrerPages {
+				t.Fatalf("registry served %d pages, want at most %d", pages, maxReferrerPages)
+			}
+		})
 	}
 }
 

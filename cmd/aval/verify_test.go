@@ -6,9 +6,11 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -191,9 +193,17 @@ func TestVerifyTrustedRootError(t *testing.T) {
 	if err := os.WriteFile(pol, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// A well-formed keyless bundle: a self-signed certificate.
+	k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), NotAfter: time.Now().Add(time.Hour)}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &k.PublicKey, k)
+	if err != nil {
+		t.Fatal(err)
+	}
 	serve(t, &registry.Attestation{
 		Envelope: &evidence.Envelope{PayloadType: evidence.PayloadType, Payload: []byte("{}")},
-		Bundle:   []byte(`{"verificationMaterial":{"certificate":{"rawBytes":"AA=="}}}`),
+		Bundle: []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json","verificationMaterial":{"certificate":{"rawBytes":"` +
+			base64.StdEncoding.EncodeToString(der) + `"}},"dsseEnvelope":{"payload":"e30=","payloadType":"application/vnd.in-toto+json","signatures":[{"sig":"AA=="}]}}`),
 	})
 	code, stdout, _ := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "--policy", pol, "-o", "json")
 	if code != ExitError || !strings.Contains(stdout, `"outcome": "error"`) || !strings.Contains(stdout, "trusted root") {

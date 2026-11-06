@@ -121,12 +121,13 @@ func sharedClient() (remote.Client, error) {
 // pageCount is the context key of the referrers page counter of one listing.
 type pageCount struct{}
 
-// pagedClient fails a referrers request once the listing in its context has
-// requested maxReferrerPages pages.
+// pagedClient fails any request of a referrers listing once it has made
+// maxReferrerPages requests. Every request counts, whatever its path: oras
+// follows any same-origin Link, so a path filter could be bypassed.
 type pagedClient struct{ remote.Client }
 
 func (c pagedClient) Do(req *http.Request) (*http.Response, error) {
-	if n, ok := req.Context().Value(pageCount{}).(*int); ok && strings.Contains(req.URL.Path, "/referrers/") {
+	if n, ok := req.Context().Value(pageCount{}).(*int); ok {
 		if *n++; *n > maxReferrerPages {
 			return nil, fmt.Errorf("more than %d referrers pages", maxReferrerPages)
 		}

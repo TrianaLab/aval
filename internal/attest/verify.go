@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -116,22 +115,17 @@ func (v *Verifier) For(bundleJSON []byte) (evidence.SignatureVerifier, error) {
 	return bundleSignature{v: v, raw: bundleJSON}, nil
 }
 
-// keyBased reports whether the bundle JSON names a public key instead of a
-// certificate, or is not JSON at all; neither needs the trusted root.
-// protojson accepts both the JSON and the proto field names.
+// keyBased reports whether verifying the bundle can never need the trusted
+// root: it does not decode or carries no usable verification material (so it
+// never verifies), or it names a public key. It asks sigstore, which
+// VerifySignature uses too, instead of parsing the JSON by hand.
 func keyBased(raw []byte) bool {
-	var b map[string]json.RawMessage
-	if json.Unmarshal(raw, &b) != nil {
+	var b bundle.Bundle
+	if b.UnmarshalJSON(raw) != nil {
 		return true
 	}
-	for _, name := range []string{"verificationMaterial", "verification_material"} {
-		var vm map[string]json.RawMessage
-		_ = json.Unmarshal(b[name], &vm) // ponytail: not an object means no key either
-		if vm["publicKey"] != nil || vm["public_key"] != nil {
-			return true
-		}
-	}
-	return false
+	vc, err := b.VerificationContent()
+	return err != nil || vc.PublicKey() != nil
 }
 
 type bundleSignature struct {

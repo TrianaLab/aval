@@ -7,12 +7,16 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
+	"math/big"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
@@ -268,8 +272,23 @@ func TestNewVerifierErrors(t *testing.T) {
 	}
 }
 
-// certBundle is the shape of a keyless bundle as far as For looks at it.
-var certBundle = []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json","verificationMaterial":{"certificate":{"rawBytes":"AA=="}}}`)
+// certBundle is a well-formed keyless bundle: a self-signed certificate and a
+// DSSE envelope. It never verifies, but sigstore classifies it as keyless.
+var certBundle = keylessBundleJSON(`"certificate":{"rawBytes":%q}`)
+
+// keylessBundleJSON returns a v0.3 bundle whose verificationMaterial holds
+// material, with %q replaced by a base64 self-signed certificate.
+func keylessBundleJSON(material string) []byte {
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), NotAfter: time.Now().Add(time.Hour)}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		panic(err)
+	}
+	vm := fmt.Sprintf(material, base64.StdEncoding.EncodeToString(der))
+	return []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json","verificationMaterial":{` + vm +
+		`,"tlogEntries":[]},"dsseEnvelope":{"payload":"e30=","payloadType":"application/vnd.in-toto+json","signatures":[{"sig":"AA=="}]}}`)
+}
 
 // The trusted root (a TUF fetch for the public-good instance) is loaded only
 // when a bundle carries a certificate, once, and a failure to load it is a
@@ -290,8 +309,8 @@ func TestKeylessTrustedRootIsLazy(t *testing.T) {
 			t.Fatalf("For(%.40q): %v, %d fetches", b, err, fetches)
 		}
 	}
-	for range 2 {
-		if _, err := v.For(certBundle); err == nil || errors.Is(err, evidence.ErrVerification) || !strings.Contains(err.Error(), "offline") {
+	for _, b := range [][]byte{certBundle, keylessBundleJSON(`"publicKey":null,"certificate":{"rawBytes":%q}`)} {
+		if _, err := v.For(b); err == nil || errors.Is(err, evidence.ErrVerification) || !strings.Contains(err.Error(), "offline") {
 			t.Fatalf("For(certificate bundle) = %v, want the plain trusted root error", err)
 		}
 	}

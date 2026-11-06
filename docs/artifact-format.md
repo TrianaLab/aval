@@ -151,8 +151,10 @@ lists the anchor's referrers after pushing and returns only once the new
 digest is among them; if it is not, it pushes the manifest again (which
 re-adds it to the index) and lists again, three attempts in total, one second
 apart. If the digest is still not listed, `aval push` and `aval run --push`
-fail (exit 1). A dropped execution is never a candidate, so even then it
-never makes an unsigned or untrusted result reusable. Aval does not
+fail (exit 1). Once a fingerprint has more than 64 attestations the
+confirmation listing fails too, so push exits 1. A dropped execution is never
+a candidate, so even then it never makes an unsigned or untrusted result
+reusable. Aval does not
 delete the previous referrers index after rewriting it, so pushing does not
 need DELETE rights.
 
@@ -173,8 +175,9 @@ need DELETE rights.
    tags are mutable, digests aren't.
 5. Verify each envelope and apply the trust policy (see below).
 
-Lookup accepts at most 64 candidates per fingerprint and follows at most 64
-referrers pages. Above either limit it fails with outcome `error` (run the
+Lookup accepts at most 64 candidates per fingerprint and makes at most 64
+requests to list referrers, whatever paths the registry's `Link` headers
+point at. Above either limit it fails with outcome `error` (run the
 test), so whoever can push, or a buggy registry, cannot make `aval verify`
 fetch an unbounded number of manifests or pages.
 
