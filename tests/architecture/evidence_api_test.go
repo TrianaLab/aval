@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
+	"go/build/constraint"
 	"go/importer"
 	"go/parser"
 	"go/token"
@@ -14,10 +15,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
-
-	"gopkg.in/yaml.v3"
 )
 
 // Issue #18: pkg/evidence is semver-stable public API. Its exported surface
@@ -28,8 +28,11 @@ import (
 // (github.com/TrianaLab/aval/v2), which starts a new snapshot file. Every
 // line of the snapshot at the base revision must still be there, so the
 // snapshot cannot be edited together with a break.
-// ponytail: names, types and signatures only, like a reduced apidiff;
-// constant values are format identifiers and follow artifact-format.md.
+// ponytail: names, types, signatures and struct tags, like a reduced
+// apidiff. Constant values are rendered only for constants of a type the
+// package declares (TrustLevel, Result, Outcome), whose values consumers
+// compare and policies store; untyped constants are format identifiers and
+// follow artifact-format.md.
 
 const consumerModule = "example.com/evidence-consumer"
 
@@ -47,7 +50,11 @@ func apiSurface(pkg *types.Package) []string {
 		}
 		switch o := obj.(type) {
 		case *types.Const:
-			out = append(out, "const "+name+" "+typ(o.Type()))
+			line := "const " + name + " " + typ(o.Type())
+			if n, ok := o.Type().(*types.Named); ok && n.Obj().Pkg() == pkg {
+				line += " = " + o.Val().ExactString()
+			}
+			out = append(out, line)
 		case *types.Var:
 			out = append(out, "var "+name+" "+typ(o.Type()))
 		case *types.Func:
@@ -76,14 +83,21 @@ func typeLines(o *types.TypeName, typ func(types.Type) string) []string {
 		if types.Comparable(o.Type()) {
 			out = append(out, "comparable "+o.Name())
 		}
-		for f := range u.Fields() {
+		for i := range u.NumFields() {
+			f := u.Field(i)
 			// An embedded field is rendered even when unexported: its
 			// promoted members are API, and the unexported-type check
-			// rejects it.
+			// rejects it. The tag is API too: it is the JSON shape
+			// consumers decode registry bytes with.
 			if f.Exported() || f.Embedded() {
-				out = append(out, fmt.Sprintf("field %s.%s %s", o.Name(), f.Name(), typ(f.Type())))
+				line := fmt.Sprintf("field %s.%s %s", o.Name(), f.Name(), typ(f.Type()))
+				if tag := u.Tag(i); tag != "" {
+					line += " " + strconv.Quote(tag)
+				}
+				out = append(out, line)
 			}
 		}
+		out = append(out, promotedFields(o, u, typ)...)
 	case *types.Interface:
 		if !u.IsMethodSet() { // a constraint: its type set is API too
 			return append(out, "type "+name+" "+typ(u))
@@ -110,6 +124,47 @@ func typeLines(o *types.TypeName, typ func(types.Type) string) []string {
 			recv = o.Name()
 		}
 		out = append(out, fmt.Sprintf("method (%s) %s%s", recv, m.Name(), signature(m.Type().(*types.Signature), typ)))
+	}
+	return out
+}
+
+// promotedFields renders the exported fields reachable through embedding
+// as the selector resolves them: a field that becomes ambiguous or shadowed
+// changes or loses its line.
+func promotedFields(o *types.TypeName, u *types.Struct, typ func(types.Type) string) []string {
+	names := map[string]bool{}
+	seen := map[types.Type]bool{}
+	var walk func(s *types.Struct)
+	walk = func(s *types.Struct) {
+		for f := range s.Fields() {
+			if !f.Embedded() {
+				continue
+			}
+			t := f.Type()
+			if p, ok := t.(*types.Pointer); ok {
+				t = p.Elem()
+			}
+			if seen[t] {
+				continue
+			}
+			seen[t] = true
+			if es, ok := t.Underlying().(*types.Struct); ok {
+				for g := range es.Fields() {
+					if g.Exported() {
+						names[g.Name()] = true
+					}
+				}
+				walk(es)
+			}
+		}
+	}
+	walk(u)
+	var out []string
+	for name := range names {
+		obj, index, _ := types.LookupFieldOrMethod(o.Type(), true, o.Pkg(), name)
+		if v, ok := obj.(*types.Var); ok && len(index) > 1 {
+			out = append(out, fmt.Sprintf("promoted %s.%s %s", o.Name(), name, typ(v.Type())))
+		}
 	}
 	return out
 }
@@ -215,56 +270,40 @@ func unexportedTypes(pkg *types.Package, surface []string) []string {
 // leftmost-longest run needs no word boundary.
 var identRe = regexp.MustCompile(`[\p{L}_][\p{L}\p{N}_]*`)
 
-// releasePlatforms returns every GOOS/GOARCH pair the release builds, read
-// from .goreleaser.yaml, each with cgo off and on: consumers build pkg/evidence
-// either way. It fails if the config yields no platform.
-func releasePlatforms(t *testing.T, config string) []build.Context {
-	t.Helper()
-	var cfg struct {
-		Builds []struct {
-			Goos   []string `yaml:"goos"`
-			Goarch []string `yaml:"goarch"`
-		} `yaml:"builds"`
+// buildConstraint reports why dir/name is not built everywhere: a
+// //go:build or // +build line (GOOS, GOARCH, cgo, a go1.N release tag or a
+// custom tag), import "C", or a _GOOS/_GOARCH file name suffix. The
+// snapshot is taken on one platform and toolchain, and consumers build
+// pkg/evidence on any, so every file must be unconstrained.
+func buildConstraint(dir, name string) (string, error) {
+	src, err := os.ReadFile(filepath.Join(dir, name))
+	if err != nil {
+		return "", err
 	}
-	if err := yaml.Unmarshal([]byte(config), &cfg); err != nil {
-		t.Fatal(err)
+	f, err := parser.ParseFile(token.NewFileSet(), name, src, parser.ImportsOnly|parser.ParseComments)
+	if err != nil {
+		return "", err
 	}
-	var out []build.Context
-	for _, b := range cfg.Builds {
-		for _, goos := range b.Goos {
-			for _, goarch := range b.Goarch {
-				for _, cgo := range []bool{false, true} {
-					ctx := build.Default
-					ctx.GOOS, ctx.GOARCH, ctx.CgoEnabled = goos, goarch, cgo
-					out = append(out, ctx)
-				}
+	for _, g := range f.Comments {
+		for _, c := range g.List {
+			if c.Pos() < f.Package && (constraint.IsGoBuild(c.Text) || constraint.IsPlusBuild(c.Text)) {
+				return "has the build constraint " + c.Text, nil
 			}
 		}
 	}
-	if len(out) == 0 {
-		t.Fatal(".goreleaser.yaml lists no goos/goarch to check pkg/evidence against")
-	}
-	return out
-}
-
-// platformSplit returns the platforms that build dir/name and those that do
-// not, judged by its file name suffix and //go:build line.
-// ponytail: custom tags (-tags foo) are not tried; a file excluded by one is
-// out everywhere and never in the surface.
-func platformSplit(dir, name string, platforms []build.Context) (in, out []string, err error) {
-	for _, ctx := range platforms {
-		ok, err := ctx.MatchFile(dir, name)
-		if err != nil {
-			return nil, nil, err
-		}
-		p := fmt.Sprintf("%s/%s cgo=%t", ctx.GOOS, ctx.GOARCH, ctx.CgoEnabled)
-		if ok {
-			in = append(in, p)
-		} else {
-			out = append(out, p)
+	for _, imp := range f.Imports {
+		if imp.Path.Value == `"C"` {
+			return "uses cgo", nil
 		}
 	}
-	return in, out, nil
+	// No file name suffix names this context, so only a _GOOS/_GOARCH
+	// suffix excludes the file here.
+	ctx := build.Default
+	ctx.GOOS, ctx.GOARCH = "none", "none"
+	if ok, err := ctx.MatchFile(dir, name); err != nil || !ok {
+		return "is excluded by its _GOOS/_GOARCH file name suffix", err
+	}
+	return "", nil
 }
 
 // gitIn runs git in dir with extra environment and returns trimmed stdout.
@@ -282,9 +321,8 @@ func gitIn(dir string, env ...string) func(...string) (string, error) {
 // the merge base with origin/<base> on a pull request, the commit the branch
 // pointed to before a push (`before` in the event at GITHUB_EVENT_PATH, so a
 // multi-commit push is compared as a whole), the merge base with origin/main
-// otherwise. Outside CI, a
-// missing origin/main returns "" (nothing to compare with); in CI every
-// failure is an error, so the check fails closed.
+// otherwise. Outside CI, a missing origin/main returns "" (nothing to
+// compare with); in CI every failure is an error, so the check fails closed.
 func apiBase(git func(...string) (string, error), getenv func(string) string) (string, error) {
 	ci := getenv("CI") != ""
 	var rev string
@@ -350,7 +388,7 @@ func snapshotRemovals(git func(...string) (string, error), base, snapshot string
 }
 
 // evidenceSources returns the non-test sources of pkg/evidence and reports
-// any file that is built on some release platforms but not on others.
+// any file that is not built on every platform and toolchain.
 func evidenceSources(t *testing.T) map[string]string {
 	t.Helper()
 	dir := filepath.Join(root, "pkg", "evidence")
@@ -358,25 +396,21 @@ func evidenceSources(t *testing.T) map[string]string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	platforms := releasePlatforms(t, readFile(t, ".goreleaser.yaml"))
 	files := map[string]string{}
 	for _, f := range paths {
 		name := filepath.Base(f)
-		if strings.HasSuffix(name, "_test.go") {
+		// The go tool ignores _ and . files; tests are not API.
+		if strings.HasSuffix(name, "_test.go") || strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".") {
 			continue
 		}
-		// The surface is computed on one platform and consumers build on
-		// all of them, so a file is built everywhere or nowhere.
-		in, out, err := platformSplit(dir, name, platforms)
+		why, err := buildConstraint(dir, name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(in) != 0 && len(out) != 0 {
-			t.Errorf("pkg/evidence/%s is built on %v but not on %v: pkg/evidence must expose the same API on every platform", name, in, out)
+		if why != "" {
+			t.Errorf("pkg/evidence/%s %s: pkg/evidence must expose the same API on every platform and Go version", name, why)
 		}
-		if len(in) != 0 {
-			files[f] = readFile(t, filepath.Join("pkg", "evidence", name))
-		}
+		files[f] = readFile(t, filepath.Join("pkg", "evidence", name))
 	}
 	return files
 }
@@ -425,20 +459,25 @@ func TestEvidenceAPIIsAppendOnly(t *testing.T) {
 func TestEvidenceAPICheckCatchesBreakingChanges(t *testing.T) {
 	const base = `package p
 import "context"
-type Signer struct{ KeyID string; hidden int }
+type Signer struct{ KeyID string "json:\"keyId\""; hidden int }
 type Verifier interface { Verify(ctx context.Context, b []byte) (Signer, error) }
 func Parse(data []byte, opts ...string) (*Signer, error) { return nil, nil }
 func (s Signer) String() string { return "" }
 const Version = "v1"
+type Level int
+const High Level = 2
 var ErrX error
 `
+	const tagged = `KeyID string "json:\"keyId\""`
 	snapshot := apiSurface(checkSource(t, "p", map[string]string{"p.go": base}))
 	want := []string{
 		"comparable Signer",
+		"const High Level = 2",
 		"const Version untyped string",
-		"field Signer.KeyID string",
+		"field Signer.KeyID string \"json:\\\"keyId\\\"\"",
 		"func Parse([]byte, ...string) (*Signer, error)",
 		"method (Signer) String() string",
+		"type Level int",
 		"type Signer struct",
 		"type Verifier interface { Verify(context.Context, []byte) (Signer, error) }",
 		"var ErrX error",
@@ -448,7 +487,7 @@ var ErrX error
 	}
 	compatible := map[string]string{
 		"renamed parameter": strings.Replace(base, "data []byte", "raw []byte", 1),
-		"new field":         strings.Replace(base, "KeyID string;", "KeyID string; Issuer string;", 1),
+		"new field":         strings.Replace(base, tagged, tagged+"; Issuer string", 1),
 		"new function":      base + "func New() {}\n",
 		"unexported change": strings.Replace(base, "hidden int", "hidden string", 1),
 	}
@@ -460,7 +499,7 @@ var ErrX error
 		}
 	}
 	breaking := map[string]string{
-		"removed field":         strings.Replace(base, "KeyID string;", "", 1),
+		"removed field":         strings.Replace(base, tagged+";", "", 1),
 		"field type":            strings.Replace(base, "KeyID string", "KeyID []byte", 1),
 		"interface method":      strings.Replace(base, "(Signer, error) }", "(Signer, error); Close() }", 1),
 		"parameter type":        strings.Replace(base, "data []byte", "data string", 1),
@@ -469,9 +508,13 @@ var ErrX error
 		"pointer receiver":      strings.Replace(base, "(s Signer)", "(s *Signer)", 1),
 		"typed constant":        strings.Replace(base, `Version = "v1"`, `Version string = "v1"`, 1),
 		"removed variable":      strings.Replace(base, "var ErrX error\n", "", 1),
-		"not comparable":        strings.Replace(base, "KeyID string;", "KeyID string; Tags []string;", 1),
+		"not comparable":        strings.Replace(base, tagged, tagged+"; Tags []string", 1),
 		"hidden not comparable": strings.Replace(base, "hidden int", "hidden []int", 1),
-		"struct to named type":  strings.Replace(base, "type Signer struct{ KeyID string; hidden int }", "type Signer string\nfunc (s Signer) KeyID() {}", 1),
+		"json tag":              strings.Replace(base, `json:\"keyId\"`, `json:\"key_id\"`, 1),
+		"omitempty":             strings.Replace(base, `json:\"keyId\"`, `json:\"keyId,omitempty\"`, 1),
+		"tag removed":           strings.Replace(base, tagged, "KeyID string", 1),
+		"constant value":        strings.Replace(base, "High Level = 2", "High Level = 3", 1),
+		"struct to named type":  strings.Replace(base, "type Signer struct{ "+tagged+"; hidden int }", "type Signer string\nfunc (s Signer) KeyID() {}", 1),
 	}
 	for name, src := range breaking {
 		if !slices.ContainsFunc(apiProblems(snapshot, apiSurface(checkSource(t, "p", map[string]string{"p.go": src})), "s"), func(p string) bool {
@@ -498,6 +541,9 @@ func TestEvidenceAPICheckCatchesHiddenSurface(t *testing.T) {
 		{"generic method", "type Box[T any] struct{ V T }\nfunc (Box[T]) Get() T { var v T; return v }", "type Box[T any] struct{ V T }\nfunc (Box[T]) Get() int { return 0 }"},
 		{"constraint type set", "type Num interface{ ~int | ~float64 }", "type Num interface{ ~int }"},
 		{"promoted method", "type Inner struct{}\nfunc (Inner) Do() {}\ntype S struct{ Inner }", "type Inner struct{}\nfunc (Inner) Do(int) {}\ntype S struct{ Inner }"},
+		{"promoted field type", "type Inner struct{ X int }\ntype S struct{ Inner }", "type Inner struct{ X string }\ntype S struct{ Inner }"},
+		{"promoted field ambiguous", "type A struct{ X int }\ntype B struct{}\ntype S struct{ A; B }", "type A struct{ X int }\ntype B struct{ X int }\ntype S struct{ A; B }"},
+		{"deep promoted field ambiguous", "type C struct{ X int }\ntype A struct{ C }\ntype B struct{ D }\ntype D struct{}\ntype S struct{ A; *B }", "type C struct{ X int }\ntype A struct{ C }\ntype B struct{ D }\ntype D struct{ X int }\ntype S struct{ A; *B }"},
 		{"promoted to pointer receiver", "type Inner struct{}\nfunc (Inner) Do() {}\ntype S struct{ Inner }", "type Inner struct{}\nfunc (*Inner) Do() {}\ntype S struct{ Inner }"},
 	}
 	for _, c := range breaking {
@@ -524,6 +570,11 @@ func TestEvidenceAPICheckCatchesHiddenSurface(t *testing.T) {
 	cur, pkg := surface("type state struct{ Public int }\ntype S struct{ s state; Name string }\nfunc New() S { return S{} }")
 	if p := unexportedTypes(pkg, cur); len(p) != 0 {
 		t.Errorf("an unexported field of an unexported type is not API: %v", p)
+	}
+	// A promoted field is rendered on the embedding type; a field that
+	// shadows it is a direct field, and embedding cycles terminate.
+	if cur, _ := surface("type Inner struct{ X int; Y int }\ntype S struct{ *Inner; Y string }\ntype L struct{ *L; Z int }"); !slices.Contains(cur, "promoted S.X int") || slices.Contains(cur, "promoted S.Y int") || slices.Contains(cur, "promoted L.Z int") {
+		t.Errorf("promoted fields:\n%s", strings.Join(cur, "\n"))
 	}
 	// The promoted method is rendered on the embedding type.
 	if cur, _ := surface("type Inner struct{}\nfunc (Inner) Do() {}\ntype S struct{ Inner }"); !slices.Contains(cur, "method (S) Do()") {
@@ -642,37 +693,53 @@ func TestSnapshotRemovalsAgainstBase(t *testing.T) {
 	}
 }
 
-// A file built on some release platforms but not others is reported, by
-// file name suffix or //go:build line; an unconstrained file is not.
-func TestPlatformSplit(t *testing.T) {
-	platforms := releasePlatforms(t, "builds:\n  - goos: [linux, darwin, windows]\n    goarch: [amd64, arm64]\n")
-	if len(platforms) != 12 {
-		t.Fatalf("got %d platforms, want 3 goos x 2 goarch x cgo off/on", len(platforms))
-	}
+// Any build constraint or platform file name suffix is reported; an
+// unconstrained file, including one named after a platform with no prefix,
+// is not.
+func TestBuildConstraint(t *testing.T) {
 	dir := t.TempDir()
-	for name, src := range map[string]string{
-		"a_windows.go": "package p\n",
-		"b.go":         "//go:build !windows\n\npackage p\n",
-		"c_arm64.go":   "package p\n",
-		"d.go":         "//go:build cgo\n\npackage p\n",
-		"e.go":         "package p\n",
-		"f.go":         "//go:build ignore\n\npackage p\n",
-	} {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(src), 0o600); err != nil {
+	cases := map[string]struct {
+		src        string
+		constraint bool
+	}{
+		"a_windows.go":     {"package p\n", true},
+		"b_arm64.go":       {"package p\n", true},
+		"c_linux_amd64.go": {"package p\n", true},
+		"d_freebsd.go":     {"package p\n", true},
+		"e_wasm.go":        {"package p\n", true},
+		"f.go":             {"//go:build !windows\n\npackage p\n", true},
+		"g.go":             {"//go:build linux || darwin || windows\n\npackage p\n", true},
+		"h.go":             {"//go:build !go1.28\n\npackage p\n", true},
+		"i.go":             {"//go:build go1.21\n\npackage p\n", true},
+		"j.go":             {"//go:build cgo\n\npackage p\n", true},
+		"k.go":             {"//go:build ignore\n\npackage p\n", true},
+		"l.go":             {"// Copyright\n\n// +build linux\n\npackage p\n", true},
+		"m.go":             {"package p\n\n// #include <stdio.h>\nimport \"C\"\n", true},
+		"n.go":             {"package p\n", false},
+		"linux.go":         {"package p\n", false},
+		"o_unix.go":        {"package p\n", false},
+		"p.go":             {"// Package p.\npackage p\n\n//go:build linux\nvar X int\n", false},
+	}
+	for name, c := range cases {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(c.src), 0o600); err != nil {
 			t.Fatal(err)
 		}
-	}
-	for name, split := range map[string]bool{"a_windows.go": true, "b.go": true, "c_arm64.go": true, "d.go": true, "e.go": false, "f.go": false} {
-		in, out, err := platformSplit(dir, name, platforms)
+		why, err := buildConstraint(dir, name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := len(in) != 0 && len(out) != 0; got != split {
-			t.Errorf("%s: split %t, want %t (in %v, out %v)", name, got, split, in, out)
+		if (why != "") != c.constraint {
+			t.Errorf("%s: %q, want constraint %t", name, why, c.constraint)
 		}
 	}
-	if _, _, err := platformSplit(filepath.Join(dir, "gone"), "x.go", platforms); err == nil {
+	if _, err := buildConstraint(dir, "gone.go"); err == nil {
 		t.Error("an unreadable file must be an error")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "bad.go"), []byte("not go"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := buildConstraint(dir, "bad.go"); err == nil {
+		t.Error("an unparsable file must be an error")
 	}
 }
 
