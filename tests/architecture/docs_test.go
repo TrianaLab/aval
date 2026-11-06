@@ -129,3 +129,49 @@ func TestLinkCheckCatchesBrokenLinks(t *testing.T) {
 		t.Errorf("broken links:\n got %q\nwant %q", got, want)
 	}
 }
+
+// Every terminal recording is rendered from a committed tape that `make
+// docs-demos` runs, stays under 1.5 MB, and is shown in docs/quickstart.md
+// with alt text; the page around it has the commands and output as text (#74).
+func TestDocsDemos(t *testing.T) {
+	const maxGIF = 1536 * 1024
+	tapes, _ := filepath.Glob(filepath.Join(root, "docs", "assets", "tapes", "*.tape"))
+	gifs, _ := filepath.Glob(filepath.Join(root, "docs", "assets", "gifs", "*.gif"))
+	if len(tapes) == 0 {
+		t.Fatal("no tapes in docs/assets/tapes")
+	}
+	page := readFile(t, "docs/quickstart.md")
+	m := regexp.MustCompile(`(?m)^DEMO_TAPES = (.*)$`).FindStringSubmatch(readFile(t, "Makefile"))
+	if m == nil {
+		t.Fatal("Makefile: no DEMO_TAPES line")
+	}
+	made := strings.Fields(m[1])
+	outputs := map[string]bool{}
+	for _, tape := range tapes {
+		name := strings.TrimSuffix(filepath.Base(tape), ".tape")
+		if !slices.Contains(made, name) {
+			t.Errorf("%s: not in DEMO_TAPES in the Makefile", name)
+		}
+		gif := "docs/assets/gifs/" + name + ".gif"
+		if !strings.Contains(readFile(t, "docs/assets/tapes/"+name+".tape"), "\nOutput "+gif+"\n") {
+			t.Errorf("%s.tape: want the line Output %s", name, gif)
+		}
+		outputs[gif] = true
+		fi, err := os.Stat(filepath.Join(root, gif))
+		if err != nil {
+			t.Errorf("%v (run make docs-demos)", err)
+			continue
+		}
+		if fi.Size() >= maxGIF {
+			t.Errorf("%s is %d bytes, want under 1.5 MB", gif, fi.Size())
+		}
+		if !regexp.MustCompile(`!\[[^\]]{20,}\]\(` + regexp.QuoteMeta(strings.TrimPrefix(gif, "docs/")) + `\)`).MatchString(page) {
+			t.Errorf("docs/quickstart.md does not show %s with alt text", gif)
+		}
+	}
+	for _, g := range gifs {
+		if rel, _ := filepath.Rel(root, g); !outputs[filepath.ToSlash(rel)] {
+			t.Errorf("%s has no tape in docs/assets/tapes", rel)
+		}
+	}
+}

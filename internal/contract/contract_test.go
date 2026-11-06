@@ -226,8 +226,11 @@ func TestRepeatedDoubleStar(t *testing.T) {
 		if Match(g, deep) || MatchContents(g, deep) {
 			t.Fatalf("%q must not match %q", g, deep)
 		}
-		if d := time.Since(start); d > 10*time.Millisecond {
-			t.Errorf("matching a 12-** glob took %v, want < 10ms", d)
+		// Linear matching takes microseconds; exponential backtracking over
+		// 40 levels and 12 ** would take hours. 200ms leaves room for -race
+		// on a loaded machine and still catches the exponential case.
+		if d := time.Since(start); d > 200*time.Millisecond {
+			t.Errorf("matching a 12-** glob took %v, want < 200ms", d)
 		}
 	}
 }

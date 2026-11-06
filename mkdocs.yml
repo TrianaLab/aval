@@ -66,10 +66,12 @@ theme:
     - toc.follow
 
 # requirements.in is the input of the hashed requirements.txt, not a page;
-# includes/ holds snippets pulled into pages.
+# includes/ holds snippets pulled into pages; assets/tapes/ holds the
+# sources of the GIFs (`make docs-demos`).
 exclude_docs: |
   requirements.in
   includes/
+  assets/tapes/
 
 # Under --strict (make docs-site) every warning fails the build: a page left
 # out of the nav, a nav entry with no file, a broken link or a missing anchor.
@@ -168,6 +170,7 @@ nav:
   - Home: index.md
   - Get started:
       - Install: install.md
+      - Quickstart: quickstart.md
   - Concepts:
       - concepts/index.md
       - Trust: concepts/trust.md

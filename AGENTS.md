@@ -75,6 +75,7 @@ A change that breaks one of these is wrong, even if tests pass.
 | `make docs-site` | the MkDocs site into `site/` with `--strict`; needs `pip install --require-hashes -r docs/requirements.txt` |
 | `make coverage` | unit tests plus an HTML report in `coverage.html` |
 | `make build` | `bin/aval` |
+| `make docs-demos` | re-records the quickstart GIFs from `docs/assets/tapes/*.tape` with `bin/aval` and a throwaway registry (needs vhs, Docker, openssl) |
 | `make brand` | renders the brand PNGs in `docs/assets/images/` from their SVGs (pinned resvg-js CLI via npx) |
 
 Epic 0 grows `make ci` to Pacto's standard (coverage gate, integration,

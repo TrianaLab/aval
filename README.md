@@ -103,7 +103,9 @@ aval run --registry localhost:5001/demo/hello-aval --policy policy.yaml
 
 Now change `src/hello.txt` and run `aval verify` again: the fingerprint
 changes, so it reports `miss` and exits 4. Stop the registry with
-`docker rm -f aval-registry`.
+`docker rm -f aval-registry`. The [quickstart](https://aval.run/main/quickstart/) walks the
+same path with recordings and the expected output, plus a rejected
+attestation (exit 5).
 
 ## Use it in CI
 

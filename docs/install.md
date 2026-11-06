@@ -67,6 +67,27 @@ sha256sum --ignore-missing -c checksums.txt
 gh attestation verify aval_0.2.0_linux_amd64.tar.gz --bundle provenance.sigstore.json --repo TrianaLab/aval
 ```
 
+## Release archive by hand
+
+Without an installer: download the archive, `checksums.txt` and its
+signature, check them as above, then put `aval` on your `PATH`:
+
+```sh
+VERSION=0.2.0
+OS=linux        # or darwin
+ARCH=amd64      # or arm64
+BASE=https://github.com/TrianaLab/aval/releases/download/v$VERSION
+curl -fsSLO "$BASE/aval_${VERSION}_${OS}_${ARCH}.tar.gz"
+curl -fsSLO "$BASE/checksums.txt"
+curl -fsSLO "$BASE/checksums.txt.sigstore.json"
+cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity "https://github.com/TrianaLab/aval/.github/workflows/release.yaml@refs/tags/v$VERSION"
+sha256sum --ignore-missing -c checksums.txt   # macOS: shasum -a 256 --ignore-missing -c checksums.txt
+tar -xzf "aval_${VERSION}_${OS}_${ARCH}.tar.gz" aval
+sudo mv aval /usr/local/bin/
+```
+
 ## Go users
 
 `go install github.com/TrianaLab/aval/cmd/aval@latest` builds from source
