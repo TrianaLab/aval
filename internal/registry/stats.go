@@ -24,8 +24,9 @@ const (
 	maxRecordSize = 64 << 10
 )
 
-// maxRecords caps the run records one ReadRecords call lists; a variable so
-// tests do not push a thousand records.
+// maxRecords caps the referrer descriptors one ReadRecords call lists
+// (records and anything the registry returns despite the artifactType
+// filter); a variable so tests do not push a thousand records.
 var maxRecords = 1000
 
 // errBound stops a listing at a read bound.
@@ -47,7 +48,8 @@ type RecordSet struct {
 // ReadRecords lists and reads the run records of the given tests, or of
 // every test with a stats anchor (a "stats-" tag) when testIDs is empty. It
 // writes nothing. A record that cannot be read or parsed is skipped and
-// counted, never an error. Listing stops after maxReferrerPages pages per
+// counted, never an error; a cancelled or expired ctx is an error, so a
+// deadline never passes as skipped records. Listing stops after maxReferrerPages pages per
 // listing or maxRecords records in total, and the set says so; only a
 // listing that fails for another reason is an error.
 func ReadRecords(ctx context.Context, repo string, testIDs []string) (RecordSet, error) {
@@ -82,7 +84,11 @@ func ReadRecords(ctx context.Context, repo string, testIDs []string) (RecordSet,
 			return RecordSet{}, fmt.Errorf("registry.ReadRecords %s: listing the records of %s: %w", repo, StatsTag(id), err)
 		}
 		for _, d := range ds {
-			if rec, err := readRecord(ctx, r, d, anchorDesc.Digest); err != nil || rec.TestID != id {
+			rec, err := readRecord(ctx, r, d, anchorDesc.Digest)
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return RecordSet{}, fmt.Errorf("registry.ReadRecords %s: reading the records of %s: %w", repo, StatsTag(id), ctxErr)
+			}
+			if err != nil || rec.TestID != id {
 				set.Skipped++
 			} else {
 				set.Records = append(set.Records, *rec)

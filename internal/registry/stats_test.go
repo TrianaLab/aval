@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -150,6 +151,30 @@ func TestReadRecordsCapsPages(t *testing.T) {
 				t.Fatalf("ReadRecords = %+v, %v after %d pages", set, err, pages)
 			}
 		})
+	}
+}
+
+// A deadline that passes while records are fetched is an error, never
+// records counted as skipped.
+func TestReadRecordsContextDone(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	armed := false
+	repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
+		if armed && strings.Contains(r.URL.Path, "/manifests/") {
+			cancel() // after the listing, on the first record fetch
+		}
+		return false
+	})
+	for i := range 2 {
+		if _, err := Record(ctx, repo, distinctRecord("unit", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	armed = true
+	set, err := ReadRecords(ctx, repo, []string{"unit"})
+	if !errors.Is(err, context.Canceled) || set.Skipped != 0 {
+		t.Fatalf("ReadRecords = %+v, %v; want context.Canceled and nothing skipped", set, err)
 	}
 }
 

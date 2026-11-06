@@ -394,7 +394,10 @@ Registry data is untrusted, so reading is bounded:
   stderr and the JSON report sets `truncated`. Which records come first is up
   to the registry; prune old records to stay below the bound.
 - A listing that fails for any other reason (registry down, no read
-  access, past `--registry-timeout`) is exit 1.
+  access) is exit 1, and so is passing `--registry-timeout` while listing
+  or fetching records: a deadline never shows up as skipped records.
+- `--since` filters after reading: the read bound, the timeout and
+  `skipped` cover every record listed, whatever its `recordedAt`.
 
 Exit codes: 0 statistics printed, 1 error, 2 usage.
 
