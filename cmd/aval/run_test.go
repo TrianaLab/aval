@@ -85,8 +85,8 @@ func TestRunOutcomes(t *testing.T) {
 		{"miss runs", nil, fmt.Errorf("x: %w", evidence.ErrNotFound), 0, false, ExitOK, true, evidence.OutcomeMiss, "ran unit: passed", ""},
 		{"miss runs and fails", nil, fmt.Errorf("x: %w", evidence.ErrNotFound), 1, false, ExitTestFailed, true, evidence.OutcomeMiss, "ran unit: failed (exit 1)", ""},
 		{"registry error runs", nil, errors.New("registry down"), 0, false, ExitOK, true, evidence.OutcomeError, "reason: registry down", ""},
-		{"verified pass is reused", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, 1, false, ExitOK, false, evidence.OutcomeVerified, "reused passed result reg.example/r@sha256:aa", ""},
-		{"verified failure is reused as a failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: true}}, nil, 0, false, ExitTestFailed, false, evidence.OutcomeVerified, "reused failed result reg.example/r@sha256:aa", "reused result failed"},
+		{"verified pass is reused", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, 1, false, ExitOK, false, evidence.OutcomeVerified, "reference: reg.example/r@sha256:aa\nreused passed result\n", ""},
+		{"verified failure is reused as a failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: true}}, nil, 0, false, ExitTestFailed, false, evidence.OutcomeVerified, "reference: reg.example/r@sha256:aa\nreused failed result\n", "reused result failed"},
 		{"verification failure runs and exits 5", map[string]candidate{"sha256:aa": {verifyErr: untrusted}}, nil, 0, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "ran unit: passed", "SECURITY"},
 		{"verification failure outranks a failed test", map[string]candidate{"sha256:aa": {verifyErr: untrusted}}, nil, 1, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "ran unit: failed", "SECURITY"},
 		{"signed cacheability differs from the contract", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, cacheability: "external-dependencies"}}, nil, 0, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "cacheability", "SECURITY"},
@@ -445,7 +445,7 @@ func pushResult(t *testing.T) pushed {
 func TestRunPushThenReuse(t *testing.T) {
 	s := pushResult(t)
 	code, stdout, stderr := runCLI("run", "-f", s.contract, "--registry", "reg.example/r", "--policy", s.policy, "--result", filepath.Join(s.dir, "r.json"))
-	if code != ExitOK || s.ran() || !strings.Contains(stdout, "reused passed result reg.example/r@sha256:aa") {
+	if code != ExitOK || s.ran() || !strings.Contains(stdout, "reference: reg.example/r@sha256:aa\nreused passed result\n") {
 		t.Fatalf("reuse: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	kid, _ := evidence.PublicKeyID(string(s.pub))

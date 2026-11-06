@@ -210,7 +210,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 		errs = append(errs, err)
 	}
 	if r.Outcome == evidence.OutcomeVerified && !o.shadow && len(errs) == 0 {
-		fmt.Fprintf(out, "reused %s result %s\n", r.Result, r.Reference)
+		fmt.Fprintf(out, "reused %s result\n", r.Result) // writeReport printed the reference
 		recordRun(ctx, out, warn, o, r, true, nil)
 		if r.Result != evidence.ResultPassed {
 			return fmt.Errorf("reused result %s: %w", r.Result, errTestFailed)

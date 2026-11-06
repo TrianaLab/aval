@@ -494,11 +494,11 @@ func malformed(format string, args ...any) error {
 func Record(ctx context.Context, repo string, rec evidence.RunRecord) (Descriptor, error) {
 	r, err := newRepository(repo)
 	if err != nil {
-		return Descriptor{}, fmt.Errorf("registry.Record: %w", err)
+		return Descriptor{}, err
 	}
 	d, err := record(ctx, r, rec)
 	if err != nil {
-		return Descriptor{}, fmt.Errorf("registry.Record %s: %w", repo, err)
+		return Descriptor{}, fmt.Errorf("%s: %w", repo, err)
 	}
 	return Descriptor{Repository: repo, Digest: d.Digest.String()}, nil
 }
