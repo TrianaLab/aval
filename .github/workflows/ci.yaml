@@ -362,7 +362,8 @@ jobs:
           jq -e '.outcome == "verification-failed"' untrusted.json
           # Only the expected cause passes; any other verification failure
           # is a real security event and fails the job (invariant 4).
-          jq -e '.reason | contains("key-based signature, but the policy accepts no keys")' untrusted.json \
+          # tests/architecture checks this literal still exists in the source.
+          jq -e '.reason | contains("is not in the trust policy")' untrusted.json \
             || { echo "::error::untrusted attestation: unexpected verification failure: $(jq .reason untrusted.json)"; exit 1; }
           echo "::warning title=aval verification failed (expected in this demo)::$(jq .reason untrusted.json)"
           echo "| untrusted attestation | \`$(jq -r .outcome untrusted.json)\` (exit 5) |" >> "$GITHUB_STEP_SUMMARY"
