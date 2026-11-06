@@ -71,7 +71,7 @@ func TestUnreadableInputsFailClosed(t *testing.T) {
 	if _, err := Compute(filepath.Join(t.TempDir(), "missing"), testContract(), fixedEnv); err == nil {
 		t.Error("missing contract root must fail")
 	}
-	if _, _, err := hashFile(filepath.Join(t.TempDir(), "gone.go")); err == nil {
+	if _, _, err := (&hasher{buf: make([]byte, 512)}).hashFile(filepath.Join(t.TempDir(), "gone.go")); err == nil {
 		t.Error("file removed after listing must fail")
 	}
 	f := newFixture(t)
@@ -86,6 +86,33 @@ func TestUnreadableInputsFailClosed(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(f.path("pkg"), 0o755) })
 	if _, err := f.compute(); err == nil {
 		t.Error("unreadable directory must fail")
+	}
+}
+
+// Audit F3: the walk only enters directories an include glob can match, so
+// an unreadable directory outside the scope (a root-owned volume, a cache)
+// does not break the fingerprint, and does not change it.
+func TestWalkSkipsDirectoriesOutsideScope(t *testing.T) {
+	f := newFixture(t)
+	f.c.Scope = contract.Scope{Source: []string{"pkg/**"}, Dependencies: []string{"go.sum"}}
+	want, err := f.compute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.write("pgdata/base/1", "row")
+	f.chmod("pgdata", 0)
+	t.Cleanup(func() { _ = os.Chmod(f.path("pgdata"), 0o755) })
+	got, err := f.compute()
+	if err != nil {
+		t.Fatalf("unreadable directory outside the scope: %v", err)
+	}
+	if got.Manifest != want.Manifest {
+		t.Errorf("manifest changed:\n%s\nwant\n%s", got.Manifest, want.Manifest)
+	}
+	// The same directory inside the scope still fails closed.
+	f.c.Scope.Source = append(f.c.Scope.Source, "pgdata/**")
+	if _, err := f.compute(); err == nil {
+		t.Error("unreadable directory in scope must fail")
 	}
 }
 
