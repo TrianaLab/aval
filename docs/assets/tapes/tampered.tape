@@ -8,7 +8,7 @@ Set Shell bash
 Set Theme "Catppuccin Mocha"
 Set FontSize 14
 Set Width 980
-Set Height 560
+Set Height 420
 Set Padding 16
 Set Framerate 15
 Set TypingSpeed 35ms

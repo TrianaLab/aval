@@ -73,7 +73,7 @@ aval run --push --key aval.key --registry localhost:5001/demo/hello-aval
 ```text
 test hello fingerprint sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
 miss hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
-reason: no trust policy configured (--policy): no attestation found for fingerprint
+reason: no trust policy configured: pass --policy to reuse verified results
 ran hello: passed (exit 0)
 pushed localhost:5001/demo/hello-aval@sha256:...
 ```
@@ -91,6 +91,8 @@ echo "exit code: $?"
 
 ```text
 verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+signer: key ..., trust level developer
+reference: localhost:5001/demo/hello-aval@sha256:...
 exit code: 0
 ```
 
@@ -103,7 +105,9 @@ aval run --registry localhost:5001/demo/hello-aval --policy policy.yaml
 ```text
 test hello fingerprint sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
 verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
-reused passed result localhost:5001/demo/hello-aval@sha256:...
+signer: key ..., trust level developer
+reference: localhost:5001/demo/hello-aval@sha256:...
+reused passed result
 ```
 
 ## 6. Change an input: a miss again
@@ -121,7 +125,7 @@ aval run --registry localhost:5001/demo/hello-aval --policy policy.yaml
 ```text
 test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
 miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-reason: registry.Lookup localhost:5001/demo/hello-aval: no attestation found for fingerprint
+reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
 ran hello: passed (exit 0)
 ```
 
@@ -143,17 +147,15 @@ echo "exit code: $?"
 ```text
 test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
 miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-reason: no trust policy configured (--policy): no attestation found for fingerprint
+reason: no trust policy configured: pass --policy to reuse verified results
 ran hello: passed (exit 0)
 pushed localhost:5001/demo/hello-aval@sha256:...
 test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-aval: SECURITY: rejected attestation localhost:5001/demo/hello-aval@sha256:...: attestation verification failed: signature: ...
+aval: SECURITY: 1 attestation(s) for hello failed signature or policy verification; treat it as a security event, see https://github.com/TrianaLab/aval/blob/main/docs/trust-model.md
 verification-failed hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-reason: attestation verification failed: signature: ...
-rejected: localhost:5001/demo/hello-aval@sha256:... verification-failed: attestation verification failed: signature: ...
-aval: SECURITY: attestation verification failed for hello: ...; running the test
+reference: localhost:5001/demo/hello-aval@sha256:...
+reason: attestation verification failed: signature: signer key id "..." is not in the trust policy (trust policy policy.yaml)
 ran hello: passed (exit 0)
-aval: attestation verification failed: signature: ...
 exit code: 5
 ```
 
