@@ -96,6 +96,7 @@ lint:
 	@v=$$(golangci-lint version --short 2>/dev/null); if [ "v$$v" != "$(GOLANGCI_LINT_VERSION)" ]; then \
 		echo "golangci-lint $(GOLANGCI_LINT_VERSION) required, found $${v:-none}"; exit 1; fi
 	golangci-lint run ./...
+	cd examples/evidence-consumer && golangci-lint run ./...
 
 fmt:
 	gofmt -w .

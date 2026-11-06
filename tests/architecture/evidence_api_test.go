@@ -3,6 +3,7 @@ package architecture
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/importer"
 	"go/parser"
 	"go/token"
@@ -21,7 +22,9 @@ import (
 // identifier, field and method, with types and signatures. The snapshot is
 // append-only: a new identifier is a new line, and removing or changing a
 // line is a breaking change that needs a new major module path
-// (github.com/TrianaLab/aval/v2), which starts a new snapshot file.
+// (github.com/TrianaLab/aval/v2), which starts a new snapshot file. Every
+// line of the snapshot at the base revision must still be there, so the
+// snapshot cannot be edited together with a break.
 // ponytail: names, types and signatures only, like a reduced apidiff;
 // constant values are format identifiers and follow artifact-format.md.
 
@@ -56,36 +59,67 @@ func apiSurface(pkg *types.Package) []string {
 
 func typeLines(o *types.TypeName, typ func(types.Type) string) []string {
 	name := o.Name()
-	if o.IsAlias() {
-		return []string{"type " + name + " = " + typ(o.Type())}
+	switch t := o.Type().(type) {
+	case *types.Alias:
+		return []string{"type " + name + typeParams(t.TypeParams(), typ) + " = " + typ(types.Unalias(t))}
+	case *types.Named:
+		name += typeParams(t.TypeParams(), typ)
 	}
 	var out []string
 	switch u := o.Type().Underlying().(type) {
 	case *types.Struct:
 		out = append(out, "type "+name+" struct")
+		// Losing comparability breaks == and map keys, so it is a line too.
+		if types.Comparable(o.Type()) {
+			out = append(out, "comparable "+o.Name())
+		}
 		for f := range u.Fields() {
-			if f.Exported() {
-				out = append(out, fmt.Sprintf("field %s.%s %s", name, f.Name(), typ(f.Type())))
+			// An embedded field is rendered even when unexported: its
+			// promoted members are API, and the unexported-type check
+			// rejects it.
+			if f.Exported() || f.Embedded() {
+				out = append(out, fmt.Sprintf("field %s.%s %s", o.Name(), f.Name(), typ(f.Type())))
 			}
 		}
 	case *types.Interface:
+		if !u.IsMethodSet() { // a constraint: its type set is API too
+			return append(out, "type "+name+" "+typ(u))
+		}
 		var ms []string
 		for m := range u.Methods() {
 			ms = append(ms, m.Name()+signature(m.Type().(*types.Signature), typ))
 		}
 		slices.Sort(ms)
-		out = append(out, "type "+name+" interface { "+strings.Join(ms, "; ")+" }")
+		return append(out, "type "+name+" interface { "+strings.Join(ms, "; ")+" }")
 	default:
 		out = append(out, "type "+name+" "+typ(u))
 	}
-	if named, ok := o.Type().(*types.Named); ok {
-		for m := range named.Methods() {
-			if m.Exported() {
-				out = append(out, fmt.Sprintf("method (%s) %s%s", typ(m.Type().(*types.Signature).Recv().Type()), m.Name(), signature(m.Type().(*types.Signature), typ)))
-			}
+	// The method set, promoted methods included, with the receiver it
+	// needs: T if the value has it, *T if only the pointer does.
+	vset := types.NewMethodSet(o.Type())
+	for sel := range types.NewMethodSet(types.NewPointer(o.Type())).Methods() {
+		m := sel.Obj()
+		if !m.Exported() {
+			continue
 		}
+		recv := "*" + o.Name()
+		if vset.Lookup(m.Pkg(), m.Name()) != nil {
+			recv = o.Name()
+		}
+		out = append(out, fmt.Sprintf("method (%s) %s%s", recv, m.Name(), signature(m.Type().(*types.Signature), typ)))
 	}
 	return out
+}
+
+func typeParams(l *types.TypeParamList, typ func(types.Type) string) string {
+	if l.Len() == 0 {
+		return ""
+	}
+	var s []string
+	for tp := range l.TypeParams() {
+		s = append(s, tp.Obj().Name()+" "+typ(tp.Constraint()))
+	}
+	return "[" + strings.Join(s, ", ") + "]"
 }
 
 func signature(sig *types.Signature, typ func(types.Type) string) string {
@@ -100,7 +134,7 @@ func signature(sig *types.Signature, typ func(types.Type) string) string {
 		}
 		return s
 	}
-	out := "(" + strings.Join(tuple(sig.Params(), sig.Variadic()), ", ") + ")"
+	out := typeParams(sig.TypeParams(), typ) + "(" + strings.Join(tuple(sig.Params(), sig.Variadic()), ", ") + ")"
 	switch res := tuple(sig.Results(), false); len(res) {
 	case 0:
 	case 1:
@@ -157,20 +191,101 @@ func moduleMajor(gomod string) string {
 	return "1"
 }
 
-func TestEvidenceAPIIsAppendOnly(t *testing.T) {
-	files := map[string]string{}
-	paths, _ := filepath.Glob(filepath.Join(root, "pkg", "evidence", "*.go"))
-	for _, f := range paths {
-		if !strings.HasSuffix(f, "_test.go") {
-			b, err := os.ReadFile(f)
-			if err != nil {
-				t.Fatal(err)
+// unexportedTypes reports surface lines that name an unexported type of
+// pkg: its exported fields and methods are API a consumer reaches, yet they
+// are not rendered, so they could change unseen.
+// ponytail: matches words against the package scope; a false match fails
+// closed.
+func unexportedTypes(pkg *types.Package, surface []string) []string {
+	var problems []string
+	for _, l := range surface {
+		for _, w := range identRe.FindAllString(l, -1) {
+			if tn, ok := pkg.Scope().Lookup(w).(*types.TypeName); ok && !tn.Exported() {
+				problems = append(problems, l+": exposes the unexported type "+w+"; export it or hide it")
 			}
-			files[f] = string(b)
+		}
+	}
+	return problems
+}
+
+var identRe = regexp.MustCompile(`\b[a-z_]\w*\b`)
+
+// gitIn runs git in dir with extra environment and returns trimmed stdout.
+func gitIn(dir string, env ...string) func(...string) (string, error) {
+	return func(args ...string) (string, error) {
+		c := exec.Command("git", args...)
+		c.Dir = dir
+		c.Env = append(os.Environ(), env...)
+		out, err := c.Output()
+		return strings.TrimSpace(string(out)), err
+	}
+}
+
+// apiBase returns the revision whose snapshot must survive line for line:
+// the merge base with origin/<base> on a pull request, the previous commit
+// on a push, the merge base with origin/main otherwise. Outside CI, a
+// missing origin/main returns "" (nothing to compare with); in CI every
+// failure is an error, so the check fails closed.
+func apiBase(git func(...string) (string, error), getenv func(string) string) (string, error) {
+	ci := getenv("CI") != ""
+	var rev string
+	var err error
+	switch {
+	case getenv("GITHUB_BASE_REF") != "":
+		rev, err = git("merge-base", "HEAD", "origin/"+getenv("GITHUB_BASE_REF"))
+	case getenv("GITHUB_EVENT_NAME") == "push":
+		rev, err = git("rev-parse", "--verify", "HEAD^")
+	default:
+		if _, e := git("rev-parse", "--verify", "origin/main^{commit}"); e != nil && !ci {
+			return "", nil
+		}
+		rev, err = git("merge-base", "HEAD", "origin/main")
+	}
+	if err != nil || rev == "" {
+		return "", fmt.Errorf("cannot resolve the base revision to compare the API snapshot with (fetch full history): %v", err)
+	}
+	return rev, nil
+}
+
+// snapshotRemovals returns the lines of snapshot at base that lines lacks.
+// A snapshot absent at base (the first one of a major version) has none.
+func snapshotRemovals(git func(...string) (string, error), base, snapshot string, lines []string) ([]string, error) {
+	if ls, err := git("ls-tree", "--name-only", base, "--", snapshot); err != nil || ls == "" {
+		return nil, err
+	}
+	old, err := git("show", base+":"+snapshot)
+	if err != nil {
+		return nil, err
+	}
+	var removed []string
+	for l := range strings.Lines(old) {
+		if l = strings.TrimSpace(l); l != "" && !slices.Contains(lines, l) {
+			removed = append(removed, l)
+		}
+	}
+	return removed, nil
+}
+
+func TestEvidenceAPIIsAppendOnly(t *testing.T) {
+	dir := filepath.Join(root, "pkg", "evidence")
+	paths, err := filepath.Glob(filepath.Join(dir, "*.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{}
+	for _, f := range paths {
+		if match, err := build.Default.MatchFile(dir, filepath.Base(f)); err != nil {
+			t.Fatal(err)
+		} else if match && !strings.HasSuffix(f, "_test.go") {
+			files[f] = readFile(t, filepath.Join("pkg", "evidence", filepath.Base(f)))
 		}
 	}
 	snapshot := "pkg/evidence/testdata/api-v" + moduleMajor(readFile(t, "go.mod")) + ".txt"
-	current := apiSurface(checkSource(t, "github.com/TrianaLab/aval/pkg/evidence", files))
+	pkg := checkSource(t, "github.com/TrianaLab/aval/pkg/evidence", files)
+	current := apiSurface(pkg)
+	for _, p := range unexportedTypes(pkg, current) {
+		t.Error(p)
+	}
 	b, err := os.ReadFile(filepath.Join(root, snapshot))
 	if err != nil {
 		t.Fatalf("%v: a new major version starts a new snapshot with the current surface:\n%s", err, strings.Join(current, "\n"))
@@ -183,6 +298,24 @@ func TestEvidenceAPIIsAppendOnly(t *testing.T) {
 	}
 	for _, p := range apiProblems(lines, current, snapshot) {
 		t.Error(p)
+	}
+	// Append-only against the base revision: editing the snapshot together
+	// with the code cannot hide a break.
+	git := gitIn(root)
+	base, err := apiBase(git, os.Getenv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base == "" {
+		t.Log("origin/main not found: append-only check against the base skipped (CI always runs it)")
+		return
+	}
+	removed, err := snapshotRemovals(git, base, snapshot, lines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range removed {
+		t.Errorf("removed or changed in %s since %s: %s (breaking: needs a new major module path)", snapshot, base, l)
 	}
 }
 
@@ -198,6 +331,7 @@ var ErrX error
 `
 	snapshot := apiSurface(checkSource(t, "p", map[string]string{"p.go": base}))
 	want := []string{
+		"comparable Signer",
 		"const Version untyped string",
 		"field Signer.KeyID string",
 		"func Parse([]byte, ...string) (*Signer, error)",
@@ -223,16 +357,18 @@ var ErrX error
 		}
 	}
 	breaking := map[string]string{
-		"removed field":        strings.Replace(base, "KeyID string;", "", 1),
-		"field type":           strings.Replace(base, "KeyID string", "KeyID []byte", 1),
-		"interface method":     strings.Replace(base, "(Signer, error) }", "(Signer, error); Close() }", 1),
-		"parameter type":       strings.Replace(base, "data []byte", "data string", 1),
-		"not variadic":         strings.Replace(base, "opts ...string", "opts []string", 1),
-		"result":               strings.Replace(base, "(*Signer, error) { return nil, nil }", "*Signer { return nil }", 1),
-		"pointer receiver":     strings.Replace(base, "(s Signer)", "(s *Signer)", 1),
-		"typed constant":       strings.Replace(base, `Version = "v1"`, `Version string = "v1"`, 1),
-		"removed variable":     strings.Replace(base, "var ErrX error\n", "", 1),
-		"struct to named type": strings.Replace(base, "type Signer struct{ KeyID string; hidden int }", "type Signer string\nfunc (s Signer) KeyID() {}", 1),
+		"removed field":         strings.Replace(base, "KeyID string;", "", 1),
+		"field type":            strings.Replace(base, "KeyID string", "KeyID []byte", 1),
+		"interface method":      strings.Replace(base, "(Signer, error) }", "(Signer, error); Close() }", 1),
+		"parameter type":        strings.Replace(base, "data []byte", "data string", 1),
+		"not variadic":          strings.Replace(base, "opts ...string", "opts []string", 1),
+		"result":                strings.Replace(base, "(*Signer, error) { return nil, nil }", "*Signer { return nil }", 1),
+		"pointer receiver":      strings.Replace(base, "(s Signer)", "(s *Signer)", 1),
+		"typed constant":        strings.Replace(base, `Version = "v1"`, `Version string = "v1"`, 1),
+		"removed variable":      strings.Replace(base, "var ErrX error\n", "", 1),
+		"not comparable":        strings.Replace(base, "KeyID string;", "KeyID string; Tags []string;", 1),
+		"hidden not comparable": strings.Replace(base, "hidden int", "hidden []int", 1),
+		"struct to named type":  strings.Replace(base, "type Signer struct{ KeyID string; hidden int }", "type Signer string\nfunc (s Signer) KeyID() {}", 1),
 	}
 	for name, src := range breaking {
 		if !slices.ContainsFunc(apiProblems(snapshot, apiSurface(checkSource(t, "p", map[string]string{"p.go": src})), "s"), func(p string) bool {
@@ -243,6 +379,136 @@ var ErrX error
 	}
 	if p := apiProblems(snapshot, append(slices.Clone(snapshot), "func New()"), "s"); len(p) != 1 || !strings.Contains(p[0], "append it") {
 		t.Errorf("an unsnapshotted addition: %v", p)
+	}
+}
+
+// Constructs the base surface above lacks: generics, embedding, constraint
+// interfaces and unexported types reached through the exported API.
+func TestEvidenceAPICheckCatchesHiddenSurface(t *testing.T) {
+	surface := func(src string) ([]string, *types.Package) {
+		pkg := checkSource(t, "p", map[string]string{"p.go": "package p\n" + src})
+		return apiSurface(pkg), pkg
+	}
+	breaking := []struct{ name, base, changed string }{
+		{"generic func constraint", "func First[T any](s []T) T { return s[0] }", "func First[T comparable](s []T) T { return s[0] }"},
+		{"generic type parameters", "type Box[T any] struct{ V T }", "type Box[T comparable, U any] struct{ V T }"},
+		{"generic method", "type Box[T any] struct{ V T }\nfunc (Box[T]) Get() T { var v T; return v }", "type Box[T any] struct{ V T }\nfunc (Box[T]) Get() int { return 0 }"},
+		{"constraint type set", "type Num interface{ ~int | ~float64 }", "type Num interface{ ~int }"},
+		{"promoted method", "type Inner struct{}\nfunc (Inner) Do() {}\ntype S struct{ Inner }", "type Inner struct{}\nfunc (Inner) Do(int) {}\ntype S struct{ Inner }"},
+		{"promoted to pointer receiver", "type Inner struct{}\nfunc (Inner) Do() {}\ntype S struct{ Inner }", "type Inner struct{}\nfunc (*Inner) Do() {}\ntype S struct{ Inner }"},
+	}
+	for _, c := range breaking {
+		old, _ := surface(c.base)
+		cur, _ := surface(c.changed)
+		if !slices.ContainsFunc(apiProblems(old, cur, "s"), func(p string) bool { return strings.HasPrefix(p, "removed") }) {
+			t.Errorf("%s not reported as breaking:\n%s\n->\n%s", c.name, strings.Join(old, "\n"), strings.Join(cur, "\n"))
+		}
+	}
+	// Unexported types whose exported members are API but not rendered.
+	for name, src := range map[string]string{
+		"embedded unexported struct":  "type extras struct{ Extra string }\nfunc (extras) Describe() string { return \"\" }\ntype Signer struct{ extras }",
+		"embedded unexported pointer": "type extras struct{ Extra string }\ntype Signer struct{ *extras }",
+		"returned unexported type":    "type state struct{ Public int }\nfunc (*state) Do() {}\nfunc NewState() *state { return nil }",
+		"unexported field type":       "type state struct{ Public int }\ntype S struct{ F state }",
+		"alias of an unexported type": "type state struct{ Public int }\ntype S = state",
+		"unexported in an interface":  "type state struct{ Public int }\ntype I interface{ Get() state }",
+	} {
+		if cur, pkg := surface(src); len(unexportedTypes(pkg, cur)) == 0 {
+			t.Errorf("%s not reported:\n%s", name, strings.Join(cur, "\n"))
+		}
+	}
+	cur, pkg := surface("type state struct{ Public int }\ntype S struct{ s state; Name string }\nfunc New() S { return S{} }")
+	if p := unexportedTypes(pkg, cur); len(p) != 0 {
+		t.Errorf("an unexported field of an unexported type is not API: %v", p)
+	}
+	// The promoted method is rendered on the embedding type.
+	if cur, _ := surface("type Inner struct{}\nfunc (Inner) Do() {}\ntype S struct{ Inner }"); !slices.Contains(cur, "method (S) Do()") {
+		t.Errorf("promoted method missing:\n%s", strings.Join(cur, "\n"))
+	}
+}
+
+// throwawayRepo is an empty git repository that ignores global and system
+// git config. commit writes name (if set) and commits.
+func throwawayRepo(t *testing.T) (git func(...string) (string, error), commit func(name, content string) string) {
+	dir := t.TempDir()
+	git = gitIn(dir, "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+	run := func(args ...string) string {
+		t.Helper()
+		out, err := git(args...)
+		if err != nil {
+			t.Fatalf("git %v: %v", args, err)
+		}
+		return out
+	}
+	run("init", "-q")
+	return git, func(name, content string) string {
+		t.Helper()
+		if name != "" {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		run("add", "-A")
+		run("commit", "-q", "--allow-empty", "-m", "c")
+		return run("rev-parse", "HEAD")
+	}
+}
+
+func envOf(kv map[string]string) func(string) string { return func(k string) string { return kv[k] } }
+
+// Without a base revision CI fails closed; only a local run skips.
+func TestAPIBaseFailsClosedInCI(t *testing.T) {
+	git, commit := throwawayRepo(t)
+	if b, err := apiBase(git, envOf(nil)); err != nil || b != "" {
+		t.Errorf("local without origin/main: %q %v, want a skip", b, err)
+	}
+	if _, err := apiBase(git, envOf(map[string]string{"CI": "true"})); err == nil {
+		t.Error("CI without origin/main must fail closed")
+	}
+	commit("README", "x")
+	if _, err := apiBase(git, envOf(map[string]string{"CI": "true", "GITHUB_EVENT_NAME": "push"})); err == nil {
+		t.Error("a push without the previous commit (shallow clone) must fail closed")
+	}
+	if _, err := apiBase(git, envOf(map[string]string{"CI": "true", "GITHUB_BASE_REF": "gone"})); err == nil {
+		t.Error("a pull request whose base branch is not fetched must fail closed")
+	}
+}
+
+// A snapshot line removed or changed since the base revision is reported
+// however the base is resolved; appended lines are not.
+func TestSnapshotRemovalsAgainstBase(t *testing.T) {
+	const snap = "api-v1.txt"
+	git, commit := throwawayRepo(t)
+	first := commit("README", "x")
+	commit(snap, "type A struct\nfield A.X string\n")
+	for _, ref := range []string{"refs/remotes/origin/main", "refs/remotes/origin/release"} {
+		if _, err := git("update-ref", ref, "HEAD"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commit("", "")
+	for name, getenv := range map[string]func(string) string{
+		"local":        envOf(nil),
+		"pull request": envOf(map[string]string{"CI": "true", "GITHUB_BASE_REF": "release", "GITHUB_EVENT_NAME": "pull_request"}),
+		"push":         envOf(map[string]string{"CI": "true", "GITHUB_EVENT_NAME": "push"}),
+	} {
+		base, err := apiBase(git, getenv)
+		if err != nil || base == "" {
+			t.Fatalf("%s: base %q: %v", name, base, err)
+		}
+		if removed, err := snapshotRemovals(git, base, snap, []string{"type A struct", "field A.X int"}); err != nil || !slices.Equal(removed, []string{"field A.X string"}) {
+			t.Errorf("%s: removed %v, %v", name, removed, err)
+		}
+		if removed, err := snapshotRemovals(git, base, snap, []string{"field A.X string", "type A struct", "type B struct"}); err != nil || len(removed) != 0 {
+			t.Errorf("%s: an appended line reported: %v, %v", name, removed, err)
+		}
+	}
+	if removed, err := snapshotRemovals(git, first, snap, nil); err != nil || len(removed) != 0 {
+		t.Errorf("no snapshot at the base: %v, %v", removed, err)
+	}
+	if _, err := snapshotRemovals(git, "0000000000000000000000000000000000000000", snap, nil); err == nil {
+		t.Error("an unknown base must be an error")
 	}
 }
 

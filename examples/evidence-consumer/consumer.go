@@ -32,7 +32,13 @@ func NewEd25519Verifier(pemKey string) (*Ed25519Verifier, error) {
 		return nil, err
 	}
 	b, _ := pem.Decode([]byte(pemKey))
-	pub, _ := x509.ParsePKIXPublicKey(b.Bytes) // PublicKeyID parsed it already
+	if b == nil {
+		return nil, errors.New("no PEM block")
+	}
+	pub, err := x509.ParsePKIXPublicKey(b.Bytes)
+	if err != nil {
+		return nil, err
+	}
 	k, ok := pub.(ed25519.PublicKey)
 	if !ok {
 		return nil, errors.New("not an ed25519 key")

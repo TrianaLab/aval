@@ -1,3 +1,10 @@
+comparable Identity
+comparable Rejection
+comparable Runner
+comparable Signer
+comparable Test
+comparable Verification
+comparable VerificationError
 const ArtifactType untyped string
 const ArtifactTypeFingerprint untyped string
 const MediaTypeDSSE untyped string

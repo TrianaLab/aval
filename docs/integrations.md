@@ -119,21 +119,40 @@ func CheckResult(ctx context.Context, envBytes []byte, sig evidence.SignatureVer
 
 `pkg/evidence` follows semantic versioning as part of the module
 `github.com/TrianaLab/aval`. Within a major version its exported API changes
-additively only: new identifiers, new struct fields, new methods on concrete
-types. Removing or renaming an exported identifier, changing a type, a field
-type, a function or method signature or a receiver, or adding a method to an
-exported interface is a breaking change and needs a new major version, which
+additively only: new identifiers, new struct fields that keep a comparable
+struct comparable, new methods on concrete types. Removing or renaming an
+exported identifier, changing a type, a field type, a function or method
+signature or a receiver, making a struct non-comparable, or adding a method
+to an exported interface is a breaking change and needs a new major version, which
 in Go means a new module path (`github.com/TrianaLab/aval/v2`).
 
-This is enforced, not only documented. The exported surface (names, types and
-signatures, without parameter names) is snapshotted in
+This is enforced, not only documented. The exported surface is snapshotted in
 [`pkg/evidence/testdata/api-v1.txt`](../pkg/evidence/testdata/api-v1.txt),
-named after the major version in `go.mod`. `make ci-gates`
-(`TestEvidenceAPIIsAppendOnly` in `tests/architecture`) fails when a line of
-the snapshot no longer matches the code, and when the code exports something
-the snapshot lacks. The snapshot is append-only: an additive change appends
-its lines in the same pull request. A new major module path starts a new
-snapshot file.
+named after the major version in `go.mod`: one line per exported constant,
+variable, function, type, field (embedded fields included) and method, with
+types, signatures, type parameters and constraints and without parameter
+names. Methods are the full method set, promoted ones included, with the
+receiver (`T` or `*T`) they need. Interfaces are one line with their whole
+method set or type set. A struct that supports `==` also gets a
+`comparable <Type>` line. Constant values are not part of it (see below).
+
+`make ci-gates` (`TestEvidenceAPIIsAppendOnly` in `tests/architecture`) fails
+when:
+
+- a line of the snapshot no longer matches the code;
+- the code exports something the snapshot lacks (an additive change appends
+  its lines in the same pull request);
+- the exported API names an unexported type of the package (an embedded,
+  returned or field type), whose members would not be rendered;
+- a line of the snapshot at the base revision is missing from the current
+  snapshot, so a break cannot be hidden by editing both. The base is the merge
+  base with `origin/<base branch>` on a pull request, the previous commit on a
+  push to `main`, and the merge base with `origin/main` otherwise. In CI
+  (`CI` set) an unresolvable base fails the job; locally, without
+  `origin/main`, this one comparison is skipped with a log line.
+
+A new major module path starts a new snapshot file, which has no base to
+compare with.
 
 The Go API and the wire formats are versioned separately. The predicate type,
 media types, report version and `apiVersion` follow
