@@ -784,4 +784,5 @@ the old ones.
   inconsistent records (a reuse with an outcome other than `verified` or
   with test time, a `verifiedResult` without outcome `verified`). Tightening
   validation is breaking for a frozen format; the identifier stays because
-  it is provisional and no record `aval` writes is affected (#88).
+  it is provisional and no record `aval` writes is affected; the maintainers
+  confirmed keeping `run-record/v1` (#88).
