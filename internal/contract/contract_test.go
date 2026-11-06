@@ -1,10 +1,13 @@
 package contract
 
 import (
+	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const valid = `
@@ -131,6 +134,127 @@ func TestMatchContents(t *testing.T) {
 	for _, tc := range cases {
 		if got := MatchContents(tc.glob, tc.name); got != tc.want {
 			t.Errorf("MatchContents(%q, %q) = %v, want %v", tc.glob, tc.name, got, tc.want)
+		}
+	}
+}
+
+// matchRef is the recursive matcher Match replaced: obviously correct and
+// exponential in the number of `**`. Match must agree with it.
+func matchRef(p, n []string, contents bool) bool {
+	for len(p) > 0 {
+		if p[0] == "**" {
+			p = p[1:]
+			if len(p) == 0 {
+				return !contents || len(n) > 0
+			}
+			for i := 0; i <= len(n); i++ {
+				if matchRef(p, n[i:], contents) {
+					return true
+				}
+			}
+			return false
+		}
+		if len(n) == 0 {
+			return false
+		}
+		if ok, _ := path.Match(p[0], n[0]); !ok {
+			return false
+		}
+		p, n = p[1:], n[1:]
+	}
+	return len(n) == 0
+}
+
+// refAgrees reports the first disagreement between Match, MatchContents and
+// MayContain and the reference semantics, or "".
+func refAgrees(glob, name string) string {
+	g, n := strings.Split(glob, "/"), strings.Split(name, "/")
+	ok := clean(n)
+	if got, want := Match(glob, name), ok && matchRef(g, n, false); got != want {
+		return fmt.Sprintf("Match(%q, %q) = %v, reference %v", glob, name, got, want)
+	}
+	if got, want := MatchContents(glob, name), ok && matchRef(g, n, true); got != want {
+		return fmt.Sprintf("MatchContents(%q, %q) = %v, reference %v", glob, name, got, want)
+	}
+	// The walk prunes with MayContain: every directory above a match must
+	// stay reachable, or a scoped file would silently drop out.
+	if Match(glob, name) {
+		for i := range len(n) - 1 {
+			if !SplitGlob(glob).MayContain(n[:i+1]) {
+				return fmt.Sprintf("MayContain(%q, %q) = false above match %q", glob, strings.Join(n[:i+1], "/"), name)
+			}
+		}
+	}
+	return ""
+}
+
+func TestMatchAgreesWithReference(t *testing.T) {
+	globs := []string{
+		"**", "**/**", "a/**", "a/**/**", "**/a", "**/**/a", "**/a/**", "a/**/b", "a/**/**/b",
+		"**/a/**/b/**", "*/a", "a/*", "*", "a/*/b/**", "**/*.go", "?", "a/b/c", "[ab]/**/c",
+	}
+	names := []string{
+		"a", "b", "c", "a/a", "a/b", "b/a", "a/b/c", "a/a/b", "a/x/b", "x/a/y/b/z", "a/b/a/b",
+		"c/a/b", "x.go", "a/x.go", "a/b/c/d", "b/c", "a/c", "x/y/z/a",
+	}
+	for _, g := range globs {
+		for _, n := range names {
+			if msg := refAgrees(g, n); msg != "" {
+				t.Error(msg)
+			}
+		}
+	}
+}
+
+// Audit F12: consecutive `**` must not change what matches, and must not
+// make matching exponential.
+func TestRepeatedDoubleStar(t *testing.T) {
+	for _, n := range []string{"x", "a/x", "a/b/x", "a/b", "x/a", "a/x/b"} {
+		if Match("**/**/x", n) != Match("**/x", n) || MatchContents("**/**/x", n) != MatchContents("**/x", n) {
+			t.Errorf("**/**/x and **/x disagree on %q", n)
+		}
+	}
+	deep := strings.Repeat("a/", 40) + "b"
+	for _, g := range []string{
+		strings.Repeat("**/", 12) + "x",
+		strings.Repeat("**/a/", 11) + "**/x",
+	} {
+		start := time.Now()
+		if Match(g, deep) || MatchContents(g, deep) {
+			t.Fatalf("%q must not match %q", g, deep)
+		}
+		if d := time.Since(start); d > 10*time.Millisecond {
+			t.Errorf("matching a 12-** glob took %v, want < 10ms", d)
+		}
+	}
+}
+
+func TestMayContain(t *testing.T) {
+	cases := []struct {
+		glob, dir string
+		want      bool
+	}{
+		{"src/**", "", true},
+		{"src/**", "src", true},
+		{"src/**", "src/a/b", true},
+		{"src/**", "pgdata", false},
+		{"go.mod", "", true},
+		{"go.mod", "a", false},
+		{"cmd/*/main.go", "cmd", true},
+		{"cmd/*/main.go", "cmd/aval", true},
+		{"cmd/*/main.go", "cmd/aval/x", false},
+		{"cmd/*/main.go", "pkg", false},
+		{"**/*.go", "anything/deep", true},
+		{"a/**/b", "a/x/y", true},
+		{"a/**/b", "b", false},
+	}
+	for _, tc := range cases {
+		var dir []string
+		if tc.dir != "" {
+			dir = strings.Split(tc.dir, "/")
+		}
+		if got := SplitGlob(tc.glob).MayContain(dir); got != tc.want {
+			t.Errorf("MayContain(%q, %q) = %v, want %v", tc.glob, tc.dir, got, tc.want)
 		}
 	}
 }

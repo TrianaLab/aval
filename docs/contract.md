@@ -87,7 +87,9 @@ the same rules.
   does not cross `/`. A malformed pattern (e.g. `[a-`) is rejected.
 - `**` is only allowed as a whole segment and matches zero or more segments.
   `src/**/*.go` matches `src/a.go` and `src/x/y/a.go`. `**` alone matches
-  every file. `foo**` or `**.go` are rejected.
+  every file. `foo**` or `**.go` are rejected. Consecutive `**` match the
+  same names as one (`**/**/x` is `**/x`), and matching takes time
+  proportional to glob segments times path segments, however many `**`.
 - In `exclude`, a trailing `**` means the files under a directory: a file
   named `build` that only `build/**` would exclude fails fingerprinting
   (see "Fail-closed errors"). Exclude such a file by name (`build`).
@@ -322,7 +324,10 @@ test without recording it; `aval run --fingerprint-only`, `--explain`,
 - A path in scope contains a newline or carriage return: `control characters
   in path are not supported`. The manifest is line-oriented, so such a name
   could forge manifest lines and collide with a different tree.
-- Any I/O error while walking or reading the root.
+- Any I/O error while walking or reading the root. The walk only enters
+  directories that a `source` or `dependencies` glob can match a file in, so
+  an unreadable directory outside the scope (a root-owned volume, a cache)
+  is never opened and causes no error. `exclude` does not prune the walk.
 
 ## Debugging
 

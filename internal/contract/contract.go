@@ -224,40 +224,92 @@ func ValidateGlob(g string) error {
 // is not a clean relative path (leading '/', empty, '.' or '..' segments)
 // never matches, so no glob can reach outside the contract root.
 func Match(glob, name string) bool {
-	segs := strings.Split(name, "/")
-	if slices.ContainsFunc(segs, func(s string) bool { return s == "" || s == "." || s == ".." }) {
-		return false
-	}
-	return matchSegs(strings.Split(glob, "/"), segs, false)
+	return SplitGlob(glob).Match(strings.Split(name, "/"))
 }
 
 // MatchContents is Match, except that a trailing `**` matches one or more
 // segments: `dir/**` matches the files under dir, never a file named dir.
 func MatchContents(glob, name string) bool {
-	return Match(glob, name) && matchSegs(strings.Split(glob, "/"), strings.Split(name, "/"), true)
+	return SplitGlob(glob).MatchContents(strings.Split(name, "/"))
 }
 
-func matchSegs(p, n []string, contents bool) bool {
-	for len(p) > 0 {
-		if p[0] == "**" {
-			p = p[1:]
-			if len(p) == 0 {
-				return !contents || len(n) > 0
-			}
-			for i := 0; i <= len(n); i++ {
-				if matchSegs(p, n[i:], contents) {
-					return true
-				}
-			}
-			return false
-		}
-		if len(n) == 0 {
-			return false
-		}
-		if ok, _ := path.Match(p[0], n[0]); !ok {
-			return false
-		}
-		p, n = p[1:], n[1:]
+// Glob is a glob split into its path segments once, to match many names.
+type Glob []string
+
+// SplitGlob splits a valid glob (see ValidateGlob) into segments.
+func SplitGlob(g string) Glob { return strings.Split(g, "/") }
+
+// Match is the package-level Match over a name already split on "/".
+func (g Glob) Match(name []string) bool {
+	return clean(name) && matchSegs(g, name)
+}
+
+// MatchContents is the package-level MatchContents over a split name.
+func (g Glob) MatchContents(name []string) bool {
+	if !clean(name) {
+		return false
 	}
-	return len(n) == 0
+	if len(g) > 0 && g[len(g)-1] == "**" {
+		// P/** matches A+B with |B| >= 1 exactly when P/** matches the
+		// name without its last segment.
+		return len(name) > 0 && matchSegs(g, name[:len(name)-1])
+	}
+	return matchSegs(g, name)
+}
+
+// MayContain reports whether a file under the directory dir (split, clean,
+// relative to the root; nil for the root) could match g. The fingerprint
+// walk skips directories for which no include glob returns true.
+func (g Glob) MayContain(dir []string) bool {
+	for i, s := range dir {
+		if i < len(g) && g[i] == "**" {
+			return true
+		}
+		// Without a `**` so far, g matches exactly len(g) segments, so a
+		// file under dir needs len(g) > len(dir).
+		if i >= len(g)-1 {
+			return false
+		}
+		if !segMatch(g[i], s) {
+			return false
+		}
+	}
+	return true
+}
+
+func clean(name []string) bool {
+	return !slices.ContainsFunc(name, func(s string) bool { return s == "" || s == "." || s == ".." })
+}
+
+// matchSegs matches segments with the classic wildcard algorithm: on a
+// mismatch, only the most recent `**` takes one more segment. Earlier `**`
+// never need to, so the cost is O(len(p)*len(n)) however many `**` the glob
+// has (a recursive matcher is exponential in them).
+func matchSegs(p, n []string) bool {
+	pi, ni := 0, 0
+	star, mark := -1, 0
+	for ni < len(n) {
+		switch {
+		case pi < len(p) && p[pi] == "**":
+			star, mark = pi, ni
+			pi++
+		case pi < len(p) && segMatch(p[pi], n[ni]):
+			pi++
+			ni++
+		case star >= 0:
+			mark++
+			pi, ni = star+1, mark
+		default:
+			return false
+		}
+	}
+	for pi < len(p) && p[pi] == "**" {
+		pi++
+	}
+	return pi == len(p)
+}
+
+func segMatch(p, n string) bool {
+	ok, _ := path.Match(p, n)
+	return ok
 }

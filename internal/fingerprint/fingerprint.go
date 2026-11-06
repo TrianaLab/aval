@@ -65,7 +65,8 @@ func Compute(dir string, c *contract.Contract, env LookupEnv, outputs ...string)
 		env = os.LookupEnv
 	}
 	canon := canonicalContract(c)
-	files, err := listFiles(dir, outputsUnder(dir, outputs))
+	source, exclude, deps := splitGlobs(c.Scope.Source), splitGlobs(c.Scope.Exclude), splitGlobs(c.Scope.Dependencies)
+	files, err := listFiles(dir, outputsUnder(dir, outputs), slices.Concat(source, deps))
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -73,7 +74,8 @@ func Compute(dir string, c *contract.Contract, env LookupEnv, outputs ...string)
 	var lines []string
 	lines = append(lines, Version, "contract "+sum(canon))
 
-	src, err := hashMatching(dir, files, "source", c.Scope.Source, c.Scope.Exclude)
+	h := &hasher{buf: make([]byte, 32<<10)}
+	src, err := h.hashMatching(dir, files, "source", source, exclude)
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -82,11 +84,11 @@ func Compute(dir string, c *contract.Contract, env LookupEnv, outputs ...string)
 	}
 	lines = append(lines, src...)
 
-	deps, err := hashMatching(dir, files, "dependency", c.Scope.Dependencies, nil)
+	dep, err := h.hashMatching(dir, files, "dependency", deps, nil)
 	if err != nil {
 		return Fingerprint{}, err
 	}
-	lines = append(lines, deps...)
+	lines = append(lines, dep...)
 
 	var section []string
 	for k, v := range c.Environment.Toolchain {
@@ -157,46 +159,66 @@ func outputsUnder(dir string, outputs []string) map[string]bool {
 	return skip
 }
 
-// listFiles returns all regular files and symlinks under dir as sorted,
-// slash-separated relative paths. VCS metadata, Aval's output directories
-// and the paths in skip are left out.
-func listFiles(dir string, skip map[string]bool) ([]string, error) {
-	var out []string
+func splitGlobs(globs []string) []contract.Glob {
+	out := make([]contract.Glob, len(globs))
+	for i, g := range globs {
+		out[i] = contract.SplitGlob(g)
+	}
+	return out
+}
+
+// file is a slash-separated path relative to the contract root and its
+// segments, split once for every glob match.
+type file struct {
+	rel  string
+	segs []string
+}
+
+// listFiles returns the regular files and symlinks under dir, sorted by
+// path. VCS metadata, Aval's output directories and the paths in skip are
+// left out, and so is every directory no include glob can match a file in:
+// an unreadable or deep directory outside the scope is never opened.
+func listFiles(dir string, skip map[string]bool, include []contract.Glob) ([]file, error) {
+	var out []file
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		rel, _ := filepath.Rel(dir, p) // cannot fail: WalkDir yields paths under dir
+		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
 			if d.Name() == ".git" || d.Name() == OutputDir {
 				return filepath.SkipDir
 			}
+			// WalkDir calls this before reading the directory, so a pruned
+			// directory is never opened.
+			segs := strings.Split(rel, "/")
+			if rel != "." && !slices.ContainsFunc(include, func(g contract.Glob) bool { return g.MayContain(segs) }) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		rel, _ := filepath.Rel(dir, p) // cannot fail: WalkDir yields paths under dir
-		if rel = filepath.ToSlash(rel); !skip[rel] {
-			out = append(out, rel)
+		if !skip[rel] {
+			out = append(out, file{rel, strings.Split(rel, "/")})
 		}
 		return nil
 	})
-	slices.Sort(out)
+	slices.SortFunc(out, func(a, b file) int { return strings.Compare(a.rel, b.rel) })
 	return out, err
 }
+
+// hasher hashes files through one reused copy buffer.
+type hasher struct{ buf []byte }
 
 // hashMatching hashes every file matching any include glob and no exclude
 // glob. Every include glob must match at least one file (before exclude): a
 // glob that matches nothing is a typo or a name that differs on disk (case,
 // Unicode form), and ignoring it would silently drop a declared input.
-func hashMatching(dir string, files []string, kind string, include, exclude []string) ([]string, error) {
+func (h *hasher) hashMatching(dir string, files []file, kind string, include, exclude []contract.Glob) ([]string, error) {
 	var lines []string
 	for _, g := range include {
-		n := 0
-		for _, f := range files {
-			if contract.Match(g, f) {
-				n++
-			}
-		}
-		if n == 0 {
-			return nil, fmt.Errorf("%s glob %q matched no files", kind, g)
+		if !slices.ContainsFunc(files, func(f file) bool { return g.Match(f.segs) }) {
+			return nil, fmt.Errorf("%s glob %q matched no files", kind, strings.Join(g, "/"))
 		}
 	}
 	for _, f := range files {
@@ -207,33 +229,33 @@ func hashMatching(dir string, files []string, kind string, include, exclude []st
 			// `dir/**` also matches a file named dir (** matches zero
 			// segments). Excluding that file would drop an input the glob
 			// does not declare, so it must be excluded by another glob.
-			if !slices.ContainsFunc(exclude, func(g string) bool { return contract.MatchContents(g, f) }) {
-				return nil, fmt.Errorf("%s %q is excluded only by a trailing \"**\", which means the files under it: exclude it by name or narrow the glob", kind, f)
+			if !slices.ContainsFunc(exclude, func(g contract.Glob) bool { return g.MatchContents(f.segs) }) {
+				return nil, fmt.Errorf("%s %q is excluded only by a trailing \"**\", which means the files under it: exclude it by name or narrow the glob", kind, f.rel)
 			}
 			continue
 		}
 		// Paths go into a line-oriented manifest unescaped; a newline in a
 		// name could forge extra lines and collide with another tree.
-		if strings.ContainsAny(f, "\n\r") {
-			return nil, fmt.Errorf("%s %q: control characters in path are not supported", kind, f)
+		if strings.ContainsAny(f.rel, "\n\r") {
+			return nil, fmt.Errorf("%s %q: control characters in path are not supported", kind, f.rel)
 		}
-		h, mode, err := hashFile(filepath.Join(dir, filepath.FromSlash(f)))
+		sum, mode, err := h.hashFile(filepath.Join(dir, filepath.FromSlash(f.rel)))
 		if err != nil {
-			return nil, fmt.Errorf("%s %s: %w", kind, f, err)
+			return nil, fmt.Errorf("%s %s: %w", kind, f.rel, err)
 		}
-		lines = append(lines, fmt.Sprintf("%s %s %s %s", kind, h, mode, f))
+		lines = append(lines, kind+" "+sum+" "+mode+" "+f.rel)
 	}
 	return lines, nil // files is sorted, so lines are too
 }
 
-func matchesAny(globs []string, f string) bool {
-	return slices.ContainsFunc(globs, func(g string) bool { return contract.Match(g, f) })
+func matchesAny(globs []contract.Glob, f file) bool {
+	return slices.ContainsFunc(globs, func(g contract.Glob) bool { return g.Match(f.segs) })
 }
 
 // hashFile returns the content hash and a portable mode ("x" executable,
 // "-" otherwise). Symlinks are rejected: their target may live outside the
 // scope, and we cannot prove it did not change (fail closed).
-func hashFile(p string) (string, string, error) {
+func (h *hasher) hashFile(p string) (string, string, error) {
 	fi, err := os.Lstat(p)
 	if err != nil {
 		return "", "", err
@@ -241,11 +263,12 @@ func hashFile(p string) (string, string, error) {
 	if !fi.Mode().IsRegular() {
 		return "", "", errors.New("only regular files are supported in scope (symlinks and devices are rejected)")
 	}
-	h := sha256.New()
+	d := sha256.New()
 	f, err := os.Open(p)
 	if err == nil { // one error branch for open and read
 		defer f.Close()
-		_, err = io.Copy(h, f)
+		// Hide *os.File's WriteTo, which copies through a fresh buffer.
+		_, err = io.CopyBuffer(d, struct{ io.Reader }{f}, h.buf)
 	}
 	if err != nil {
 		return "", "", err
@@ -254,7 +277,7 @@ func hashFile(p string) (string, string, error) {
 	if fi.Mode()&0o111 != 0 {
 		mode = "x"
 	}
-	return hex.EncodeToString(h.Sum(nil)), mode, nil
+	return hex.EncodeToString(d.Sum(nil)), mode, nil
 }
 
 func sum(b []byte) string {
