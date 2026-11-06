@@ -130,7 +130,7 @@ func readBounded(fsys fs.FS, p string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() // read-only: a close error loses nothing
 	data, err := io.ReadAll(io.LimitReader(f, MaxFileSize+1))
 	if err == nil && len(data) > MaxFileSize {
 		err = errors.New("larger than 1 MiB")

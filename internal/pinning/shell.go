@@ -35,7 +35,7 @@ func isShellScript(fsys fs.FS, p string) bool {
 	if err != nil {
 		return true
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() // read-only: a close error loses nothing
 	head := make([]byte, 128)
 	n, _ := io.ReadFull(f, head)
 	return shebangRe.Match(head[:n])
