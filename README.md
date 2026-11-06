@@ -86,7 +86,7 @@ identities:
 EOF
 ```
 
-Run the test, then sign and push the result. The first line says `miss`:
+Run the test, then sign and push the result. The output says `miss`:
 this run has no policy, so it does not look for a result and runs the test:
 
 ```sh

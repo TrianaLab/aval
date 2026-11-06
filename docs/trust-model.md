@@ -166,11 +166,13 @@ unknown class in `allowedCacheability`. Relative `trustedRoot` and
 
 A policy with an `issuer` identity and no `trustedRoot` uses the Sigstore
 public-good trusted root. sigstore-go fetches it with TUF from
-`tuf-repo-cdn.sigstore.dev` and caches it under `$HOME/.sigstore`. Today this
-happens on every `aval verify` and `aval run` with such a policy, before the
-lookup, so a miss pays for it too. Without network access, or with a HOME
-that cannot be written, the trusted root does not load: outcome `error`
-(exit 1), and `aval run` runs the test. Reuse is lost, never faked.
+`tuf-repo-cdn.sigstore.dev` and caches it under `$HOME/.sigstore`. Aval loads
+it only when a candidate's Sigstore bundle carries a certificate, at most once
+per command. A miss or a key-based attestation never fetches it. Without
+network access, or with a HOME that cannot be written, the trusted root does
+not load: that candidate is outcome `error` (exit 1, never
+`verification-failed`), and `aval run` runs the test. Reuse is lost, never
+faked.
 
 To avoid the dependency, pin the trusted root in the policy:
 

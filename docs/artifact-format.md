@@ -208,6 +208,8 @@ is not set, including the credential helpers it names (`credsStore`,
 `docker-credential-ecr-login`). Log in with `docker login <registry>` (or
 `oras login`, which writes the same file). Without an entry for the registry,
 Aval connects anonymously, which is enough to read a public repository.
+Every registry call runs under `--registry-timeout` (default `1m`; see
+[Lookup and consumption](#lookup-and-consumption)).
 
 A config file that cannot be parsed, or a helper that fails, is outcome
 `error` (exit 1): `aval run` runs the test and nothing is reused. Loopback
@@ -236,7 +238,8 @@ checked, otherwise `miss`.
 Every push adds one execution, even for the same inputs: the hostname and
 timestamps in the predicate differ. Aval never deletes one. Once a
 fingerprint has more than 64 executions, every lookup for it is outcome
-`error`: the test always runs, and pushing again only adds more. It stays
+`error`: the test always runs. Every push for it still adds an execution,
+then fails its confirmation and exits 1. It stays
 that way until someone deletes executions. Other fingerprints are not
 affected, so the next change to an input also ends it.
 
