@@ -77,7 +77,7 @@ func TestRunRecordsEveryOutcome(t *testing.T) {
 				argv, ran := command(t, tc.testExit, tc.missing)
 				dir := t.TempDir()
 				recFile := filepath.Join(dir, "record.json")
-				args := []string{"run", "-f", contractWith(t, "hermetic", argv...), "--registry", "r", "--policy", "p.yaml",
+				args := []string{"run", "-f", contractWith(t, "hermetic", argv...), "--registry", "registry.example/acme/stats", "--policy", "p.yaml",
 					"--result", filepath.Join(dir, "result.json"), "--record", "--record-file", recFile, "--ci-run-url", "https://ci.example/1"}
 				if tc.shadow {
 					args = append(args, "--shadow")
@@ -97,7 +97,7 @@ func TestRunRecordsEveryOutcome(t *testing.T) {
 				if rec != want || rec != readRecord(t, recFile) || !strings.HasPrefix(rec.Fingerprint, "sha256:") || (tc.reused && rec.TestDurationMs != 0) {
 					t.Fatalf("published %+v, wrote %+v, want %+v", rec, readRecord(t, recFile), want)
 				}
-				if line := map[bool]string{true: "recorded r@sha256:cc", false: "warning: run record not published"}[pushErr == nil]; !strings.Contains(stdout+stderr, line) {
+				if line := map[bool]string{true: "recorded registry.example/acme/stats@sha256:cc", false: "warning: run record not published"}[pushErr == nil]; !strings.Contains(stdout+stderr, line) {
 					t.Fatalf("stdout %q stderr %q, want %q", stdout, stderr, line)
 				}
 			})
@@ -124,10 +124,10 @@ func TestRunRecordDurations(t *testing.T) {
 	}
 	got := fakeRecord(t, nil)
 	c := contractWith(t, "hermetic", "sleep", "0.05")
-	if code, _, stderr := runCLI("run", "-f", c, "--registry", "r", "--policy", "p.yaml", "--record"); code != ExitOK {
+	if code, _, stderr := runCLI("run", "-f", c, "--registry", "registry.example/acme/stats", "--policy", "p.yaml", "--record"); code != ExitOK {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
-	if code, _, stderr := runCLI("run", "-f", c, "--registry", "r", "--policy", "p.yaml", "--record", "--shadow", "--result", filepath.Join(t.TempDir(), "r.json")); code != ExitOK {
+	if code, _, stderr := runCLI("run", "-f", c, "--registry", "registry.example/acme/stats", "--policy", "p.yaml", "--record", "--shadow", "--result", filepath.Join(t.TempDir(), "r.json")); code != ExitOK {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
 	if r := (*got)[0]; !r.Reused || r.SavedDurationMs != 90_000 || r.TestDurationMs != 0 {
@@ -173,6 +173,48 @@ func TestRecordFileIsNotAnInput(t *testing.T) {
 	}
 }
 
+// A file at --record-file that Aval did not write is never overwritten and
+// never stops the run; inside the scope it stays an input. A file shaped like
+// a run record but invalid (unknown outcome, unknown field) is such a file:
+// taking it for Aval output would drop an input from the fingerprint.
+func TestRecordFileNeverClobbers(t *testing.T) {
+	valid := `{"version":"` + evidence.RunRecordVersion + `","testId":"unit","outcome":"miss","avalVersion":"dev","recordedAt":"2026-11-06T12:30:00Z"}`
+	for name, body := range map[string]string{
+		"not json":        "keep me",
+		"unknown outcome": strings.Replace(valid, `"miss"`, `"reused"`, 1),
+		"unknown field":   strings.Replace(valid, `{`, `{"x":1,`, 1),
+		"trailing data":   valid + "{}",
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := writeContract(t, "hermetic")
+			recFile := filepath.Join(filepath.Dir(c), "record.txt") // matches scope *.txt
+			fp := func(content string) string {
+				t.Helper()
+				if err := os.WriteFile(recFile, []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				report := filepath.Join(t.TempDir(), "report.json")
+				code, _, stderr := runCLI("run", "-f", c, "--result", filepath.Join(t.TempDir(), "r.json"), "--report", report, "--record-file", recFile)
+				if code != ExitOK || !strings.Contains(stderr, "run record not written: "+recFile+" (--record-file) exists") {
+					t.Fatalf("exit %d, stderr %q", code, stderr)
+				}
+				if got, _ := os.ReadFile(recFile); string(got) != content {
+					t.Fatalf("record file overwritten: %q", got)
+				}
+				var r evidence.Report
+				raw, _ := os.ReadFile(report)
+				if err := json.Unmarshal(raw, &r); err != nil || r.Fingerprint == "" {
+					t.Fatalf("report %s: %v", raw, err)
+				}
+				return r.Fingerprint
+			}
+			if fp(body) == fp(body+" ") {
+				t.Fatal("the record file is in scope but not an input of the fingerprint")
+			}
+		})
+	}
+}
+
 // aval record publishes the record aval run wrote, unchanged.
 func TestRecordCommand(t *testing.T) {
 	recFile := filepath.Join(t.TempDir(), "record.json")
@@ -180,8 +222,8 @@ func TestRecordCommand(t *testing.T) {
 		t.Fatalf("run: exit %d, stderr %q", code, stderr)
 	}
 	got := fakeRecord(t, nil)
-	code, stdout, stderr := runCLI("record", "--registry", "r", "--record-file", recFile)
-	if code != ExitOK || !strings.Contains(stdout, "recorded r@sha256:cc") || len(*got) != 1 || (*got)[0] != readRecord(t, recFile) {
+	code, stdout, stderr := runCLI("record", "--registry", "registry.example/acme/stats", "--record-file", recFile)
+	if code != ExitOK || !strings.Contains(stdout, "recorded registry.example/acme/stats@sha256:cc") || len(*got) != 1 || (*got)[0] != readRecord(t, recFile) {
 		t.Fatalf("exit %d, stdout %q, stderr %q, records %+v", code, stdout, stderr, *got)
 	}
 
@@ -198,11 +240,12 @@ func TestRecordCommand(t *testing.T) {
 		stderr  string
 	}{
 		{"no registry", []string{"--record-file", recFile}, nil, ExitUsage, "are required"},
-		{"no file", []string{"--registry", "r"}, nil, ExitUsage, "are required"},
-		{"bad timeout", []string{"--registry", "r", "--record-file", recFile, "--registry-timeout", "0s"}, nil, ExitUsage, "--registry-timeout"},
-		{"missing file", []string{"--registry", "r", "--record-file", filepath.Join(t.TempDir(), "none.json")}, nil, ExitError, "reading run record"},
-		{"invalid record", []string{"--registry", "r", "--record-file", invalid}, nil, ExitError, "version"},
-		{"push error", []string{"--registry", "r", "--record-file", recFile}, errors.New("denied"), ExitError, "publishing run record: denied"},
+		{"no file", []string{"--registry", "registry.example/acme/stats"}, nil, ExitUsage, "are required"},
+		{"bad registry", []string{"--registry", "r", "--record-file", recFile}, nil, ExitUsage, "not an OCI repository"},
+		{"bad timeout", []string{"--registry", "registry.example/acme/stats", "--record-file", recFile, "--registry-timeout", "0s"}, nil, ExitUsage, "--registry-timeout"},
+		{"missing file", []string{"--registry", "registry.example/acme/stats", "--record-file", filepath.Join(t.TempDir(), "none.json")}, nil, ExitError, "reading run record"},
+		{"invalid record", []string{"--registry", "registry.example/acme/stats", "--record-file", invalid}, nil, ExitError, "version"},
+		{"push error", []string{"--registry", "registry.example/acme/stats", "--record-file", recFile}, errors.New("denied"), ExitError, "publishing run record: denied"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

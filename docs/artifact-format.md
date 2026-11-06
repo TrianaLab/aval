@@ -290,7 +290,10 @@ credentials, registry down, past `--registry-timeout`) or written prints
 `aval: warning: run record not ...` on stderr and never changes the exit
 code. Publishing has its own `--registry-timeout` deadline, so it cannot
 hold the command longer. `--record` needs `--registry`. Aval keeps no local
-state; a record file exists only when `--record-file` asks for one.
+state; a record file exists only when `--record-file` asks for one. An
+existing file at `--record-file` that is not an Aval result, report or valid
+run record is never overwritten: the run warns and goes on, and inside the
+contract scope that file stays an input of the fingerprint.
 
 ### Layout
 

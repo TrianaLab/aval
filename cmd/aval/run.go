@@ -169,6 +169,17 @@ func (o runFlags) checkOutputs() error {
 	return nil
 }
 
+// outputs are the files run writes as Aval output. A file at --record-file
+// that Aval did not write is left out, so it stays what it is (an input, if
+// in scope): recordRun does not overwrite it, and a statistics flag never
+// stops the test from running (#86).
+func (o runFlags) outputs() []string {
+	if existsNonAvalOutput(o.recordFile) {
+		return []string{o.resultFile, o.reportFile}
+	}
+	return []string{o.resultFile, o.reportFile, o.recordFile}
+}
+
 func runTest(cmd *cobra.Command, o runFlags) error {
 	// Read the signing token once, before validation needs it, and keep it
 	// out of the environment of anything that runs later.
@@ -177,7 +188,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	if err := o.validate(token); err != nil {
 		return err
 	}
-	c, fp, fpErr := loadAndFingerprint(o.file, o.resultFile, o.reportFile, o.recordFile)
+	c, fp, fpErr := loadAndFingerprint(o.file, o.outputs()...)
 	if c == nil {
 		return fpErr
 	}
@@ -356,7 +367,10 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 		rec.Reused, rec.Result = true, r.Result
 		rec.SavedDurationMs = r.Predicate.FinishedAt.Sub(r.Predicate.StartedAt).Milliseconds()
 	}
-	if o.recordFile != "" {
+	switch {
+	case existsNonAvalOutput(o.recordFile):
+		fmt.Fprintf(warn, "aval: warning: run record not written: %s (--record-file) exists and holds no Aval output; Aval does not overwrite it\n", o.recordFile)
+	case o.recordFile != "":
 		if err := writeJSON(o.recordFile, rec); err != nil {
 			fmt.Fprintf(warn, "aval: warning: run record not written: %s\n", oneLine(err.Error()))
 		}
@@ -479,6 +493,9 @@ verify never read them.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if repo == "" || file == "" {
 				return usageError{errors.New("--registry and --record-file are required")}
+			}
+			if err := checkRegistry(repo); err != nil {
+				return err
 			}
 			if err := checkTimeout(timeout); err != nil {
 				return err
