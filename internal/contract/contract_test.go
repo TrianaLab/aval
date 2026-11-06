@@ -64,6 +64,12 @@ func TestParseInvalid(t *testing.T) {
 		"dot segment":           {`["go.sum"]`, `["./go.sum"]`, "segments"},
 		"empty segment":         {`["go.sum"]`, `["a//b"]`, "segments"},
 		"inner ..":              {`["go.sum"]`, `["a/../../b"]`, "segments"},
+		"allowMutable without reason": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{ref: "postgres:16"}]`, "scope.allowMutable[0]: ref and reason are both required"},
+		"allowMutable blank ref": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{ref: " ", reason: "x"}]`, "scope.allowMutable[0]"},
+		"allowMutable unknown key": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{ref: a, reason: b, file: c}]`, "file"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -72,6 +78,25 @@ func TestParseInvalid(t *testing.T) {
 				t.Fatalf("want error containing %q, got %v", tc.wantErr, err)
 			}
 		})
+	}
+}
+
+// TestParseAllowMutable: scope.allowMutable is optional (contracts without
+// it still parse) and keeps each acknowledgement as written.
+func TestParseAllowMutable(t *testing.T) {
+	c, err := Parse([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable:
+    - ref: postgres:16
+      reason: the image is rebuilt and scanned nightly`, 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []AllowMutable{{Ref: "postgres:16", Reason: "the image is rebuilt and scanned nightly"}}
+	if fmt.Sprint(c.Scope.AllowMutable) != fmt.Sprint(want) {
+		t.Fatalf("allowMutable = %+v", c.Scope.AllowMutable)
+	}
+	if c, _ := Parse([]byte(valid)); c.Scope.AllowMutable != nil {
+		t.Fatalf("omitted allowMutable = %+v, want nil", c.Scope.AllowMutable)
 	}
 }
 

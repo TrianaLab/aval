@@ -197,7 +197,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	}
 	ctx, out, warn := cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr()
 	if o.explain || o.fingerprintOnly {
-		if err := printFingerprint(out, fp, fpErr, o); err != nil || o.fingerprintOnly {
+		if err := printFingerprint(out, warn, fp, fpErr, o); err != nil || o.fingerprintOnly {
 			return err
 		}
 	}
@@ -228,15 +228,16 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 		return errors.Join(append(errs, err)...)
 	}
 	fmt.Fprintf(out, "ran %s: %s (exit %d)\n", c.Metadata.Name, p.Result, p.Execution.ExitCode)
-	errs = append(errs, keep(ctx, out, p, fpErr, token, o)...)
+	errs = append(errs, keep(ctx, out, p, fpErr, mutable(c, fp), token, o)...)
 	recordRun(ctx, out, warn, o, r, false, p)
 	return errors.Join(append(errs, judge(out, warn, r, p))...)
 }
 
 // printFingerprint handles --explain and --fingerprint-only. Both need the
 // fingerprint, so its error is final here. --explain alone goes on to run
-// when the fingerprint is known.
-func printFingerprint(out io.Writer, fp fingerprint.Fingerprint, fpErr error, o runFlags) error {
+// when the fingerprint is known, and decide lists the mutable references;
+// --fingerprint-only lists them on warn, so stdout stays the digest.
+func printFingerprint(out, warn io.Writer, fp fingerprint.Fingerprint, fpErr error, o runFlags) error {
 	if fpErr != nil {
 		return fpErr
 	}
@@ -244,9 +245,17 @@ func printFingerprint(out io.Writer, fp fingerprint.Fingerprint, fpErr error, o 
 		fmt.Fprint(out, fp.Manifest)
 	}
 	if o.fingerprintOnly {
+		printFindings(warn, fp)
 		fmt.Fprintln(out, fp.Digest)
 	}
 	return nil
+}
+
+// printFindings lists every mutable reference, acknowledged or not.
+func printFindings(w io.Writer, fp fingerprint.Fingerprint) {
+	for _, f := range fp.Findings {
+		fmt.Fprintf(w, "mutable: %s\n", oneLine(f.String()))
+	}
 }
 
 // judge turns the real run into the command's verdict. With a verified
@@ -270,6 +279,7 @@ func judge(out, warn io.Writer, r evidence.Report, p *evidence.Predicate) error 
 func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, fpErr error, o runFlags) (evidence.Report, error) {
 	if fpErr == nil {
 		fmt.Fprintf(out, "test %s fingerprint %s\n", c.Metadata.Name, fp.Digest)
+		printFindings(out, fp)
 	}
 	switch c.Cacheability {
 	case contract.NonDeterministic:
@@ -281,6 +291,8 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 	switch {
 	case fpErr != nil:
 		return failReport(r, fpErr)
+	case mutable(c, fp) != nil:
+		return failReport(r, mutable(c, fp))
 	case o.noReuse:
 		return failReport(r, skipped("reuse disabled (--no-reuse)"))
 	case o.repo == "":
@@ -329,8 +341,10 @@ func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract
 }
 
 // keep records the result and, with --push, publishes it. Without a
-// fingerprint there is nothing a result could be reused for.
-func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr error, token string, o runFlags) []error {
+// fingerprint there is nothing a result could be reused for; with
+// unacknowledged mutable references (pinErr) nothing may reuse it, so it is
+// recorded but not published.
+func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr, pinErr error, token string, o runFlags) []error {
 	if fpErr != nil {
 		if o.push {
 			return []error{fmt.Errorf("result not published: %w", fpErr)}
@@ -342,6 +356,9 @@ func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr error
 	}
 	if !o.push {
 		return nil
+	}
+	if pinErr != nil {
+		return []error{fmt.Errorf("result not published: %s", pinErr)}
 	}
 	ref, err := signAndPush(ctx, p, o.repo, o.key, token, o.registryTimeout)
 	if err != nil {
@@ -456,6 +473,9 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 			c, fp, err := loadAndFingerprint(file, resultFile)
 			if err != nil {
 				return err
+			}
+			if err := mutable(c, fp); err != nil {
+				return fmt.Errorf("result not published: %s", err)
 			}
 			raw, err := os.ReadFile(resultFile)
 			if err != nil {

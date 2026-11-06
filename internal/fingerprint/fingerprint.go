@@ -20,6 +20,7 @@
 package fingerprint
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -33,6 +34,7 @@ import (
 	"strings"
 
 	"github.com/TrianaLab/aval/internal/contract"
+	"github.com/TrianaLab/aval/internal/pinning"
 )
 
 // Version is the manifest format version. Bump it whenever the manifest
@@ -45,6 +47,22 @@ type Fingerprint struct {
 	Digest string
 	// Manifest is the exact text that was hashed, for debugging misses.
 	Manifest string
+	// Findings are the mutable references in the hashed files and in
+	// runner.command (see internal/pinning), with the reason from
+	// scope.allowMutable on the acknowledged ones. They are not part of the
+	// manifest: they say what the digest cannot vouch for.
+	Findings []pinning.Finding
+}
+
+// Unpinned returns the findings scope.allowMutable does not acknowledge.
+func (f Fingerprint) Unpinned() []pinning.Finding {
+	var out []pinning.Finding
+	for _, x := range f.Findings {
+		if x.Allowed == "" {
+			out = append(out, x)
+		}
+	}
+	return out
 }
 
 // Hex returns the hex part of the digest.
@@ -110,7 +128,28 @@ func Compute(dir string, c *contract.Contract, env LookupEnv, outputs ...string)
 	lines = append(lines, slices.Compact(section)...)
 
 	manifest := strings.Join(lines, "\n") + "\n"
-	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest}, nil
+	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: findings(dir, c, slices.Concat(src, dep))}, nil
+}
+
+// findings scans the hashed files (from their manifest lines) and
+// runner.command, and marks the findings scope.allowMutable acknowledges.
+func findings(dir string, c *contract.Contract, lines []string) []pinning.Finding {
+	paths := make([]string, len(lines))
+	for i, l := range lines {
+		paths[i] = strings.SplitN(l, " ", 4)[3] // kind sum mode path
+	}
+	out := pinning.Scan(dir, paths, c.Runner.Command)
+	for i := range out {
+		if out[i].Ecosystem == "scan" { // a file Aval cannot read is never accepted
+			continue
+		}
+		for _, a := range c.Scope.AllowMutable {
+			if a.Ref == out[i].Ref {
+				out[i].Allowed = a.Reason
+			}
+		}
+	}
+	return out
 }
 
 // canonicalContract serializes the contract so that formatting, comments and
@@ -134,6 +173,11 @@ func canonicalContract(c *contract.Contract) []byte {
 	cc.Scope.Exclude = sorted(c.Scope.Exclude)
 	cc.Scope.Dependencies = sorted(c.Scope.Dependencies)
 	cc.Environment.Env = sorted(c.Environment.Env)
+	cc.Scope.AllowMutable = slices.Clone(c.Scope.AllowMutable)
+	slices.SortFunc(cc.Scope.AllowMutable, func(a, b contract.AllowMutable) int {
+		return cmp.Or(strings.Compare(a.Ref, b.Ref), strings.Compare(a.Reason, b.Reason))
+	})
+	cc.Scope.AllowMutable = slices.Compact(cc.Scope.AllowMutable)
 	// Marshal cannot fail: the contract holds only strings, string slices
 	// and string maps. Map keys are sorted by encoding/json.
 	b, _ := json.Marshal(cc)

@@ -1,9 +1,11 @@
-# Pinned by tag for readability. For controlled-environment reuse, pin by
-# digest instead (redis:7.4-alpine@sha256:...): a tag can be re-pushed without
-# changing this file, and then the fingerprint would not see the change.
+# Pinned by digest: a tag such as redis:7.4-alpine can be repushed without
+# changing this file, so the fingerprint would not see the change. Aval
+# refuses to reuse a controlled-environment result with an unpinned image
+# (see "Pin your dependencies" in the docs). To update, resolve the tag's
+# current digest, e.g. docker buildx imagetools inspect redis:7.4-alpine.
 services:
   redis:
-    image: redis:7.4-alpine
+    image: redis:7.4-alpine@sha256:c5d34a98396a4775e223c74e929162c35c5a2182901ba26b50ade939941ce14b
     ports:
       - "16379:6379"
     healthcheck:

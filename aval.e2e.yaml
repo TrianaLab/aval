@@ -24,6 +24,9 @@ scope:
   # contract, and with it the published results, stay the same.
   exclude: ["**/.aval/**"]
   dependencies: [go.mod, go.sum, Makefile]
+  allowMutable:
+    - ref: registry:2
+      reason: only make docs-demos starts it to record the quickstart GIFs; the e2e suites never run it
 environment:
   toolchain: {go: "1.27"}
   env: [GOFLAGS, GOEXPERIMENT, CGO_ENABLED]

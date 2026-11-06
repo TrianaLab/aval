@@ -47,6 +47,7 @@ Find the message in a section below. Text in `<...>` changes per run.
     | `empty glob`, `must be a relative, slash-separated path`, `empty, '.' or '..' segments are not allowed`, `'**' must be a whole path segment` | write globs like `src/**/*.go` |
     | `cacheability: required`, `cacheability: unknown class` | pick a [class](write-a-contract.md#step-by-step) |
     | `environment.toolchain: invalid key`, `invalid variable name` | lower case tool names, valid variable names |
+    | `scope.allowMutable[<i>]: ref and reason are both required` | give each entry a `ref` and a `reason` ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
 
 ## Errors (exit 1)
 
