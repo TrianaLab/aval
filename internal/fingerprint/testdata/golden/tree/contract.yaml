@@ -5,7 +5,7 @@
 # The test sets DB_IMAGE, sets EMPTY to "" and leaves MODE unset. pkg/.git is
 # a regular file the test creates (a worktree gitfile): it is an input, unlike
 # a .git directory. crlf.txt pins raw content bytes (no EOL normalization).
-apiVersion: aval.dev/v1alpha1
+apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
   name: golden

@@ -183,9 +183,10 @@ file out of scope, like any undeclared file.
 - Files not matched by `source` or `dependencies`. Undeclared inputs are
   invisible: if the test reads them, Aval cannot detect a change. This is
   the main risk of declared scope; keep the scope honest.
-- `.git` directories at any depth (skipped entirely). A regular file named
-  `.git` (a worktree or submodule pointer) is an ordinary file: it is in
-  scope if a glob matches it.
+- `.git` directories at any depth (skipped entirely). The name match is
+  exact and case-sensitive: a `.GIT` directory is not skipped. A regular
+  file named `.git` (a worktree or submodule pointer) is an ordinary file:
+  it is in scope if a glob matches it.
 - The git commit, branch or any VCS metadata. Two commits with identical
   scope content produce the same fingerprint and can reuse the same result.
   That is intended: a commit that only touches unrelated files should not

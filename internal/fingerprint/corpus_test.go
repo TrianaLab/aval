@@ -211,6 +211,9 @@ var corpus = []corpusCase{
 	}, change: func(f *fixture) { f.write("build", "#!/bin/sh\necho b\n") }, want: same},
 	{name: "file under .git added", change: func(f *fixture) { f.write(".git/objects/x.go", "package x\n") }, want: same},
 	{name: "file under a nested .git added", change: func(f *fixture) { f.write("pkg/a/.git/x.go", "package x\n") }, want: same},
+	// Only the exact name .git is skipped: a case-insensitive match would drop
+	// in-scope files under .GIT on every filesystem.
+	{name: "file under .GIT added", change: func(f *fixture) { f.write(".GIT/x.go", "package x\n") }, want: differ},
 	{name: "checkout path", change: func(f *fixture) {
 		to := filepath.Join(f.t.TempDir(), "elsewhere")
 		f.do(os.Rename(f.dir, to))

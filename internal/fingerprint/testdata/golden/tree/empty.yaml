@@ -1,6 +1,6 @@
 # minimal.yaml with every optional field present but empty. Its manifest
 # must equal the one of minimal.yaml.
-apiVersion: aval.dev/v1alpha1
+apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
   name: golden-minimal
