@@ -77,8 +77,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # TestEvidenceAPIIsAppendOnly compares the API snapshot with the
-          # base revision (merge base with the PR base, or the previous
-          # commit on a push) and fails when it cannot resolve it.
+          # base revision (merge base with the PR base, or `before` of the
+          # push event) and fails when it cannot resolve it.
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:

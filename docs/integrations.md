@@ -131,7 +131,8 @@ This is enforced, not only documented. The exported surface is snapshotted in
 named after the major version in `go.mod`: one line per exported constant,
 variable, function, type, field (embedded fields included) and method, with
 types, signatures, type parameters and constraints and without parameter
-names. Methods are the full method set, promoted ones included, with the
+names (type parameter names and the order of union terms are kept, so
+changing them needs a snapshot change too). Methods are the full method set, promoted ones included, with the
 receiver (`T` or `*T`) they need. Interfaces are one line with their whole
 method set or type set. A struct that supports `==` also gets a
 `comparable <Type>` line. Constant values are not part of it (see below).
@@ -144,10 +145,17 @@ when:
   its lines in the same pull request);
 - the exported API names an unexported type of the package (an embedded,
   returned or field type), whose members would not be rendered;
+- a non-test file of `pkg/evidence` is built on some release platforms and
+  not on others (a `_GOOS`/`_GOARCH` file suffix or a `//go:build` line),
+  since the snapshot is taken on one platform. The platforms are every
+  `goos`/`goarch` pair in [`.goreleaser.yaml`](../.goreleaser.yaml), each
+  with cgo off and on;
 - a line of the snapshot at the base revision is missing from the current
   snapshot, so a break cannot be hidden by editing both. The base is the merge
-  base with `origin/<base branch>` on a pull request, the previous commit on a
-  push to `main`, and the merge base with `origin/main` otherwise. In CI
+  base with `origin/<base branch>` on a pull request, the commit `main`
+  pointed to before a push to `main` (`before` of the push event, so all the
+  commits of one push are compared together), and the merge base with
+  `origin/main` otherwise. In CI
   (`CI` set) an unresolvable base fails the job; locally, without
   `origin/main`, this one comparison is skipped with a log line.
 

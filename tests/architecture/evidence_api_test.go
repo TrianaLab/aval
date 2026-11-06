@@ -1,6 +1,7 @@
 package architecture
 
 import (
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -15,6 +16,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Issue #18: pkg/evidence is semver-stable public API. Its exported surface
@@ -208,7 +211,61 @@ func unexportedTypes(pkg *types.Package, surface []string) []string {
 	return problems
 }
 
-var identRe = regexp.MustCompile(`\b[a-z_]\w*\b`)
+// Go identifiers are Unicode letters, digits and underscores; a
+// leftmost-longest run needs no word boundary.
+var identRe = regexp.MustCompile(`[\p{L}_][\p{L}\p{N}_]*`)
+
+// releasePlatforms returns every GOOS/GOARCH pair the release builds, read
+// from .goreleaser.yaml, each with cgo off and on: consumers build pkg/evidence
+// either way. It fails if the config yields no platform.
+func releasePlatforms(t *testing.T, config string) []build.Context {
+	t.Helper()
+	var cfg struct {
+		Builds []struct {
+			Goos   []string `yaml:"goos"`
+			Goarch []string `yaml:"goarch"`
+		} `yaml:"builds"`
+	}
+	if err := yaml.Unmarshal([]byte(config), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	var out []build.Context
+	for _, b := range cfg.Builds {
+		for _, goos := range b.Goos {
+			for _, goarch := range b.Goarch {
+				for _, cgo := range []bool{false, true} {
+					ctx := build.Default
+					ctx.GOOS, ctx.GOARCH, ctx.CgoEnabled = goos, goarch, cgo
+					out = append(out, ctx)
+				}
+			}
+		}
+	}
+	if len(out) == 0 {
+		t.Fatal(".goreleaser.yaml lists no goos/goarch to check pkg/evidence against")
+	}
+	return out
+}
+
+// platformSplit returns the platforms that build dir/name and those that do
+// not, judged by its file name suffix and //go:build line.
+// ponytail: custom tags (-tags foo) are not tried; a file excluded by one is
+// out everywhere and never in the surface.
+func platformSplit(dir, name string, platforms []build.Context) (in, out []string, err error) {
+	for _, ctx := range platforms {
+		ok, err := ctx.MatchFile(dir, name)
+		if err != nil {
+			return nil, nil, err
+		}
+		p := fmt.Sprintf("%s/%s cgo=%t", ctx.GOOS, ctx.GOARCH, ctx.CgoEnabled)
+		if ok {
+			in = append(in, p)
+		} else {
+			out = append(out, p)
+		}
+	}
+	return in, out, nil
+}
 
 // gitIn runs git in dir with extra environment and returns trimmed stdout.
 func gitIn(dir string, env ...string) func(...string) (string, error) {
@@ -222,8 +279,10 @@ func gitIn(dir string, env ...string) func(...string) (string, error) {
 }
 
 // apiBase returns the revision whose snapshot must survive line for line:
-// the merge base with origin/<base> on a pull request, the previous commit
-// on a push, the merge base with origin/main otherwise. Outside CI, a
+// the merge base with origin/<base> on a pull request, the commit the branch
+// pointed to before a push (`before` in the event at GITHUB_EVENT_PATH, so a
+// multi-commit push is compared as a whole), the merge base with origin/main
+// otherwise. Outside CI, a
 // missing origin/main returns "" (nothing to compare with); in CI every
 // failure is an error, so the check fails closed.
 func apiBase(git func(...string) (string, error), getenv func(string) string) (string, error) {
@@ -234,7 +293,10 @@ func apiBase(git func(...string) (string, error), getenv func(string) string) (s
 	case getenv("GITHUB_BASE_REF") != "":
 		rev, err = git("merge-base", "HEAD", "origin/"+getenv("GITHUB_BASE_REF"))
 	case getenv("GITHUB_EVENT_NAME") == "push":
-		rev, err = git("rev-parse", "--verify", "HEAD^")
+		var before string
+		if before, err = pushBefore(getenv("GITHUB_EVENT_PATH")); err == nil {
+			rev, err = git("rev-parse", "--verify", before+"^{commit}")
+		}
 	default:
 		if _, e := git("rev-parse", "--verify", "origin/main^{commit}"); e != nil && !ci {
 			return "", nil
@@ -245,6 +307,27 @@ func apiBase(git func(...string) (string, error), getenv func(string) string) (s
 		return "", fmt.Errorf("cannot resolve the base revision to compare the API snapshot with (fetch full history): %v", err)
 	}
 	return rev, nil
+}
+
+var commitRe = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
+
+// pushBefore returns `before` from the push event JSON at path. A missing
+// event, a malformed value or the all-zero id of a new branch is an error.
+func pushBefore(path string) (string, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	var ev struct {
+		Before string `json:"before"`
+	}
+	if err := json.Unmarshal(b, &ev); err != nil {
+		return "", err
+	}
+	if !commitRe.MatchString(ev.Before) || strings.Trim(ev.Before, "0") == "" {
+		return "", fmt.Errorf("push event has no usable before commit: %q", ev.Before)
+	}
+	return ev.Before, nil
 }
 
 // snapshotRemovals returns the lines of snapshot at base that lines lacks.
@@ -266,20 +349,40 @@ func snapshotRemovals(git func(...string) (string, error), base, snapshot string
 	return removed, nil
 }
 
-func TestEvidenceAPIIsAppendOnly(t *testing.T) {
+// evidenceSources returns the non-test sources of pkg/evidence and reports
+// any file that is built on some release platforms but not on others.
+func evidenceSources(t *testing.T) map[string]string {
+	t.Helper()
 	dir := filepath.Join(root, "pkg", "evidence")
 	paths, err := filepath.Glob(filepath.Join(dir, "*.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	platforms := releasePlatforms(t, readFile(t, ".goreleaser.yaml"))
 	files := map[string]string{}
 	for _, f := range paths {
-		if match, err := build.Default.MatchFile(dir, filepath.Base(f)); err != nil {
+		name := filepath.Base(f)
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		// The surface is computed on one platform and consumers build on
+		// all of them, so a file is built everywhere or nowhere.
+		in, out, err := platformSplit(dir, name, platforms)
+		if err != nil {
 			t.Fatal(err)
-		} else if match && !strings.HasSuffix(f, "_test.go") {
-			files[f] = readFile(t, filepath.Join("pkg", "evidence", filepath.Base(f)))
+		}
+		if len(in) != 0 && len(out) != 0 {
+			t.Errorf("pkg/evidence/%s is built on %v but not on %v: pkg/evidence must expose the same API on every platform", name, in, out)
+		}
+		if len(in) != 0 {
+			files[f] = readFile(t, filepath.Join("pkg", "evidence", name))
 		}
 	}
+	return files
+}
+
+func TestEvidenceAPIIsAppendOnly(t *testing.T) {
+	files := evidenceSources(t)
 	snapshot := "pkg/evidence/testdata/api-v" + moduleMajor(readFile(t, "go.mod")) + ".txt"
 	pkg := checkSource(t, "github.com/TrianaLab/aval/pkg/evidence", files)
 	current := apiSurface(pkg)
@@ -412,6 +515,7 @@ func TestEvidenceAPICheckCatchesHiddenSurface(t *testing.T) {
 		"unexported field type":       "type state struct{ Public int }\ntype S struct{ F state }",
 		"alias of an unexported type": "type state struct{ Public int }\ntype S = state",
 		"unexported in an interface":  "type state struct{ Public int }\ntype I interface{ Get() state }",
+		"non-ascii unexported":        "type état struct{ Public int }\nfunc New() *état { return nil }",
 	} {
 		if cur, pkg := surface(src); len(unexportedTypes(pkg, cur)) == 0 {
 			t.Errorf("%s not reported:\n%s", name, strings.Join(cur, "\n"))
@@ -467,8 +571,26 @@ func TestAPIBaseFailsClosedInCI(t *testing.T) {
 		t.Error("CI without origin/main must fail closed")
 	}
 	commit("README", "x")
-	if _, err := apiBase(git, envOf(map[string]string{"CI": "true", "GITHUB_EVENT_NAME": "push"})); err == nil {
-		t.Error("a push without the previous commit (shallow clone) must fail closed")
+	dir := t.TempDir()
+	for name, event := range map[string]string{
+		"no event file":   "",
+		"no before":       `{}`,
+		"new branch":      `{"before":"0000000000000000000000000000000000000000"}`,
+		"not a commit id": `{"before":"HEAD^"}`,
+		"option-like":     `{"before":"--all"}`,
+		"malformed":       `{`,
+		"unknown commit":  `{"before":"1111111111111111111111111111111111111111"}`,
+	} {
+		path := filepath.Join(dir, "missing.json")
+		if event != "" {
+			path = filepath.Join(dir, strings.ReplaceAll(name, " ", "-")+".json")
+			if err := os.WriteFile(path, []byte(event), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if b, err := apiBase(git, envOf(map[string]string{"CI": "true", "GITHUB_EVENT_NAME": "push", "GITHUB_EVENT_PATH": path})); err == nil {
+			t.Errorf("a push with %s must fail closed, got base %q", name, b)
+		}
 	}
 	if _, err := apiBase(git, envOf(map[string]string{"CI": "true", "GITHUB_BASE_REF": "gone"})); err == nil {
 		t.Error("a pull request whose base branch is not fetched must fail closed")
@@ -481,21 +603,29 @@ func TestSnapshotRemovalsAgainstBase(t *testing.T) {
 	const snap = "api-v1.txt"
 	git, commit := throwawayRepo(t)
 	first := commit("README", "x")
-	commit(snap, "type A struct\nfield A.X string\n")
+	second := commit(snap, "type A struct\nfield A.X string\n")
 	for _, ref := range []string{"refs/remotes/origin/main", "refs/remotes/origin/release"} {
 		if _, err := git("update-ref", ref, "HEAD"); err != nil {
 			t.Fatal(err)
 		}
 	}
+	// One push of two commits: the first rewrites the snapshot together
+	// with a break, the second is unrelated. The base is the pre-push tip,
+	// not HEAD^.
+	commit(snap, "type A struct\nfield A.X int\n")
 	commit("", "")
+	event := filepath.Join(t.TempDir(), "event.json")
+	if err := os.WriteFile(event, []byte(`{"before":"`+second+`"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	for name, getenv := range map[string]func(string) string{
 		"local":        envOf(nil),
 		"pull request": envOf(map[string]string{"CI": "true", "GITHUB_BASE_REF": "release", "GITHUB_EVENT_NAME": "pull_request"}),
-		"push":         envOf(map[string]string{"CI": "true", "GITHUB_EVENT_NAME": "push"}),
+		"push":         envOf(map[string]string{"CI": "true", "GITHUB_EVENT_NAME": "push", "GITHUB_EVENT_PATH": event}),
 	} {
 		base, err := apiBase(git, getenv)
-		if err != nil || base == "" {
-			t.Fatalf("%s: base %q: %v", name, base, err)
+		if err != nil || base != second {
+			t.Fatalf("%s: base %q, want %s: %v", name, base, second, err)
 		}
 		if removed, err := snapshotRemovals(git, base, snap, []string{"type A struct", "field A.X int"}); err != nil || !slices.Equal(removed, []string{"field A.X string"}) {
 			t.Errorf("%s: removed %v, %v", name, removed, err)
@@ -509,6 +639,40 @@ func TestSnapshotRemovalsAgainstBase(t *testing.T) {
 	}
 	if _, err := snapshotRemovals(git, "0000000000000000000000000000000000000000", snap, nil); err == nil {
 		t.Error("an unknown base must be an error")
+	}
+}
+
+// A file built on some release platforms but not others is reported, by
+// file name suffix or //go:build line; an unconstrained file is not.
+func TestPlatformSplit(t *testing.T) {
+	platforms := releasePlatforms(t, "builds:\n  - goos: [linux, darwin, windows]\n    goarch: [amd64, arm64]\n")
+	if len(platforms) != 12 {
+		t.Fatalf("got %d platforms, want 3 goos x 2 goarch x cgo off/on", len(platforms))
+	}
+	dir := t.TempDir()
+	for name, src := range map[string]string{
+		"a_windows.go": "package p\n",
+		"b.go":         "//go:build !windows\n\npackage p\n",
+		"c_arm64.go":   "package p\n",
+		"d.go":         "//go:build cgo\n\npackage p\n",
+		"e.go":         "package p\n",
+		"f.go":         "//go:build ignore\n\npackage p\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(src), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, split := range map[string]bool{"a_windows.go": true, "b.go": true, "c_arm64.go": true, "d.go": true, "e.go": false, "f.go": false} {
+		in, out, err := platformSplit(dir, name, platforms)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := len(in) != 0 && len(out) != 0; got != split {
+			t.Errorf("%s: split %t, want %t (in %v, out %v)", name, got, split, in, out)
+		}
+	}
+	if _, _, err := platformSplit(filepath.Join(dir, "gone"), "x.go", platforms); err == nil {
+		t.Error("an unreadable file must be an error")
 	}
 }
 
