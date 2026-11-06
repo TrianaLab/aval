@@ -89,7 +89,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	if err := o.validate(); err != nil {
 		return err
 	}
-	c, fp, fpErr := loadAndFingerprint(o.file)
+	c, fp, fpErr := loadAndFingerprint(o.file, o.resultFile, o.reportFile)
 	if c == nil {
 		return fpErr
 	}
@@ -292,7 +292,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 			if repo == "" {
 				return usageError{errors.New("--registry is required")}
 			}
-			c, fp, err := loadAndFingerprint(file)
+			c, fp, err := loadAndFingerprint(file, resultFile)
 			if err != nil {
 				return err
 			}

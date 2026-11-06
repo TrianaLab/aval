@@ -127,3 +127,42 @@ func TestRunPushReuseStory(t *testing.T) {
 		t.Fatalf("changed input: exit %d, %d runs\nstdout %s\nstderr %s", code, runs(), stdout, stderr)
 	}
 }
+
+// A contract that declares the whole tree (scope.source ["**"]) is not
+// changed by Aval's own outputs (#63): a run writes its result and report
+// inside the root, the next run gets the same fingerprint, and push accepts
+// the recorded result. One output lives under .aval/, the other at a custom
+// --result path that only the flag excludes.
+func TestWholeTreeScopeSurvivesOwnOutputs(t *testing.T) {
+	srv := httptest.NewServer(ggcr.New(ggcr.Logger(log.New(io.Discard, "", 0))))
+	t.Cleanup(srv.Close)
+	repo := strings.TrimPrefix(srv.URL, "http://") + "/acme/whole-tree-aval"
+	key, _ := keyPair(t, t.TempDir(), "dev")
+
+	whole := strings.Replace(contract, `["src/**"]`, `["**"]`, 1)
+	dir := writeProject(t, map[string]string{"aval.yaml": whole, "src/a.txt": "a\n"})
+	file := filepath.Join(dir, "aval.yaml")
+	result := filepath.Join(dir, "out", "result.json")
+	report := filepath.Join(dir, ".aval", "report.json")
+
+	fingerprint := func(stdout string) string {
+		_, rest, _ := strings.Cut(stdout, " fingerprint ")
+		fp, _, _ := strings.Cut(rest, "\n")
+		return fp
+	}
+	var fps []string
+	for i := range 2 {
+		stdout, stderr, code := avalEnv(t, "run", "-f", file, "--result", result, "--report", report)
+		if code != 0 || !strings.Contains(stdout, "ran story: passed") {
+			t.Fatalf("run %d: exit %d\nstdout %s\nstderr %s", i+1, code, stdout, stderr)
+		}
+		fps = append(fps, fingerprint(stdout))
+	}
+	if !digest.MatchString(fps[0]) || fps[0] != fps[1] {
+		t.Fatalf("fingerprint changed across runs: %q then %q", fps[0], fps[1])
+	}
+	stdout, stderr, code := avalEnv(t, "push", "-f", file, "--registry", repo, "--key", key, "--result", result)
+	if code != 0 || !strings.Contains(stdout, "pushed "+repo+"@sha256:") {
+		t.Fatalf("push: exit %d\nstdout %s\nstderr %s", code, stdout, stderr)
+	}
+}

@@ -187,6 +187,18 @@ file out of scope, like any undeclared file.
   exact and case-sensitive: a `.GIT` directory is not skipped. A regular
   file named `.git` (a worktree or submodule pointer) is an ordinary file:
   it is in scope if a glob matches it.
+- Aval's own outputs, so a broad scope such as `["**"]` keeps its
+  fingerprint across `aval run`s and `aval push` accepts the recorded
+  result:
+  - `.aval` directories at any depth (skipped entirely, the same exact,
+    case-sensitive name match as `.git`). `.aval/` is reserved for Aval: a
+    file the test reads must not live there.
+  - The `--result` and `--report` files the command is given, when they
+    fall inside the contract root. Each command knows only its own flags:
+    `aval push` skips its `--result`, `aval verify` neither. A custom path
+    outside `.aval/` is therefore hashed by a command that is not given it
+    (a miss, never a false hit); keep results and reports under `.aval/`
+    or outside the root.
 - The git commit, branch or any VCS metadata. Two commits with identical
   scope content produce the same fingerprint and can reuse the same result.
   That is intended: a commit that only touches unrelated files should not
@@ -225,7 +237,7 @@ inputs.
 and asserts its outcome: a relevant change (content, rename, add, delete,
 exec bit, lockfile, toolchain, env value or presence, command, any contract
 field, re-included excludes) changes the fingerprint; an irrelevant one
-(out-of-scope or excluded files, `.git`, checkout path, ordering,
+(out-of-scope or excluded files, `.git`, Aval's own outputs, checkout path, ordering,
 duplicates, timestamps, non-exec permission bits, YAML formatting) does not;
 an unprovable one (see "Fail-closed errors") fails closed. The test fails if
 a manifest section is changed by no differ row, so a new section must come
