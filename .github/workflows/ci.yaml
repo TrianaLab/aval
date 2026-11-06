@@ -222,8 +222,8 @@ jobs:
           go-version-file: go.mod
       - run: make ci-security
 
-  # Docs gates: markdownlint, vale, CLI reference drift and the strict site
-  # build. No path filter:
+  # Docs gates: markdownlint, vale, CLI reference drift, the strict site
+  # build and the deploy logic (scripts/test-deploy-docs.sh). No path filter:
   # a docs-only PR must run it too. Links are checked in ci-gates.
   ci-docs:
     runs-on: ubuntu-latest

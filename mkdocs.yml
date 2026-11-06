@@ -1,7 +1,7 @@
 site_name: Aval
 site_description: Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.
 # GitHub Pages project site. Publishing is .github/workflows/docs.yaml.
-site_url: https://trianalab.github.io/aval/
+site_url: https://aval.run/
 repo_url: https://github.com/TrianaLab/aval
 repo_name: TrianaLab/aval
 edit_uri: edit/main/docs/
@@ -15,7 +15,7 @@ theme:
   # inlined), partials/copyright.html (the footer line) and
   # partials/javascripts/outdated.html.
   custom_dir: overrides
-  # The mark from story 8.2 (docs/brand.md). The header and the drawer show
+  # The mark from story 8.2. The header and the drawer show
   # the wordmark from partials/logo.html instead.
   logo: assets/images/logo.svg
   favicon: favicon.svg
@@ -89,6 +89,12 @@ extra:
     provider: mike
     # Show the alias ("latest") next to the version in the selector.
     alias: true
+    # Versions that never show the outdated banner (overrides/main.html): the
+    # current release and the development version, so only a release older
+    # than `latest` shows it. Material matches these as regexes.
+    default:
+      - ^latest$
+      - ^main$
 
 markdown_extensions:
   - abbr
@@ -177,7 +183,6 @@ nav:
           - Vision and roadmap: vision.md
   - Project:
       - Changelog: changelog.md
-      - Brand: brand.md
       - Contributing: https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md
       - Security policy: https://github.com/TrianaLab/aval/blob/main/SECURITY.md
       - Code of conduct: https://github.com/TrianaLab/aval/blob/main/CODE_OF_CONDUCT.md

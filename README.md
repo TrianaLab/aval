@@ -17,11 +17,12 @@ OCI registry you already have.
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh | bash
+curl -fsSL https://aval.run/install.sh | bash
 aval --version
 ```
 
-Windows, release archives, `go install` and what the installers check:
+On Windows, in PowerShell: `irm https://aval.run/install.ps1 | iex`.
+Release archives, `go install` and what the installers check:
 [Install](https://aval.run/main/install/).
 
 ## Try it on your laptop
