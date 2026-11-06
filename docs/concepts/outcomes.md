@@ -16,6 +16,10 @@ flowchart LR
 The exit codes are those of `aval verify`. `aval run` turns every outcome
 except `verified` into a test run.
 
+All exit codes, from the [CLI reference](../cli-reference.md#exit-codes):
+
+--8<-- "docs/cli-reference.md:exit-codes"
+
 ## The four outcomes
 
 | Outcome | What it means | `aval run` does |
@@ -46,7 +50,7 @@ it and do not retry it away: fail the job and look.
 
 ```console
 $ aval verify --registry $REG --policy policy.yaml
-miss integration sha256:b40e9fac…
+miss orders-integration sha256:b40e9fac…
 reason: registry.Lookup …: no attestation found for fingerprint
 $ echo $?
 4
@@ -65,6 +69,6 @@ esac
 ```
 
 !!! info "The full spec"
-    Every exit code is in the [CLI reference](../cli-reference.md#exit-codes).
     The JSON report is in the
-    [artifact format](../artifact-format.md#verify-report).
+    [artifact format](../artifact-format.md#verify-report), the commands in
+    the [CLI reference](../cli-reference.md).

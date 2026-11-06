@@ -51,9 +51,9 @@ public Go API. It exposes:
 | `Report`, `ReportVersion` | The document printed by `aval verify --output json`. |
 | `RunRecord`, `RunRecordVersion`, `ParseRunRecord(data []byte) (*RunRecord, error)` | A run record published by `aval run --record` (see [artifact-format.md](artifact-format.md#run-records)). Unsigned statistics: never a basis for reuse or trust. `ParseRunRecord` checks the version, `testId` and the closed sets only. |
 
-Trust levels: `1` developer (personal acceleration, not full trust), `2` CI
-runner with verifiable identity, `3` isolated execution with verifiable
-attestation of the environment. `0` (unknown) is never accepted.
+Trust levels, from the [trust model](trust-model.md#trust-levels):
+
+--8<-- "docs/trust-model.md:trust-levels"
 
 A complete external consumer lives in
 [`examples/evidence-consumer`](https://github.com/TrianaLab/aval/blob/main/examples/evidence-consumer/consumer.go): its
@@ -196,35 +196,21 @@ stderr adds one `aval: SECURITY: ...` line when an attestation failed
 verification. Errors before there is a report (flags, `aval.yaml`) go to
 stderr.
 
-```json
-{
-  "version": "aval.trianalab.io/verify-report/v1",
-  "outcome": "verified",
-  "testId": "orders-integration",
-  "fingerprint": "sha256:...",
-  "reference": "ghcr.io/acme/orders-aval@sha256:...",
-  "result": "passed",
-  "signer": { "issuer": "...", "subjectRegexp": "...", "trustLevel": 2 },
-  "predicate": { "...": "..." }
-}
-```
+The report, from the [artifact format](artifact-format.md#verify-report):
 
-`reference`, `result`, `signer`, `predicate`, `reason` and `rejected` are
-omitted when empty. `reason` is set for `miss`, `verification-failed` and
-`error`. `rejected` lists candidate attestations that were not used, each
-`{reference, outcome, reason}` with `outcome` `verification-failed`, `error`
-or `miss`. A `verification-failed` entry is a security event even when the
-report's `outcome` is `verified`. A `miss` entry is an authentic attestation
-from a signer the policy lists below `minTrustLevel`: routine non-reuse, not
-a security event.
+--8<-- "docs/artifact-format.md:verify-report"
 
-| Exit code | `outcome` | Meaning | What to do |
-|---|---|---|---|
-| 0 | `verified` | A valid attestation satisfies the policy. | Reuse `result`. |
-| 4 | `miss` | No attestation for this fingerprint that the policy can reuse (none found, or only signers the policy lists below `minTrustLevel`). | Run the test. |
-| 5 | `verification-failed` | Attestation exists but failed signature or policy. | Run the test **and** alert. |
-| 1 | `error` (may have no report if fingerprinting failed) | Aval could not decide (registry down, I/O, bad policy file, trusted root unavailable). | Run the test (fail closed). |
-| 2 | (no report) | Bad flags or invalid `aval.yaml`, checked before anything runs: a `--registry` that is not an OCI repository (`ghcr.io/acme/orders-aval`, no scheme, tag or digest), `--push` or `aval push` with a `--key` that does not load or with neither a key nor `$SIGSTORE_ID_TOKEN`, a `--result` or `--report` path that holds an input of the test or, for `aval run`, any existing file that is not an Aval result or report. | Fix the invocation. |
+The exit codes, from the [CLI reference](cli-reference.md#exit-codes). Exit 2
+prints no report, and neither does exit 1 when fingerprinting failed:
+
+--8<-- "docs/cli-reference.md:exit-codes"
+
+Exit 2 also covers: a `--registry` that is not an OCI repository
+(`ghcr.io/acme/orders-aval`, no scheme, tag or digest); `--push` or `aval push`
+with a `--key` that does not load, or with neither a key nor
+`$SIGSTORE_ID_TOKEN`; a `--result` or `--report` path that holds an input of
+the test or, for `aval run`, any existing file that is not an Aval result or
+report.
 
 CI snippet that keeps miss and verification failure apart:
 

@@ -16,9 +16,13 @@ var update = flag.Bool("update", false, "rewrite docs/cli-reference.md from the 
 var cliReference = filepath.Join("..", "..", "docs", "cli-reference.md")
 
 // exitCodes is the one exit-code table (the Exit* constants in main.go).
+// Other pages include it through the snippet section "exit-codes"
+// (`--8<-- "docs/cli-reference.md:exit-codes"`) instead of copying it.
 // ponytail: hand-written; the codes are frozen API, so it changes with them.
 const exitCodes = `
 ## Exit codes
+
+<!-- --8<-- [start:exit-codes] -->
 
 | Code | ` + "`aval run`" + ` | ` + "`aval verify`" + ` | ` + "`aval push`" + ` |
 |---|---|---|---|
@@ -32,6 +36,8 @@ const exitCodes = `
 
 A miss (4) is routine. A verification failure (5) means someone published a
 result the policy does not trust; never hide it or retry it away.
+
+<!-- --8<-- [end:exit-codes] -->
 `
 
 // renderCLIReference writes one section per command, in the order `aval
