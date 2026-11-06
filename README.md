@@ -62,6 +62,7 @@ EOF
 Make a P-256 signing key and a trust policy that trusts it. Aval only accepts
 ECDSA P-256 keys:
 
+<!-- --8<-- [start:key] (the docs guides include this block) -->
 ```sh
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out aval.key
 openssl pkey -in aval.key -pubout -out aval.pub
@@ -74,6 +75,7 @@ identities:
     trustLevel: developer
 EOF
 ```
+<!-- --8<-- [end:key] -->
 
 Run the test, then sign and push the result. The output says `miss`:
 this run has no policy, so it does not look for a result and runs the test:

@@ -13,6 +13,9 @@
     "MD010": { "code_blocks": false },
     // GitHub autolinks bare URLs and addresses.
     "MD034": false,
+    // Material tabs (===) and collapsible blocks (???) indent the fenced
+    // blocks inside them, which MD046 reads as indented code blocks.
+    "MD046": false,
     // One bullet character everywhere.
     "MD004": { "style": "dash" }
   }
