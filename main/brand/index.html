@@ -309,7 +309,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../trust-model/" class="md-tabs__link">
+        <a href="../concepts/" class="md-tabs__link">
           
   
   
@@ -667,6 +667,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -686,8 +692,9 @@
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
-            
+          <div class="md-nav__link md-nav__container">
+            <a href="../concepts/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -701,8 +708,14 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
@@ -716,20 +729,22 @@
           <ul class="md-nav__list" data-md-scrollfix>
             
               
+            
+              
                 
   
   
   
   
     <li class="md-nav__item">
-      <a href="../trust-model/" class="md-nav__link">
+      <a href="../concepts/trust/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Trust model
+    Trust
   
 
     
@@ -750,14 +765,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../contract/" class="md-nav__link">
+      <a href="../concepts/outcomes/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    The test contract
+    Outcomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
   
 
     
@@ -870,6 +913,122 @@
   
   
   
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Specs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The test contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../artifact-format/" class="md-nav__link">
         
@@ -887,6 +1046,14 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1096,6 +1263,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagrams
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#clear-space-and-size" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1270,6 +1448,17 @@
     <span class="md-ellipsis">
       
         Type
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagrams
       
     </span>
   </a>
@@ -1464,6 +1653,43 @@
 </tbody>
 </table>
 <p>All three are SIL OFL 1.1. The site serves them from <code>docs/assets/fonts/</code>, each with its licence; it loads no web fonts from a CDN.</p>
+<h2 id="diagrams">Diagrams<a class="headerlink" href="#diagrams" title="Anchor link">&para;</a></h2>
+<p>Diagrams are Mermaid flowcharts in a fenced <code>mermaid</code> block. The site renders them with a vendored copy of Mermaid (<code>docs/javascripts/vendor/</code>, MIT) and colours them with the site's tokens, in light and in dark. Nodes are outlined in emerald on the page background; mark a node with one of these classes when its colour carries meaning:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Use</th>
+<th>Look</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ok</code></td>
+<td>reuse, <code>verified</code></td>
+<td>emerald fill</td>
+</tr>
+<tr>
+<td><code>warn</code></td>
+<td><code>error</code>: Aval could not decide</td>
+<td>amber outline</td>
+</tr>
+<tr>
+<td><code>err</code></td>
+<td><code>verification-failed</code>, a security event</td>
+<td>red outline</td>
+</tr>
+<tr>
+<td><code>muted</code></td>
+<td>a side step, <code>miss</code></td>
+<td>grey</td>
+</tr>
+</tbody>
+</table>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>flowchart LR
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  a[Look up] --&gt; b([verified]):::ok
+</span></code></pre></div>
+<p>Keep a diagram to one idea and about eight nodes, with short labels.</p>
 <h2 id="clear-space-and-size">Clear space and size<a class="headerlink" href="#clear-space-and-size" title="Anchor link">&para;</a></h2>
 <ul>
 <li>Keep clear space around the logo of at least half the mark's height.</li>
@@ -1567,6 +1793,8 @@
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../javascripts/version-selector.js"></script>
+      
+        <script src="../javascripts/diagrams.js"></script>
       
     
   </body>

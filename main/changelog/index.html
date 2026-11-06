@@ -311,7 +311,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../trust-model/" class="md-tabs__link">
+        <a href="../concepts/" class="md-tabs__link">
           
   
   
@@ -669,6 +669,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -688,8 +694,9 @@
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
-            
+          <div class="md-nav__link md-nav__container">
+            <a href="../concepts/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -703,8 +710,14 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
@@ -718,20 +731,22 @@
           <ul class="md-nav__list" data-md-scrollfix>
             
               
+            
+              
                 
   
   
   
   
     <li class="md-nav__item">
-      <a href="../trust-model/" class="md-nav__link">
+      <a href="../concepts/trust/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Trust model
+    Trust
   
 
     
@@ -752,14 +767,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../contract/" class="md-nav__link">
+      <a href="../concepts/outcomes/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    The test contract
+    Outcomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
   
 
     
@@ -872,6 +915,122 @@
   
   
   
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Specs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The test contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../artifact-format/" class="md-nav__link">
         
@@ -889,6 +1048,14 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1423,13 +1590,13 @@
 <h2 id="020">0.2.0<a class="headerlink" href="#020" title="Anchor link">&para;</a></h2>
 <h3 id="minor-changes">Minor Changes<a class="headerlink" href="#minor-changes" title="Anchor link">&para;</a></h3>
 <ul>
-<li>0148c76: Formats are frozen. The contract and policy <code>apiVersion</code> is now <code>aval.trianalab.io/v1</code> and the verify report <code>version</code> is <code>aval.trianalab.io/verify-report/v1</code>; <code>aval.dev/v1alpha1</code> contracts and policy files are rejected, so change that line in yours. The contract hash covers <code>apiVersion</code>, so results published before are misses and each test runs once. The predicate type (<code>https://aval.trianalab.io/attestation/execution/v2</code>), media and artifact types (<code>application/vnd.trianalab.aval.execution.v2</code>, <code>application/vnd.trianalab.aval.fingerprint.v1</code>) and predicate <code>schemaVersion</code> <code>v2</code> are unchanged and now frozen, so attestations written by v0.1.0 keep a valid, readable format. Compatibility rules (additive changes within a version, what needs a new version, how consumers treat unknown fields and values, deprecation) are in <code>docs/artifact-format.md</code>, and golden files guard the JSON shape of the statement, predicate and verify report.</li>
+<li>0148c76: Formats are frozen. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> <code>apiVersion</code> is now <code>aval.trianalab.io/v1</code> and the verify report <code>version</code> is <code>aval.trianalab.io/verify-report/v1</code>; <code>aval.dev/v1alpha1</code> contracts and <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> files are rejected, so change that line in yours. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash covers <code>apiVersion</code>, so results published before are misses and each test runs once. The predicate type (<code>https://aval.trianalab.io/attestation/execution/v2</code>), media and artifact types (<code>application/vnd.trianalab.aval.execution.v2</code>, <code>application/vnd.trianalab.aval.fingerprint.v1</code>) and predicate <code>schemaVersion</code> <code>v2</code> are unchanged and now frozen, so attestations written by v0.1.0 keep a valid, readable format. Compatibility rules (additive changes within a version, what needs a new version, how consumers treat unknown fields and values, deprecation) are in <code>docs/artifact-format.md</code>, and golden files guard the JSON shape of the statement, predicate and verify report.</li>
 </ul>
 <h3 id="patch-changes">Patch Changes<a class="headerlink" href="#patch-changes" title="Anchor link">&para;</a></h3>
 <ul>
-<li>c17dc26: <code>aval run</code> and <code>aval verify</code> escape newlines and control characters in reasons printed as text and on stderr, so text from an untrusted attestation cannot start a log line of its own. Aval's own CI now reuses its signed e2e results, and a release requires a verified e2e attestation for its commit.</li>
-<li>59b9b66: <code>pkg/evidence</code> is semver-stable Go API: within a major version it changes additively only, and CI fails when an exported identifier is removed or changes type or signature without a new major module path. <code>examples/evidence-consumer</code> is a separate module that consumes Aval evidence through <code>pkg/evidence</code> alone, with its own signature verifier. The policy is in <code>docs/integrations.md</code>.</li>
-<li>bbf9e55: Fingerprinting fails closed in two more cases: a <code>scope.source</code> glob that matches no file (a typo, or a name that differs on disk by case or Unicode form), and a file excluded only because a trailing <code>**</code> in <code>exclude</code> matched zero segments (<code>build/**</code> against a file named <code>build</code>). Trees that fingerprinted before and still do keep the same fingerprint. A table-driven false-hit corpus now pins every kind of relevant and irrelevant change.</li>
+<li>c17dc26: <code>aval run</code> and <code>aval verify</code> escape newlines and control characters in reasons printed as text and on stderr, so text from an untrusted <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> cannot start a log line of its own. Aval's own CI now reuses its signed e2e results, and a release requires a verified e2e <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> for its commit.</li>
+<li>59b9b66: <code>pkg/evidence</code> is semver-stable Go API: within a major version it changes additively only, and CI fails when an exported identifier is removed or changes type or signature without a new major module path. <code>examples/evidence-consumer</code> is a separate module that consumes Aval evidence through <code>pkg/evidence</code> alone, with its own signature verifier. The <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> is in <code>docs/integrations.md</code>.</li>
+<li>bbf9e55: Fingerprinting fails closed in two more cases: a <code>scope.source</code> glob that matches no file (a typo, or a name that differs on disk by case or Unicode form), and a file excluded only because a trailing <code>**</code> in <code>exclude</code> matched zero segments (<code>build/**</code> against a file named <code>build</code>). Trees that fingerprinted before and still do keep the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. A table-driven false-hit corpus now pins every kind of relevant and irrelevant change.</li>
 </ul>
 <h2 id="010">0.1.0<a class="headerlink" href="#010" title="Anchor link">&para;</a></h2>
 <h3 id="minor-changes_1">Minor Changes<a class="headerlink" href="#minor-changes_1" title="Anchor link">&para;</a></h3>
@@ -1546,6 +1713,8 @@
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../javascripts/version-selector.js"></script>
+      
+        <script src="../javascripts/diagrams.js"></script>
       
     
   </body>

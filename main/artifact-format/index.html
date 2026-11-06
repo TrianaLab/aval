@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://trianalab.github.io/aval/main/artifact-format/">
       
       
-        <link rel="prev" href="../cli-reference/">
+        <link rel="prev" href="../trust-model/">
       
       
         <link rel="next" href="../changelog/">
@@ -311,7 +311,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../trust-model/" class="md-tabs__link">
+        <a href="../concepts/" class="md-tabs__link">
           
   
   
@@ -669,6 +669,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -688,8 +694,9 @@
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
-            
+          <div class="md-nav__link md-nav__container">
+            <a href="../concepts/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -703,8 +710,14 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
@@ -718,20 +731,22 @@
           <ul class="md-nav__list" data-md-scrollfix>
             
               
+            
+              
                 
   
   
   
   
     <li class="md-nav__item">
-      <a href="../trust-model/" class="md-nav__link">
+      <a href="../concepts/trust/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Trust model
+    Trust
   
 
     
@@ -752,14 +767,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../contract/" class="md-nav__link">
+      <a href="../concepts/outcomes/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    The test contract
+    Outcomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
   
 
     
@@ -858,6 +901,127 @@
     
   
     CLI reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Specs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The test contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
   
 
     
@@ -1217,6 +1381,14 @@
     </ul>
   
 </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
       
     </li>
   
@@ -1799,6 +1971,24 @@
   
 
       
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../contract/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Specs
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
     </ol>
   </nav>
 
@@ -1819,10 +2009,10 @@
 
 <h1 id="artifact-format">Artifact format<a class="headerlink" href="#artifact-format" title="Anchor link">&para;</a></h1>
 <p>This document describes how Aval stores an execution result in an OCI
-registry, the attestation it signs, and the JSON that <code>aval verify --output json</code>
-prints. It is the contract external tools consume through <code>pkg/evidence</code>.</p>
+registry, the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> it signs, and the JSON that <code>aval verify --output json</code>
+prints. It is the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> external tools consume through <code>pkg/evidence</code>.</p>
 <p>Status: pre-alpha. The Go types in <code>pkg/evidence</code> are the source of truth.
-Signing, push, lookup, fetch, verification and the policy file are
+Signing, push, lookup, fetch, verification and the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> file are
 implemented (<code>attest.Sign</code>, <code>registry.Push</code>, <code>registry.Lookup</code>,
 <code>registry.Fetch</code>, <code>evidence.Verify</code>, <code>policy.Load</code>). <code>aval verify</code>,
 <code>aval run</code> and <code>aval push</code> use them.</p>
@@ -1850,7 +2040,7 @@ see <a href="#versioning-and-compatibility">Versioning and compatibility</a>.</p
 <tr>
 <td><code>ArtifactTypeFingerprint</code></td>
 <td><code>application/vnd.trianalab.aval.fingerprint.v1</code></td>
-<td><code>artifactType</code> of the per-fingerprint anchor manifest</td>
+<td><code>artifactType</code> of the per-<abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> anchor manifest</td>
 <td>frozen</td>
 </tr>
 <tr>
@@ -1925,24 +2115,24 @@ see <a href="#versioning-and-compatibility">Versioning and compatibility</a>.</p
 Sigstore media type <code>application/vnd.dev.sigstore.bundle.v0.3+json</code>
 (<code>MediaTypeSigstoreBundle</code>), and manifests carry the annotation
 <code>io.trianalab.aval.fingerprint</code> (<code>AnnotationFingerprint</code>, informational:
-verification reads the fingerprint from the signed predicate). The
+verification reads the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> from the signed predicate). The
 annotation key is frozen. The stats anchor carries <code>io.trianalab.aval.test</code>
 (<code>AnnotationTest</code>, provisional) with the test id.</p>
-<p>Related identifiers from other packages: the fingerprint manifest format is
-<code>aval-fingerprint/v1</code> (<code>internal/fingerprint</code>), and the contract and policy
+<p>Related identifiers from other packages: the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> manifest format is
+<code>aval-fingerprint/v1</code> (<code>internal/fingerprint</code>), and the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>
 <code>apiVersion</code> is <code>aval.trianalab.io/v1</code> (<code>internal/contract</code>, see
-<a href="../contract/#versioning">contract.md</a>). Both are frozen. The fingerprint
+<a href="../contract/#versioning"><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.md</a>). Both are frozen. The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>
 manifest version is a format tag, not a namespaced identifier: it names the
 canonical manifest layout and hash, not a resource, so it stays outside
 <code>aval.trianalab.io</code> and is frozen as <code>aval-fingerprint/v1</code>; a breaking change
 mints <code>aval-fingerprint/v2</code>.</p>
 <h2 id="oci-layout">OCI layout<a class="headerlink" href="#oci-layout" title="Anchor link">&para;</a></h2>
 <p>There is no Aval server or database. The registry is the only index.</p>
-<p>Per fingerprint there is one <strong>anchor</strong> manifest, and one <strong>execution</strong>
+<p>Per <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> there is one <strong>anchor</strong> manifest, and one <strong>execution</strong>
 manifest per execution whose <code>subject</code> is the anchor, so the OCI 1.1
-referrers API lists every execution for a fingerprint.</p>
+referrers API lists every execution for a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</p>
 <p>The anchor is deterministic: its bytes, and so its digest, depend only on the
-fingerprint. It is tagged <code>sha256-&lt;fingerprint hex&gt;</code> (<code>registry.Tag</code>):</p>
+<abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. It is tagged <code>sha256-&lt;fingerprint hex&gt;</code> (<code>registry.Tag</code>):</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"schemaVersion"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"mediaType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.oci.image.manifest.v1+json"</span><span class="p">,</span>
@@ -2005,14 +2195,14 @@ guidance (<code>artifactType</code> set, empty config):</p>
   <code>application/vnd.oci.empty.v1+json</code>).</li>
 <li><strong>layers</strong>: the signed DSSE envelope (see below), then the Sigstore
   bundle with the verification material. <code>registry.Push</code> refuses an
-  attestation whose bundle is missing or is not valid JSON. If
-  <code>registry.Fetch</code> reads a manifest without a bundle layer, the attestation
+  <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> whose bundle is missing or is not valid JSON. If
+  <code>registry.Fetch</code> reads a manifest without a bundle layer, the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>
   can never verify, so it ends as a verification failure.
   <code>registry.Fetch</code> rejects any other layer, a repeated layer, or a missing
   envelope as a verification failure, and so a manifest that is not
   sha256-addressed, is larger than 4 MiB, or does not match the digest it
   was fetched by.</li>
-<li><strong>subject</strong>: always the anchor of the execution's fingerprint. The tested
+<li><strong>subject</strong>: always the anchor of the execution's <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. The tested
   revision or artifact is recorded inside the statement (<code>subject</code>), not in
   the manifest, so the referrers of a tested image do not list its evidence.</li>
 </ul>
@@ -2029,13 +2219,13 @@ also repairs a tag that was moved.</p>
 <p>Registries without the referrers API (for example GHCR) are supported: oras
 maintains the OCI referrers tag schema (<code>sha256-&lt;anchor hex&gt;</code> index) on push
 and reads it on lookup. That index is rewritten on every push, so two concurrent
-pushes for the same fingerprint can drop one entry from it. Push therefore
+pushes for the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> can drop one entry from it. Push therefore
 lists the anchor's referrers after pushing and returns only once the new
 digest is among them; if it is not, it pushes the manifest again (which
 re-adds it to the index) and lists again, three attempts in total, one second
 apart. If the digest is still not listed, <code>aval push</code> and <code>aval run --push</code>
 fail (exit 1). A registry that indexes referrers asynchronously for longer
-than about two seconds also fails the push; rerun it. Once a fingerprint has more than 64 attestations the
+than about two seconds also fails the push; rerun it. Once a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> has more than 64 attestations the
 confirmation listing fails too, so push exits 1. A dropped execution is never
 a candidate, so even then it never makes an unsigned or untrusted result
 reusable. Aval does not
@@ -2043,11 +2233,11 @@ delete the previous referrers index after rewriting it, so pushing does not
 need DELETE rights.</p>
 <h3 id="lookup-and-consumption">Lookup and consumption<a class="headerlink" href="#lookup-and-consumption" title="Anchor link">&para;</a></h3>
 <ol>
-<li>Compute the fingerprint locally (<code>aval run --fingerprint-only</code>), e.g.
+<li>Compute the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> locally (<code>aval run --fingerprint-only</code>), e.g.
    <code>sha256:3f9a...</code>.</li>
 <li>Resolve the tag <code>sha256-&lt;fingerprint hex&gt;</code> in the repository passed via
    <code>--registry</code>. It must point at the anchor digest Aval computes locally for
-   that fingerprint; anything else is a verification failure (the tag was
+   that <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; anything else is a verification failure (the tag was
    moved).</li>
 <li>List the anchor's referrers with <code>artifactType</code>
    <code>application/vnd.trianalab.aval.execution.v2</code>. Each one is a candidate,
@@ -2056,26 +2246,26 @@ need DELETE rights.</p>
    verification failure, so it never turns into a miss.</li>
 <li>Fetch each candidate by digest (<code>repo@sha256:...</code>). Never fetch by tag:
    tags are mutable, digests aren't.</li>
-<li>Verify each envelope and apply the trust policy (see below).</li>
+<li>Verify each envelope and apply the trust <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> (see below).</li>
 </ol>
-<p>Lookup accepts at most 64 candidates per fingerprint and makes at most 64
+<p>Lookup accepts at most 64 candidates per <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and makes at most 64
 requests to list referrers, whatever paths the registry's <code>Link</code> headers
-point at. Above either limit it fails with outcome <code>error</code> (run the
+point at. Above either limit it fails with <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code> (run the
 test), so whoever can push, or a buggy registry, cannot make <code>aval verify</code>
 fetch an unbounded number of manifests or pages.</p>
 <p>A listed candidate whose manifest the registry answers with 404 (deleted,
-for example by an "untagged manifests" retention policy) is absent: it is
+for example by an "untagged manifests" retention <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>) is absent: it is
 skipped with a warning on stderr and is not part of <code>rejected</code>. If every
-candidate is absent, the outcome is a miss. Absence never hides a
+candidate is absent, the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is a miss. Absence never hides a
 verification failure of another candidate.</p>
 <p>Every registry call of one command runs under <code>--registry-timeout</code> (default
 <code>1m</code>): lookup and every fetch share one deadline, and push has its own. A
-registry that stalls past it is outcome <code>error</code> (exit 1), so <code>aval run</code> runs
+registry that stalls past it is <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code> (exit 1), so <code>aval run</code> runs
 the test; <code>runner.command</code> is never under this deadline. One credential store
 and one auth token cache are shared by all registry calls of a process.</p>
 <p>A missing tag, or an anchor without executions, is a <strong>miss</strong>
 (<code>evidence.ErrNotFound</code>, exit code 4). An artifact that exists but is
-malformed or fails signature or policy checks is a <strong>verification failure</strong>
+malformed or fails signature or <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> checks is a <strong>verification failure</strong>
 (<code>evidence.ErrVerification</code>, exit code 5) and is a security event.</p>
 <h3 id="registry-credentials">Registry credentials<a class="headerlink" href="#registry-credentials" title="Anchor link">&para;</a></h3>
 <p>Aval reads registry credentials the way Docker does: from
@@ -2087,29 +2277,29 @@ is not set, including the credential helpers it names (<code>credsStore</code>,
 Aval connects anonymously, which is enough to read a public repository.
 Every registry call runs under <code>--registry-timeout</code> (default <code>1m</code>; see
 <a href="#lookup-and-consumption">Lookup and consumption</a>).</p>
-<p>A config file that cannot be parsed, or a helper that fails, is outcome
+<p>A config file that cannot be parsed, or a helper that fails, is <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>
 <code>error</code> (exit 1): <code>aval run</code> runs the test and nothing is reused. Loopback
 registries (<code>localhost</code>, <code>127.0.0.1</code>, <code>::1</code>) use plain HTTP; every other
 registry uses HTTPS.</p>
-<h3 id="multiple-attestations-per-fingerprint">Multiple attestations per fingerprint<a class="headerlink" href="#multiple-attestations-per-fingerprint" title="Anchor link">&para;</a></h3>
-<p>Several executions can produce the same fingerprint (a developer run and a CI
+<h3 id="multiple-attestations-per-fingerprint">Multiple attestations per <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr><a class="headerlink" href="#multiple-attestations-per-fingerprint" title="Anchor link">&para;</a></h3>
+<p>Several executions can produce the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> (a developer run and a CI
 run, or a re-run). All of them stay listed as referrers of the anchor, so a
 later push cannot hide or replace an earlier one. <code>aval verify</code> verifies every
-candidate: the verified one with the highest trust level wins (ties go to a
+candidate: the verified one with the highest <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> wins (ties go to a
 non-passed result, then the lowest digest). Candidates that are not used are
 listed in the report's <code>rejected</code> field; when any of them failed verification,
 stderr gets one <code>aval: SECURITY: ...</code> line. A candidate
-that cannot be fetched or checked (outcome <code>error</code>) might have outranked the
+that cannot be fetched or checked (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>) might have outranked the
 verified one, so it blocks reuse and the test runs. A candidate that passes
-every check but whose signer the policy lists below <code>minTrustLevel</code> is
+every check but whose <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> lists below <code>minTrustLevel</code> is
 rejected as <code>miss</code>: it was fully evaluated, so it does not block a verified
-sibling. When nothing is reused, the outcome is <code>verification-failed</code> when
+sibling. When nothing is reused, the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is <code>verification-failed</code> when
 any candidate failed verification, otherwise <code>error</code> when any could not be
 checked, otherwise <code>miss</code>.</p>
 <h3 id="the-64-candidate-cap-and-cleanup">The 64-candidate cap and cleanup<a class="headerlink" href="#the-64-candidate-cap-and-cleanup" title="Anchor link">&para;</a></h3>
 <p>Every push adds one execution, even for the same inputs: the hostname and
 timestamps in the predicate differ. Aval never deletes one. Once a
-fingerprint has more than 64 executions, every lookup for it is outcome
+<abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> has more than 64 executions, every lookup for it is <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>
 <code>error</code>: the test always runs. Every push for it still adds an execution,
 then fails its confirmation and exits 1. It stays
 that way until someone deletes executions. Other fingerprints are not
@@ -2117,7 +2307,7 @@ affected, so the next change to an input also ends it.</p>
 <p>To stay below the cap, push from one place (for example CI on the main
 branch). <code>aval run --push</code> does not push after it reuses a result, but
 <code>aval run --shadow --push</code> runs and pushes every time.</p>
-<p>To clean up a fingerprint, list its executions and delete the ones you no
+<p>To clean up a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, list its executions and delete the ones you no
 longer need, for example with <a href="https://oras.land">ORAS</a>:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--fingerprint-only<span class="w">            </span><span class="c1"># prints sha256:&lt;hex&gt;</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>oras<span class="w"> </span>discover<span class="w"> </span>--artifact-type<span class="w"> </span>application/vnd.trianalab.aval.execution.v2<span class="w"> </span>&lt;repo&gt;:sha256-&lt;hex&gt;
@@ -2130,14 +2320,14 @@ reusable, never make an untrusted one reusable. Keep the one you still want
 to reuse, and keep any execution that failed verification until you have
 looked into it.</p>
 <h2 id="run-records">Run records<a class="headerlink" href="#run-records" title="Anchor link">&para;</a></h2>
-<p><code>aval run --record</code> publishes one run record per run, for every outcome
+<p><code>aval run --record</code> publishes one run record per run, for every <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>
 (<code>verified</code>, <code>miss</code>, <code>error</code>, <code>verification-failed</code>), so reuse can be
 measured from the registry alone. <code>--record-file &lt;path&gt;</code> writes the same
 record to a file, and <code>aval record --record-file &lt;path&gt;</code> publishes it later,
 for example from a CI job that has write credentials but runs no tests.</p>
 <p>Records are <strong>statistics, never evidence</strong>. They are unsigned and
 informational. <code>aval run</code> and <code>aval verify</code> never fetch or read them, so a
-record, forged or not, cannot cause reuse, change an outcome or count toward
+record, forged or not, cannot cause reuse, change an <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> or count toward
 the 64-candidate cap.</p>
 <p>Recording is best-effort: a record that cannot be published (no write
 credentials, registry down, past <code>--registry-timeout</code>) or written prints
@@ -2147,14 +2337,14 @@ hold the command longer. <code>--record</code> needs <code>--registry</code>. Av
 state; a record file exists only when <code>--record-file</code> asks for one. An
 existing file at <code>--record-file</code> that is not an Aval result, report or valid
 run record is never overwritten: the run warns and goes on, and inside the
-contract scope that file stays an input of the fingerprint. A <code>--record-file</code>
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> that file stays an input of the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. A <code>--record-file</code>
 that is also <code>--result</code> or <code>--report</code> is not written either.</p>
 <h3 id="layout">Layout<a class="headerlink" href="#layout" title="Anchor link">&para;</a></h3>
-<p>Per test there is one <strong>stats anchor</strong>, separate from every fingerprint
+<p>Per test there is one <strong>stats anchor</strong>, separate from every <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>
 anchor. It is deterministic (its digest depends on the test id alone) and
-tagged <code>stats-&lt;test id&gt;</code> (<code>registry.StatsTag</code>); fingerprint tags and OCI
+tagged <code>stats-&lt;test id&gt;</code> (<code>registry.StatsTag</code>); <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> tags and OCI
 referrers tag schema tags start with <code>sha256-</code>, so the tags cannot collide.
-It has the same shape as the fingerprint anchor, with
+It has the same shape as the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> anchor, with
 <code>"artifactType": "application/vnd.trianalab.aval.stats.v1"</code> and the
 annotation <code>"io.trianalab.aval.test": "&lt;test id&gt;"</code>.</p>
 <p>Each record is an OCI 1.1 image manifest with
@@ -2189,13 +2379,13 @@ limit, publishing a record fails with a warning. Pruning old records is future w
 <td><code>testId</code></td>
 <td>string</td>
 <td>always</td>
-<td><code>metadata.name</code> from the contract.</td>
+<td><code>metadata.name</code> from the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.</td>
 </tr>
 <tr>
 <td><code>fingerprint</code></td>
 <td>string</td>
 <td>always</td>
-<td><code>sha256:&lt;hex&gt;</code>; empty when the fingerprint could not be computed.</td>
+<td><code>sha256:&lt;hex&gt;</code>; empty when the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> could not be computed.</td>
 </tr>
 <tr>
 <td><code>outcome</code></td>
@@ -2225,7 +2415,7 @@ limit, publishing a record fails with a warning. Pruning old records is future w
 <td><code>savedDurationMs</code></td>
 <td>integer</td>
 <td>always</td>
-<td>On reuse, the test duration recorded in the reused attestation (<code>finishedAt - startedAt</code>); <code>0</code> otherwise.</td>
+<td>On reuse, the test duration recorded in the reused <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> (<code>finishedAt - startedAt</code>); <code>0</code> otherwise.</td>
 </tr>
 <tr>
 <td><code>avalVersion</code></td>
@@ -2278,7 +2468,7 @@ It also produces a Sigstore bundle (<code>application/vnd.dev.sigstore.bundle.v0
 carrying the certificate or key hint and the Rekor entry; it is stored as the
 second layer of the execution manifest. <code>registry.Push</code> requires it:
 <code>aval verify</code> checks the signature through the bundle (<code>attest.Verifier</code>),
-so an attestation without one could only ever be a verification failure.</p>
+so an <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> without one could only ever be a verification failure.</p>
 <h2 id="in-toto-statement">in-toto Statement<a class="headerlink" href="#in-toto-statement" title="Anchor link">&para;</a></h2>
 <p>The envelope payload is an in-toto Statement v1 (<code>evidence.Statement</code>). Its
 <code>subject</code> is the tested revision or artifact, the same one recorded in
@@ -2299,7 +2489,7 @@ so an attestation without one could only ever be a verification failure.</p>
 <code>name</code>.</p>
 <p><code>aval run</code> records <code>name</code> = the test id and <code>digest</code> = <code>{"sha256": "&lt;fingerprint
 hex&gt;"}</code> (the declared inputs), <code>runner.identity</code> = the host name (a claim;
-trust comes from the signer), <code>runner.trustLevel</code> = 0, and
+trust comes from the <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr>), <code>runner.trustLevel</code> = 0, and
 <code>execution.environment</code> = <code>os</code> and <code>arch</code> plus the declared toolchain.
 Recording a git commit or image as the subject is milestone 3 work.</p>
 <h2 id="predicate">Predicate<a class="headerlink" href="#predicate" title="Anchor link">&para;</a></h2>
@@ -2355,7 +2545,7 @@ checked by <code>Predicate.Validate</code> (called by <code>evidence.Parse</code
 <td><code>test.cacheability</code></td>
 <td>string</td>
 <td></td>
-<td>Class declared in the contract: <code>hermetic</code>, <code>controlled-environment</code>, <code>external-dependencies</code>, <code>non-deterministic</code>.</td>
+<td>Class declared in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: <code>hermetic</code>, <code>controlled-environment</code>, <code>external-dependencies</code>, <code>non-deterministic</code>.</td>
 </tr>
 <tr>
 <td><code>result</code></td>
@@ -2385,7 +2575,7 @@ checked by <code>Predicate.Validate</code> (called by <code>evidence.Parse</code
 <td><code>execution.environment</code></td>
 <td>map string to string</td>
 <td>no (omitted when empty)</td>
-<td>Conditions of the run (toolchain, OS/arch). Only keys declared under <code>environment.toolchain</code> in <code>aval.yaml</code> are part of the fingerprint; anything else here is informational.</td>
+<td>Conditions of the run (toolchain, OS/arch). Only keys declared under <code>environment.toolchain</code> in <code>aval.yaml</code> are part of the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; anything else here is informational.</td>
 </tr>
 <tr>
 <td><code>execution.exitCode</code></td>
@@ -2438,8 +2628,8 @@ checked by <code>Predicate.Validate</code> (called by <code>evidence.Parse</code
 </tbody>
 </table>
 <p><code>runner.identity</code>, <code>runner.issuer</code> and <code>runner.trustLevel</code> are claims written
-by whoever produced the predicate. The authoritative identity and trust level
-are those of the <strong>verified signer</strong>, matched against the policy's accepted
+by whoever produced the predicate. The authoritative identity and <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr>
+are those of the <strong>verified <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr></strong>, matched against the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>'s accepted
 identities (<code>evidence.Verification.Signer</code> and its <code>TrustLevel</code>). Consumers
 must not make trust decisions from the <code>runner</code> block. The Go fields
 <code>Runner.Issuer</code>, <code>Runner.TrustLevel</code> and <code>Verification.TrustLevel</code> are
@@ -2515,7 +2705,7 @@ This is the stable machine interface for CI scripts and external tools.</p>
 <td><code>testId</code></td>
 <td>string</td>
 <td>always</td>
-<td><code>metadata.name</code> from the contract.</td>
+<td><code>metadata.name</code> from the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.</td>
 </tr>
 <tr>
 <td><code>fingerprint</code></td>
@@ -2526,7 +2716,7 @@ This is the stable machine interface for CI scripts and external tools.</p>
 <tr>
 <td><code>reference</code></td>
 <td>string</td>
-<td>when an attestation was found</td>
+<td>when an <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> was found</td>
 <td>Immutable <code>repo@sha256:&lt;manifest digest&gt;</code>.</td>
 </tr>
 <tr>
@@ -2539,7 +2729,7 @@ This is the stable machine interface for CI scripts and external tools.</p>
 <td><code>signer</code></td>
 <td>object</td>
 <td><code>verified</code> only</td>
-<td>Accepted policy identity that matched (<code>issuer</code>, <code>subjectRegexp</code>, <code>trustLevel</code>) plus the identity the signature actually carried: <code>subject</code>, the certificate subject (SAN) for keyless signatures, or <code>keyId</code>, <code>base64(sha256(DER public key))</code> for key-based ones. <code>subject</code> and <code>keyId</code> are omitted when empty.</td>
+<td>Accepted <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> identity that matched (<code>issuer</code>, <code>subjectRegexp</code>, <code>trustLevel</code>) plus the identity the signature actually carried: <code>subject</code>, the certificate subject (SAN) for keyless signatures, or <code>keyId</code>, <code>base64(sha256(DER public key))</code> for key-based ones. <code>subject</code> and <code>keyId</code> are omitted when empty.</td>
 </tr>
 <tr>
 <td><code>predicate</code></td>
@@ -2557,7 +2747,7 @@ This is the stable machine interface for CI scripts and external tools.</p>
 <td><code>rejected</code></td>
 <td>array</td>
 <td>when a candidate was not used</td>
-<td>Each <code>{reference, outcome, reason}</code>; <code>outcome</code> is <code>verification-failed</code>, <code>error</code> or <code>miss</code>. A <code>verification-failed</code> entry is a security event even when <code>outcome</code> is <code>verified</code>: alert. A <code>miss</code> entry is an authentic attestation whose signer the policy lists below <code>minTrustLevel</code>: routine non-reuse, no alert.</td>
+<td>Each <code>{reference, outcome, reason}</code>; <code>outcome</code> is <code>verification-failed</code>, <code>error</code> or <code>miss</code>. A <code>verification-failed</code> entry is a security event even when <code>outcome</code> is <code>verified</code>: alert. A <code>miss</code> entry is an authentic <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> whose <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> lists below <code>minTrustLevel</code>: routine non-reuse, no alert.</td>
 </tr>
 </tbody>
 </table>
@@ -2574,40 +2764,40 @@ This is the stable machine interface for CI scripts and external tools.</p>
 <tbody>
 <tr>
 <td><code>verified</code></td>
-<td>Valid attestation satisfies the policy.</td>
+<td>Valid <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> satisfies the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>.</td>
 <td>Reuse <code>result</code>.</td>
 <td>0</td>
 </tr>
 <tr>
 <td><code>miss</code></td>
-<td>No attestation for this fingerprint that the policy can reuse: none found, or only authentic ones whose signer the policy lists below <code>minTrustLevel</code>.</td>
+<td>No <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> for this <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> that the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> can reuse: none found, or only authentic ones whose <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> lists below <code>minTrustLevel</code>.</td>
 <td>Run the test.</td>
 <td>4</td>
 </tr>
 <tr>
 <td><code>verification-failed</code></td>
-<td>Attestation exists but fails signature or policy.</td>
+<td>Attestation exists but fails signature or <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>.</td>
 <td>Run the test <strong>and</strong> alert. Never hide this.</td>
 <td>5</td>
 </tr>
 <tr>
 <td><code>error</code></td>
-<td>Aval could not decide (registry unreachable, bad policy file, trusted root unavailable).</td>
+<td>Aval could not decide (registry unreachable, bad <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> file, trusted root unavailable).</td>
 <td>Treat as a miss: run the test (fail closed).</td>
 <td>1</td>
 </tr>
 </tbody>
 </table>
-<p>These are the <code>aval verify</code> exit codes. <code>aval run</code> acts on the outcome and
+<p>These are the <code>aval verify</code> exit codes. <code>aval run</code> acts on the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> and
 exits with the result instead; see
 <a href="../trust-model/#what-aval-run-does-with-each-outcome">trust-model.md</a>.</p>
-<p>If the fingerprint cannot be computed (empty scope, missing dependency,
+<p>If the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> cannot be computed (empty <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, missing dependency,
 symlink, control characters in a path, I/O error), <code>aval verify</code> prints no
-report and exits 1; bad flags or an invalid contract print no report and exit 2.
-<code>aval run --report</code> still writes one in that case, with outcome <code>error</code>, the
+report and exits 1; bad flags or an invalid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> print no report and exit 2.
+<code>aval run --report</code> still writes one in that case, with <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>, the
 reason, and an empty <code>fingerprint</code>, and then runs the test.</p>
 <p>Without <code>--policy</code>, <code>aval verify</code> skips the lookup and reports <code>outcome: "miss"</code>
-(exit 4), and so it does for a <code>non-deterministic</code> contract. With <code>--policy</code>, a policy file that cannot be loaded is
+(exit 4), and so it does for a <code>non-deterministic</code> <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>. With <code>--policy</code>, a <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> file that cannot be loaded is
 <code>outcome: "error"</code> (exit 1) and no lookup is made. A trusted root that
 cannot be loaded is <code>outcome: "error"</code> (exit 1) once a candidate with a
 certificate needs it.</p>
@@ -2669,7 +2859,7 @@ certificate needs it.</p>
 <td><code>run-record/v1</code>, <code>run.v1</code>, <code>stats.v1</code> (provisional)</td>
 </tr>
 <tr>
-<td>Contract and policy file</td>
+<td>Contract and <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> file</td>
 <td><code>apiVersion</code></td>
 <td><code>aval.trianalab.io/v1</code></td>
 </tr>
@@ -2683,15 +2873,15 @@ certificate needs it.</p>
 <p>The predicate keeps <code>v2</code>: <code>v1</code> was used before and an identifier is never
 recycled, and <code>v2</code> is already under <code>aval.trianalab.io</code> and is what v0.1.0
 writes, so attestations published by v0.1.0 stay readable. The report and the
-contract moved from the pre-freeze <code>aval.dev/.../v1alpha1</code> names to
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> moved from the pre-freeze <code>aval.dev/.../v1alpha1</code> names to
 <code>aval.trianalab.io</code> at <code>v1</code>. There is no accept window for the old names: a
-contract or policy file with <code>aval.dev/v1alpha1</code> is invalid.</p>
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> or <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> file with <code>aval.dev/v1alpha1</code> is invalid.</p>
 <h3 id="additive-changes-same-identifier">Additive changes (same identifier)<a class="headerlink" href="#additive-changes-same-identifier" title="Anchor link">&para;</a></h3>
 <ul>
 <li>A new optional field, omitted when empty, whose absence means what it
   meant before.</li>
 <li>A new key under <code>annotations</code>.</li>
-<li>A new optional contract field. Older <code>aval</code> binaries reject a contract
+<li>A new optional <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field. Older <code>aval</code> binaries reject a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
   that uses it (unknown fields are rejected), which fails closed.</li>
 </ul>
 <p>Existing fields keep their name, JSON tag, type and meaning.</p>
@@ -2701,8 +2891,8 @@ contract or policy file with <code>aval.dev/v1alpha1</code> is invalid.</p>
 <li>Making an optional field required, or tightening validation of an
   existing one.</li>
 <li>A new value of a closed set: <code>outcome</code>, <code>result</code>, <code>trustLevel</code>,
-  cacheability class, or an exit code.</li>
-<li>A change to what the fingerprint covers or how it is hashed: a new
+  <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class, or an exit code.</li>
+<li>A change to what the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> covers or how it is hashed: a new
   <code>aval-fingerprint/vN</code>. There is no accept window: old attestations become
   misses, never false hits.</li>
 </ul>
@@ -2718,10 +2908,10 @@ contract or policy file with <code>aval.dev/v1alpha1</code> is invalid.</p>
   Aval documents strictly. <code>evidence.Parse</code> ignores unknown fields.</li>
 <li><strong>Unknown values of a closed set: fail closed.</strong> An <code>outcome</code> other than
   the four listed above, a <code>result</code> other than <code>passed</code> or <code>failed</code>, or an
-  unknown trust level or cacheability class means "not verified": run the
+  unknown <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> or <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class means "not verified": run the
   test. Within a version such a value can only come from a bug or tampering.</li>
-<li><strong>No field grants trust.</strong> Trust comes from the verified signer and the
-  policy (see <a href="../trust-model/">trust-model.md</a>), never from a field that is
+<li><strong>No field grants trust.</strong> Trust comes from the verified <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> and the
+  <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> (see <a href="../trust-model/">trust-model.md</a>), never from a field that is
   new or that you do not understand.</li>
 </ul>
 <h3 id="deprecation">Deprecation<a class="headerlink" href="#deprecation" title="Anchor link">&para;</a></h3>
@@ -2746,15 +2936,15 @@ the old ones.</p>
 <h3 id="history">History<a class="headerlink" href="#history" title="Anchor link">&para;</a></h3>
 <ul>
 <li>Predicate <code>v1</code> became <code>v2</code> when the execution manifest's <code>subject</code> changed
-  from the tested artifact to the fingerprint anchor and the optional
+  from the tested artifact to the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> anchor and the optional
   Sigstore bundle layer was added.</li>
 <li>At the freeze (#17), the verify report moved from
   <code>aval.dev/verify-report/v1alpha1</code> to <code>aval.trianalab.io/verify-report/v1</code>
-  and the contract and policy <code>apiVersion</code> from <code>aval.dev/v1alpha1</code> to
-  <code>aval.trianalab.io/v1</code>, without other changes. The contract hash covers
-  <code>apiVersion</code>, so every fingerprint changed: results published before
+  and the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> <code>apiVersion</code> from <code>aval.dev/v1alpha1</code> to
+  <code>aval.trianalab.io/v1</code>, without other changes. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash covers
+  <code>apiVersion</code>, so every <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> changed: results published before
   are misses and the tests run once.</li>
-<li>Within <code>verify-report/v1</code> (#65), a signer the policy lists below
+<li>Within <code>verify-report/v1</code> (#65), a <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> lists below
   <code>minTrustLevel</code> became <code>miss</code> instead of <code>verification-failed</code>, and
   <code>rejected[].outcome</code> may now also be <code>miss</code>. No new value, field or exit
   code; the maintainers confirmed this as additive, so the version stays.</li>
@@ -2796,7 +2986,7 @@ the old ones.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../cli-reference/" class="md-footer__link md-footer__link--prev" aria-label="Previous: CLI reference">
+          <a href="../trust-model/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Trust model">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2806,7 +2996,7 @@ the old ones.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                CLI reference
+                Trust model
               </div>
             </div>
           </a>
@@ -2865,6 +3055,8 @@ the old ones.</p>
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../javascripts/version-selector.js"></script>
+      
+        <script src="../javascripts/diagrams.js"></script>
       
     
   </body>

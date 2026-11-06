@@ -313,7 +313,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../trust-model/" class="md-tabs__link">
+        <a href="../concepts/" class="md-tabs__link">
           
   
   
@@ -815,6 +815,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -834,8 +840,9 @@
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
-            
+          <div class="md-nav__link md-nav__container">
+            <a href="../concepts/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -849,8 +856,14 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
@@ -864,20 +877,22 @@
           <ul class="md-nav__list" data-md-scrollfix>
             
               
+            
+              
                 
   
   
   
   
     <li class="md-nav__item">
-      <a href="../trust-model/" class="md-nav__link">
+      <a href="../concepts/trust/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Trust model
+    Trust
   
 
     
@@ -898,14 +913,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../contract/" class="md-nav__link">
+      <a href="../concepts/outcomes/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    The test contract
+    Outcomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
   
 
     
@@ -1018,6 +1061,122 @@
   
   
   
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Specs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The test contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../artifact-format/" class="md-nav__link">
         
@@ -1035,6 +1194,14 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1452,14 +1619,14 @@
 
 
 <h1 id="aval-vision">Aval: vision<a class="headerlink" href="#aval-vision" title="Anchor link">&para;</a></h1>
-<p>Status: pre-alpha. Milestones 1 (contract + fingerprint) and 2 (sign, push
+<p>Status: pre-alpha. Milestones 1 (<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> + <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>) and 2 (sign, push
 and verify against a registry, <code>aval run</code> reuse or execute) are implemented.</p>
 <h2 id="thesis">Thesis<a class="headerlink" href="#thesis" title="Anchor link">&para;</a></h2>
 <p>Aval turns test results into signed, verifiable OCI artifacts. An expensive
 test runs once, locally or in CI. The result is published to an OCI registry as
-a signed attestation bound to a deterministic fingerprint of the test's inputs.
-Any other environment computes the same fingerprint, finds the attestation,
-verifies it, and if the trust policy allows it, reuses the result instead of
+a signed <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> bound to a deterministic <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> of the test's inputs.
+Any other environment computes the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, finds the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>,
+verifies it, and if the trust <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> allows it, reuses the result instead of
 running the test again.</p>
 <p>This is not a test cache. It is a CI primitive: <strong>verifiable test execution
 reuse</strong>. A cache optimizes for hit rate and quietly tolerates a stale entry now
@@ -1469,9 +1636,9 @@ can't, it runs the test.</p>
 test passed, not that it ran honestly or against the inputs you have now.
 Reuse is only safe when two things hold:</p>
 <ul>
-<li>an explicit <strong>input contract</strong> (<code>aval.yaml</code>) that says what the test depends
+<li>an explicit <strong>input <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></strong> (<code>aval.yaml</code>) that says what the test depends
   on, so "same inputs" is something you can check, and</li>
-<li>a <strong>trust policy</strong> over signer identities, so "who ran it" is something you
+<li>a <strong>trust <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr></strong> over <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> identities, so "who ran it" is something you
   can accept or reject.</li>
 </ul>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Anchor link">&para;</a></h2>
@@ -1484,13 +1651,13 @@ system. Most teams have not, and their CI cannot prove that a result from one
 environment is valid in another.</p>
 <h2 id="goals">Goals<a class="headerlink" href="#goals" title="Anchor link">&para;</a></h2>
 <ul>
-<li>A test contract (<code>aval.yaml</code>) that declares a test's identity, its runner
-  command, its input scope, the environment conditions that matter, and its
-  cacheability class.</li>
-<li>A deterministic execution fingerprint over the declared inputs, independent
+<li>A test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (<code>aval.yaml</code>) that declares a test's identity, its runner
+  command, its input <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, the environment conditions that matter, and its
+  <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class.</li>
+<li>A deterministic execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> over the declared inputs, independent
   of checkout path and file iteration order.</li>
 <li>Signed in-toto attestations of execution results, stored in any OCI 1.1
-  registry and found by fingerprint.</li>
+  registry and found by <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</li>
 <li>Verification that keeps "no result" (miss) separate from "result exists
   but can't be trusted" (verification failure), in both code and exit codes.</li>
 <li>A versioned output format and a public Go package (<code>pkg/evidence</code>) that
@@ -1502,7 +1669,7 @@ environment is valid in another.</p>
   go through standard OCI registries.</li>
 <li><strong>No runtime tracing or input inference in v0.</strong> Scope is declared, not
   observed. Recording the files a test actually reads ("observed inputs") is
-  future work, and would be used to check declared scope, not to replace it.</li>
+  future work, and would be used to check declared <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, not to replace it.</li>
 <li><strong>Not a build system and not a Bazel replacement.</strong> Aval doesn't model
   build graphs, actions or outputs. Teams already on Bazel's remote cache may
   not need it.</li>
@@ -1521,47 +1688,47 @@ environment is valid in another.</p>
    <code>sha256-&lt;fingerprint hex&gt;</code>, and artifacts are always consumed by digest.
    <em>Rationale:</em> registries, signing and access control already exist and are
    already operated; tags are mutable, digests aren't.</li>
-<li><strong>Scope belongs to the test contract, not the runner.</strong> Every test declares
+<li><strong>Scope belongs to the test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, not the runner.</strong> Every test declares
    its inputs in <code>aval.yaml</code> (<code>scope.source</code>, <code>scope.exclude</code>,
    <code>scope.dependencies</code>, <code>environment</code>). Nothing is inferred or traced in v0.
    <em>Rationale:</em> the test author is the one who knows what the test depends on,
-   and a declared scope can be reviewed in a PR.</li>
+   and a declared <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> can be reviewed in a PR.</li>
 <li><strong>Fail closed.</strong> If input equivalence can't be proven, the test runs. That
-   covers unknown contract fields, dependency globs that match nothing,
-   symlinks in scope, and an empty scope. A miss (exit 4, <code>ErrNotFound</code>) and
+   covers unknown <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> fields, dependency globs that match nothing,
+   symlinks in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, and an empty <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>. A miss (exit 4, <code>ErrNotFound</code>) and
    a verification failure (exit 5, <code>ErrVerification</code>) are separate outcomes.
    A verification failure is a security event and is never downgraded to a
    miss. <em>Rationale:</em> a false hit costs more than a re-run, and a forged or
    mis-signed result is something someone needs to look at.</li>
 <li><strong>Trust tiers.</strong> Level 1 is a developer signature, meant as personal
    acceleration and not full trust. Level 2 is a runner with a verifiable
-   identity. Level 3 is isolated execution with a verifiable attestation. The
-   policy decides which signer identities are accepted, at which level, and
-   the minimum level needed for reuse. With no policy, nothing is accepted.
+   identity. Level 3 is isolated execution with a verifiable <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>. The
+   <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> decides which <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> identities are accepted, at which level, and
+   the minimum level needed for reuse. With no <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>, nothing is accepted.
    <em>Rationale:</em> how much a signed claim is worth depends on where it was
    produced, and that call belongs to whoever consumes the result.</li>
-<li><strong>Test identity vs execution fingerprint.</strong> <code>metadata.name</code> / <code>test.id</code> says
-   <em>what</em> is checked. The fingerprint says <em>which concrete inputs and
+<li><strong>Test identity vs execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</strong> <code>metadata.name</code> / <code>test.id</code> says
+   <em>what</em> is checked. The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> says <em>which concrete inputs and
    conditions</em> a particular run had. <em>Rationale:</em> the same check gets many
-   executions, and policy and reporting need to tell the two apart.</li>
+   executions, and <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> and reporting need to tell the two apart.</li>
 <li><strong>Cacheability classes.</strong> <code>hermetic</code> and <code>controlled-environment</code> are
-   reusable by default. <code>external-dependencies</code> needs an explicit policy
+   reusable by default. <code>external-dependencies</code> needs an explicit <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>
    opt-in. <code>non-deterministic</code> is never reusable. <em>Rationale:</em> a
-   matching fingerprint only means something if the result depends on the
+   matching <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> only means something if the result depends on the
    declared inputs.</li>
 <li><strong>Language-, framework- and CI-agnostic.</strong> v0 ships only a generic runner:
    an argv command with no shell interpolation, where the exit code is the
    result. <em>Rationale:</em> one generic runner covers every stack, and
    framework-specific runners can come later if there's demand.</li>
 </ol>
-<h3 id="consumption-contract">Consumption contract<a class="headerlink" href="#consumption-contract" title="Anchor link">&para;</a></h3>
+<h3 id="consumption-contract">Consumption <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr><a class="headerlink" href="#consumption-contract" title="Anchor link">&para;</a></h3>
 <p>External tools consume Aval results through:</p>
 <ul>
 <li>versioned artifact and predicate formats with Aval's own media types
   (frozen: predicate type
   <code>https://aval.trianalab.io/attestation/execution/v2</code>, media type
   <code>application/vnd.trianalab.aval.execution.v2+json</code>, artifact type
-  <code>application/vnd.trianalab.aval.execution.v2</code>, contract <code>apiVersion</code>
+  <code>application/vnd.trianalab.aval.execution.v2</code>, <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <code>apiVersion</code>
   <code>aval.trianalab.io/v1</code>),</li>
 <li>neutral predicate fields: <code>subject</code>, <code>test.id</code>, <code>result</code>,
   <code>execution.fingerprint</code>, <code>execution.environment</code>, <code>runner</code> identity,
@@ -1578,13 +1745,13 @@ environment is valid in another.</p>
   don't compete there. Aval targets tests outside a hermetic build graph
   (integration, e2e, cross-environment). We'll know it isn't working if early
   users are mostly Bazel shops that also want Aval for build actions.</li>
-<li><strong>Declaring scope can cost more than it saves.</strong> Mitigation: keep the
-  contract small (globs, lockfiles, a toolchain map) and make it debuggable
+<li><strong>Declaring <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> can cost more than it saves.</strong> Mitigation: keep the
+  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> small (globs, lockfiles, a toolchain map) and make it debuggable
   with <code>aval run --explain</code>. Detection: contracts that drift away from the code
-  they cover, or teams that give up on tests with a wide scope.</li>
+  they cover, or teams that give up on tests with a wide <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>.</li>
 <li><strong>Real savings are small if inputs always change.</strong> If every commit touches
-  the scope, the fingerprint never matches. Detection: the hit rate in the
-  milestone 3 example and in early adopters' pipelines. A test whose scope is
+  the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> never matches. Detection: the hit rate in the
+  milestone 3 example and in early adopters' pipelines. A test whose <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> is
   "the whole repo" is a bad fit, and the docs should say so.</li>
 <li><strong>Security policies may reject attestations from developer machines.</strong>
   Mitigation: this is expected, and it's why trust tiers exist. CI policies
@@ -1594,18 +1761,18 @@ environment is valid in another.</p>
 </ul>
 <h2 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Anchor link">&para;</a></h2>
 <ol>
-<li><strong>Fingerprint + contract.</strong> <em>Implemented.</em> Exit criterion: <code>aval.yaml</code> is
+<li><strong>Fingerprint + <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.</strong> <em>Implemented.</em> Exit criterion: <code>aval.yaml</code> is
    parsed and validated with unknown fields rejected, and
    <code>aval run --fingerprint-only</code> / <code>--explain</code> produce a deterministic
    <code>aval-fingerprint/v1</code> digest and manifest that fail closed on undeclared
    or unprovable inputs.</li>
 <li><strong>Push/verify against a local registry with Cosign signing.</strong>
    <em>Implemented</em> (<code>aval run</code> exits with the test's own result after a miss,
-   and reports the miss). Exit criterion: <code>aval run --push</code> signs and publishes an attestation to a local
+   and reports the miss). Exit criterion: <code>aval run --push</code> signs and publishes an <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> to a local
    OCI registry. <code>aval verify</code> and <code>aval run</code> against that registry reuse a
-   policy-accepted result (exit 0), report a miss (exit 4), and report a
-   tampered or untrusted attestation as a verification failure (exit 5). The
-   policy file format is defined.</li>
+   <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>-accepted result (exit 0), report a miss (exit 4), and report a
+   tampered or untrusted <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> as a verification failure (exit 5). The
+   <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> file format is defined.</li>
 <li><strong>End-to-end example in GitHub Actions.</strong> Exit criterion: a public example
    repo where one workflow run executes and publishes, a second run with
    unchanged inputs reuses the result, and a run with changed inputs misses
@@ -1624,26 +1791,26 @@ environment is valid in another.</p>
    <code>dogfood-shadow</code> runs the unit suite (<code>aval.yaml</code>) with <code>--shadow</code>, and on
    <code>main</code> <code>dogfood-publish</code> signs and pushes both results to
    <code>ghcr.io/trianalab/aval-attestations</code>. A release requires a verified e2e
-   attestation for its commit. See <a href="https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#ci-quality-gates">CONTRIBUTING.md</a>.</li>
+   <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> for its commit. See <a href="https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#ci-quality-gates">CONTRIBUTING.md</a>.</li>
 <li><strong>False-hit suite.</strong> <em>Implemented.</em> Exit criterion: an automated suite
    that applies every known kind of relevant change (source, dependency,
-   toolchain, env var, exec bit, contract edit, symlink, file rename) and
+   toolchain, env var, exec bit, <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> edit, symlink, file rename) and
    asserts that none of them can reuse a previous execution.
    The table-driven corpus in <code>internal/fingerprint/corpus_test.go</code> covers
    these kinds and pins the known gaps (see
-   <a href="../contract/#known-gaps">contract.md</a>). The <code>ci-false-hit</code> CI job runs it
+   <a href="../contract/#known-gaps"><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.md</a>). The <code>ci-false-hit</code> CI job runs it
    on every PR and push, together with golden manifests of a fixed tree that
    fail on any change to them without an <code>aval-fingerprint/vN</code> bump (a
    mutation sweep of the manifest code found no manifest-changing mutant
-   that passes; see <a href="../contract/#false-hit-corpus">contract.md</a>).
+   that passes; see <a href="../contract/#false-hit-corpus"><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.md</a>).
    Committed goldens are append-only, so the golden cannot be rewritten
    instead.</li>
-<li><strong>Stable consumption contract for external integrations.</strong> Exit criterion:
+<li><strong>Stable consumption <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> for external integrations.</strong> Exit criterion:
    the predicate type, media types, predicate fields, <code>pkg/evidence</code> API and
    <code>aval verify --output json</code> report are declared stable and versioned,
    with only additive changes allowed within v1, and an external consumer
    can verify results using <code>pkg/evidence</code> alone.
-   <em>In progress:</em> the predicate type, media types, contract <code>apiVersion</code>
+   <em>In progress:</em> the predicate type, media types, <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <code>apiVersion</code>
    and verify report version are frozen, with compatibility rules in
    <a href="../artifact-format/#versioning-and-compatibility">artifact-format.md</a>
    and golden files guarding the JSON shape (#17).</li>
@@ -1754,6 +1921,8 @@ environment is valid in another.</p>
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../javascripts/version-selector.js"></script>
+      
+        <script src="../javascripts/diagrams.js"></script>
       
     
   </body>
