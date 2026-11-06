@@ -211,7 +211,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	}
 	if r.Outcome == evidence.OutcomeVerified && !o.shadow && len(errs) == 0 {
 		fmt.Fprintf(out, "reused %s result %s\n", r.Result, r.Reference)
-		recordRun(ctx, out, warn, o, r, nil)
+		recordRun(ctx, out, warn, o, r, true, nil)
 		if r.Result != evidence.ResultPassed {
 			return fmt.Errorf("reused result %s: %w", r.Result, errTestFailed)
 		}
@@ -224,12 +224,12 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	}
 	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), fp)
 	if err != nil {
-		recordRun(ctx, out, warn, o, r, nil)
+		recordRun(ctx, out, warn, o, r, false, nil)
 		return errors.Join(append(errs, err)...)
 	}
 	fmt.Fprintf(out, "ran %s: %s (exit %d)\n", c.Metadata.Name, p.Result, p.Execution.ExitCode)
 	errs = append(errs, keep(ctx, out, p, fpErr, token, o)...)
-	recordRun(ctx, out, warn, o, r, p)
+	recordRun(ctx, out, warn, o, r, false, p)
 	return errors.Join(append(errs, judge(out, warn, r, p))...)
 }
 
@@ -349,10 +349,12 @@ func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr error
 }
 
 // recordRun writes the run record (--record-file) and publishes it
-// (--record). ran is the real run, nil when the test did not run: reused,
-// or runner.command could not start. Best effort: a failure is a warning and
+// (--record). reused is true only when the verified result was reused
+// (not in --shadow, not after a failed --report write): a verified lookup
+// alone is no reuse. ran is the real run, nil when the test did not run:
+// reused, or runner.command could not start. Best effort: a failure is a warning and
 // never changes the exit code, and a record is statistics, never evidence.
-func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.Report, ran *evidence.Predicate) {
+func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.Report, reused bool, ran *evidence.Predicate) {
 	if !o.record && o.recordFile == "" {
 		return
 	}
@@ -363,11 +365,14 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 	switch {
 	case ran != nil:
 		rec.Result, rec.TestDurationMs = ran.Result, ran.FinishedAt.Sub(ran.StartedAt).Milliseconds()
-	case r.Outcome == evidence.OutcomeVerified:
+	case reused:
 		rec.Reused, rec.Result = true, r.Result
 		rec.SavedDurationMs = r.Predicate.FinishedAt.Sub(r.Predicate.StartedAt).Milliseconds()
 	}
+	rf := filepath.Clean(o.recordFile)
 	switch {
+	case o.recordFile != "" && (rf == filepath.Clean(o.resultFile) || o.reportFile != "" && rf == filepath.Clean(o.reportFile)):
+		fmt.Fprintln(warn, "aval: warning: run record not written: --record-file is also --result/--report")
 	case existsNonAvalOutput(o.recordFile):
 		fmt.Fprintf(warn, "aval: warning: run record not written: %s (--record-file) exists and holds no Aval output; Aval does not overwrite it\n", o.recordFile)
 	case o.recordFile != "":

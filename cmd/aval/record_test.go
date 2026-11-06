@@ -50,24 +50,28 @@ func readRecord(t *testing.T, path string) evidence.RunRecord {
 func TestRunRecordsEveryOutcome(t *testing.T) {
 	untrusted := &evidence.VerificationError{Reason: "untrusted signer"}
 	cases := []struct {
-		name     string
-		cands    map[string]candidate
-		lookup   error
-		missing  bool // runner.command cannot start
-		testExit int
-		shadow   bool
-		code     int
-		outcome  evidence.Outcome
-		reused   bool
-		result   evidence.Result
+		name      string
+		cands     map[string]candidate
+		lookup    error
+		missing   bool // runner.command cannot start
+		testExit  int
+		shadow    bool
+		badReport bool // --report cannot be written, so a verified result is not reused
+		code      int
+		outcome   evidence.Outcome
+		reused    bool
+		result    evidence.Result
 	}{
-		{"miss", nil, fmt.Errorf("x: %w", evidence.ErrNotFound), false, 1, false, ExitTestFailed, evidence.OutcomeMiss, false, evidence.ResultFailed},
-		{"error", nil, errors.New("registry down"), false, 0, false, ExitOK, evidence.OutcomeError, false, evidence.ResultPassed},
-		{"verification failure", map[string]candidate{"sha256:aa": {verifyErr: untrusted}}, nil, false, 0, false, ExitVerificationFailed, evidence.OutcomeVerificationFailed, false, evidence.ResultPassed},
-		{"reused", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, false, 1, false, ExitOK, evidence.OutcomeVerified, true, evidence.ResultPassed},
-		{"reused failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: true}}, nil, false, 0, false, ExitTestFailed, evidence.OutcomeVerified, true, evidence.ResultFailed},
-		{"shadow", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, false, 0, true, ExitOK, evidence.OutcomeVerified, false, evidence.ResultPassed},
-		{"command cannot start", nil, fmt.Errorf("x: %w", evidence.ErrNotFound), true, 0, false, ExitError, evidence.OutcomeMiss, false, ""},
+		{"miss", nil, fmt.Errorf("x: %w", evidence.ErrNotFound), false, 1, false, false, ExitTestFailed, evidence.OutcomeMiss, false, evidence.ResultFailed},
+		{"error", nil, errors.New("registry down"), false, 0, false, false, ExitOK, evidence.OutcomeError, false, evidence.ResultPassed},
+		{"verification failure", map[string]candidate{"sha256:aa": {verifyErr: untrusted}}, nil, false, 0, false, false, ExitVerificationFailed, evidence.OutcomeVerificationFailed, false, evidence.ResultPassed},
+		{"reused", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, false, 1, false, false, ExitOK, evidence.OutcomeVerified, true, evidence.ResultPassed},
+		{"reused failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: true}}, nil, false, 0, false, false, ExitTestFailed, evidence.OutcomeVerified, true, evidence.ResultFailed},
+		{"shadow", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, false, 0, true, false, ExitOK, evidence.OutcomeVerified, false, evidence.ResultPassed},
+		{"command cannot start", nil, fmt.Errorf("x: %w", evidence.ErrNotFound), true, 0, false, false, ExitError, evidence.OutcomeMiss, false, ""},
+		{"shadow, command cannot start", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, true, 0, true, false, ExitError, evidence.OutcomeVerified, false, ""},
+		{"report unwritable", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, false, 0, false, true, ExitError, evidence.OutcomeVerified, false, evidence.ResultPassed},
+		{"report unwritable, command cannot start", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, true, 0, false, true, ExitError, evidence.OutcomeVerified, false, ""},
 	}
 	for _, tc := range cases {
 		for _, pushErr := range []error{nil, errors.New("401 unauthorized")} {
@@ -77,10 +81,14 @@ func TestRunRecordsEveryOutcome(t *testing.T) {
 				argv, ran := command(t, tc.testExit, tc.missing)
 				dir := t.TempDir()
 				recFile := filepath.Join(dir, "record.json")
-				args := []string{"run", "-f", contractWith(t, "hermetic", argv...), "--registry", "registry.example/acme/stats", "--policy", "p.yaml",
+				c := contractWith(t, "hermetic", argv...)
+				args := []string{"run", "-f", c, "--registry", "registry.example/acme/stats", "--policy", "p.yaml",
 					"--result", filepath.Join(dir, "result.json"), "--record", "--record-file", recFile, "--ci-run-url", "https://ci.example/1"}
 				if tc.shadow {
 					args = append(args, "--shadow")
+				}
+				if tc.badReport {
+					args = append(args, "--report", filepath.Join(c, "report.json")) // its directory is a file
 				}
 				code, stdout, stderr := runCLI(args...)
 				if code != tc.code || ran() != (!tc.reused && !tc.missing) {
@@ -153,6 +161,38 @@ func TestRunRecordOptions(t *testing.T) {
 	under := filepath.Join(result, "x.json") // its directory is a file
 	if code, _, stderr := runCLI("run", "-f", c, "--result", result, "--record-file", under); code != ExitOK || !strings.Contains(stderr, "warning: run record not written") || len(*got) != 0 {
 		t.Fatalf("unwritable record file: exit %d, stderr %q", code, stderr)
+	}
+}
+
+// --record-file that is also --result or --report is not written: the
+// record would overwrite the result or the report.
+func TestRecordFileIsNotResultOrReport(t *testing.T) {
+	c := writeContract(t, "hermetic")
+	dir := t.TempDir()
+	result, report := filepath.Join(dir, "r.json"), filepath.Join(dir, "report.json")
+	for _, rf := range []string{result, dir + "/./report.json"} {
+		code, _, stderr := runCLI("run", "-f", c, "--result", result, "--report", report, "--record-file", rf)
+		if code != ExitOK || !strings.Contains(stderr, "run record not written: --record-file is also --result/--report") {
+			t.Fatalf("%s: exit %d, stderr %q", rf, code, stderr)
+		}
+	}
+	var p evidence.Predicate
+	var r evidence.Report
+	for path, v := range map[string]any{result: &p, report: &r} {
+		f, err := os.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dec := json.NewDecoder(f)
+		dec.DisallowUnknownFields() // a run record is neither
+		err = dec.Decode(v)
+		_ = f.Close()
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+	}
+	if p.Test.ID != "unit" || r.TestID != "unit" {
+		t.Fatalf("result %+v report %+v", p.Test, r)
 	}
 }
 

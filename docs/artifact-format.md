@@ -293,7 +293,8 @@ hold the command longer. `--record` needs `--registry`. Aval keeps no local
 state; a record file exists only when `--record-file` asks for one. An
 existing file at `--record-file` that is not an Aval result, report or valid
 run record is never overwritten: the run warns and goes on, and inside the
-contract scope that file stays an input of the fingerprint.
+contract scope that file stays an input of the fingerprint. A `--record-file`
+that is also `--result` or `--report` is not written either.
 
 ### Layout
 
@@ -314,7 +315,7 @@ not confirm the referrers listing, so on a registry without the referrers
 API two concurrent records for one test can drop one of them.
 On such registries all records of a test also share one referrers index,
 which grows with every record; once it exceeds the registry's manifest size
-limit, publishing a record fails with a warning. Prune old records (see #88).
+limit, publishing a record fails with a warning. Pruning old records is future work (Epic 9, #88).
 
 ### Record JSON
 
@@ -326,7 +327,7 @@ limit, publishing a record fails with a warning. Prune old records (see #88).
 | `testId` | string | always | `metadata.name` from the contract. |
 | `fingerprint` | string | always | `sha256:<hex>`; empty when the fingerprint could not be computed. |
 | `outcome` | string | always | The lookup decision, as in the verify report. |
-| `reused` | bool | always | `true` when a verified result was reused and the test did not run. With `--shadow` it is `false`. |
+| `reused` | bool | always | `true` when a verified result was reused and the test did not run. With `--shadow`, or when `--report` cannot be written, it is `false`. |
 | `result` | string | when known | The reused or the real `passed` / `failed`; omitted when `runner.command` could not start. |
 | `testDurationMs` | integer | always | How long `runner.command` ran, in milliseconds; `0` when it did not run. |
 | `savedDurationMs` | integer | always | On reuse, the test duration recorded in the reused attestation (`finishedAt - startedAt`); `0` otherwise. |
