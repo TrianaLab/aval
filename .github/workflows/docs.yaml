@@ -4,8 +4,8 @@ name: docs
 # version on the gh-pages branch: a push to main deploys version `main`, a
 # release tag v<version> deploys <version> with the `latest` alias. The site
 # root redirects to `latest` once a release exists, else to `main`, and
-# <site>/install.sh and <site>/install.ps1 serve the installers of the
-# deployed commit (scripts/deploy-docs.sh). The gh-pages tree is then uploaded as the Pages
+# <site>/install.sh and <site>/install.ps1 serve the installers of
+# origin/main, even on a tag deploy (scripts/deploy-docs.sh). The gh-pages tree is then uploaded as the Pages
 # artifact, so Pages must use "GitHub Actions" as its source.
 #
 # Until a maintainer enables that (Settings > Pages > Source: GitHub Actions),

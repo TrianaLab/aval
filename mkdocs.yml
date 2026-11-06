@@ -1,7 +1,7 @@
 site_name: Aval
 site_description: Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.
 # GitHub Pages project site. Publishing is .github/workflows/docs.yaml.
-site_url: https://trianalab.github.io/aval/
+site_url: https://aval.run/
 repo_url: https://github.com/TrianaLab/aval
 repo_name: TrianaLab/aval
 edit_uri: edit/main/docs/

@@ -10,7 +10,7 @@ the repository.
 ## Linux and macOS
 
 ```sh
-curl -fsSL https://trianalab.github.io/aval/install.sh | bash
+curl -fsSL https://aval.run/install.sh | bash
 ```
 
 The script needs `curl` or `wget` and `sha256sum` or `shasum`, and works with
@@ -28,7 +28,7 @@ uses `sudo` only when that directory is not writable.
 Flags need the script as a file, or `bash -s --` when piped:
 
 ```sh
-curl -fsSL https://trianalab.github.io/aval/install.sh | bash -s -- --version v0.2.0
+curl -fsSL https://aval.run/install.sh | bash -s -- --version v0.2.0
 ```
 
 ## Windows
@@ -36,7 +36,7 @@ curl -fsSL https://trianalab.github.io/aval/install.sh | bash -s -- --version v0
 In PowerShell 5.1 or 7:
 
 ```powershell
-irm https://trianalab.github.io/aval/install.ps1 | iex
+irm https://aval.run/install.ps1 | iex
 ```
 
 It installs `aval.exe` into `%LOCALAPPDATA%\Programs\aval` and adds that

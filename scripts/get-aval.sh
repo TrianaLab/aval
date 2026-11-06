@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-line installer for Aval (Linux and macOS).
 #
-#   curl -fsSL https://trianalab.github.io/aval/install.sh | bash
+#   curl -fsSL https://aval.run/install.sh | bash
 #
 # Windows uses scripts/install.ps1. scripts/deploy-docs.sh copies this file to
 # the site root on every docs deploy, and `docs/install.sh` (a symlink) puts
@@ -144,7 +144,7 @@ sha256_of() {
 case "$(uname -s)" in
   Linux) OS=linux ;;
   Darwin) OS=darwin ;;
-  MINGW* | MSYS* | CYGWIN*) fail "on Windows, use install.ps1: irm https://trianalab.github.io/aval/install.ps1 | iex" ;;
+  MINGW* | MSYS* | CYGWIN*) fail "on Windows, use install.ps1: irm https://aval.run/install.ps1 | iex" ;;
   *) fail "unsupported OS: $(uname -s)" ;;
 esac
 case "$(uname -m)" in

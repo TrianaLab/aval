@@ -1,6 +1,6 @@
 # One-line installer for Aval (Windows, PowerShell 5.1 or 7).
 #
-#   irm https://trianalab.github.io/aval/install.ps1 | iex
+#   irm https://aval.run/install.ps1 | iex
 #
 # The Windows counterpart of scripts/get-aval.sh, with the same checks; read
 # that script's header for why each one exists. The docs site serves these
