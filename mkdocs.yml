@@ -144,6 +144,7 @@ nav:
   - Home: index.md
   - Get started:
       - Why Aval: vision.md
+      - Install: install.md
   - Concepts:
       - Trust model: trust-model.md
       - The test contract: contract.md
