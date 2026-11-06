@@ -1,6 +1,6 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
 	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-false-hit ci-e2e ci-release ci-fuzz ci-security \
-	docs-lint docs-cli docs-site ci-docs brand
+	docs-lint docs-cli docs-site docs-deploy-test ci-docs brand
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
 UNIT_PKGS = $(shell go list ./... | grep -v /tests/)
@@ -135,6 +135,11 @@ docs-lint:
 docs-site:
 	NO_MKDOCS_2_WARNING=1 mkdocs build --strict
 
+# scripts/deploy-docs.sh (the docs.yaml deploy) against a scratch copy with a
+# local origin: default version, `latest` alias and the root installers.
+docs-deploy-test:
+	scripts/test-deploy-docs.sh
+
 # Regenerate docs/cli-reference.md from the cobra command tree.
 docs-cli:
 	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval -update
@@ -190,6 +195,6 @@ ci-release: test-release
 ci-fuzz: fuzz
 ci-security: vuln
 # Fails when docs/cli-reference.md drifts from the CLI (TestCLIReference) or
-# the site does not build strictly.
-ci-docs: docs-lint docs-site
+# the site does not build strictly, or the deploy logic breaks.
+ci-docs: docs-lint docs-site docs-deploy-test
 	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval

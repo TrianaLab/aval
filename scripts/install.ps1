@@ -1,11 +1,11 @@
 # One-line installer for Aval (Windows, PowerShell 5.1 or 7).
 #
-#   irm https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/install.ps1 | iex
+#   irm https://aval.run/install.ps1 | iex
 #
 # The Windows counterpart of scripts/get-aval.sh, with the same checks; read
-# that script's header for why each one exists. `docs/install.ps1` is a
-# symlink to this file, so the docs site (#81, not merged yet) can publish
-# these same bytes.
+# that script's header for why each one exists. The docs site serves these
+# same bytes: scripts/deploy-docs.sh copies this file to the site root and
+# `docs/install.ps1` is a symlink to it.
 #
 #   * checksums.txt must exist and list the archive, and the archive must have
 #     that sha256, or nothing is installed. Always checked.

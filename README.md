@@ -22,11 +22,11 @@ No server or database: ORAS, Cosign and OCI 1.1 referrers do the work, and artif
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh | bash
+curl -fsSL https://aval.run/install.sh | bash
 aval --version
 ```
 
-On Windows, in PowerShell: `irm https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/install.ps1 | iex`.
+On Windows, in PowerShell: `irm https://aval.run/install.ps1 | iex`.
 Both installers check the sha256 against the release's `checksums.txt`, and the
 release signature and provenance when `cosign` or `gh` is installed; see
 [Install](docs/install.md) for options.

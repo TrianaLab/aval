@@ -2,8 +2,10 @@ name: docs
 
 # Publishes the MkDocs site (mkdocs.yml) to GitHub Pages. mike keeps every
 # version on the gh-pages branch: a push to main deploys version `main`, a
-# release tag v<version> deploys <version> with the `latest` alias and makes
-# `latest` the default. The gh-pages tree is then uploaded as the Pages
+# release tag v<version> deploys <version> with the `latest` alias. The site
+# root redirects to `latest` once a release exists, else to `main`, and
+# <site>/install.sh and <site>/install.ps1 serve the installers of
+# origin/main, even on a tag deploy (scripts/deploy-docs.sh). The gh-pages tree is then uploaded as the Pages
 # artifact, so Pages must use "GitHub Actions" as its source.
 #
 # Until a maintainer enables that (Settings > Pages > Source: GitHub Actions),
@@ -72,16 +74,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin gh-pages:gh-pages || echo "no gh-pages branch yet; mike creates it"
-          export NO_MKDOCS_2_WARNING=1
-          if [ "$REF_TYPE" = "tag" ]; then
-            mike deploy --push --update-aliases "${REF_NAME#v}" latest
-            mike set-default --push latest
-          else
-            mike deploy --push main
-            # Before the first release there is no `latest`; serve main.
-            mike list latest > /dev/null 2>&1 || mike set-default --push main
-          fi
+          # Also sets the default version and copies the installers to the
+          # gh-pages root; scripts/test-deploy-docs.sh (make ci-docs) tests it.
+          PUSH=true scripts/deploy-docs.sh "$REF_TYPE" "$REF_NAME"
           git worktree add "$RUNNER_TEMP/gh-pages" gh-pages
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
