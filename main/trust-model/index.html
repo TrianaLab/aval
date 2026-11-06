@@ -755,6 +755,8 @@
       
         
       
+        
+      
     
     
     
@@ -843,6 +845,34 @@
     
   
     Write a contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pinning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pin your dependencies
   
 
     
@@ -2419,6 +2449,10 @@ declared class.</p>
 <tr>
 <td>Undeclared input changed (file outside <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, unlisted env var, network service)</td>
 <td>Out of <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> for detection in v0: the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> only covers declared inputs. Mitigated by <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> review, <code>external-dependencies</code> not being reusable by default and <code>non-deterministic</code> never being reusable, and the false-hit suite (roadmap item 4). Observed-input tracing is future work.</td>
+</tr>
+<tr>
+<td>Content behind a declared name changed (repushed image tag, new upstream release, changed remote script)</td>
+<td>A static scanner (<code>internal/pinning</code>) reports the mutable references it recognizes in the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> and <code>runner.command</code>; for <code>hermetic</code> and <code>controlled-environment</code> an unacknowledged one makes the lookup a <code>miss</code> and blocks publishing. Accepting one needs <code>scope.allowMutable</code> in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, which changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and shows in review. References it does not recognize stay a known gap (<a href="../pinning/">Pin your dependencies</a>).</td>
 </tr>
 <tr>
 <td>Registry compromise (attacker can write arbitrary manifests and tags)</td>

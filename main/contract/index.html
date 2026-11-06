@@ -755,6 +755,8 @@
       
         
       
+        
+      
     
     
     
@@ -843,6 +845,34 @@
     
   
     Write a contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pinning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pin your dependencies
   
 
     
@@ -1992,15 +2022,18 @@ declared, Aval cannot see it.</p>
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">dependencies</span><span class="p">:</span><span class="w">                 </span><span class="c1"># optional, each glob must match &gt;= 1 file</span>
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"go.mod"</span>
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"go.sum"</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="nt">environment</span><span class="p">:</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span><span class="w">                    </span><span class="c1"># optional, declared, not detected (v0)</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">    </span><span class="nt">go</span><span class="p">:</span><span class="w"> </span><span class="s">"1.25"</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w">                          </span><span class="c1"># optional, names only; values are hashed</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CGO_ENABLED</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOFLAGS</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span><span class="w">          </span><span class="c1"># required, see "Cacheability classes"</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">  </span><span class="nt">allowMutable</span><span class="p">:</span><span class="w">                 </span><span class="c1"># optional, accepts a mutable reference on purpose</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="s">"postgres:16"</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="s">"rebuilt</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">scanned</span><span class="nv"> </span><span class="s">nightly"</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span><span class="w">                    </span><span class="c1"># optional, declared, not detected (v0)</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">    </span><span class="nt">go</span><span class="p">:</span><span class="w"> </span><span class="s">"1.25"</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w">                          </span><span class="c1"># optional, names only; values are hashed</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CGO_ENABLED</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOFLAGS</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span><span class="w">          </span><span class="c1"># required, see "Cacheability classes"</span>
 </span></code></pre></div>
 <p>Check it locally:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>path/to/aval.yaml<span class="w"> </span>--fingerprint-only<span class="w">   </span><span class="c1"># prints sha256:&lt;hex&gt;</span>
@@ -2063,6 +2096,12 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 <td>list of globs</td>
 <td>no</td>
 <td>Lockfiles and manifests. Each glob must match at least one file at <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time.</td>
+</tr>
+<tr>
+<td><code>scope.allowMutable</code></td>
+<td>list of <code>{ref, reason}</code></td>
+<td>no</td>
+<td>Acknowledges a mutable reference that would otherwise block reuse (see <a href="../pinning/">Pin your dependencies</a>). <code>ref</code> is the reference exactly as Aval reports it; <code>reason</code> says why it is acceptable. Both must be non-blank. An entry accepts every occurrence of that reference in the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> and in <code>runner.command</code>. Part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash.</td>
 </tr>
 <tr>
 <td><code>environment.toolchain</code></td>
@@ -2158,6 +2197,13 @@ Without a <abbr title="Your file that lists which signers you trust, and how muc
 <code>aval run</code> prints <code>cacheability external-dependencies: not reusable by
 default (the policy may allow it)</code> and <code>cacheability non-deterministic: never
 reusable</code>. A <code>non-deterministic</code> test is never looked up: it always runs.</p>
+<p>A <code>hermetic</code> or <code>controlled-environment</code> test whose <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> or
+<code>runner.command</code> holds a mutable reference (a container tag, a manifest
+without a lockfile, a script fetched at run time) that <code>scope.allowMutable</code>
+does not acknowledge is never looked up either: the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is <code>miss</code>, the
+reason lists each reference, the test runs and its result is not published.
+For <code>external-dependencies</code> the references are printed as information. See
+<a href="../pinning/">Pin your dependencies</a>.</p>
 <h2 id="what-goes-into-the-fingerprint">What goes into the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr><a class="headerlink" href="#what-goes-into-the-fingerprint" title="Anchor link">&para;</a></h2>
 <p>The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>sha256:&lt;hex&gt;</code> of a canonical, line-oriented manifest
 (format <code>aval-fingerprint/v1</code>). <code>aval run --explain</code> prints the exact text
@@ -2174,12 +2220,14 @@ that was hashed. Layout, in this order:</p>
   fingerprints from different formats never collide.</li>
 <li><strong><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></strong>: SHA-256 of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> serialized as JSON after parsing.
   Comments, formatting and YAML key order do not matter. Set-like lists
-  (<code>source</code>, <code>exclude</code>, <code>dependencies</code>, <code>env</code>) are sorted and deduplicated
-  first, so their order does not matter. <code>runner.command</code> is not sorted:
+  (<code>source</code>, <code>exclude</code>, <code>dependencies</code>, <code>env</code>, <code>allowMutable</code>) are sorted
+  and deduplicated first, so their order does not matter. <code>runner.command</code> is not sorted:
   argv order is semantic. Map keys (<code>toolchain</code>) are sorted by the JSON
   encoder. Every field is included, so changing <code>metadata.name</code>,
   <code>runner.command</code> or <code>cacheability</code> changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. An explicitly
-  empty list or map (<code>exclude: []</code>) hashes the same as an omitted field.</li>
+  empty list or map (<code>exclude: []</code>) hashes the same as an omitted field.
+  <code>allowMutable</code> is left out of the JSON when empty, so contracts without
+  it hash as they did before the field existed.</li>
 <li><strong>source</strong>: one line per file that matches any <code>source</code> glob and no
   <code>exclude</code> glob.</li>
 <li><strong>dependency</strong>: one line per file that matches any <code>dependencies</code> glob.
@@ -2253,9 +2301,15 @@ hashes (see above):</p>
   list (corpus row).</li>
 <li>Content behind a declared name: a container tag such as <code>postgres:16</code>
   that is repushed, a dependency fetched from the network at run time, a
-  service reached over the network. Only the declared text is hashed. Pin
-  digests inside the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> (<code>controlled-environment</code>) or use
-  <code>external-dependencies</code>, which is not reusable by default.</li>
+  service reached over the network. Only the declared text is hashed. The
+  references the mutable-reference scanner recognizes block reuse for
+  <code>hermetic</code> and <code>controlled-environment</code> (the <code>refused</code> corpus rows):
+  images without a digest, manifests without a lockfile, unpinned installs,
+  scripts piped from the network, branch-tracking git references. See
+  <a href="../pinning/">Pin your dependencies</a> for the list and the fixes per
+  ecosystem. A reference the scanner does not recognize, and a service
+  reached over the network, remain invisible: use <code>external-dependencies</code>,
+  which is not reusable by default.</li>
 <li>The installed toolchain, OS and architecture: <code>environment.toolchain</code> is
   trusted as written (see "Future work").</li>
 </ul>
@@ -2269,7 +2323,11 @@ exec bit, lockfile, toolchain, env value or presence, command, any <abbr title="
 field, re-included excludes) changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; an irrelevant one
 (out-of-<abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> or excluded files, <code>.git</code>, Aval's own outputs, checkout path, ordering,
 duplicates, timestamps, non-exec permission bits, YAML formatting) does not;
-an unprovable one (see "Fail-closed errors") fails closed. The test fails if
+an unprovable one (see "Fail-closed errors") fails closed; a repushed
+image tag (in a compose file or in <code>runner.command</code>) keeps the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>
+but is reported as an unacknowledged mutable reference, so it is refused.
+The scanner has its own false-hit table per ecosystem, mutable and pinned
+variants, in <code>internal/pinning</code>, and a fuzz target over every detector. The test fails if
 a manifest section is changed by no differ row, so a new section must come
 with corpus cases; a new attribute in an existing section or a new <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
 field needs its row added by review.</p>
