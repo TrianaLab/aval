@@ -309,6 +309,9 @@ the record JSON, and the stats anchor as `subject`. Records are listed by the
 stats anchor's referrers. Unlike `registry.Push`, publishing a record does
 not confirm the referrers listing, so on a registry without the referrers
 API two concurrent records for one test can drop one of them.
+On such registries all records of a test also share one referrers index,
+which grows with every record; once it exceeds the registry's manifest size
+limit, publishing a record fails with a warning. Prune old records (see #88).
 
 ### Record JSON
 

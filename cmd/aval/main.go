@@ -58,6 +58,7 @@ var (
 	sign           = attest.Sign
 	publish        = registry.Push
 	pushRecord     = registry.Record
+	now            = time.Now
 )
 
 var (

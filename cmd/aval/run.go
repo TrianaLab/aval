@@ -347,7 +347,7 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 	}
 	rec := evidence.RunRecord{
 		Version: evidence.RunRecordVersion, TestID: r.TestID, Fingerprint: r.Fingerprint, Outcome: r.Outcome,
-		AvalVersion: version, RecordedAt: time.Now().UTC(), CIRunURL: o.ciRunURL,
+		AvalVersion: version, RecordedAt: now().UTC(), CIRunURL: o.ciRunURL,
 	}
 	switch {
 	case ran != nil:

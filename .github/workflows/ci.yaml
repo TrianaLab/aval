@@ -568,11 +568,15 @@ jobs:
       packages: write
     env:
       AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
+    # Statistics only (#86): every step is best-effort, so nothing here can
+    # fail the job and turn main red.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        continue-on-error: true
         with:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        continue-on-error: true
         with:
           go-version-file: go.mod
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -582,13 +586,16 @@ jobs:
           path: results
           merge-multiple: true
       - name: Build aval from this commit
+        continue-on-error: true
         run: make build && echo "$PWD/bin" >> "$GITHUB_PATH"
       - name: Publish run records
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           export DOCKER_CONFIG="$RUNNER_TEMP/docker"
-          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin \
+            || { echo "::warning title=aval run record::ghcr login failed; run records not published"; exit 0; }
           for name in engine e2e; do
             f="results/$name-record.json"
             if [ ! -f "$f" ]; then

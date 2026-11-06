@@ -9,16 +9,21 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TrianaLab/aval/internal/registry"
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
-// fakeRecord replaces publishing run records; it keeps what was published.
+// recordedAt is the fixed clock fakeRecord installs; records store it in UTC.
+var recordedAt = time.Date(2026, 11, 6, 12, 30, 0, 0, time.UTC)
+
+// fakeRecord replaces publishing run records and the clock; it keeps what was published.
 func fakeRecord(t *testing.T, err error) *[]evidence.RunRecord {
 	t.Helper()
-	p := pushRecord
-	t.Cleanup(func() { pushRecord = p })
+	p, n := pushRecord, now
+	t.Cleanup(func() { pushRecord, now = p, n })
+	now = func() time.Time { return recordedAt.In(time.FixedZone("CET", 3600)) }
 	var got []evidence.RunRecord
 	pushRecord = func(_ context.Context, repo string, rec evidence.RunRecord) (registry.Descriptor, error) {
 		got = append(got, rec)
@@ -87,9 +92,9 @@ func TestRunRecordsEveryOutcome(t *testing.T) {
 				rec := (*got)[0]
 				want := evidence.RunRecord{
 					Version: evidence.RunRecordVersion, TestID: "unit", Fingerprint: rec.Fingerprint, Outcome: tc.outcome, Reused: tc.reused, Result: tc.result,
-					TestDurationMs: rec.TestDurationMs, AvalVersion: version, RecordedAt: rec.RecordedAt, CIRunURL: "https://ci.example/1",
+					TestDurationMs: rec.TestDurationMs, AvalVersion: version, RecordedAt: recordedAt, CIRunURL: "https://ci.example/1",
 				}
-				if rec != want || rec != readRecord(t, recFile) || !strings.HasPrefix(rec.Fingerprint, "sha256:") || rec.RecordedAt.IsZero() || (tc.reused && rec.TestDurationMs != 0) {
+				if rec != want || rec != readRecord(t, recFile) || !strings.HasPrefix(rec.Fingerprint, "sha256:") || (tc.reused && rec.TestDurationMs != 0) {
 					t.Fatalf("published %+v, wrote %+v, want %+v", rec, readRecord(t, recFile), want)
 				}
 				if line := map[bool]string{true: "recorded r@sha256:cc", false: "warning: run record not published"}[pushErr == nil]; !strings.Contains(stdout+stderr, line) {
