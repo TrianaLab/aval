@@ -103,3 +103,6 @@ try {
   if ($server) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
   Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 }
+# The last installer run was a refused one, and the host takes the last
+# native exit code as the script's; every failure above throws instead.
+exit 0
