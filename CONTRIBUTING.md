@@ -66,7 +66,7 @@ Two more rules once you have picked:
 | `ci-release` | level 5 against a snapshot dry-run of the release build |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
 | `ci-security` | govulncheck on both modules (needs network) |
-| `ci-docs` | markdownlint and vale (`make docs-lint`), `docs/cli-reference.md` matches the cobra commands, the site builds with `--strict` (`make docs-site`), and `scripts/deploy-docs.sh` publishes the versions, default and root installers as expected (`make docs-deploy-test`) |
+| `ci-docs` | markdownlint and vale (`make docs-lint`), `docs/cli-reference.md` matches the cobra commands, the site builds with `--strict` (`make docs-site`), and `scripts/deploy-docs.sh` publishes the versions, default and root installers as expected (`make docs-deploy-test`); on a PR, the built site is uploaded for preview |
 
 CI also dogfoods Aval (#28). `dogfood-fingerprint` and `dogfood-compare`
 check that Aval's own contracts (`aval.yaml`, `aval.e2e.yaml`) fingerprint
@@ -157,6 +157,46 @@ needs an entry in its `nav`; `make docs-site` fails otherwise.
 `.github/workflows/docs.yaml` publishes it to GitHub Pages with mike: a push to
 `main` deploys version `main`, a release tag `v<version>` deploys `<version>`
 with the `latest` alias.
+
+### Build and preview
+
+```sh
+pip install --require-hashes -r docs/requirements.txt
+mkdocs serve      # live preview on http://127.0.0.1:8000
+make ci-docs      # the CI docs gates
+make test-architecture  # links, doc examples, page length, size budget
+```
+
+On a pull request, `ci-docs` uploads the built site as the `docs-site`
+artifact (kept 7 days). Download it from the run page, unzip it and run
+`python3 -m http.server -d <dir>` to read it as the reviewer sees it.
+
+### Recordings
+
+The GIFs in `docs/assets/gifs/` are recorded from `docs/assets/tapes/*.tape`.
+After a change to the CLI output or a tape, run `make docs-demos` (needs vhs,
+Docker and openssl) and commit the GIFs.
+
+### Rules
+
+`tests/architecture` enforces these:
+
+- A concept page (`docs/concepts/`) and a task guide (`docs/guides/`) stay
+  under 120 lines; `README.md` stays under 150. Put details in collapsible
+  blocks or link to the reference.
+- A guide opens with a `Goal:` sentence, has a diagram and ends with
+  `## Read next`. Its YAML, Go and JSON come from tested files through
+  snippets, so they cannot drift.
+- Every contract and policy example in the docs parses with Aval's own
+  parsers. Exit codes are listed in one table only, in
+  `docs/cli-reference.md`; other pages include it.
+- Every relative link and heading anchor resolves.
+- Size budget: each image under 100 KiB, each recording under 1.5 MiB, and all
+  images and recordings under `docs/` and `overrides/` under 2 MiB together.
+
+Prose follows the Vale rules (short, concrete, no marketing words) and
+markdownlint. Docs describe only what the code does; mark future work with
+its milestone.
 
 One-time human step: enable Pages with source "GitHub Actions" (Settings >
 Pages), and let release tags `v*` deploy to the `github-pages` environment
