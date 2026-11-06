@@ -62,7 +62,7 @@ Flags:
   -h, --help                        help for push
       --key string                  signing key path (default: keyless OIDC)
       --registry string             OCI repository for attestations (required)
-      --registry-timeout duration   deadline for registry lookup and fetch, and separately for push (default 1m0s)
+      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
       --result string               result recorded by 'aval run' (default ".aval/result.json")
 ```
 
@@ -98,7 +98,7 @@ Flags:
       --policy string               trust policy file (required for reuse; without it the test always runs)
       --push                        sign and publish the result after running (needs --registry)
       --registry string             OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
-      --registry-timeout duration   deadline for registry lookup and fetch, and separately for push (default 1m0s)
+      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
       --report string               also write the lookup decision as a verify report (JSON) to this file
       --result string               where to record the result for 'aval push' (default ".aval/result.json")
       --shadow                      verify, but run the test anyway and fail on a false hit
@@ -121,5 +121,5 @@ Flags:
   -o, --output string               output format: text or json (default "text")
       --policy string               trust policy file (without it every lookup is a miss)
       --registry string             OCI repository for attestations (required)
-      --registry-timeout duration   deadline for registry lookup and fetch, and separately for push (default 1m0s)
+      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
 ```

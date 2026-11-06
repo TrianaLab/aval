@@ -151,7 +151,8 @@ lists the anchor's referrers after pushing and returns only once the new
 digest is among them; if it is not, it pushes the manifest again (which
 re-adds it to the index) and lists again, three attempts in total, one second
 apart. If the digest is still not listed, `aval push` and `aval run --push`
-fail (exit 1). Once a fingerprint has more than 64 attestations the
+fail (exit 1). A registry that indexes referrers asynchronously for longer
+than about two seconds also fails the push; rerun it. Once a fingerprint has more than 64 attestations the
 confirmation listing fails too, so push exits 1. A dropped execution is never
 a candidate, so even then it never makes an unsigned or untrusted result
 reusable. Aval does not

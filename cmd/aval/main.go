@@ -127,7 +127,7 @@ func newRootCmd() *cobra.Command {
 // calls of one command (lookup and fetch together, push on its own). On
 // expiry the outcome is error, so run still runs the test (invariant 3).
 func registryTimeoutFlag(cmd *cobra.Command, d *time.Duration) {
-	cmd.Flags().DurationVar(d, "registry-timeout", time.Minute, "deadline for registry lookup and fetch, and separately for push")
+	cmd.Flags().DurationVar(d, "registry-timeout", time.Minute, "deadline for this command's registry calls (lookup and fetch share one; push has its own)")
 }
 
 // checkTimeout rejects a deadline that would fail every registry call.
