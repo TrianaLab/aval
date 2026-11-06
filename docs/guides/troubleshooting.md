@@ -4,9 +4,11 @@ Goal: go from an exit code or an error message to its cause and its fix.
 
 ```mermaid
 flowchart LR
-  code{exit code} -- 2 --> u([fix the command or aval.yaml])
-  code -- 1 --> e([read the aval: line]):::warn
-  code -- 4 --> m([miss: routine]):::muted
+  code{exit code} -- 0 --> ok([passed or verified]):::ok
+  code -- 1 --> e([error: read the aval: line]):::warn
+  code -- 2 --> u([fix the command or aval.yaml]):::warn
+  code -- 3 --> f([test failed: fix the test]):::warn
+  code -- 4 --> m([miss: routine, run the test]):::muted
   code -- 5 --> s([security event: look]):::err
 ```
 
@@ -18,7 +20,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 
 | Code | Cause | Fix |
 |---|---|---|
-| 0 | passed, or a verified result was reused | nothing |
+| 0 | `aval run`: the test passed, or a verified passing result was reused. `aval verify`: a verified result was found, passed or failed | nothing; after `aval verify`, read `result` in `--output json` |
 | 1 | an error (`aval run` still runs the test), or `FALSE HIT` with `--shadow` | read the `aval:` line below |
 | 2 | bad flags or an invalid `aval.yaml` | fix the flag or field the message names |
 | 3 | the test failed, or `aval run` reused a failing result | fix the test |
@@ -50,7 +52,7 @@ Find the message in a section below. Text in `<...>` changes per run.
     | `metadata.name: <x> must be 1-64 chars` | lower case letters, digits, `.`, `_`, `-` |
     | `runner.command: must be a non-empty argv list` | `command: ["go", "test", "./..."]` |
     | `scope.source: at least one glob is required` | list the files the test reads |
-    | `must be a relative, slash-separated path`, `empty, '.' or '..' segments are not allowed`, `'**' must be a whole path segment` | write globs like `src/**/*.go` |
+    | `empty glob`, `must be a relative, slash-separated path`, `empty, '.' or '..' segments are not allowed`, `'**' must be a whole path segment` | write globs like `src/**/*.go` |
     | `cacheability: required`, `cacheability: unknown class` | pick a [class](write-a-contract.md#step-by-step) |
     | `environment.toolchain: invalid key`, `invalid variable name` | lower case tool names, valid variable names |
 
@@ -64,9 +66,9 @@ Find the message in a section below. Text in `<...>` changes per run.
     | `scope.source matched no files`, `glob <x> matched no files` | fix the glob, or create the file |
     | `is excluded only by a trailing` | exclude the file by name |
     | `only regular files are supported in scope`, `control characters in path are not supported` | keep symlinks and odd names out of scope |
-    | `decoding policy: <x>`, `minTrustLevel: <x> must be developer, runner or isolated`, `identities: at least one is required` | fix the field ([Write a trust policy](trust-policy.md)) |
+    | `decoding policy: <x>`, `minTrustLevel: <x> must be developer, runner or isolated`, `identities: at least one is required`, `identities[<i>]: <x>`, `trustLevel: <x> must be developer, runner or isolated` | fix the field ([Write a trust policy](trust-policy.md)) |
     | `publicKey cannot be combined with issuer or subjectRegexp`, `issuer and subjectRegexp are required (or publicKey)` | one kind of signer per identity |
-    | `not a PEM public key`, `larger than <n> bytes`, `subjectRegexp: <x>` | fix the key file or the regexp |
+    | `publicKey: <x>`, `publicKey <file>: <x>`, `not a PEM public key`, `larger than <n> bytes`, `subjectRegexp: <x>` | fix the key file or the regexp |
     | `allowedCacheability: non-deterministic results are never reusable`, `allowedCacheability: unknown class` | remove that class |
     | `sigstore trusted root: <x>` | allow network and a writable `$HOME`, or pin `trustedRoot` |
 
@@ -92,7 +94,7 @@ Find the message in a section below. Text in `<...>` changes per run.
     | `no attestation found for fingerprint` | none: the inputs changed or nobody pushed yet |
     | `no trust policy configured`, `no registry configured`, `reuse disabled (--no-reuse)` | pass `--policy`, `--registry`, drop `--no-reuse` |
     | `cacheability <x> is never reusable`, `is not in allowedCacheability` | by design, or allow the class in the policy |
-    | `not reusable under the trust policy` | the signer is below `minTrustLevel`; raise its `trustLevel` if you trust it |
+    | `not reusable under the trust policy`, `signer <x> has trust level <y>, policy requires at least <z>` | the signer is below `minTrustLevel`; raise its `trustLevel` if you trust it |
 
 ## Verification failures (exit 5)
 
@@ -103,10 +105,11 @@ an attacker is the dangerous one. Fail the job and look.
 ??? danger "Reasons"
     | Reason | Fix |
     |---|---|
-    | `signer key id <x> is not in the trust policy`, `it lists no keyless identities`, `is not accepted by the policy` | trust that signer, or find out who pushed |
+    | `signature: <x>`, `signer key id <x> is not in the trust policy`, `it lists no keyless identities`, `is not accepted by the policy` | trust that signer, or find out who pushed |
     | `bundle signs a different envelope`, `no Sigstore bundle stored with the attestation`, `decoding Sigstore bundle`, `bundle does not carry a DSSE envelope`, `envelope: missing or not an in-toto payload`, `decoding statement`, `statement: type <x>`, `predicate: <x>`, `malformed attestation: <x>` | a broken or forged result: delete it |
     | `fingerprint <x>, want <y>`, `test id <x>, want <y>`, `statement subject does not match the predicate subject` | a result that claims other inputs: delete it |
-    | `cacheability <x> is not reusable under the policy`, `tag <x> points at <y>, not the fingerprint anchor` | a lie about the result or the tag: find out who pushed |
+    | `cacheability <x> is not reusable under the policy`, `cacheability <x>, want <y>`, `tag <x> points at <y>, not the fingerprint anchor` | a lie about the result or the tag: find out who pushed |
+    | `no signature verifier configured`, `expected fingerprint and test id are required` | only from Go: fill in `VerifyOptions` ([Consume from Go](go-consumer.md)) |
 
 ## Read next
 

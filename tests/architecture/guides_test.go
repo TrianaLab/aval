@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -19,7 +20,14 @@ var guides = []string{
 const guideMaxLines = 120
 
 var (
-	fenceRe   = regexp.MustCompile("(?ms)^( *)```(\\w*)\\n(.*?)^ *```")
+	fenceRe   = regexp.MustCompile("(?ms)^( *)```(\\w*)[^\\n]*\\n(.*?)^ *```")
+	yamlDocRe = regexp.MustCompile(`(?m)^\s*(apiVersion|kind|identities|minTrustLevel|scope|runner|cacheability):`)
+	// msgRe finds the reasons a user reads for the common cases: contract
+	// and policy validation, misses (skipped) and verification failures
+	// (Reason, and the reasons evidence.Verify returns).
+	msgRe     = regexp.MustCompile(`(?:\badd\(|skipped\(|Reason: |return [^,\n]+, )(?:fmt\.Sprintf\()?("(?:[^"\\]|\\.)*")( \+)?`)
+	valRe     = regexp.MustCompile(`(?:errors\.New|fmt\.Errorf)\(("(?:[^"\\]|\\.)*")`)
+	verbRe    = regexp.MustCompile(`%[-+# 0-9.]*[a-zA-Z]`)
 	avalCmdRe = regexp.MustCompile(`(?m)^\s*aval ([a-z]+)\b(.*)$`)
 	flagRe    = regexp.MustCompile(`(?:^|\s)(--[a-z][a-z-]*)`)
 	cliSecRe  = regexp.MustCompile(`(?m)^## aval ([a-z]+)$`)
@@ -49,7 +57,8 @@ func guideProblems(name, md, cliRef string) []string {
 	}
 	sections := cliSections(cliRef)
 	for _, f := range fenceRe.FindAllStringSubmatch(md, -1) {
-		lang, body := f[2], strings.TrimSpace(f[3])
+		body := strings.TrimSpace(f[3])
+		lang := fenceLang(f[2], body)
 		switch lang {
 		case "yaml", "go", "json":
 			if strings.Contains(body, "\n") || !strings.HasPrefix(body, "--8<-- ") {
@@ -62,6 +71,26 @@ func guideProblems(name, md, cliRef string) []string {
 		}
 	}
 	return probs
+}
+
+// fenceLang normalises a fence's language so aliases and untagged blocks
+// get the same checks: yml is yaml, shell aliases are sh, and an untagged
+// block is yaml if it looks like aval.yaml or a policy, sh if it runs aval.
+func fenceLang(lang, body string) string {
+	switch lang {
+	case "yml":
+		return "yaml"
+	case "bash", "shell", "zsh":
+		return "sh"
+	case "":
+		if yamlDocRe.MatchString(body) {
+			return "yaml"
+		}
+		if avalCmdRe.MatchString(body) {
+			return "sh"
+		}
+	}
+	return lang
 }
 
 // cliSections maps each subcommand to its section of the CLI reference.
@@ -121,6 +150,50 @@ func troubleshootingProblems(md, src string, codes []string) []string {
 	return probs
 }
 
+// messageFormats returns the format strings re captures in src. A literal
+// followed by + (as in "signature: " + err.Error()) ends in a hole.
+func messageFormats(src string, re *regexp.Regexp) []string {
+	var formats []string
+	for _, m := range re.FindAllStringSubmatch(src, -1) {
+		f, err := strconv.Unquote(m[1])
+		if err != nil {
+			continue
+		}
+		if len(m) > 2 && m[2] != "" {
+			f += "%v"
+		}
+		formats = append(formats, f)
+	}
+	return formats
+}
+
+// uncoveredMessages lists the formats that no message in the first column
+// of a troubleshooting table quotes: a span matches when, with its <...>
+// holes and the format's verbs both read as one hole, it is a part of the
+// format of at least 10 characters. Formats with almost no fixed text (such
+// as "%s: %w") say nothing on their own and are skipped.
+func uncoveredMessages(md string, formats []string) []string {
+	var spans []string
+	for _, row := range rowRe.FindAllStringSubmatch(md, -1) {
+		for _, s := range spanRe.FindAllStringSubmatch(row[1], -1) {
+			if n := holeRe.ReplaceAllString(s[1], "%"); len(n) >= 10 {
+				spans = append(spans, n)
+			}
+		}
+	}
+	var missing []string
+	for _, f := range formats {
+		n := verbRe.ReplaceAllString(f, "%")
+		if len(strings.Trim(strings.ReplaceAll(n, "%", ""), " :;,.[]()")) < 6 {
+			continue
+		}
+		if !slices.ContainsFunc(spans, func(s string) bool { return strings.Contains(n, s) }) {
+			missing = append(missing, fmt.Sprintf("troubleshooting: no row for %q", f))
+		}
+	}
+	return missing
+}
+
 func TestGuides(t *testing.T) {
 	cliRef := readFile(t, "docs/cli-reference.md")
 	for _, g := range guides {
@@ -139,14 +212,27 @@ func TestGuides(t *testing.T) {
 	if len(codes) < 7 {
 		t.Fatalf("found exit codes %v in cmd/aval/main.go, want 0 to 6", codes)
 	}
-	for _, p := range troubleshootingProblems(readFile(t, "docs/guides/troubleshooting.md"), src.String(), codes) {
+	ts := readFile(t, "docs/guides/troubleshooting.md")
+	for _, p := range troubleshootingProblems(ts, src.String(), codes) {
+		t.Error(p)
+	}
+	var formats []string
+	for _, f := range trackedFiles(t, "cmd/aval/*.go", "internal/registry/*.go", "pkg/evidence/evidence.go", "internal/contract/*.go", "internal/policy/*.go", ":!*_test.go") {
+		formats = append(formats, messageFormats(readFile(t, f), msgRe)...)
+		if strings.HasPrefix(f, "internal/contract/") || strings.HasPrefix(f, "internal/policy/") {
+			formats = append(formats, messageFormats(readFile(t, f), valRe)...)
+		}
+	}
+	for _, p := range uncoveredMessages(ts, formats) {
 		t.Error(p)
 	}
 }
 
 func TestGuideChecksCatchDrift(t *testing.T) {
 	cliRef := "## aval run\n      --push   push\n## aval verify\n      --policy x\n"
-	bad := "# T\n\nNo goal.\n\n```yaml\nkind: Test\n```\n\n```sh\naval run --push --pull\naval stats\naval verify --policy p\n```\n"
+	bad := "# T\n\nNo goal.\n\n```yaml\nkind: Test\n```\n\n```sh\naval run --push --pull\naval stats\naval verify --policy p\n```\n" +
+		// aliases and untagged blocks get the same checks
+		"```yml title=\"aval.yaml\"\nkind: Test\n```\n```\nidentities: []\n```\n```bash\naval stats\n```\n"
 	got := guideProblems("g", bad, cliRef)
 	for _, want := range []string{
 		`g: must open with the title, then a "Goal: " sentence`,
@@ -160,8 +246,8 @@ func TestGuideChecksCatchDrift(t *testing.T) {
 			t.Errorf("missing %q in %q", want, got)
 		}
 	}
-	if len(got) != 6 {
-		t.Errorf("got %d problems, want 6: %q", len(got), got)
+	if len(got) != 9 {
+		t.Errorf("got %d problems, want 9: %q", len(got), got)
 	}
 	ok := "# T\n\nGoal: x.\n\n```mermaid\nflowchart LR\n```\n\n```yaml\n--8<-- \"a.yaml\"\n```\n\n## Read next\n"
 	if p := guideProblems("g", ok+strings.Repeat("\n", guideMaxLines), cliRef); len(p) != 1 {
@@ -172,6 +258,16 @@ func TestGuideChecksCatchDrift(t *testing.T) {
 	got = troubleshootingProblems(md, `errors.New("--push requires --registry"); fmt.Errorf("bad flag %s there")`, []string{"0", "4"})
 	want := []string{"troubleshooting: no row for exit code 4", `troubleshooting: "bad flag <x> here" is not in the Go source`}
 	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	src := `add("kind: got %q, want %q", k); return nil, "signature: " + err.Error(); add("%s: %w", f, err)`
+	formats := messageFormats(src, msgRe)
+	if want := []string{"kind: got %q, want %q", "signature: %v", "%s: %w"}; !slices.Equal(formats, want) {
+		t.Errorf("formats %q, want %q", formats, want)
+	}
+	got = uncoveredMessages("| Message | Fix |\n| `kind: got <x>, want <y>` | fix |\n", formats)
+	if want := []string{`troubleshooting: no row for "signature: %v"`}; !slices.Equal(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
