@@ -1,6 +1,6 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
 	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-false-hit ci-e2e ci-release ci-fuzz ci-security \
-	docs-lint docs-cli docs-site docs-deploy-test ci-docs brand
+	docs-lint docs-cli docs-site docs-deploy-test docs-demos ci-docs brand
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
 UNIT_PKGS = $(shell go list ./... | grep -v /tests/)
@@ -97,7 +97,7 @@ lint:
 		echo "golangci-lint $(GOLANGCI_LINT_VERSION) required, found $${v:-none}"; exit 1; fi
 	golangci-lint run ./...
 	cd examples/evidence-consumer && golangci-lint run ./...
-	shellcheck scripts/*.sh
+	shellcheck scripts/*.sh docs/assets/tapes/*.sh
 
 fmt:
 	gofmt -w .
@@ -143,6 +143,22 @@ docs-deploy-test:
 # Regenerate docs/cli-reference.md from the cobra command tree.
 docs-cli:
 	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval -update
+
+# Re-record the docs/quickstart.md GIFs from docs/assets/tapes/*.tape with
+# this checkout's bin/aval: real runs against a throwaway registry:2 on
+# localhost:5001 (the port the quickstart uses). Needs vhs, Docker and
+# openssl. The tapes share one project and run in order: miss, hit, changed
+# input, tampered. Commit the GIFs; tests/architecture keeps each under 1.5 MB.
+DEMO_REGISTRY = aval-docs-demos-registry
+DEMO_TAPES = miss hit changed-input tampered
+
+docs-demos: build
+	@dir=$$(mktemp -d); trap 'docker rm -f $(DEMO_REGISTRY) >/dev/null 2>&1; rm -rf "$$dir"' EXIT; \
+	docker run -d --name $(DEMO_REGISTRY) -p 5001:5000 registry:2 >/dev/null && \
+	sh docs/assets/tapes/setup.sh "$$dir" && \
+	for t in $(DEMO_TAPES); do \
+		AVAL_DEMO_DIR="$$dir" AVAL_DEMO_BIN=$(CURDIR)/bin vhs docs/assets/tapes/$$t.tape || exit 1; \
+	done
 
 # Render the committed brand PNGs from their SVG sources.
 # Run it after changing a logo SVG and commit the result.

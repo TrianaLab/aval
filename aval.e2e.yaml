@@ -17,8 +17,9 @@ scope:
     - "tests/integration/**"
     - "tests/acceptance/**"
     - "examples/go-compose/**"
-    # tests/acceptance runs the README quickstart as written.
+    # tests/acceptance runs the README and docs quickstarts as written.
     - "README.md"
+    - "docs/quickstart.md"
   # Redundant since #63 (Aval never hashes .aval/), kept so the canonical
   # contract, and with it the published results, stay the same.
   exclude: ["**/.aval/**"]
