@@ -39,7 +39,8 @@ func FuzzParse(f *testing.F) {
 
 // FuzzMatch: for any glob ValidateGlob accepts, Match never panics and never
 // matches a name outside the contract root; a glob without metacharacters
-// matches exactly itself.
+// matches exactly itself; Match, MatchContents and MayContain agree with the
+// reference matcher (refAgrees).
 func FuzzMatch(f *testing.F) {
 	for _, s := range [][2]string{
 		{"**/*.go", "a/b/c.go"}, {"testdata/**", "testdata/x/y.json"}, {"cmd/*/main.go", "cmd/aval/main.go"},
@@ -49,10 +50,13 @@ func FuzzMatch(f *testing.F) {
 		f.Add(s[0], s[1])
 	}
 	f.Fuzz(func(t *testing.T, glob, name string) {
-		// ponytail: `**` backtracking is exponential in the number of `**`
-		// segments; real contracts use one or two, so cap the fuzzer there.
+		// Match itself is linear; the cap keeps the exponential reference
+		// matcher (matchRef) fast.
 		if ValidateGlob(glob) != nil || strings.Count(glob, "**") > 3 || len(name) > 256 {
 			return
+		}
+		if msg := refAgrees(glob, name); msg != "" {
+			t.Fatal(msg)
 		}
 		got := Match(glob, name)
 		if got && (strings.HasPrefix(name, "/") || strings.Contains("/"+name+"/", "/../")) {
