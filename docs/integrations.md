@@ -49,6 +49,7 @@ public Go API. It exposes:
 | `ErrNotFound` | No attestation exists for the fingerprint. A miss; re-run. |
 | `ErrVerification` | An attestation exists but failed signature or policy checks. Security event. `*VerificationError` wraps it with a reason. |
 | `Report`, `ReportVersion` | The document printed by `aval verify --output json`. |
+| `RunRecord`, `RunRecordVersion`, `ParseRunRecord(data []byte) (*RunRecord, error)` | A run record published by `aval run --record` (see [artifact-format.md](artifact-format.md#run-records)). Unsigned statistics: never a basis for reuse or trust. `ParseRunRecord` checks the version, `testId` and the closed sets only. |
 
 Trust levels: `1` developer (personal acceleration, not full trust), `2` CI
 runner with verifiable identity, `3` isolated execution with verifiable

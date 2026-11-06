@@ -29,13 +29,18 @@ All constants live in `pkg/evidence`.
 | `PredicateType` | `https://aval.trianalab.io/attestation/execution/v2` | in-toto `predicateType` | frozen |
 | `SchemaVersion` | `v2` | Predicate `schemaVersion` | frozen |
 | `ReportVersion` | `aval.trianalab.io/verify-report/v1` | `version` of the verify report | frozen |
+| `RunRecordVersion` | `aval.trianalab.io/run-record/v1` | `version` of a run record | provisional |
+| `ArtifactTypeRun` | `application/vnd.trianalab.aval.run.v1` | `artifactType` of a run record manifest | provisional |
+| `MediaTypeRun` | `application/vnd.trianalab.aval.run.v1+json` | Media type of the run record layer | provisional |
+| `ArtifactTypeStats` | `application/vnd.trianalab.aval.stats.v1` | `artifactType` of the per-test stats anchor manifest | provisional |
 
 Registry identifiers (`internal/registry`): the bundle layer uses the
 Sigstore media type `application/vnd.dev.sigstore.bundle.v0.3+json`
 (`MediaTypeSigstoreBundle`), and manifests carry the annotation
 `io.trianalab.aval.fingerprint` (`AnnotationFingerprint`, informational:
 verification reads the fingerprint from the signed predicate). The
-annotation key is frozen.
+annotation key is frozen. The stats anchor carries `io.trianalab.aval.test`
+(`AnnotationTest`, provisional) with the test id.
 
 Related identifiers from other packages: the fingerprint manifest format is
 `aval-fingerprint/v1` (`internal/fingerprint`), and the contract and policy
@@ -267,6 +272,80 @@ reusable, never make an untrusted one reusable. Keep the one you still want
 to reuse, and keep any execution that failed verification until you have
 looked into it.
 
+## Run records
+
+`aval run --record` publishes one run record per run, for every outcome
+(`verified`, `miss`, `error`, `verification-failed`), so reuse can be
+measured from the registry alone. `--record-file <path>` writes the same
+record to a file, and `aval record --record-file <path>` publishes it later,
+for example from a CI job that has write credentials but runs no tests.
+
+Records are **statistics, never evidence**. They are unsigned and
+informational. `aval run` and `aval verify` never fetch or read them, so a
+record, forged or not, cannot cause reuse, change an outcome or count toward
+the 64-candidate cap.
+
+Recording is best-effort: a record that cannot be published (no write
+credentials, registry down, past `--registry-timeout`) or written prints
+`aval: warning: run record not ...` on stderr and never changes the exit
+code. Publishing has its own `--registry-timeout` deadline, so it cannot
+hold the command longer. `--record` needs `--registry`. Aval keeps no local
+state; a record file exists only when `--record-file` asks for one.
+
+### Layout
+
+Per test there is one **stats anchor**, separate from every fingerprint
+anchor. It is deterministic (its digest depends on the test id alone) and
+tagged `stats-<test id>` (`registry.StatsTag`); fingerprint tags and OCI
+referrers tag schema tags start with `sha256-`, so the tags cannot collide.
+It has the same shape as the fingerprint anchor, with
+`"artifactType": "application/vnd.trianalab.aval.stats.v1"` and the
+annotation `"io.trianalab.aval.test": "<test id>"`.
+
+Each record is an OCI 1.1 image manifest with
+`"artifactType": "application/vnd.trianalab.aval.run.v1"`, the empty config,
+one layer of media type `application/vnd.trianalab.aval.run.v1+json` holding
+the record JSON, and the stats anchor as `subject`. Records are listed by the
+stats anchor's referrers. Unlike `registry.Push`, publishing a record does
+not confirm the referrers listing, so on a registry without the referrers
+API two concurrent records for one test can drop one of them.
+
+### Record JSON
+
+`evidence.RunRecord`, parsed by `evidence.ParseRunRecord`:
+
+| Field | Type | Present | Meaning |
+|---|---|---|---|
+| `version` | string | always | `aval.trianalab.io/run-record/v1`. |
+| `testId` | string | always | `metadata.name` from the contract. |
+| `fingerprint` | string | always | `sha256:<hex>`; empty when the fingerprint could not be computed. |
+| `outcome` | string | always | The lookup decision, as in the verify report. |
+| `reused` | bool | always | `true` when a verified result was reused and the test did not run. With `--shadow` it is `false`. |
+| `result` | string | when known | The reused or the real `passed` / `failed`; omitted when `runner.command` could not start. |
+| `testDurationMs` | integer | always | How long `runner.command` ran, in milliseconds; `0` when it did not run. |
+| `savedDurationMs` | integer | always | On reuse, the test duration recorded in the reused attestation (`finishedAt - startedAt`); `0` otherwise. |
+| `avalVersion` | string | always | Version of the `aval` binary that ran. |
+| `recordedAt` | RFC 3339 timestamp | always | When the record was made. |
+| `ciRunUrl` | string | when passed | `--ci-run-url`, a link to the CI run. Aval does not derive it from any CI vendor. |
+
+Example:
+
+```json
+{
+  "version": "aval.trianalab.io/run-record/v1",
+  "testId": "orders-integration",
+  "fingerprint": "sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7",
+  "outcome": "verified",
+  "reused": true,
+  "result": "passed",
+  "testDurationMs": 0,
+  "savedDurationMs": 1184000,
+  "avalVersion": "0.3.0",
+  "recordedAt": "2026-11-06T09:00:00Z",
+  "ciRunUrl": "https://ci.example.com/acme/orders/runs/42"
+}
+```
+
 ## DSSE envelope
 
 The layer is a DSSE envelope (`evidence.Envelope`):
@@ -486,6 +565,7 @@ These rules apply to every frozen format:
 | Statement and predicate | `PredicateType`, `SchemaVersion`, `MediaTypeExecution`, `ArtifactType` | `.../execution/v2`, `v2`, `execution.v2` |
 | Fingerprint anchor | `ArtifactTypeFingerprint` | `fingerprint.v1` |
 | Verify report, outcomes and exit codes | `ReportVersion` | `aval.trianalab.io/verify-report/v1` |
+| Run record and stats anchor | `RunRecordVersion`, `ArtifactTypeRun`, `MediaTypeRun`, `ArtifactTypeStats` | `run-record/v1`, `run.v1`, `stats.v1` (provisional) |
 | Contract and policy file | `apiVersion` | `aval.trianalab.io/v1` |
 | Fingerprint manifest | header line, `execution.fingerprintVersion` | `aval-fingerprint/v1` |
 
@@ -547,9 +627,10 @@ is announced in the release notes of the release that removes it.
 
 ### Golden files
 
-`pkg/evidence/testdata/statement-execution-v2.golden.json` and
-`pkg/evidence/testdata/verify-report-v1.golden.json` set every field of the
-statement, predicate and verify report. A test decodes each strictly into the
+`pkg/evidence/testdata/statement-execution-v2.golden.json`,
+`pkg/evidence/testdata/verify-report-v1.golden.json` and
+`pkg/evidence/testdata/run-record-v1.golden.json` set every field of the
+statement, predicate, verify report and run record. A test decodes each strictly into the
 current types and requires the same JSON back, so dropping, renaming or
 retyping a field, or adding a required one, fails. Another test requires
 every JSON field of those types to be set in its golden file, so a new field

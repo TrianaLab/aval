@@ -38,7 +38,9 @@ const idTokenEnv = "SIGSTORE_ID_TOKEN"
 
 type runFlags struct {
 	file, repo, policyFile, resultFile, reportFile, key string
+	recordFile, ciRunURL                                string
 	push, noReuse, shadow, fingerprintOnly, explain     bool
+	record                                              bool
 	registryTimeout                                     time.Duration
 }
 
@@ -57,6 +59,12 @@ or policy error, a miss. A verification failure also runs the test, and then
 exits 5: it is a security event. A reused failing result exits 3, like a
 failing run. --shadow verifies and still runs the test; if the verified
 result disagrees with the run, that is a false hit and run exits 1.
+
+--record publishes a run record (outcome, reuse, durations) for statistics
+to the test's stats anchor in the registry, for every outcome. It is
+best-effort: a failure, such as missing write credentials, is a warning and
+never changes the exit code. Records are unsigned and never read by run or
+verify. --record-file writes the same record to a file for 'aval record'.
 
 Exit codes: 0 passed or reused a pass, 3 failed or reused a failure,
 5 verification failed (after running the test), 1 error or false hit,
@@ -77,6 +85,9 @@ runner.command never sees it.`,
 	f.BoolVar(&o.shadow, "shadow", false, "verify, but run the test anyway and fail on a false hit")
 	f.BoolVar(&o.fingerprintOnly, "fingerprint-only", false, "print the execution fingerprint and exit")
 	f.BoolVar(&o.explain, "explain", false, "print the fingerprint manifest (what was hashed)")
+	f.BoolVar(&o.record, "record", false, "publish a run record for statistics after the run (needs --registry; best-effort)")
+	f.StringVar(&o.recordFile, "record-file", "", "also write the run record to this file, for 'aval record'")
+	f.StringVar(&o.ciRunURL, "ci-run-url", "", "link to the CI run, stored in the run record")
 	registryTimeoutFlag(cmd, &o.registryTimeout)
 	return cmd
 }
@@ -87,6 +98,8 @@ func (o runFlags) validate(token string) error {
 	switch {
 	case o.push && o.repo == "":
 		return usageError{errors.New("--push requires --registry")}
+	case o.record && o.repo == "":
+		return usageError{errors.New("--record requires --registry")}
 	case o.shadow && o.noReuse:
 		return usageError{errors.New("--shadow and --no-reuse exclude each other")}
 	case o.repo != "":
@@ -164,7 +177,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	if err := o.validate(token); err != nil {
 		return err
 	}
-	c, fp, fpErr := loadAndFingerprint(o.file, o.resultFile, o.reportFile)
+	c, fp, fpErr := loadAndFingerprint(o.file, o.resultFile, o.reportFile, o.recordFile)
 	if c == nil {
 		return fpErr
 	}
@@ -187,6 +200,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	}
 	if r.Outcome == evidence.OutcomeVerified && !o.shadow && len(errs) == 0 {
 		fmt.Fprintf(out, "reused %s result %s\n", r.Result, r.Reference)
+		recordRun(ctx, out, warn, o, r, nil)
 		if r.Result != evidence.ResultPassed {
 			return fmt.Errorf("reused result %s: %w", r.Result, errTestFailed)
 		}
@@ -199,10 +213,12 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	}
 	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), fp)
 	if err != nil {
+		recordRun(ctx, out, warn, o, r, nil)
 		return errors.Join(append(errs, err)...)
 	}
 	fmt.Fprintf(out, "ran %s: %s (exit %d)\n", c.Metadata.Name, p.Result, p.Execution.ExitCode)
 	errs = append(errs, keep(ctx, out, p, fpErr, token, o)...)
+	recordRun(ctx, out, warn, o, r, p)
 	return errors.Join(append(errs, judge(out, warn, r, p))...)
 }
 
@@ -321,6 +337,43 @@ func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr error
 	return nil
 }
 
+// recordRun writes the run record (--record-file) and publishes it
+// (--record). ran is the real run, nil when the test did not run: reused,
+// or runner.command could not start. Best effort: a failure is a warning and
+// never changes the exit code, and a record is statistics, never evidence.
+func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.Report, ran *evidence.Predicate) {
+	if !o.record && o.recordFile == "" {
+		return
+	}
+	rec := evidence.RunRecord{
+		Version: evidence.RunRecordVersion, TestID: r.TestID, Fingerprint: r.Fingerprint, Outcome: r.Outcome,
+		AvalVersion: version, RecordedAt: time.Now().UTC(), CIRunURL: o.ciRunURL,
+	}
+	switch {
+	case ran != nil:
+		rec.Result, rec.TestDurationMs = ran.Result, ran.FinishedAt.Sub(ran.StartedAt).Milliseconds()
+	case r.Outcome == evidence.OutcomeVerified:
+		rec.Reused, rec.Result = true, r.Result
+		rec.SavedDurationMs = r.Predicate.FinishedAt.Sub(r.Predicate.StartedAt).Milliseconds()
+	}
+	if o.recordFile != "" {
+		if err := writeJSON(o.recordFile, rec); err != nil {
+			fmt.Fprintf(warn, "aval: warning: run record not written: %s\n", oneLine(err.Error()))
+		}
+	}
+	if !o.record {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, o.registryTimeout)
+	defer cancel()
+	d, err := pushRecord(ctx, o.repo, rec)
+	if err != nil {
+		fmt.Fprintf(warn, "aval: warning: run record not published: %s\n", oneLine(err.Error()))
+		return
+	}
+	fmt.Fprintf(out, "recorded %s\n", d.Reference())
+}
+
 // writeReportFile writes r to path, unless no --report was asked for.
 func writeReportFile(path string, r evidence.Report) error {
 	if path == "" {
@@ -407,6 +460,50 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 	f.StringVar(&repo, "registry", "", "OCI repository for attestations (required)")
 	f.StringVar(&key, "key", "", "signing key path (default: keyless OIDC)")
 	f.StringVar(&resultFile, "result", defaultResult, "result recorded by 'aval run'")
+	registryTimeoutFlag(cmd, &timeout)
+	return cmd
+}
+
+func newRecordCmd() *cobra.Command {
+	var repo, file string
+	var timeout time.Duration
+	cmd := &cobra.Command{
+		Use:   "record",
+		Short: "Publish a run record written by 'aval run --record-file'",
+		Long: `record publishes a run record that 'aval run --record-file' wrote to the
+test's stats anchor in the registry, as 'aval run --record' would have. Use it
+to publish, from a job with write credentials that runs no tests, the record
+of a run made without them. Run records are unsigned statistics: run and
+verify never read them.`,
+		Args: noArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if repo == "" || file == "" {
+				return usageError{errors.New("--registry and --record-file are required")}
+			}
+			if err := checkTimeout(timeout); err != nil {
+				return err
+			}
+			raw, err := os.ReadFile(file)
+			if err != nil {
+				return fmt.Errorf("reading run record: %w", err)
+			}
+			rec, err := evidence.ParseRunRecord(raw)
+			if err != nil {
+				return fmt.Errorf("run record %s: %w", file, err)
+			}
+			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
+			defer cancel()
+			d, err := pushRecord(ctx, repo, *rec)
+			if err != nil {
+				return fmt.Errorf("publishing run record: %w", err)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "recorded %s\n", d.Reference())
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringVar(&repo, "registry", "", "OCI repository for run records (required)")
+	f.StringVar(&file, "record-file", "", "run record written by 'aval run --record-file' (required)")
 	registryTimeoutFlag(cmd, &timeout)
 	return cmd
 }

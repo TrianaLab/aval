@@ -57,6 +57,7 @@ var (
 	newVerifier    = attest.NewVerifier
 	sign           = attest.Sign
 	publish        = registry.Push
+	pushRecord     = registry.Record
 )
 
 var (
@@ -122,7 +123,7 @@ func newRootCmd() *cobra.Command {
 		return nil
 	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
-	root.AddCommand(newRunCmd(), newPushCmd(), newVerifyCmd())
+	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newVerifyCmd())
 	return root
 }
 

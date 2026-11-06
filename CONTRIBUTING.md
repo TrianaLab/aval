@@ -74,8 +74,11 @@ runs the unit suite with `aval run --shadow` and fails on a false hit (exit 1).
 Both fail on a verification failure (exit 5), read
 `ghcr.io/trianalab/aval-attestations` anonymously and upload their reports
 (the `aval verify --output json` format) as artifacts. On `main`,
-`dogfood-publish`, the only job with `packages: write` and `id-token: write`,
-signs keyless and pushes the results that were not reused; it runs no tests.
+`dogfood-publish`, the only job with `id-token: write`, signs keyless and
+pushes the results that were not reused; it runs no tests. Both suites also
+write a run record (`--record-file`), and on `main` `dogfood-record`
+(`packages: write` only, no tests) publishes them with `aval record`, whatever
+the suites' outcome; a record that cannot be published is a warning.
 Trust comes from `.github/aval/main.yaml` (main and releases: only `ci.yaml`
 on `main`, runner level) and `.github/aval/pr.yaml` (pull requests: also
 developer signatures); `tests/architecture/dogfood_test.go` enforces both,
