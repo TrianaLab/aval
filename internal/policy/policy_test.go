@@ -138,3 +138,26 @@ func TestLoadErrors(t *testing.T) {
 		t.Fatalf("empty identities: %v", err)
 	}
 }
+
+// The subjectRegexp check here and evidence.MatchIdentity each compile the
+// regexp (alone, then anchored). They must agree: an entry accepted here
+// matches a subject the regexp covers, and one rejected here matches nothing.
+func TestSubjectRegexpAgreesWithMatchIdentity(t *testing.T) {
+	const iss = "https://issuer.example"
+	deep := strings.Repeat("(", 999) + "a" + strings.Repeat(")", 999)
+	for expr, subject := range map[string]string{
+		`https://github\.com/acme/.*`: "https://github.com/acme/orders",
+		`a|b`:                         "b",
+		`.*`:                          "",
+		deep:                          "a",
+		`a)|(b`:                       "a)|(b",
+		`ci(`:                         "ci(",
+		`[`:                           "[",
+	} {
+		_, err := identity{Issuer: iss, SubjectRegexp: expr, TrustLevel: "runner"}.validate("")
+		_, matched := evidence.MatchIdentity([]evidence.Identity{{Issuer: iss, SubjectRegexp: expr, TrustLevel: evidence.TrustRunner}}, iss, subject)
+		if (err == nil) != matched {
+			t.Errorf("%.40q: policy error %v, MatchIdentity matched %v", expr, err, matched)
+		}
+	}
+}

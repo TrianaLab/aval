@@ -40,7 +40,7 @@ func predicate(cacheability string) evidence.Predicate {
 		Test:          evidence.Test{ID: "app-integration", Cacheability: cacheability},
 		Result:        evidence.ResultPassed,
 		Execution:     evidence.Execution{Fingerprint: fp, FingerprintVersion: "aval-fingerprint/v1"},
-		Runner:        evidence.Runner{Identity: "ci", TrustLevel: evidence.TrustRunner},
+		Runner:        evidence.Runner{Identity: "ci"},
 		StartedAt:     start,
 		FinishedAt:    start.Add(time.Minute),
 	}

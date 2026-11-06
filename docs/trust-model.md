@@ -54,19 +54,22 @@ in one of two modes:
 - **Keyless** (CI): an ephemeral key, a short-lived Fulcio certificate for
   the OIDC token the caller passes in, and a Rekor entry (always recorded,
   since the certificate expires in minutes and Rekor's timestamp is what
-  makes it verifiable later). Defaults to the Sigstore public-good instance;
-  any Fulcio and Rekor can be configured. Obtaining the OIDC token is the
-  caller's job, so no CI vendor or issuer is assumed.
+  makes it verifiable later). Signing always uses the Sigstore public-good
+  instance (`https://fulcio.sigstore.dev`, `https://rekor.sigstore.dev`);
+  the endpoints cannot be configured (TODO(milestone-5): signing against a
+  private Sigstore deployment; verification already accepts its pinned
+  `trustedRoot`). Obtaining the OIDC token is the caller's job, so no CI
+  vendor or issuer is assumed.
 - **Key-based** (local): an unencrypted ECDSA P-256 PEM key (PKCS#8 or SEC1),
   for example from `openssl ecparam -name prime256v1 -genkey -noout -out
-  aval.key`. Cosign keys are encrypted and not supported. No Rekor entry
-  unless a Rekor URL is given. Expect policies to grant such signatures at
-  most level 1.
+  aval.key`. Cosign keys are encrypted and not supported. No Rekor entry.
+  The bundle's key hint is the key's `evidence.PublicKeyID`. Expect policies
+  to grant such signatures at most level 1.
 
 Besides the envelope, `Sign` returns the Sigstore bundle (v0.3 JSON) with the
 verification material (certificate or key hint, Rekor entry). `registry.Push`
-stores it next to the envelope as an optional layer of the execution manifest
-(see [artifact-format.md](artifact-format.md#oci-layout)).
+requires it and stores it next to the envelope as the second layer of the
+execution manifest (see [artifact-format.md](artifact-format.md#oci-layout)).
 
 ## Trust levels
 

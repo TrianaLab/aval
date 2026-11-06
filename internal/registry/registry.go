@@ -39,8 +39,8 @@ import (
 )
 
 const (
-	// MediaTypeSigstoreBundle is the media type of the optional Sigstore
-	// bundle layer (Sigstore standard).
+	// MediaTypeSigstoreBundle is the media type of the Sigstore bundle
+	// layer (Sigstore standard).
 	MediaTypeSigstoreBundle = "application/vnd.dev.sigstore.bundle.v0.3+json"
 	// AnnotationFingerprint records the fingerprint on the anchor and on
 	// every attestation manifest. Informational: Verify checks the
@@ -85,7 +85,9 @@ type Attestation struct {
 	// Envelope is the signed DSSE envelope. Required.
 	Envelope *evidence.Envelope
 	// Bundle is the Sigstore bundle JSON with the verification material
-	// (certificate or key hint, transparency log entry). Optional.
+	// (certificate or key hint, transparency log entry). Required by Push:
+	// without it the attestation can never verify. Fetch leaves it nil when
+	// the manifest has no bundle layer.
 	Bundle []byte
 }
 
@@ -204,6 +206,9 @@ func Push(ctx context.Context, repo, fingerprint string, a Attestation) (Descrip
 	if a.Envelope == nil {
 		return Descriptor{}, errors.New("registry.Push: no envelope")
 	}
+	if !json.Valid(a.Bundle) {
+		return Descriptor{}, errors.New("registry.Push: no valid Sigstore bundle; an attestation without one can never verify")
+	}
 	r, err := newRepository(repo)
 	if err != nil {
 		return Descriptor{}, fmt.Errorf("registry.Push: %w", err)
@@ -224,14 +229,11 @@ func push(ctx context.Context, r *remote.Repository, fingerprint string, a Attes
 	if err != nil {
 		return ocispec.Descriptor{}, err
 	}
-	layers := []ocispec.Descriptor{envDesc}
-	if len(a.Bundle) > 0 {
-		bundleDesc, err := pushBlob(ctx, r, MediaTypeSigstoreBundle, a.Bundle)
-		if err != nil {
-			return ocispec.Descriptor{}, err
-		}
-		layers = append(layers, bundleDesc)
+	bundleDesc, err := pushBlob(ctx, r, MediaTypeSigstoreBundle, a.Bundle)
+	if err != nil {
+		return ocispec.Descriptor{}, err
 	}
+	layers := []ocispec.Descriptor{envDesc, bundleDesc}
 	anchorRaw, anchorDesc := anchor(fingerprint)
 	// Re-tagging the deterministic anchor is idempotent and repairs a
 	// moved tag.
