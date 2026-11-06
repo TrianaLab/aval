@@ -1546,7 +1546,7 @@ environment is valid in another.</p>
    executions, and policy and reporting need to tell the two apart.</li>
 <li><strong>Cacheability classes.</strong> <code>hermetic</code> and <code>controlled-environment</code> are
    reusable by default. <code>external-dependencies</code> needs an explicit policy
-   opt-in. <code>non-deterministic</code> is never reusable by default. <em>Rationale:</em> a
+   opt-in. <code>non-deterministic</code> is never reusable. <em>Rationale:</em> a
    matching fingerprint only means something if the result depends on the
    declared inputs.</li>
 <li><strong>Language-, framework- and CI-agnostic.</strong> v0 ships only a generic runner:

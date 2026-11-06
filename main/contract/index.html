@@ -1747,7 +1747,7 @@ renaming a test produces a new fingerprint.</p>
 <tr>
 <td><code>non-deterministic</code></td>
 <td>Results vary between runs with identical inputs.</td>
-<td>no</td>
+<td>never</td>
 </tr>
 </tbody>
 </table>
@@ -1755,9 +1755,9 @@ renaming a test produces a new fingerprint.</p>
 is still reused only if a valid, signed attestation exists and the trust
 policy accepts its signer (see <a href="../trust-model/#policy">trust-model.md</a>).
 Without a policy nothing is accepted.
-<code>aval run</code> prints <code>cacheability &lt;class&gt;: not reusable by default</code> for the
-last two classes. A <code>non-deterministic</code> test is never looked up: it always
-runs.</p>
+<code>aval run</code> prints <code>cacheability external-dependencies: not reusable by
+default (the policy may allow it)</code> and <code>cacheability non-deterministic: never
+reusable</code>. A <code>non-deterministic</code> test is never looked up: it always runs.</p>
 <h2 id="what-goes-into-the-fingerprint">What goes into the fingerprint<a class="headerlink" href="#what-goes-into-the-fingerprint" title="Anchor link">&para;</a></h2>
 <p>The fingerprint is <code>sha256:&lt;hex&gt;</code> of a canonical, line-oriented manifest
 (format <code>aval-fingerprint/v1</code>). <code>aval run --explain</code> prints the exact text

@@ -1654,8 +1654,11 @@ major module path, even when the format it described is retired.</p>
 <h3 id="3-aval-verify-output-json">3. <code>aval verify --output json</code><a class="headerlink" href="#3-aval-verify-output-json" title="Anchor link">&para;</a></h3>
 <p><code>aval verify</code> computes the fingerprint from <code>aval.yaml</code>, looks up the
 attestation, verifies it against the trust policy and runs nothing. With
-<code>--output json</code> (<code>-o json</code>) it prints an <code>evidence.Report</code> on stdout; the error
-message, if any, goes to stderr.</p>
+<code>--output json</code> (<code>-o json</code>) it prints an <code>evidence.Report</code> on stdout. Once
+the report is printed its <code>reason</code> is the only copy of the error message;
+stderr adds one <code>aval: SECURITY: ...</code> line when an attestation failed
+verification. Errors before there is a report (flags, <code>aval.yaml</code>) go to
+stderr.</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval.trianalab.io/verify-report/v1"</span><span class="p">,</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span>
@@ -1763,8 +1766,8 @@ The policy file format (<code>--policy</code>) is described in
   does this) and <code>version == "aval.trianalab.io/verify-report/v1"</code> on reports.
   Reject versions you do not know. Within a version, ignore unknown fields:
   changes are additive.</li>
-<li><strong>Respect cacheability.</strong> <code>non-deterministic</code> results are never reusable by
-  default; do not widen that in your adapter.</li>
+<li><strong>Respect cacheability.</strong> <code>non-deterministic</code> results are never reusable;
+  do not widen that in your adapter.</li>
 </ul>
 <h3 id="example-pacto-as-an-external-consumer">Example: Pacto as an external consumer<a class="headerlink" href="#example-pacto-as-an-external-consumer" title="Anchor link">&para;</a></h3>
 <p>This is a conceptual example of an integration that lives outside Aval. Aval

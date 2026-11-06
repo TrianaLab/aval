@@ -1765,8 +1765,8 @@ the test runs.</p>
   candidate is verified and the policy picks the verified one with the
   highest trust level. A candidate that fails verification never decides the
   outcome while another verifies, and is listed in <code>rejected</code> in the verify
-  report (and on stderr as <code>aval: SECURITY: ...</code>), so the security event
-  stays visible. A candidate
+  report (and stderr gets one <code>aval: SECURITY: ...</code> line), so the security
+  event stays visible. A candidate
   that cannot be fetched or checked blocks reuse (the test runs), because it
   might have outranked the verified one.</li>
 <li><strong>Unknown or missing fields</strong> in <code>aval.yaml</code> are rejected (exit 2) rather
@@ -1827,10 +1827,22 @@ failure.</p>
 <code>runner.command</code> starts: the code under test cannot use it to sign results as
 the workload identity.</p>
 <p>Reasons can carry text from an untrusted attestation, so the text output
-and stderr escape it with Go string escapes (newlines, control and other
-non-printable characters, quotes and backslashes): such text never
-starts a line of its own (a CI log command, a terminal escape). The JSON
-report keeps the reason as is.</p>
+and stderr escape newlines, control and other non-printable characters and
+invalid UTF-8 with Go escapes (<code>\n</code>, <code>\x1b</code>, <code>\u2028</code>); quotes and
+backslashes stay as they are. Such text never starts a line of its own (a CI
+log command, a terminal escape). The JSON report keeps the reason as is.</p>
+<p>Each command prints the reason once, in the report: stderr does not repeat
+it. On a verification failure stderr gets a single <code>aval: SECURITY: ...</code>
+line that counts the attestations that failed and links here; a signer the
+policy does not list gets the reason <code>signer key id "&lt;id&gt;" is not in the trust
+policy (trust policy &lt;file&gt;)</code> (for a certificate, <code>signer "&lt;subject&gt;"
+(issuer "&lt;issuer&gt;") is not accepted by the policy (trust policy &lt;file&gt;)</code>;
+when the policy lists only keys the certificate is not verified, so the
+reason is <code>certificate claiming signer "&lt;subject&gt;" (issuer "&lt;issuer&gt;") is not
+accepted by the policy: it lists no keyless identities (trust policy &lt;file&gt;)</code>).
+For a <code>verified</code> result the text report adds <code>signer:</code> (key id, or subject and issuer, with the trust level
+name) and <code>reference:</code> lines. Errors joined from several causes print one <code>aval:</code> line per cause (an invalid
+<code>aval.yaml</code>); in a report (an invalid policy) the causes share the <code>reason:</code> line, separated by semicolons.</p>
 <p><code>--record</code> publishes a run record for statistics after the decision, for
 every outcome (see <a href="../artifact-format/#run-records">artifact-format.md</a>).
 Records are unsigned, never read by <code>aval run</code> or <code>aval verify</code>, and never
@@ -1960,11 +1972,11 @@ declared class.</p>
 </tr>
 <tr>
 <td>Undeclared input changed (file outside scope, unlisted env var, network service)</td>
-<td>Out of scope for detection in v0: the fingerprint only covers declared inputs. Mitigated by contract review, <code>external-dependencies</code> / <code>non-deterministic</code> classes not being reusable by default, and the false-hit suite (roadmap item 4). Observed-input tracing is future work.</td>
+<td>Out of scope for detection in v0: the fingerprint only covers declared inputs. Mitigated by contract review, <code>external-dependencies</code> not being reusable by default and <code>non-deterministic</code> never being reusable, and the false-hit suite (roadmap item 4). Observed-input tracing is future work.</td>
 </tr>
 <tr>
 <td>Registry compromise (attacker can write arbitrary manifests and tags)</td>
-<td>Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as <code>verification-failed</code>, or, when another candidate verifies, as a <code>rejected</code> entry with outcome <code>verification-failed</code> in the verify report (and a warning on stderr). It can delete attestations (forcing misses, i.e. re-runs) or deny service (<code>error</code>, re-run). Availability is out of scope.</td>
+<td>Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as <code>verification-failed</code>, or, when another candidate verifies, as a <code>rejected</code> entry with outcome <code>verification-failed</code> in the verify report (and an <code>aval: SECURITY: ...</code> line on stderr). It can delete attestations (forcing misses, i.e. re-runs) or deny service (<code>error</code>, re-run). Availability is out of scope.</td>
 </tr>
 <tr>
 <td>Forged or tampered run records (anyone with push access)</td>
