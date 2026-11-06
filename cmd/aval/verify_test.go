@@ -51,7 +51,7 @@ func signedFor(t *testing.T, contractFile, keyFile string, edit func(*evidence.P
 		Test:          evidence.Test{ID: c.Metadata.Name, Cacheability: string(c.Cacheability)},
 		Result:        evidence.ResultPassed,
 		Execution:     evidence.Execution{Fingerprint: fp.Digest, FingerprintVersion: "aval-fingerprint/v1"},
-		Runner:        evidence.Runner{Identity: "dev", TrustLevel: evidence.TrustIsolated},
+		Runner:        evidence.Runner{Identity: "dev", TrustLevel: evidence.TrustIsolated}, //nolint:staticcheck // a claim Verify must ignore
 		StartedAt:     start,
 		FinishedAt:    start.Add(time.Second),
 	}

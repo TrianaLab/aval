@@ -30,7 +30,7 @@ All constants live in `pkg/evidence`.
 | `SchemaVersion` | `v2` | Predicate `schemaVersion` | frozen |
 | `ReportVersion` | `aval.trianalab.io/verify-report/v1` | `version` of the verify report | frozen |
 
-Registry identifiers (`internal/registry`): the optional bundle layer uses the
+Registry identifiers (`internal/registry`): the bundle layer uses the
 Sigstore media type `application/vnd.dev.sigstore.bundle.v0.3+json`
 (`MediaTypeSigstoreBundle`), and manifests carry the annotation
 `io.trianalab.aval.fingerprint` (`AnnotationFingerprint`, informational:
@@ -121,11 +121,14 @@ guidance (`artifactType` set, empty config):
 
 - **config**: the OCI empty descriptor (`{}`, media type
   `application/vnd.oci.empty.v1+json`).
-- **layers**: the signed DSSE envelope (see below), then optionally the
-  Sigstore bundle with the verification material. `registry.Fetch` rejects
-  any other layer, a repeated layer, or a missing envelope as a verification
-  failure, and so a manifest that is not sha256-addressed, is larger than
-  4 MiB, or does not match the digest it was fetched by.
+- **layers**: the signed DSSE envelope (see below), then the Sigstore
+  bundle with the verification material. `registry.Push` refuses an
+  attestation without a bundle; a manifest without one that `registry.Fetch`
+  reads can never verify, so it ends as a verification failure.
+  `registry.Fetch` rejects any other layer, a repeated layer, or a missing
+  envelope as a verification failure, and so a manifest that is not
+  sha256-addressed, is larger than 4 MiB, or does not match the digest it
+  was fetched by.
 - **subject**: always the anchor of the execution's fingerprint. The tested
   revision or artifact is recorded inside the statement (`subject`), not in
   the manifest, so the referrers of a tested image do not list its evidence.
@@ -281,9 +284,9 @@ Signing uses sigstore-go (`attest.Sign`, keyless with a Fulcio certificate
 and Rekor entry, or key-based; see [trust-model.md](trust-model.md#signing)).
 It also produces a Sigstore bundle (`application/vnd.dev.sigstore.bundle.v0.3+json`)
 carrying the certificate or key hint and the Rekor entry; it is stored as the
-second layer of the execution manifest. The layer is optional for
-`registry.Push`, but `aval verify` checks the signature through the bundle
-(`attest.Verifier`), so an attestation without one is a verification failure.
+second layer of the execution manifest. `registry.Push` requires it:
+`aval verify` checks the signature through the bundle (`attest.Verifier`),
+so an attestation without one could only ever be a verification failure.
 
 ## in-toto Statement
 
@@ -345,8 +348,11 @@ checked by `Predicate.Validate` (called by `evidence.Parse`).
 `runner.identity`, `runner.issuer` and `runner.trustLevel` are claims written
 by whoever produced the predicate. The authoritative identity and trust level
 are those of the **verified signer**, matched against the policy's accepted
-identities (`evidence.Verification.Signer` / `.TrustLevel`). Consumers must not
-make trust decisions from the `runner` block.
+identities (`evidence.Verification.Signer` and its `TrustLevel`). Consumers
+must not make trust decisions from the `runner` block. The Go fields
+`Runner.Issuer`, `Runner.TrustLevel` and `Verification.TrustLevel` are
+deprecated: Aval leaves the first two empty, and the third duplicates
+`Verification.Signer.TrustLevel`.
 
 `evidence.Parse` only checks structure. A parsed predicate is a claim, not
 evidence; use `evidence.Verify` to get something you can rely on.

@@ -102,7 +102,7 @@ func exitCode(err error) int {
 		return ExitTestFailed
 	case errors.Is(err, evidence.ErrNotFound), errors.Is(err, errBelowMinTrust):
 		return ExitMiss
-	case errors.Is(err, evidence.ErrNotImplemented):
+	case errors.Is(err, evidence.ErrNotImplemented): //nolint:staticcheck // deprecated, but exit 6 stays reserved for it
 		return ExitNotImplemented
 	}
 	return ExitError

@@ -69,7 +69,7 @@ func TestVerifyKeyBasedBundle(t *testing.T) {
 		t.Fatal(err)
 	}
 	kid, _ := evidence.PublicKeyID(pub)
-	if got.Signer.KeyID != kid || got.Signer.KeyID != s.Signer.KeyID || got.TrustLevel != evidence.TrustDeveloper {
+	if got.Signer.KeyID != kid || got.Signer.TrustLevel != evidence.TrustDeveloper {
 		t.Fatalf("unexpected verification: %+v", got)
 	}
 }

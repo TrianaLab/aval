@@ -139,8 +139,16 @@ type Execution struct {
 // Runner is who produced the result, as claimed inside the predicate. The
 // authoritative identity is the verified signer, not this field.
 type Runner struct {
-	Identity   string     `json:"identity"`
-	Issuer     string     `json:"issuer,omitempty"`
+	Identity string `json:"identity"`
+	// Issuer is never set by Aval.
+	//
+	// Deprecated: the OIDC issuer of a keyless signer is in
+	// Verification.Signer.Issuer, taken from the verified certificate.
+	Issuer string `json:"issuer,omitempty"`
+	// TrustLevel is never set by Aval (always 0) and never read by Verify.
+	//
+	// Deprecated: the trust level is granted by the policy; read
+	// Verification.Signer.TrustLevel.
 	TrustLevel TrustLevel `json:"trustLevel"`
 }
 
@@ -347,7 +355,10 @@ type Verification struct {
 	Predicate *Predicate
 	// Signer is the policy entry that accepted the signer, with Subject and
 	// KeyID set to the identity the signature actually carried.
-	Signer     Identity
+	Signer Identity
+	// TrustLevel equals Signer.TrustLevel.
+	//
+	// Deprecated: use Signer.TrustLevel.
 	TrustLevel TrustLevel
 }
 
@@ -358,7 +369,10 @@ var (
 	// ErrVerification means an attestation exists but failed signature or
 	// policy checks. This is a security event and must be surfaced.
 	ErrVerification = errors.New("attestation verification failed")
-	// ErrNotImplemented marks milestone stubs.
+	// ErrNotImplemented marks milestone stubs (exit code 6, reserved).
+	//
+	// Deprecated: no function in this package or the aval CLI returns it,
+	// so consumers have nothing to check it for.
 	ErrNotImplemented = errors.New("not implemented")
 )
 

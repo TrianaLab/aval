@@ -138,7 +138,7 @@ func TestPushFetchVerify(t *testing.T) {
 		got, err := evidence.Verify(ctx, a.Envelope, opts)
 		switch s {
 		case trusted:
-			if err != nil || got.Signer.KeyID != trusted.Signer.KeyID {
+			if kid, _ := evidence.PublicKeyID(pub); err != nil || got.Signer.KeyID != kid {
 				t.Fatalf("trusted attestation: %+v %v", got, err)
 			}
 		default:
