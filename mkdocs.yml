@@ -89,6 +89,12 @@ extra:
     provider: mike
     # Show the alias ("latest") next to the version in the selector.
     alias: true
+    # Versions that never show the outdated banner (overrides/main.html): the
+    # current release and the development version, so only a release older
+    # than `latest` shows it. Material matches these as regexes.
+    default:
+      - ^latest$
+      - ^main$
 
 markdown_extensions:
   - abbr

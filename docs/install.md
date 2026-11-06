@@ -3,12 +3,14 @@
 Aval is one static binary for Linux, macOS and Windows on amd64 and arm64.
 The installers download it from
 [GitHub Releases](https://github.com/TrianaLab/aval/releases) and check it
-before installing.
+before installing. This site serves the installers of the latest commit on
+`main`; the same files are `scripts/get-aval.sh` and `scripts/install.ps1` in
+the repository.
 
 ## Linux and macOS
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh | bash
+curl -fsSL https://trianalab.github.io/aval/install.sh | bash
 ```
 
 The script needs `curl` or `wget` and `sha256sum` or `shasum`, and works with
@@ -26,7 +28,7 @@ uses `sudo` only when that directory is not writable.
 Flags need the script as a file, or `bash -s --` when piped:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh | bash -s -- --version v0.2.0
+curl -fsSL https://trianalab.github.io/aval/install.sh | bash -s -- --version v0.2.0
 ```
 
 ## Windows
@@ -34,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-ava
 In PowerShell 5.1 or 7:
 
 ```powershell
-irm https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/install.ps1 | iex
+irm https://trianalab.github.io/aval/install.ps1 | iex
 ```
 
 It installs `aval.exe` into `%LOCALAPPDATA%\Programs\aval` and adds that
