@@ -512,6 +512,46 @@ jobs:
             aval push -f "$contract" --registry "$AVAL_REGISTRY" --result "results/$name-result.json"
           done
 
+  # Story 8.8 (#90): the one-line installers (scripts/get-aval.sh,
+  # scripts/install.ps1) against Aval's real releases, including tampered
+  # downloads served from a local mirror that must be refused. macOS runs the
+  # bash installer with /bin/bash 3.2, as `curl | bash` does there; Windows
+  # runs install.ps1 under PowerShell 7 and Windows PowerShell 5.1. CI-only
+  # (needs three OSes and the network), so it has no `make` leg; shellcheck
+  # runs in ci-static. No token reaches the scripts.
+  installer:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: get-aval.sh, latest and pinned releases and tamper cases
+        if: runner.os != 'Windows'
+        run: /bin/bash scripts/test-get-aval.sh
+      - name: get-aval.sh into the default directory (sudo only if needed)
+        if: runner.os != 'Windows'
+        run: |
+          /bin/bash scripts/get-aval.sh
+          test "$(command -v aval)" = /usr/local/bin/aval
+          aval --version
+      - name: install.ps1 under PowerShell 7
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: scripts/test-install.ps1 -Shell pwsh
+      - name: install.ps1 under Windows PowerShell 5.1
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: scripts/test-install.ps1 -Shell powershell
+
   # Conventional commit PR title (CONTRIBUTING.md "Commits"). Squash merges
   # use the title as the commit message. The title goes through env, never
   # interpolated into the script, so `$(...)` in a title is not executed.
@@ -553,6 +593,7 @@ jobs:
       - dogfood-compare
       - dogfood-shadow
       - dogfood-publish
+      - installer
       - pr-title
     runs-on: ubuntu-latest
     steps:

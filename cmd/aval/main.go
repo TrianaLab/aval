@@ -2,19 +2,24 @@
 package main
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
+	orasregistry "oras.land/oras-go/v2/registry"
 
 	"github.com/TrianaLab/aval/internal/attest"
 	"github.com/TrianaLab/aval/internal/contract"
@@ -138,6 +143,22 @@ func checkTimeout(d time.Duration) error {
 	return nil
 }
 
+// repoExample shows the --registry form in usage errors.
+const repoExample = "ghcr.io/acme/orders-aval"
+
+// checkRegistry rejects a --registry that is not an OCI repository (host and
+// name, no scheme, tag or digest) before anything runs.
+func checkRegistry(repo string) error {
+	ref, err := orasregistry.ParseReference(repo)
+	if err == nil && ref.Reference != "" {
+		err = errors.New("a tag or digest is not allowed")
+	}
+	if err != nil {
+		return usageError{fmt.Errorf("--registry %s is not an OCI repository (host/name, no scheme, tag or digest), e.g. %s: %w", repo, repoExample, err)}
+	}
+	return nil
+}
+
 // noArgs is cobra.NoArgs with exit code 2 (usage) instead of 1.
 func noArgs(c *cobra.Command, args []string) error {
 	if err := cobra.NoArgs(c, args); err != nil {
@@ -156,12 +177,110 @@ func loadAndFingerprint(file string, outputs ...string) (*contract.Contract, fin
 	if err != nil {
 		return nil, fingerprint.Fingerprint{}, usageError{err}
 	}
+	for _, o := range outputs {
+		if isInput(filepath.Dir(file), c, o) {
+			// Skipping it would silently drop an input from the fingerprint.
+			return nil, fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result or --report) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract directory", o, fingerprint.OutputDir)}
+		}
+	}
 	fp, err := fingerprint.Compute(filepath.Dir(file), c, os.LookupEnv, outputs...)
 	if err != nil {
 		// Cannot prove input equivalence: callers must run the test.
 		return c, fingerprint.Fingerprint{}, fmt.Errorf("fingerprint: %w", err)
 	}
 	return c, fp, nil
+}
+
+// isInput reports whether the output path p holds an input of the test that
+// fingerprint.Compute would skip: the scope of c, rooted at dir, includes p,
+// and p holds something other than Aval's own result or report (a
+// whole-tree scope finds those on the next run, #63).
+// ponytail: an input that is itself a valid Aval result or report (a test
+// fixture) is taken for an output; name such a fixture as --result and the
+// run overwrites it anyway.
+func isInput(dir string, c *contract.Contract, p string) bool {
+	return inScope(dir, c, p) && existsNonAvalOutput(p)
+}
+
+// existsNonAvalOutput reports whether something other than Aval's own
+// result or report sits at p. Anything that cannot be read or is not a
+// regular file counts (fail closed).
+func existsNonAvalOutput(p string) bool {
+	if p == "" {
+		return false
+	}
+	fi, err := os.Lstat(p)
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+		return false // nothing there; writing it fails on its own
+	}
+	if err != nil || !fi.Mode().IsRegular() {
+		return true
+	}
+	raw, err := os.ReadFile(p)
+	return err != nil || !isAvalOutput(raw)
+}
+
+// isAvalOutput reports whether raw is exactly a result recorded by 'aval
+// run' or a verify report: strict JSON (no unknown fields, nothing after
+// it) with the mandatory fields set, so an arbitrary input file is not
+// mistaken for one and dropped from the fingerprint.
+func isAvalOutput(raw []byte) bool {
+	var p evidence.Predicate
+	if decodeStrict(raw, &p) == nil && p.Validate() == nil {
+		return true
+	}
+	var r evidence.Report
+	if decodeStrict(raw, &r) != nil || r.Version != evidence.ReportVersion || r.TestID == "" {
+		return false
+	}
+	switch r.Outcome {
+	case evidence.OutcomeVerified, evidence.OutcomeMiss, evidence.OutcomeVerificationFailed:
+		return r.Fingerprint != ""
+	case evidence.OutcomeError:
+		// 'aval run --report' writes an error report without a fingerprint
+		// when it could not compute one.
+		return true
+	}
+	return false
+}
+
+// decodeStrict decodes one JSON value from raw into v, rejecting unknown
+// fields and trailing data.
+func decodeStrict(raw []byte, v any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		return err
+	}
+	if dec.Decode(&struct{}{}) != io.EOF {
+		return errors.New("trailing data after the JSON value")
+	}
+	return nil
+}
+
+// inScope reports whether the scope of c, rooted at dir, would hash the file
+// at path p if it were not an Aval output: it lies inside dir, outside .git
+// and .aval directories, and matches source (not excluded) or dependencies.
+// A path that cannot be resolved is not skipped by fingerprint.Compute either.
+func inScope(dir string, c *contract.Contract, p string) bool {
+	root, err := filepath.Abs(dir)
+	abs, aerr := filepath.Abs(p)
+	if p == "" || err != nil || aerr != nil {
+		return false
+	}
+	rel, err := filepath.Rel(root, abs)
+	if err != nil || !filepath.IsLocal(rel) {
+		return false
+	}
+	segs := strings.Split(filepath.ToSlash(rel), "/")
+	if slices.ContainsFunc(segs[:len(segs)-1], func(s string) bool { return s == ".git" || s == fingerprint.OutputDir }) {
+		return false
+	}
+	match := func(globs []string, m func(contract.Glob, []string) bool) bool {
+		return slices.ContainsFunc(globs, func(g string) bool { return m(contract.SplitGlob(g), segs) })
+	}
+	return match(c.Scope.Source, contract.Glob.Match) && !match(c.Scope.Exclude, contract.Glob.MatchContents) ||
+		match(c.Scope.Dependencies, contract.Glob.Match)
 }
 
 func newVerifyCmd() *cobra.Command {
@@ -183,7 +302,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			if repo == "" {
 				return usageError{errors.New("--registry is required")}
 			}
-			if err := checkTimeout(timeout); err != nil {
+			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout)); err != nil {
 				return err
 			}
 			c, fp, err := loadAndFingerprint(file)

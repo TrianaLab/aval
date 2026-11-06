@@ -57,7 +57,9 @@ in one of two modes:
   makes it verifiable later). Defaults to the Sigstore public-good instance;
   any Fulcio and Rekor can be configured. Obtaining the OIDC token is the
   caller's job, so no CI vendor or issuer is assumed.
-- **Key-based** (local): an unencrypted ECDSA P-256 PEM key. No Rekor entry
+- **Key-based** (local): an unencrypted ECDSA P-256 PEM key (PKCS#8 or SEC1),
+  for example from `openssl ecparam -name prime256v1 -genkey -noout -out
+  aval.key`. Cosign keys are encrypted and not supported. No Rekor entry
   unless a Rekor URL is given. Expect policies to grant such signatures at
   most level 1.
 
