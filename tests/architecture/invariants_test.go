@@ -22,16 +22,18 @@ const self = "tests/architecture/invariants_test.go"
 // is a public API decision.
 var evidenceAllowedModules = []string{}
 
-// trackedFiles returns the git-tracked files matching the pathspecs.
+// trackedFiles returns the git-tracked files matching the pathspecs. Paths
+// are NUL-separated (-z): they may contain spaces, and git would otherwise
+// quote non-ASCII names.
 func trackedFiles(t *testing.T, pathspecs ...string) []string {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{"ls-files", "--"}, pathspecs...)...)
+	cmd := exec.Command("git", append([]string{"ls-files", "-z", "--"}, pathspecs...)...)
 	cmd.Dir = root
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("git ls-files: %v", err)
 	}
-	return strings.Fields(string(out))
+	return strings.FieldsFunc(string(out), func(r rune) bool { return r == 0 })
 }
 
 func readFile(t *testing.T, rel string) string {

@@ -1,0 +1,11 @@
+# Only the required fields: exclude, dependencies and environment are
+# omitted. Its manifest must equal the one of empty.yaml.
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata:
+  name: golden-minimal
+runner:
+  command: [./run.sh]
+scope:
+  source: [main.go]
+cacheability: hermetic

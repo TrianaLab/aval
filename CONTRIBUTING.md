@@ -59,6 +59,7 @@ Two more rules once you have picked:
 | `ci-static` | gofmt, `go vet`, golangci-lint |
 | `ci-gates` | level 3 |
 | `ci-engine` | level 1 with `-race`, the `examples/go-compose` module |
+| `ci-false-hit` | the false-hit corpus, glob tables, the manifest golden and the append-only check on goldens: a change to the golden tree's manifests fails unless `fingerprint.Version` is bumped |
 | `ci-e2e` | levels 2 and 4, run through `aval run -f aval.e2e.yaml` (reused in CI on a verified hit) |
 | `ci-release` | level 5 against a snapshot dry-run of the release build |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
@@ -89,7 +90,7 @@ action fails on every PR. `security.yaml` reruns govulncheck daily, which also
 covers merges by the Dependabot workflow (they use `GITHUB_TOKEN` and trigger
 no workflow); see `SECURITY.md` for Dependabot and how to report a
 vulnerability. A PR that changes only Markdown or `docs/` skips every job
-except `ci-gates`, `ci-docs`, `dependency-review` and `pr-title`. The `required` job aggregates every
+except `ci-gates`, `ci-false-hit`, `ci-docs`, `dependency-review` and `pr-title`. The `required` job aggregates every
 other job and is the only required status check; `tests/architecture` fails if
 a job is not wired into it. It also enforces that `pkg/evidence` depends only
 on the standard library and allowlisted modules, that no Go code names a
@@ -213,7 +214,7 @@ Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 - **Miss is not verification failure.** No attestation is exit 4 (`ErrNotFound`); an attestation that fails signature or policy is exit 5 (`ErrVerification`), a security event. Keep them separate in code, output and exit codes, and never hide the second.
 - **No Pacto dependency.** Aval does not import Pacto or model its concepts. Integrations consume Aval through `pkg/evidence` and `aval verify --output json`; adapters live in the consumer's repo.
 - **`pkg/evidence` is public API.** Breaking changes (rename, removal, type or meaning change) to exported identifiers, the predicate or the verify report JSON need a version bump (`PredicateType`, `ReportVersion`) and a note in `docs/artifact-format.md`; additive changes do not. The rules are in `docs/artifact-format.md` ("Versioning and compatibility"); golden files in `pkg/evidence/testdata` guard the JSON shape.
-- **Fingerprint changes bump the manifest version** (`aval-fingerprint/v1`) so old and new fingerprints never collide.
+- **Fingerprint changes bump the manifest version** (`aval-fingerprint/v1`) so old and new fingerprints never collide. `TestManifestGolden` (`ci-false-hit`) enforces it: it pins, per version, the manifests of three contracts over `internal/fingerprint/testdata/golden/tree` (one sets every field, one omits every optional field, one sets them empty) and fails on any byte change to them under the same version. The golden tree and the corpus together catch every manifest-changing mutant of the manifest code (the mutation sweep is described in docs/contract.md); a path that tree does not exercise is covered only by the corpus, so a new manifest feature needs a case in the golden tree (see [docs/contract.md](docs/contract.md#false-hit-corpus)). `TestGoldensAppendOnly` stops the golden being rewritten to match: a committed `*.manifest` golden may be added but never modified, renamed or deleted, checked against the merge base with `AVAL_GOLDEN_BASE` (CI: the PR base branch or the previous push; the job fails if it does not resolve, and after a force-push the old `before` may be unreachable, so the job fails until a normal push) or, under `make ci-false-hit` without it, `origin/main` (fails if that ref is missing; a plain `go test` without `AVAL_GOLDEN_BASE` skips this one test). After a bump, `go test ./internal/fingerprint -run TestManifestGolden -update` writes the golden of the new version.
 
 ## Unfinished work
 

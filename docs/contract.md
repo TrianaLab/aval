@@ -183,7 +183,10 @@ file out of scope, like any undeclared file.
 - Files not matched by `source` or `dependencies`. Undeclared inputs are
   invisible: if the test reads them, Aval cannot detect a change. This is
   the main risk of declared scope; keep the scope honest.
-- `.git` directories (skipped entirely).
+- `.git` directories at any depth (skipped entirely). The name match is
+  exact and case-sensitive: a `.GIT` directory is not skipped. A regular
+  file named `.git` (a worktree or submodule pointer) is an ordinary file:
+  it is in scope if a glob matches it.
 - The git commit, branch or any VCS metadata. Two commits with identical
   scope content produce the same fingerprint and can reuse the same result.
   That is intended: a commit that only touches unrelated files should not
@@ -228,6 +231,61 @@ an unprovable one (see "Fail-closed errors") fails closed. The test fails if
 a manifest section is changed by no differ row, so a new section must come
 with corpus cases; a new attribute in an existing section or a new contract
 field needs its row added by review.
+
+`TestManifestGolden` pins, per manifest version, the manifests of three
+contracts over a fixed tree (`internal/fingerprint/testdata/golden/tree`),
+concatenated in `testdata/golden/aval-fingerprint-vN.manifest`. One
+contract sets every field: `source`, `exclude`, `dependencies` and `env`
+each unsorted and with a repeat, a toolchain map with six keys, argv with
+`&`, `<`, `>` and non-ASCII characters, and env vars that are set, set to
+the empty string and unset. One omits every optional field; one sets every
+optional field to an empty list or map and must encode like the one that
+omits them (`TestGoldenOmittedEqualsEmpty`). The tree has a nested path, a
+path with a space, a file that sorts differently by full path than in walk
+order (`pkg.go` before `pkg/...`), an empty file under a dot-directory,
+content with CRLF line endings, an excluded file and a file outside the
+scope. The test adds a top-level and a nested `.git` directory (skipped)
+and a regular file named `.git` (in scope), and fixes the env values and
+the file modes: one exec bit each for owner (0744), group (0654) and other
+(0645), all three (0755), and a file with setuid, setgid and sticky but no
+exec bit. Any change to how these manifests are built (their lines, the
+hashes in them or the canonical contract JSON) fails it unless the header
+version is bumped too, so an old fingerprint can never mean different
+inputs.
+
+What this covers was measured by mutation: each conditional, constant,
+format string and normalization in `Compute`, `canonicalContract`,
+`listFiles`, `hashMatching`, `hashFile`, `sum` and the glob matcher was
+mutated and `make ci-false-hit` run; every mutant that changes the manifest
+of some input fails it, through the golden, the corpus, the glob tables or
+the fail-closed tests. The two mutants that pass are equivalent on the
+platforms CI runs: dropping `filepath.ToSlash` (the separator is already
+`/` on Unix) and masking with `Mode().Perm()&0o111` instead of
+`Mode()&0o111`. A path the tree does not exercise (a new manifest feature)
+is caught only by the corpus, so it must come with a case in the golden
+tree.
+
+`TestGoldensAppendOnly` stops the golden being rewritten to match: a
+committed `*.manifest` golden may be added (a new version) but never
+modified, renamed or deleted. It diffs the goldens against the merge base of
+`HEAD` and `AVAL_GOLDEN_BASE`; in CI that is the PR base branch or the commit
+before the push, and the test fails if it does not resolve (after a
+force-push to `main` the old commit may be unreachable, and the job fails
+until the next normal push). Locally `make ci-false-hit` sets it to
+`origin/main` when it is unset, and the test fails when that ref is missing,
+so set `AVAL_GOLDEN_BASE` to the upstream main if your remote is named
+differently. A plain `go test` without `AVAL_GOLDEN_BASE` (the `ci-engine`
+job and the dogfood suite, which check out shallow) skips this one test;
+the `ci-false-hit` leg never does. `TestGoldenEditsCatchesEdits` is
+its negative test; by hand, append a line to the golden and run
+`AVAL_GOLDEN_BASE=HEAD go test ./internal/fingerprint -run TestGoldensAppendOnly`.
+The `ci-false-hit` CI job (`make ci-false-hit`, part of `make ci`) runs these
+tests and the glob tables on every PR and push, with no path filter.
+`TestFalseHitGateIsBinding` (`tests/architecture`) fails if that job or leg
+is removed, made conditional, allowed to fail (`continue-on-error`), checked
+out shallow, or given any other `AVAL_GOLDEN_BASE`, or if the recipe of
+`make ci-false-hit` changes in any way (a `-skip`, a dropped package, a
+dropped `-count=1`, a dropped `AVAL_GOLDEN_BASE` default). Edits to the tests themselves are left to review.
 
 ### Fail-closed errors
 
