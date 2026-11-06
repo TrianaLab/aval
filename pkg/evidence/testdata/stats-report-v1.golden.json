@@ -1,0 +1,40 @@
+{
+  "version": "aval.trianalab.io/stats-report/v1",
+  "registry": "ghcr.io/acme/orders-aval",
+  "since": "2026-10-30T00:00:00Z",
+  "total": {
+    "runs": 10,
+    "reused": 4,
+    "hitRate": 0.4,
+    "misses": {
+      "noTrustedResult": 3,
+      "error": 1,
+      "verifiedNotReused": 1
+    },
+    "verificationFailures": 1,
+    "shadowFalseHits": 1,
+    "testDurationMs": 7104000,
+    "savedDurationMs": 4736000
+  },
+  "tests": [
+    {
+      "testId": "orders-integration",
+      "stats": {
+        "runs": 10,
+        "reused": 4,
+        "hitRate": 0.4,
+        "misses": {
+          "noTrustedResult": 3,
+          "error": 1,
+          "verifiedNotReused": 1
+        },
+        "verificationFailures": 1,
+        "shadowFalseHits": 1,
+        "testDurationMs": 7104000,
+        "savedDurationMs": 4736000
+      }
+    }
+  ],
+  "skipped": 2,
+  "truncated": "more than 1000 run records"
+}

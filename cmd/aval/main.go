@@ -76,6 +76,7 @@ var (
 	sign           = attest.Sign
 	publish        = registry.Push
 	pushRecord     = registry.Record
+	readRecords    = registry.ReadRecords
 	now            = time.Now
 )
 
@@ -182,7 +183,7 @@ func newRootCmd() *cobra.Command {
 		return nil
 	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
-	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newVerifyCmd())
+	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd())
 	return root
 }
 

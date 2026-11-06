@@ -33,6 +33,7 @@ All constants live in `pkg/evidence`.
 | `ArtifactTypeRun` | `application/vnd.trianalab.aval.run.v1` | `artifactType` of a run record manifest | provisional |
 | `MediaTypeRun` | `application/vnd.trianalab.aval.run.v1+json` | Media type of the run record layer | provisional |
 | `ArtifactTypeStats` | `application/vnd.trianalab.aval.stats.v1` | `artifactType` of the per-test stats anchor manifest | provisional |
+| `StatsReportVersion` | `aval.trianalab.io/stats-report/v1` | `version` of the `aval stats --output json` document | provisional |
 
 Registry identifiers (`internal/registry`): the bundle layer uses the
 Sigstore media type `application/vnd.dev.sigstore.bundle.v0.3+json`
@@ -296,6 +297,11 @@ run record is never overwritten: the run warns and goes on, and inside the
 contract scope that file stays an input of the fingerprint. A `--record-file`
 that is also `--result` or `--report` is not written either.
 
+A run that stops before the lookup publishes no record: bad flags, an
+invalid `aval.yaml`, an output path that would clobber an input (exit 2),
+and `--fingerprint-only`. So does `--explain` when the fingerprint cannot be
+computed.
+
 ### Layout
 
 Per test there is one **stats anchor**, separate from every fingerprint
@@ -315,7 +321,8 @@ not confirm the referrers listing, so on a registry without the referrers
 API two concurrent records for one test can drop one of them.
 On such registries all records of a test also share one referrers index,
 which grows with every record; once it exceeds the registry's manifest size
-limit, publishing a record fails with a warning. Pruning old records is future work (Epic 9, #88).
+limit, publishing a record fails with a warning; prune old records (see
+[Pruning run records](#pruning-run-records)).
 
 ### Record JSON
 
@@ -329,6 +336,7 @@ limit, publishing a record fails with a warning. Pruning old records is future w
 | `outcome` | string | always | The lookup decision, as in the verify report. |
 | `reused` | bool | always | `true` when a verified result was reused and the test did not run. With `--shadow`, or when `--report` cannot be written, it is `false`. |
 | `result` | string | when known | The reused or the real `passed` / `failed`; omitted when `runner.command` could not start. |
+| `verifiedResult` | string | when `outcome` is `verified` | The result of the verified attestation. With `reused` `false` and the test run (`--shadow`), a `verifiedResult` that differs from `result` is a false hit. Records made before it was added (#88) lack it. |
 | `testDurationMs` | integer | always | How long `runner.command` ran, in milliseconds; `0` when it did not run. |
 | `savedDurationMs` | integer | always | On reuse, the test duration recorded in the reused attestation (`finishedAt - startedAt`); `0` otherwise. |
 | `avalVersion` | string | always | Version of the `aval` binary that ran. |
@@ -345,6 +353,7 @@ Example:
   "outcome": "verified",
   "reused": true,
   "result": "passed",
+  "verifiedResult": "passed",
   "testDurationMs": 0,
   "savedDurationMs": 1184000,
   "avalVersion": "0.3.0",
@@ -352,6 +361,93 @@ Example:
   "ciRunUrl": "https://ci.example.com/acme/orders/runs/42"
 }
 ```
+
+`evidence.ParseRunRecord` also rejects an inconsistent record: `reused`
+`true` with an `outcome` other than `verified` or a `testDurationMs` other
+than `0`, and a `verifiedResult` with an `outcome` other than `verified`. A
+hand-edited record cannot claim a reuse that never happened; `aval record`
+refuses it and `aval stats` skips it.
+
+### Statistics: `aval stats`
+
+`aval stats --registry <repo> [--test <id>] [--since <duration|date>]
+[--output text|json]` reads the run records and aggregates them on demand.
+It lists the `stats-<test id>` tags of the repository (or takes `--test`),
+lists each stats anchor's referrers with artifact type
+`application/vnd.trianalab.aval.run.v1`, and fetches each record by digest.
+It writes nothing, locally or to the registry, and needs only read access.
+`--since` keeps records whose `recordedAt` is at or after a time: a duration
+back from now (`168h`, `30d`) or a date (`2026-11-01`, or RFC 3339).
+
+Statistics are informational: records are unsigned, so anyone with push
+access can skew them, and they never affect reuse.
+
+Registry data is untrusted, so reading is bounded:
+
+- A record whose manifest is not a run record of that stats anchor, whose
+  layer is over 64 KiB, that cannot be fetched or parsed, that is
+  inconsistent (see above) or that names another test is **skipped and
+  counted** (`skipped`), never an error.
+- Reading stops after 1000 records in total, or 64 pages in one tag or
+  referrers listing. The statistics then cover only what was read before,
+  `aval stats` prints `aval: warning: stopped reading run records: ...` on
+  stderr and the JSON report sets `truncated`. Which records come first is up
+  to the registry; prune old records to stay below the bound.
+- A listing that fails for any other reason (registry down, no read
+  access, past `--registry-timeout`) is exit 1.
+
+Exit codes: 0 statistics printed, 1 error, 2 usage.
+
+#### Stats report JSON
+
+`aval stats --output json` prints `evidence.StatsReport`:
+
+| Field | Type | Present | Meaning |
+|---|---|---|---|
+| `version` | string | always | `aval.trianalab.io/stats-report/v1`. |
+| `registry` | string | always | The repository read. |
+| `since` | RFC 3339 timestamp | with `--since` | Records made before it are left out (not counted, not skipped). |
+| `total` | object | always | Run statistics over every test in `tests`. |
+| `tests` | array | always | One `{"testId", "stats"}` per test with records, sorted by test id; `[]` when there are none. |
+| `skipped` | integer | always | Records read but not counted (see above). |
+| `truncated` | string | when a bound was hit | Which bound, e.g. `more than 1000 run records`. |
+
+Run statistics (`total`, `tests[].stats`); `runs` is the sum of `reused`,
+the three `misses` and `verificationFailures`:
+
+| Field | Meaning |
+|---|---|
+| `runs` | Records counted. |
+| `reused` | Records with `reused` `true`. |
+| `hitRate` | `reused / runs`; `0` when `runs` is `0`. |
+| `misses.noTrustedResult` | Outcome `miss`. |
+| `misses.error` | Outcome `error`: Aval could not decide. |
+| `misses.verifiedNotReused` | Outcome `verified` with `reused` `false`: `--shadow`, or the `--report` file could not be written. |
+| `verificationFailures` | Outcome `verification-failed`: security events, not misses. |
+| `shadowFalseHits` | Of `verifiedNotReused`, the runs whose `result` differs from `verifiedResult`. Records without both are not counted. |
+| `testDurationMs` | Sum of `testDurationMs`: time spent running tests. |
+| `savedDurationMs` | Sum of `savedDurationMs`: test time reuse saved. |
+
+A negative duration in a record (a clock jump, or an edit) counts as `0`.
+The golden file is `pkg/evidence/testdata/stats-report-v1.golden.json`.
+
+### Pruning run records
+
+Records accumulate: one per recorded run. Aval never deletes one. To keep
+`aval stats` below its read bound, and the referrers index of registries
+without the referrers API below their manifest size limit, delete old
+records, for example with [ORAS](https://oras.land):
+
+```sh
+oras discover --artifact-type application/vnd.trianalab.aval.run.v1 <repo>:stats-<test id>
+oras manifest delete <repo>@sha256:<record digest>
+```
+
+`oras discover --format json` shows each record's digest; fetch one with
+`oras manifest fetch` and `oras blob fetch` to read its `recordedAt`.
+Deleting records only changes statistics: run records never affect reuse.
+The registry must allow deletes (see
+[the 64-candidate cap and cleanup](#the-64-candidate-cap-and-cleanup)).
 
 ## DSSE envelope
 
@@ -581,6 +677,7 @@ These rules apply to every frozen format:
 | Fingerprint anchor | `ArtifactTypeFingerprint` | `fingerprint.v1` |
 | Verify report, outcomes and exit codes | `ReportVersion` | `aval.trianalab.io/verify-report/v1` |
 | Run record and stats anchor | `RunRecordVersion`, `ArtifactTypeRun`, `MediaTypeRun`, `ArtifactTypeStats` | `run-record/v1`, `run.v1`, `stats.v1` (provisional) |
+| Stats report | `StatsReportVersion` | `aval.trianalab.io/stats-report/v1` (provisional) |
 | Contract and policy file | `apiVersion` | `aval.trianalab.io/v1` |
 | Fingerprint manifest | header line, `execution.fingerprintVersion` | `aval-fingerprint/v1` |
 
@@ -643,9 +740,10 @@ is announced in the release notes of the release that removes it.
 ### Golden files
 
 `pkg/evidence/testdata/statement-execution-v2.golden.json`,
-`pkg/evidence/testdata/verify-report-v1.golden.json` and
-`pkg/evidence/testdata/run-record-v1.golden.json` set every field of the
-statement, predicate, verify report and run record. A test decodes each strictly into the
+`pkg/evidence/testdata/verify-report-v1.golden.json`,
+`pkg/evidence/testdata/run-record-v1.golden.json` and
+`pkg/evidence/testdata/stats-report-v1.golden.json` set every field of the
+statement, predicate, verify report, run record and stats report. A test decodes each strictly into the
 current types and requires the same JSON back, so dropping, renaming or
 retyping a field, or adding a required one, fails. Another test requires
 every JSON field of those types to be set in its golden file, so a new field
@@ -669,3 +767,9 @@ the old ones.
   `minTrustLevel` became `miss` instead of `verification-failed`, and
   `rejected[].outcome` may now also be `miss`. No new value, field or exit
   code; the maintainers confirmed this as additive, so the version stays.
+- Within the provisional `run-record/v1` (#88), records gained the optional
+  `verifiedResult`, and `evidence.ParseRunRecord` started rejecting
+  inconsistent records (a reuse with an outcome other than `verified` or
+  with test time, a `verifiedResult` without outcome `verified`). Tightening
+  validation is breaking for a frozen format; the identifier stays because
+  it is provisional and no record `aval` writes is affected.

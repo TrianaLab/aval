@@ -382,6 +382,9 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 		Version: evidence.RunRecordVersion, TestID: r.TestID, Fingerprint: r.Fingerprint, Outcome: r.Outcome,
 		AvalVersion: version, RecordedAt: now().UTC(), CIRunURL: o.ciRunURL,
 	}
+	if r.Outcome == evidence.OutcomeVerified {
+		rec.VerifiedResult = r.Result
+	}
 	switch {
 	case ran != nil:
 		rec.Result, rec.TestDurationMs = ran.Result, ran.FinishedAt.Sub(ran.StartedAt).Milliseconds()

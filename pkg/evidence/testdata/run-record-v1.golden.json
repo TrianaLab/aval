@@ -5,6 +5,7 @@
   "outcome": "verified",
   "reused": true,
   "result": "passed",
+  "verifiedResult": "passed",
   "testDurationMs": 0,
   "savedDurationMs": 1184000,
   "avalVersion": "0.3.0",

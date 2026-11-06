@@ -19,9 +19,10 @@ import (
 // (TestGoldensSetEveryField), so dropping, renaming or retyping one fails
 // here, and so does a new field missing from its golden file.
 var goldens = map[string]string{
-	PredicateType:    "testdata/statement-execution-v2.golden.json",
-	ReportVersion:    "testdata/verify-report-v1.golden.json",
-	RunRecordVersion: "testdata/run-record-v1.golden.json",
+	PredicateType:      "testdata/statement-execution-v2.golden.json",
+	ReportVersion:      "testdata/verify-report-v1.golden.json",
+	RunRecordVersion:   "testdata/run-record-v1.golden.json",
+	StatsReportVersion: "testdata/stats-report-v1.golden.json",
 }
 
 // strictRoundTrip decodes data into v rejecting unknown fields, encodes v
@@ -104,7 +105,7 @@ func TestReportGolden(t *testing.T) {
 // Every JSON field of the frozen types is set in its golden file, so a new
 // field is guarded from the change that adds it.
 func TestGoldensSetEveryField(t *testing.T) {
-	var st, r, rec map[string]any
+	var st, r, rec, stats map[string]any
 	if err := json.Unmarshal(readGolden(t, PredicateType), &st); err != nil {
 		t.Fatal(err)
 	}
@@ -114,11 +115,15 @@ func TestGoldensSetEveryField(t *testing.T) {
 	if err := json.Unmarshal(readGolden(t, RunRecordVersion), &rec); err != nil {
 		t.Fatal(err)
 	}
+	if err := json.Unmarshal(readGolden(t, StatsReportVersion), &stats); err != nil {
+		t.Fatal(err)
+	}
 	for _, m := range [][]string{
 		missingFields("statement", reflect.TypeOf(Statement{}), st),
 		missingFields("predicate", reflect.TypeOf(Predicate{}), st["predicate"]),
 		missingFields("report", reflect.TypeOf(Report{}), r),
 		missingFields("run record", reflect.TypeOf(RunRecord{}), rec),
+		missingFields("stats report", reflect.TypeOf(StatsReport{}), stats),
 	} {
 		for _, f := range m {
 			t.Errorf("%s: not set in the golden file", f)

@@ -68,6 +68,7 @@ func TestRunRecordsEveryOutcome(t *testing.T) {
 		{"reused", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, false, 1, false, false, ExitOK, evidence.OutcomeVerified, true, evidence.ResultPassed},
 		{"reused failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: true}}, nil, false, 0, false, false, ExitTestFailed, evidence.OutcomeVerified, true, evidence.ResultFailed},
 		{"shadow", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, false, 0, true, false, ExitOK, evidence.OutcomeVerified, false, evidence.ResultPassed},
+		{"shadow false hit", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: true}}, nil, false, 0, true, false, ExitError, evidence.OutcomeVerified, false, evidence.ResultPassed},
 		{"command cannot start", nil, fmt.Errorf("x: %w", evidence.ErrNotFound), true, 0, false, false, ExitError, evidence.OutcomeMiss, false, ""},
 		{"shadow, command cannot start", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, true, 0, true, false, ExitError, evidence.OutcomeVerified, false, ""},
 		{"report unwritable", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, false, 0, false, true, ExitError, evidence.OutcomeVerified, false, evidence.ResultPassed},
@@ -99,7 +100,7 @@ func TestRunRecordsEveryOutcome(t *testing.T) {
 				}
 				rec := (*got)[0]
 				want := evidence.RunRecord{
-					Version: evidence.RunRecordVersion, TestID: "unit", Fingerprint: rec.Fingerprint, Outcome: tc.outcome, Reused: tc.reused, Result: tc.result,
+					Version: evidence.RunRecordVersion, TestID: "unit", Fingerprint: rec.Fingerprint, Outcome: tc.outcome, Reused: tc.reused, Result: tc.result, VerifiedResult: verifiedResult(tc.outcome, tc.cands),
 					TestDurationMs: rec.TestDurationMs, AvalVersion: version, RecordedAt: recordedAt, CIRunURL: "https://ci.example/1",
 				}
 				if rec != want || rec != readRecord(t, recFile) || !strings.HasPrefix(rec.Fingerprint, "sha256:") || (tc.reused && rec.TestDurationMs != 0) {
@@ -111,6 +112,17 @@ func TestRunRecordsEveryOutcome(t *testing.T) {
 			})
 		}
 	}
+}
+
+// verifiedResult is the result of the one candidate when it verified.
+func verifiedResult(o evidence.Outcome, cands map[string]candidate) evidence.Result {
+	switch {
+	case o != evidence.OutcomeVerified:
+		return ""
+	case cands["sha256:aa"].failed:
+		return evidence.ResultFailed
+	}
+	return evidence.ResultPassed
 }
 
 // command is a marker exiting code, or with missing one that cannot start.

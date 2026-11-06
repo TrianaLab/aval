@@ -137,3 +137,32 @@ field RunRecord.TestID string "json:\"testId\""
 field RunRecord.Version string "json:\"version\""
 func ParseRunRecord([]byte) (*RunRecord, error)
 type RunRecord struct
+comparable MissCauses
+comparable RunStats
+comparable TestStats
+const StatsReportVersion untyped string
+field MissCauses.Error int "json:\"error\""
+field MissCauses.NoTrustedResult int "json:\"noTrustedResult\""
+field MissCauses.VerifiedNotReused int "json:\"verifiedNotReused\""
+field RunRecord.VerifiedResult Result "json:\"verifiedResult,omitempty\""
+field RunStats.HitRate float64 "json:\"hitRate\""
+field RunStats.Misses MissCauses "json:\"misses\""
+field RunStats.Reused int "json:\"reused\""
+field RunStats.Runs int "json:\"runs\""
+field RunStats.SavedDurationMs int64 "json:\"savedDurationMs\""
+field RunStats.ShadowFalseHits int "json:\"shadowFalseHits\""
+field RunStats.TestDurationMs int64 "json:\"testDurationMs\""
+field RunStats.VerificationFailures int "json:\"verificationFailures\""
+field StatsReport.Registry string "json:\"registry\""
+field StatsReport.Since *time.Time "json:\"since,omitempty\""
+field StatsReport.Skipped int "json:\"skipped\""
+field StatsReport.Tests []TestStats "json:\"tests\""
+field StatsReport.Total RunStats "json:\"total\""
+field StatsReport.Truncated string "json:\"truncated,omitempty\""
+field StatsReport.Version string "json:\"version\""
+field TestStats.Stats RunStats "json:\"stats\""
+field TestStats.TestID string "json:\"testId\""
+type MissCauses struct
+type RunStats struct
+type StatsReport struct
+type TestStats struct

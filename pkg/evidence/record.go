@@ -43,6 +43,10 @@ type RunRecord struct {
 	// Result is the reused or the real result; empty when the test could
 	// not start.
 	Result Result `json:"result,omitempty"`
+	// VerifiedResult is the result of the verified attestation when the
+	// outcome is verified; empty otherwise. With Reused false and the test
+	// run, a VerifiedResult that differs from Result is a false hit.
+	VerifiedResult Result `json:"verifiedResult,omitempty"`
 	// TestDurationMs is how long runner.command ran (0 when it did not).
 	TestDurationMs int64 `json:"testDurationMs"`
 	// SavedDurationMs is, on reuse, the test duration recorded in the
@@ -55,8 +59,10 @@ type RunRecord struct {
 	CIRunURL string `json:"ciRunUrl,omitempty"`
 }
 
-// ParseRunRecord decodes a run record and checks its version, test id and
-// closed sets. Like Parse, it checks structure only: a record is a claim.
+// ParseRunRecord decodes a run record and checks its version, test id,
+// closed sets and that it is consistent: reused requires outcome verified and
+// testDurationMs 0, and verifiedResult requires outcome verified. Like Parse,
+// it checks structure only: a record is a claim.
 func ParseRunRecord(data []byte) (*RunRecord, error) {
 	var r RunRecord
 	if err := json.Unmarshal(data, &r); err != nil {
@@ -72,8 +78,16 @@ func ParseRunRecord(data []byte) (*RunRecord, error) {
 	if !slices.Contains([]Outcome{OutcomeVerified, OutcomeMiss, OutcomeVerificationFailed, OutcomeError}, r.Outcome) {
 		errs = append(errs, fmt.Errorf("outcome: unknown value %q", r.Outcome))
 	}
-	if r.Result != "" && r.Result != ResultPassed && r.Result != ResultFailed {
-		errs = append(errs, fmt.Errorf("result: unknown value %q", r.Result))
+	for i, v := range []Result{r.Result, r.VerifiedResult} {
+		if v != "" && v != ResultPassed && v != ResultFailed {
+			errs = append(errs, fmt.Errorf("%s: unknown value %q", [...]string{"result", "verifiedResult"}[i], v))
+		}
+	}
+	if r.Reused && (r.Outcome != OutcomeVerified || r.TestDurationMs != 0) {
+		errs = append(errs, fmt.Errorf("reused: requires outcome verified and testDurationMs 0, got outcome %q and testDurationMs %d", r.Outcome, r.TestDurationMs))
+	}
+	if r.VerifiedResult != "" && r.Outcome != OutcomeVerified {
+		errs = append(errs, fmt.Errorf("verifiedResult: requires outcome verified, got %q", r.Outcome))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err

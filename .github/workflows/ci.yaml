@@ -472,6 +472,18 @@ jobs:
       - name: Summary
         if: always()
         run: .github/aval/summary.sh aval-engine .aval/engine-report.json
+      # Run statistics (#88): `aval stats` over the dogfood suites' run
+      # records, read anonymously. Informational: it never fails the job.
+      - name: Run statistics
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            echo "### aval stats, last 30 days"
+            echo '```'
+            aval stats --registry "$AVAL_REGISTRY" --since 30d 2>&1 || echo "aval stats failed"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
