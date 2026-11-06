@@ -1,0 +1,161 @@
+site_name: Aval
+site_description: Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.
+# GitHub Pages project site. Publishing is .github/workflows/docs.yaml.
+site_url: https://trianalab.github.io/aval/
+repo_url: https://github.com/TrianaLab/aval
+repo_name: TrianaLab/aval
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+
+theme:
+  name: material
+  # overrides/: main.html (banner on old mike versions), home.html (the
+  # landing page, opted in by docs/index.md), partials/logo.html (the wordmark
+  # inlined), partials/copyright.html (the footer line) and
+  # partials/javascripts/outdated.html.
+  custom_dir: overrides
+  # The mark from story 8.2 (docs/brand.md). The header and the drawer show
+  # the wordmark from partials/logo.html instead.
+  logo: assets/images/logo.svg
+  favicon: favicon.svg
+  # No Google Fonts: Sora, Manrope and JetBrains Mono are bundled in
+  # docs/assets/fonts/ and declared in stylesheets/extra.css.
+  font: false
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      # custom: every colour comes from the tokens in stylesheets/extra.css.
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - content.action.edit
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - content.tooltips
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+
+# requirements.in is the input of the hashed requirements.txt, not a page.
+exclude_docs: |
+  requirements.in
+
+# Under --strict (make docs-site) every warning fails the build: a page left
+# out of the nav, a nav entry with no file, a broken link or a missing anchor.
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+
+extra:
+  # overrides/partials/copyright.html renders the footer line, credit and
+  # GitHub link included.
+  generator: false
+  version:
+    provider: mike
+    # Show the alias ("latest") next to the version in the selector.
+    alias: true
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Anchor link
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      base_path:
+        - .
+      # Without this a missing --8<-- path is dropped silently and the strict
+      # build still passes.
+      check_paths: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search
+
+extra_css:
+  # brand.css holds the brand tokens; extra.css builds the theme on them.
+  - stylesheets/brand.css
+  - stylesheets/extra.css
+
+extra_javascript:
+  # Opens the mike version selector on click instead of hover (see extra.css).
+  - javascripts/version-selector.js
+
+# A reader's path: what Aval is, how to use it, the ideas it rests on, then
+# the pages to look things up. Every page under docs/ has exactly one entry.
+nav:
+  - Home: index.md
+  - Get started:
+      - Why Aval: vision.md
+      - Install: install.md
+  - Guides:
+      - Consume Aval evidence: integrations.md
+  - Concepts:
+      - Trust model: trust-model.md
+      - The test contract: contract.md
+  - Reference:
+      - CLI reference: cli-reference.md
+      - Artifact format: artifact-format.md
+  - Project:
+      - Changelog: changelog.md
+      - Brand: brand.md
+      - Contributing: https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md
+      - Security policy: https://github.com/TrianaLab/aval/blob/main/SECURITY.md
+      - Code of conduct: https://github.com/TrianaLab/aval/blob/main/CODE_OF_CONDUCT.md

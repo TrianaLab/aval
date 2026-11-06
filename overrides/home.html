@@ -1,0 +1,114 @@
+{% extends "main.html" %}
+
+{# The landing page, opted in by `template: home.html` in docs/index.md. The
+   sections sit in Material's `hero` block, above <main>, so they can span the
+   full width; the page's markdown only feeds the search index. Styles: the
+   "Home" part of stylesheets/extra.css. Jinja comments, not HTML ones: an HTML
+   comment is served to every visitor. #}
+{% block hero %}
+<div class="aval-home">
+
+<section class="aval-hero" aria-labelledby="aval-hero-title">
+  <div class="aval-hero__grid" aria-hidden="true"></div>
+  <div class="aval-wrap aval-hero__inner">
+    <div class="aval-hero__copy">
+      <span class="aval-kicker"><i></i>signed test results for CI</span>
+      {# The page's only <h1>. docs/index.md repeats the text for search. #}
+      <h1 class="aval-hero__title" id="aval-hero-title">Run a heavy test once.<br><em>Reuse</em> the result safely everywhere.</h1>
+      <p class="aval-hero__lead">Aval signs a passing test result and ties it to the exact inputs it used. When another job has the same inputs and trusts the signer, it skips the test.</p>
+      <div class="aval-hero__cta">
+        <a class="aval-btn aval-btn--primary" href="{{ 'vision/' | url }}">Get started</a>
+        <a class="aval-btn" href="{{ 'trust-model/' | url }}">How trust works</a>
+      </div>
+      {# The verified installers from #94; docs/install.md has the flags and the go install fallback. #}
+      <div class="aval-install"><b aria-hidden="true">$</b><code>curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh | bash</code></div>
+      <p class="aval-install__alt">Windows: a PowerShell installer is in <a href="{{ 'install/' | url }}">Install</a>.</p>
+    </div>
+    <div class="aval-hero__art">
+      {# One 2:1 isometric projection: three layers and a verify report standing
+         above the top one. The report fields are from a real `aval verify -o
+         json`; trust level 2 is "runner" in pkg/evidence. #}
+      <svg class="aval-stack" viewBox="0 0 440 486" role="img" aria-label="Three stacked layers, inputs, result and policy, with a verified result lifted off the top layer">
+        <g><path class="side" d="M150 400 L280 465 L280 478 L150 413 Z"/><path class="side dk" d="M280 465 L410 400 L410 413 L280 478 Z"/><path class="top" d="M280 335 L410 400 L280 465 L150 400 Z"/><path class="edge" d="M280 335 L410 400 L280 465 L150 400 Z M150 400 V413 L280 478 L410 413 V400 M280 465 V478"/></g>
+        <g><path class="side" d="M150 362 L280 427 L280 440 L150 375 Z"/><path class="side dk" d="M280 427 L410 362 L410 375 L280 440 Z"/><path class="top" d="M280 297 L410 362 L280 427 L150 362 Z"/><path class="edge" d="M280 297 L410 362 L280 427 L150 362 Z M150 362 V375 L280 440 L410 375 V362 M280 427 V440"/></g>
+        <g><path class="side" d="M150 324 L280 389 L280 402 L150 337 Z"/><path class="side dk" d="M280 389 L410 324 L410 337 L280 402 Z"/><path class="top" d="M280 259 L410 324 L280 389 L150 324 Z"/><path class="glow" d="M280 288 L352 324 L280 360 L208 324 Z"/><path class="edge" d="M280 259 L410 324 L280 389 L150 324 Z M150 324 V337 L280 402 L410 337 V324 M280 389 V402"/></g>
+        <path class="drop" d="M239.8 251.1 v93 M306.8 217.6 v93"/><circle class="dot" cx="239.8" cy="344.1" r="2.5"/><circle class="dot" cx="306.8" cy="310.6" r="2.5"/>
+        <circle class="dot" cx="150" cy="324" r="3.5"/><path class="ldr" d="M145 324 H120"/><text x="113" y="321" text-anchor="end"><tspan class="em">policy</tspan></text><text x="113" y="338" text-anchor="end">trusted signer</text>
+        <circle class="dot" cx="150" cy="362" r="3.5"/><path class="ldr" d="M145 362 H120"/><text x="113" y="359" text-anchor="end"><tspan class="em">result</tspan></text><text x="113" y="376" text-anchor="end">signed</text>
+        <circle class="dot" cx="150" cy="400" r="3.5"/><path class="ldr" d="M145 400 H120"/><text x="113" y="397" text-anchor="end"><tspan class="em">inputs</tspan></text><text x="113" y="414" text-anchor="end">fingerprint</text>
+        <g class="lift"><g transform="matrix(.8944 -.4472 0 1 168.2 120.9)">
+          <path class="paper" d="M0 0 L5 4 L10 0 L15 4 L20 0 L25 4 L30 0 L35 4 L40 0 L45 4 L50 0 L55 4 L60 0 L65 4 L70 0 L75 4 L80 0 L85 4 L90 0 L95 4 L100 0 L105 4 L110 0 L115 4 L120 0 L125 4 L130 0 L135 4 L140 0 L145 4 L150 0 L155 4 L160 0 L165 4 L170 0 L175 4 L180 0 L185 4 L190 0 L195 4 L200 0 L205 4 L210 0 L215 4 L220 0 L225 4 L230 0 L235 4 L240 0 L245 4 L250 0 L250 166 L245 162 L240 166 L235 162 L230 166 L225 162 L220 166 L215 162 L210 166 L205 162 L200 166 L195 162 L190 166 L185 162 L180 166 L175 162 L170 166 L165 162 L160 166 L155 162 L150 166 L145 162 L140 166 L135 162 L130 166 L125 162 L120 166 L115 162 L110 166 L105 162 L100 166 L95 162 L90 166 L85 162 L80 166 L75 162 L70 166 L65 162 L60 166 L55 162 L50 166 L45 162 L40 166 L35 162 L30 166 L25 162 L20 166 L15 162 L10 166 L5 162 L0 166 Z"/>
+          <text class="t" x="20" y="31">integration</text><text class="s" x="230" y="30" text-anchor="end">verify report</text>
+          <path class="rule" d="M20 44 H230"/>
+          <text class="k" x="20" y="66">fingerprint</text><text class="v" x="112" y="66">sha256:b40e9fac…</text>
+          <text class="k" x="20" y="86">result</text><text class="v" x="112" y="86">passed · exit 0</text>
+          <text class="k" x="20" y="106">signer</text><text class="v" x="112" y="106">keyId cLcaE8Mw…</text>
+          <text class="k" x="20" y="126">trust level</text><text class="v" x="112" y="126">2 · runner</text>
+          <g class="stamp" transform="rotate(-6 178 164)"><rect x="112" y="146" width="132" height="36" rx="2"/><rect class="in" x="116" y="150" width="124" height="28" rx="1"/><text x="178" y="170" text-anchor="middle">✓ VERIFIED</text></g>
+        </g></g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section class="aval-run" aria-labelledby="aval-run-title">
+  <div class="aval-wrap aval-run__inner">
+    {# Real output of bin/aval against a local registry:2 with a key-based
+       policy; hashes shortened with an ellipsis, the test's own output left
+       out. Exit 5 in the fail-closed line is from `aval run --help`. #}
+    <figure class="aval-term" aria-label="Terminal: the first aval run misses, runs the test and pushes a signed result; the second, with the same inputs, verifies it and reuses the passed result.">
+      <div class="aval-term__bar" aria-hidden="true"><i></i><i></i><i></i><span>ci / integration</span><span class="aval-term__tag">aval.yaml</span></div>
+<pre><span class="c"># REG=localhost:5055/acme/orders-aval</span>
+<span class="c"># first job: nothing signed for these inputs yet</span>
+<span class="pr">$</span> <span class="w">aval run</span> --push --key keys/ci.pem --registry $REG --policy policy.yaml
+<span class="d">test integration fingerprint sha256:b40e9fac…</span>
+<span class="y">miss</span> integration sha256:b40e9fac…
+<span class="d">reason: registry.Lookup …: no attestation found for fingerprint</span>
+ran integration: <span class="g">passed</span> (exit 0)
+<span class="w">pushed</span> localhost:5055/acme/orders-aval@sha256:2496759a…
+<span class="sep"></span><span class="c"># another job, same inputs</span>
+<span class="pr">$</span> <span class="w">aval run</span> --registry $REG --policy policy.yaml
+<span class="d">test integration fingerprint sha256:b40e9fac…</span>
+<span class="hit"><span class="g">verified</span> integration sha256:b40e9fac…
+<span class="w">reused passed result</span> …/orders-aval@sha256:2496759a…</span><span class="pr">$</span> <span class="cur"></span></pre>
+    </figure>
+    <div class="aval-run__explain">
+      <p class="aval-eyebrow">// see it run</p>
+      <h2 id="aval-run-title">A miss runs the test. A match skips it.</h2>
+      <ol>
+        <li><b>Fingerprint.</b> Aval hashes the inputs you list in <code>aval.yaml</code>.</li>
+        <li><b>Miss.</b> No signed result for that fingerprint, so the test runs and <code>--push</code> signs the pass.</li>
+        <li><b>Verified.</b> Same fingerprint, valid signature, a signer your policy trusts: the run is skipped and exits 0.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="aval-metrics" aria-label="Example numbers">
+  <div class="aval-wrap aval-metrics__inner">
+    <div class="aval-metric"><div class="aval-metric__n">1<small>run</small></div><div><p><b>Integration suite</b> ran once on main and was signed.</p><div class="aval-metric__bar" aria-hidden="true"><i class="on"></i></div></div></div>
+    <div class="aval-metric"><div class="aval-metric__n">37<small>×</small></div><div><p><b>Reused</b> by pull requests with the same inputs.</p><div class="aval-metric__bar" aria-hidden="true">{% for _ in range(14) %}<i></i>{% endfor %}</div></div></div>
+    <div class="aval-metric"><div class="aval-metric__n">4<small>h</small></div><div><p><b>CI time saved</b> this week. No result trusted blindly.</p><div class="aval-metric__bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div></div>
+  </div>
+  <p class="aval-metrics__note">Example numbers.</p>
+</section>
+
+<section class="aval-how" id="how-it-works" aria-labelledby="aval-how-title">
+  <div class="aval-wrap">
+    <p class="aval-eyebrow">// how it works</p>
+    <h2 id="aval-how-title">Three steps. No server to run.</h2>
+    <div class="aval-steps">
+      <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/></svg><span>01 · declare</span></div><h3>List the inputs</h3><p>Write the files and tools your test reads in <code>aval.yaml</code>. Aval hashes them into one fingerprint.</p></div>
+      <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m2 15 10 5.5L22 15"/></svg><span>02 · sign</span></div><h3>Run once, sign the result</h3><p>On a miss the test runs. Aval signs the result and pushes it to your own OCI registry.</p></div>
+      <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></svg><span>03 · reuse</span></div><h3>Verify, then skip</h3><p>Same fingerprint and a trusted signer? The run is skipped. Anything unclear, the test runs.</p></div>
+    </div>
+    <p class="aval-failclosed">If Aval cannot prove reuse is safe, the test runs. A bad signature fails with exit 5, never a silent miss.</p>
+  </div>
+</section>
+
+</div>
+{% endblock %}
+
+{# No sidebars and no article: the sections above are the page. #}
+{% block site_nav %}{% endblock %}
+{% block container %}{% endblock %}

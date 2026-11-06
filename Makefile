@@ -1,6 +1,6 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
 	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-false-hit ci-e2e ci-release ci-fuzz ci-security \
-	docs-lint docs-cli ci-docs brand
+	docs-lint docs-cli docs-site ci-docs brand
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
 UNIT_PKGS = $(shell go list ./... | grep -v /tests/)
@@ -125,6 +125,16 @@ docs-lint:
 		echo "vale $(VALE_VERSION) required, found $${v:-none}"; exit 1; fi
 	vale $(DOCS_MD)
 
+# The MkDocs site (mkdocs.yml) into site/. --strict turns every warning into a
+# failure: a page missing from the nav, a broken link or anchor, a missing
+# snippet. Install the pinned tools with
+# `pip install --require-hashes -r docs/requirements.txt` (regenerate that file
+# from docs/requirements.in with `uv pip compile --universal --python-version
+# 3.12 --generate-hashes`); preview with `mkdocs serve`. NO_MKDOCS_2_WARNING
+# silences a banner Material prints on every build.
+docs-site:
+	NO_MKDOCS_2_WARNING=1 mkdocs build --strict
+
 # Regenerate docs/cli-reference.md from the cobra command tree.
 docs-cli:
 	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval -update
@@ -179,6 +189,7 @@ ci-e2e: build
 ci-release: test-release
 ci-fuzz: fuzz
 ci-security: vuln
-# Fails when docs/cli-reference.md drifts from the CLI (TestCLIReference).
-ci-docs: docs-lint
+# Fails when docs/cli-reference.md drifts from the CLI (TestCLIReference) or
+# the site does not build strictly.
+ci-docs: docs-lint docs-site
 	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval
