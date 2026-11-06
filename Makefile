@@ -144,7 +144,7 @@ docs-deploy-test:
 docs-cli:
 	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval -update
 
-# Render the committed brand PNGs from their SVG sources (docs/brand.md).
+# Render the committed brand PNGs from their SVG sources.
 # Run it after changing a logo SVG and commit the result.
 RESVG = npx --yes @resvg/resvg-js-cli@2.6.2-beta.1
 BRAND = docs/assets/images

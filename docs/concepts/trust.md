@@ -16,6 +16,10 @@ flowchart LR
   lvl -- yes --> ok([verified<br>reuse]):::ok
 ```
 
+All exit codes, from the [CLI reference](../cli-reference.md#exit-codes):
+
+--8<-- "docs/cli-reference.md:exit-codes"
+
 ## Signers
 
 A **signer** is who signed a result. There are two kinds:
@@ -29,11 +33,7 @@ A **signer** is who signed a result. There are two kinds:
 
 Your policy gives each signer a trust level:
 
-| Level | Name | Use it for |
-|---|---|---|
-| 1 | developer | skip a test you already ran on your own machine |
-| 2 | runner | reuse in CI: a CI job with a verifiable identity |
-| 3 | isolated | reuse even when the runner host is not trusted |
+--8<-- "docs/trust-model.md:trust-levels"
 
 The predicate inside a result also claims a level. Aval ignores that claim:
 the level always comes from your policy.
@@ -43,17 +43,7 @@ the level always comes from your policy.
 A policy is a YAML file you keep in your repository. This one trusts the
 `main` branch workflow for CI reuse, and Alice's key at developer level:
 
-```yaml
-apiVersion: aval.trianalab.io/v1
-kind: Policy
-minTrustLevel: runner
-identities:
-  - issuer: https://token.actions.githubusercontent.com
-    subjectRegexp: https://github\.com/acme/orders/\.github/workflows/ci\.yaml@refs/heads/main
-    trustLevel: runner
-  - publicKey: keys/alice.pub
-    trustLevel: developer
-```
+--8<-- "docs/trust-model.md:policy-file"
 
 With `minTrustLevel: runner`, a result Alice signed is a miss: the test runs.
 Without `--policy`, nothing is trusted and every test runs.

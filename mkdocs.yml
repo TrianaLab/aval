@@ -15,7 +15,7 @@ theme:
   # inlined), partials/copyright.html (the footer line) and
   # partials/javascripts/outdated.html.
   custom_dir: overrides
-  # The mark from story 8.2 (docs/brand.md). The header and the drawer show
+  # The mark from story 8.2. The header and the drawer show
   # the wordmark from partials/logo.html instead.
   logo: assets/images/logo.svg
   favicon: favicon.svg
@@ -160,15 +160,14 @@ extra_javascript:
   # pages that have one.
   - javascripts/diagrams.js
 
-# A reader's path: what Aval is, how to use it, the ideas it rests on, then
-# the pages to look things up. Every page under docs/ has exactly one entry.
+# A reader's path: user pages first (Get started, Concepts, and Guides once
+# #75 lands), then the pages to look things up. The dense design documents
+# live under Reference -> Specs and are no section's entry point. Every page
+# under docs/ has exactly one entry.
 nav:
   - Home: index.md
   - Get started:
-      - Why Aval: vision.md
       - Install: install.md
-  - Guides:
-      - Consume Aval evidence: integrations.md
   - Concepts:
       - concepts/index.md
       - Trust: concepts/trust.md
@@ -180,9 +179,10 @@ nav:
           - The test contract: contract.md
           - Trust model: trust-model.md
           - Artifact format: artifact-format.md
+          - Consuming evidence: integrations.md
+          - Vision and roadmap: vision.md
   - Project:
       - Changelog: changelog.md
-      - Brand: brand.md
       - Contributing: https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md
       - Security policy: https://github.com/TrianaLab/aval/blob/main/SECURITY.md
       - Code of conduct: https://github.com/TrianaLab/aval/blob/main/CODE_OF_CONDUCT.md

@@ -493,6 +493,8 @@ put secrets there: the predicate is published to the registry.
 `aval run --report <file>` writes the same document for its lookup decision.
 This is the stable machine interface for CI scripts and external tools.
 
+<!-- --8<-- [start:verify-report] -->
+
 | Field | Type | Present | Meaning |
 |---|---|---|---|
 | `version` | string | always | `aval.trianalab.io/verify-report/v1`. |
@@ -506,16 +508,22 @@ This is the stable machine interface for CI scripts and external tools.
 | `reason` | string | non-`verified` outcomes | Human-readable cause. |
 | `rejected` | array | when a candidate was not used | Each `{reference, outcome, reason}`; `outcome` is `verification-failed`, `error` or `miss`. A `verification-failed` entry is a security event even when `outcome` is `verified`: alert. A `miss` entry is an authentic attestation whose signer the policy lists below `minTrustLevel`: routine non-reuse, no alert. |
 
-Outcomes and exit codes:
+Outcomes:
 
-| `outcome` | Meaning | What the caller does | Exit code |
-|---|---|---|---|
-| `verified` | Valid attestation satisfies the policy. | Reuse `result`. | 0 |
-| `miss` | No attestation for this fingerprint that the policy can reuse: none found, or only authentic ones whose signer the policy lists below `minTrustLevel`. | Run the test. | 4 |
-| `verification-failed` | Attestation exists but fails signature or policy. | Run the test **and** alert. Never hide this. | 5 |
-| `error` | Aval could not decide (registry unreachable, bad policy file, trusted root unavailable). | Treat as a miss: run the test (fail closed). | 1 |
+| `outcome` | Meaning | What the caller does |
+|---|---|---|
+| `verified` | Valid attestation satisfies the policy. | Reuse `result`. |
+| `miss` | No attestation for this fingerprint that the policy can reuse: none found, or only authentic ones whose signer the policy lists below `minTrustLevel`. | Run the test. |
+| `verification-failed` | Attestation exists but fails signature or policy. | Run the test **and** alert. Never hide this. |
+| `error` | Aval could not decide (registry unreachable, bad policy file, trusted root unavailable). | Treat as a miss: run the test (fail closed). |
 
-These are the `aval verify` exit codes. `aval run` acts on the outcome and
+<!-- --8<-- [end:verify-report] -->
+
+Exit codes, from the [CLI reference](cli-reference.md#exit-codes):
+
+--8<-- "docs/cli-reference.md:exit-codes"
+
+`aval verify` exits with the outcome. `aval run` acts on the outcome and
 exits with the result instead; see
 [trust-model.md](trust-model.md#what-aval-run-does-with-each-outcome).
 

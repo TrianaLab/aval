@@ -75,12 +75,16 @@ execution manifest (see [artifact-format.md](artifact-format.md#oci-layout)).
 
 `evidence.TrustLevel`, higher is stronger:
 
+<!-- --8<-- [start:trust-levels] -->
+
 | Level | Name | Constant | Who | Good for |
 |---|---|---|---|---|
 | 0 | unknown | `TrustUnknown` | level could not be established | never accepted |
 | 1 | developer | `TrustDeveloper` | a developer's local signature | personal acceleration only: skip a test you already ran on your machine. Not full trust. |
 | 2 | runner | `TrustRunner` | a CI runner with a verifiable workload identity (e.g. GitHub Actions OIDC) | reuse in CI. CI should require at least this level. |
 | 3 | isolated | `TrustIsolated` | an isolated execution with a verifiable attestation of the environment itself | reuse where the runner host is not trusted either |
+
+<!-- --8<-- [end:trust-levels] -->
 
 Level 1 exists because a local signature is still useful to its author.
 Expect many security policies to refuse it outright; that is the intended
@@ -144,6 +148,8 @@ runs), never a verification failure.
 
 ### Policy file
 
+<!-- --8<-- [start:policy-file] -->
+
 ```yaml
 apiVersion: aval.trianalab.io/v1
 kind: Policy
@@ -157,6 +163,8 @@ identities:
     trustLevel: developer
 allowedCacheability: [external-dependencies]
 ```
+
+<!-- --8<-- [end:policy-file] -->
 
 `policy.Load` rejects, rather than ignores: unknown fields, more than one
 YAML document, another `apiVersion` or `kind`, a missing or unknown
@@ -232,13 +240,17 @@ verify text report (`--report <file>` also writes the JSON report). Only
 `verified` reuses; everything else runs `runner.command` in the contract's
 directory:
 
-| Lookup outcome | `aval run` | Exit code |
-|---|---|---|
-| `verified`, result `passed` | reuse, do not run | 0 |
-| `verified`, result `failed` | reuse the failure, do not run | 3 |
-| `miss` (also: no `--registry`, no `--policy`, `--no-reuse`, `non-deterministic`, `external-dependencies` not in `AllowedCacheability`, only signers below `minTrustLevel`) | run | test result: 0 or 3 |
-| `error` (registry, policy or fingerprint error) | run | test result: 0 or 3 |
-| `verification-failed` | run, print `aval: SECURITY: ...` on stderr | 5, whatever the test result |
+| Lookup outcome | `aval run` |
+|---|---|
+| `verified`, result `passed` | reuse, do not run |
+| `verified`, result `failed` | reuse the failure, do not run |
+| `miss` (also: no `--registry`, no `--policy`, `--no-reuse`, `non-deterministic`, `external-dependencies` not in `AllowedCacheability`, only signers below `minTrustLevel`) | run |
+| `error` (registry, policy or fingerprint error) | run |
+| `verification-failed` | run, print `aval: SECURITY: ...` on stderr |
+
+The exit codes, from the [CLI reference](cli-reference.md#exit-codes):
+
+--8<-- "docs/cli-reference.md:exit-codes"
 
 A fingerprint error leaves nothing to look up or record: the test runs, the
 report has outcome `error` with the reason, and `--push` fails (exit 1).
@@ -297,13 +309,15 @@ class.
 
 These are different outcomes, in code and in exit codes:
 
-| Situation | `aval verify` outcome | Exit code | Go error |
-|---|---|---|---|
-| valid attestation, policy satisfied | `verified` | 0 | nil |
-| no attestation for this fingerprint | `miss` | 4 | wraps `evidence.ErrNotFound` |
-| only authentic attestations whose signer the policy lists below `minTrustLevel` | `miss` | 4 | CLI only (see [Policy](#policy)) |
-| attestation exists but fails signature or policy | `verification-failed` | 5 | wraps `evidence.ErrVerification` (`*evidence.VerificationError` carries the reason) |
-| Aval could not decide (registry down, I/O) | `error` | 1 | other |
+| Situation | `aval verify` outcome | Go error |
+|---|---|---|
+| valid attestation, policy satisfied | `verified` | nil |
+| no attestation for this fingerprint | `miss` | wraps `evidence.ErrNotFound` |
+| only authentic attestations whose signer the policy lists below `minTrustLevel` | `miss` | CLI only (see [Policy](#policy)) |
+| attestation exists but fails signature or policy | `verification-failed` | wraps `evidence.ErrVerification` (`*evidence.VerificationError` carries the reason) |
+| Aval could not decide (registry down, I/O) | `error` | other |
+
+Each outcome has its own exit code; see the [exit codes](cli-reference.md#exit-codes).
 
 A miss is routine: inputs changed, nobody ran this yet. Run the test.
 

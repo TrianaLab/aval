@@ -13,6 +13,8 @@ declared, Aval cannot see it.
 
 ## Example
 
+<!-- --8<-- [start:example] -->
+
 ```yaml
 apiVersion: aval.trianalab.io/v1   # required, exact value
 kind: Test                      # required, exact value
@@ -44,6 +46,8 @@ environment:
 
 cacheability: hermetic          # required, see "Cacheability classes"
 ```
+
+<!-- --8<-- [end:example] -->
 
 Check it locally:
 
