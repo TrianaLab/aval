@@ -97,6 +97,7 @@ lint:
 		echo "golangci-lint $(GOLANGCI_LINT_VERSION) required, found $${v:-none}"; exit 1; fi
 	golangci-lint run ./...
 	cd examples/evidence-consumer && golangci-lint run ./...
+	shellcheck scripts/*.sh
 
 fmt:
 	gofmt -w .
