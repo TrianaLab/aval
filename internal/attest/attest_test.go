@@ -86,15 +86,17 @@ const (
 // fakeFulcio certifies the keypair's public key for a fixed identity,
 // standing in for Fulcio so no test talks to the network.
 type fakeFulcio struct {
-	issuer string // OIDC issuer extension
-	err    error
-	gotTok string
+	issuer  string // OIDC issuer extension; empty omits it
+	raw     []byte // returned instead of a certificate when set
+	err     error
+	gotTok  string
+	extOver []pkix.Extension
 }
 
 func (f *fakeFulcio) GetCertificate(_ context.Context, kp sign.Keypair, o *sign.CertificateProviderOptions) ([]byte, error) {
 	f.gotTok = o.IDToken
-	if f.err != nil {
-		return nil, f.err
+	if f.err != nil || f.raw != nil {
+		return f.raw, f.err
 	}
 	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	san, _ := url.Parse(ciSAN)
@@ -106,8 +108,11 @@ func (f *fakeFulcio) GetCertificate(_ context.Context, kp sign.Keypair, o *sign.
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
 	}
-	v, _ := asn1.MarshalWithParams(f.issuer, "utf8")
-	tmpl.ExtraExtensions = []pkix.Extension{{Id: certificate.OIDIssuerV2, Value: v}}
+	if f.issuer != "" {
+		v, _ := asn1.MarshalWithParams(f.issuer, "utf8")
+		tmpl.ExtraExtensions = append(tmpl.ExtraExtensions, pkix.Extension{Id: certificate.OIDIssuerV2, Value: v})
+	}
+	tmpl.ExtraExtensions = append(tmpl.ExtraExtensions, f.extOver...)
 	return x509.CreateCertificate(rand.Reader, tmpl, tmpl, kp.GetPublicKey(), caKey)
 }
 
@@ -288,7 +293,10 @@ func TestSignKeyless(t *testing.T) {
 func TestTrustLevelComesFromSignerNotPredicate(t *testing.T) {
 	useFakes(t)
 	st := predicate()
-	st.Runner = evidence.Runner{Identity: ciSAN, Issuer: ghIssuer, TrustLevel: evidence.TrustIsolated} //nolint:staticcheck // a claim that must be ignored
+	// Set through JSON, as a hostile producer would, to avoid the deprecated fields.
+	if err := json.Unmarshal([]byte(`{"identity":"`+ciSAN+`","issuer":"`+ghIssuer+`","trustLevel":3}`), &st.Runner); err != nil {
+		t.Fatal(err)
+	}
 	stmt, err := NewStatement(st)
 	if err != nil {
 		t.Fatal(err)
@@ -343,6 +351,12 @@ func TestSignRejects(t *testing.T) {
 		{"non-P-256 ECDSA key", statement(t), SignOptions{Key: writePEM(t, p384)}, nil},
 		{"non-ECDSA key", statement(t), SignOptions{Key: writePEM(t, ed)}, nil},
 		{"Fulcio error", statement(t), SignOptions{IDToken: "t"}, func(s *seams) { s.fulcio.err = errors.New("fulcio down") }},
+		{"certificate is not X.509", statement(t), SignOptions{IDToken: "t"}, func(s *seams) { s.fulcio.raw = []byte("junk") }},
+		{"certificate without OIDC issuer", statement(t), SignOptions{IDToken: "t"}, func(s *seams) { s.fulcio.issuer = "" }},
+		{"certificate with malformed issuer", statement(t), SignOptions{IDToken: "t"}, func(s *seams) {
+			s.fulcio.issuer = ""
+			s.fulcio.extOver = []pkix.Extension{{Id: certificate.OIDIssuerV2, Value: []byte{0xff}}}
+		}},
 	}
 	for _, c := range cases {
 		s := useFakes(t)

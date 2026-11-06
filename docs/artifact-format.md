@@ -123,7 +123,7 @@ guidance (`artifactType` set, empty config):
   `application/vnd.oci.empty.v1+json`).
 - **layers**: the signed DSSE envelope (see below), then the Sigstore
   bundle with the verification material. `registry.Push` refuses an
-  attestation without a bundle; a manifest without one that `registry.Fetch`
+  attestation without a bundle that is valid JSON; a manifest without one that `registry.Fetch`
   reads can never verify, so it ends as a verification failure.
   `registry.Fetch` rejects any other layer, a repeated layer, or a missing
   envelope as a verification failure, and so a manifest that is not

@@ -338,6 +338,9 @@ func TestInputValidation(t *testing.T) {
 	if _, err := Push(ctx, "localhost:5000/x", fpA, Attestation{Envelope: att("ci", nil).Envelope}); err == nil || !strings.Contains(err.Error(), "bundle") {
 		t.Errorf("Push must reject a missing bundle, got %v", err)
 	}
+	if _, err := Push(ctx, "localhost:5000/x", fpA, Attestation{Envelope: att("ci", nil).Envelope, Bundle: []byte(" ")}); err == nil || !strings.Contains(err.Error(), "bundle") {
+		t.Errorf("Push must reject a blank bundle, got %v", err)
+	}
 	if _, err := Lookup(ctx, "localhost:5000/x", "sha256:ABC"); err == nil || errors.Is(err, evidence.ErrNotFound) {
 		t.Errorf("Lookup must reject a malformed fingerprint, got %v", err)
 	}
@@ -386,7 +389,7 @@ func fail(w http.ResponseWriter) bool {
 
 func TestRegistryErrorsAreNotMisses(t *testing.T) {
 	ctx := context.Background()
-	a := att("ci", []byte("bundle"))
+	a := att("ci", []byte(`{"b":1}`))
 	env, _ := json.Marshal(a.Envelope)
 	digestIs := func(r *http.Request, d digest.Digest) bool {
 		return r.Method == http.MethodPut && r.URL.Query().Get("digest") == d.String()
@@ -394,7 +397,7 @@ func TestRegistryErrorsAreNotMisses(t *testing.T) {
 	pushCases := map[string]func(*http.Request) bool{
 		"config blob": func(r *http.Request) bool { return digestIs(r, emptyJSON.Digest) },
 		"envelope":    func(r *http.Request) bool { return digestIs(r, digest.FromBytes(env)) },
-		"bundle":      func(r *http.Request) bool { return digestIs(r, digest.FromString("bundle")) },
+		"bundle":      func(r *http.Request) bool { return digestIs(r, digest.FromString(`{"b":1}`)) },
 		"anchor tag": func(r *http.Request) bool {
 			return r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/manifests/"+Tag(fpA))
 		},

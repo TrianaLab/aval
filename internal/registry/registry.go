@@ -206,8 +206,8 @@ func Push(ctx context.Context, repo, fingerprint string, a Attestation) (Descrip
 	if a.Envelope == nil {
 		return Descriptor{}, errors.New("registry.Push: no envelope")
 	}
-	if len(a.Bundle) == 0 {
-		return Descriptor{}, errors.New("registry.Push: no Sigstore bundle; an attestation without one can never verify")
+	if !json.Valid(a.Bundle) {
+		return Descriptor{}, errors.New("registry.Push: no valid Sigstore bundle; an attestation without one can never verify")
 	}
 	r, err := newRepository(repo)
 	if err != nil {

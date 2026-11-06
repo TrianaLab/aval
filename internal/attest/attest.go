@@ -9,12 +9,14 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -114,6 +116,11 @@ func Sign(ctx context.Context, s *evidence.Statement, opts SignOptions) (*Signed
 	if err != nil {
 		return nil, fmt.Errorf("attest.Sign: %w", err)
 	}
+	if opts.Key == "" {
+		if err := checkCert(b.GetVerificationMaterial().GetCertificate().GetRawBytes()); err != nil {
+			return nil, fmt.Errorf("attest.Sign: signing certificate: %w", err)
+		}
+	}
 	raw, _ := protojson.Marshal(b) // ponytail: a bundle sigstore-go just built, cannot fail
 	d := b.GetDsseEnvelope()
 	env := &evidence.Envelope{PayloadType: d.GetPayloadType(), Payload: d.GetPayload()}
@@ -121,6 +128,24 @@ func Sign(ctx context.Context, s *evidence.Statement, opts SignOptions) (*Signed
 		env.Signatures = append(env.Signatures, evidence.Signature{KeyID: sig.GetKeyid(), Sig: sig.GetSig()})
 	}
 	return &Signed{Envelope: env, Bundle: raw}, nil
+}
+
+// checkCert fails closed on a Fulcio certificate the verifier would reject:
+// without an OIDC issuer and subject no policy can match it, so publishing
+// the attestation would only produce verification failures downstream.
+func checkCert(der []byte) error {
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		return err
+	}
+	sum, err := certificate.SummarizeCertificate(cert) // fails without a subject
+	if err != nil {
+		return err
+	}
+	if sum.Issuer == "" {
+		return errors.New("certificate has no OIDC issuer")
+	}
+	return nil
 }
 
 // keyPair is a sign.Keypair over a long-lived ECDSA P-256 key.
