@@ -5,6 +5,8 @@ Generated from the cobra command tree by `make docs-cli`. Do not edit by hand:
 
 ## Exit codes
 
+<!-- --8<-- [start:exit-codes] -->
+
 | Code | `aval run` | `aval verify` | `aval push` |
 |---|---|---|---|
 | 0 | the test passed, or a verified passing result was reused | a verified result exists (passing or failing) | pushed |
@@ -17,6 +19,8 @@ Generated from the cobra command tree by `make docs-cli`. Do not edit by hand:
 
 A miss (4) is routine. A verification failure (5) means someone published a
 result the policy does not trust; never hide it or retry it away.
+
+<!-- --8<-- [end:exit-codes] -->
 
 ## aval
 

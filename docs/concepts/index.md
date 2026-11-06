@@ -27,27 +27,16 @@ If Aval cannot prove that reuse is safe, the test runs.
 
 ## An example
 
-A contract for a Go integration test:
+A contract for a Go integration test, from [the test contract](../contract.md#example):
 
-```yaml
-apiVersion: aval.trianalab.io/v1
-kind: Test
-metadata:
-  name: integration
-runner:
-  command: ["go", "test", "-tags=integration", "./orders/..."]
-scope:
-  source: ["orders/**/*.go", "testdata/orders/**"]
-  dependencies: ["go.mod", "go.sum"]
-cacheability: hermetic
-```
+--8<-- "docs/contract.md:example"
 
 The first job finds nothing, runs the test and pushes a signed result:
 
 ```console
 $ aval run --push --key keys/ci.pem --registry $REG --policy policy.yaml
-miss integration sha256:b40e9fac…
-ran integration: passed (exit 0)
+miss orders-integration sha256:b40e9fac…
+ran orders-integration: passed (exit 0)
 pushed localhost:5055/acme/orders-aval@sha256:2496759a…
 ```
 
@@ -55,7 +44,7 @@ A second job with the same inputs reuses it:
 
 ```console
 $ aval run --registry $REG --policy policy.yaml
-verified integration sha256:b40e9fac…
+verified orders-integration sha256:b40e9fac…
 reused passed result …/orders-aval@sha256:2496759a…
 ```
 

@@ -2,22 +2,17 @@
 
 Test results as signed, verifiable OCI artifacts.
 
-Aval is not a test cache. It is a CI primitive for **verifiable test execution reuse**: a heavy test runs once, the result is signed and bound to a fingerprint of its declared inputs, and any other environment with the same fingerprint can verify it and skip the run. A signature proves *who* claims the test passed, not that it ran honestly, so reuse requires an explicit input contract plus a trust policy over signers.
+A heavy test runs once. Aval signs the result and binds it to a fingerprint
+of the test's declared inputs. Any other job with the same fingerprint can
+verify the signature against its own trust policy and skip the run. If Aval
+cannot prove that reuse is safe, the test runs.
 
-**Problem.** Integration and end-to-end suites run again on every push, in every pipeline, even when nothing they depend on changed. Build caches cover compilation and unit tests well, but rarely heavy tests with services, and they give you no signed record of who ran what.
+No server or database: ORAS, Cosign and OCI 1.1 referrers do the work, in the
+OCI registry you already have.
 
-## How it works
-
-```text
-dev / CI:   run test -> fingerprint inputs -> sign (in-toto/DSSE) -> push to OCI registry
-                                                                     tag sha256-<fp>
-CI on push: fingerprint inputs -> lookup sha256-<fp> -> verify signature + policy -> reuse
-                                         | miss                    | fails
-                                         v                         v
-                                      run test           run test, report security event
-```
-
-No server or database: ORAS, Cosign and OCI 1.1 referrers do the work, and artifacts are always consumed by digest. If input equivalence cannot be proven, the test runs.
+**Docs: [aval.run](https://aval.run/)**: [how it works](https://aval.run/concepts/),
+[trust](https://aval.run/concepts/trust/), [outcomes](https://aval.run/concepts/outcomes/),
+[CLI reference](https://aval.run/cli-reference/) and the specs.
 
 ## Install
 
@@ -26,24 +21,8 @@ curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-ava
 aval --version
 ```
 
-On Windows, in PowerShell: `irm https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/install.ps1 | iex`.
-Both installers check the sha256 against the release's `checksums.txt`, and the
-release signature and provenance when `cosign` or `gh` is installed; see
-[Install](docs/install.md) for options.
-
-Alternatives: download a release archive (Linux and macOS, amd64 or arm64; Windows has a zip):
-
-```sh
-VERSION=0.2.0
-OS=linux        # or darwin
-ARCH=amd64      # or arm64
-curl -fsSLO "https://github.com/TrianaLab/aval/releases/download/v$VERSION/aval_${VERSION}_${OS}_${ARCH}.tar.gz"
-tar -xzf "aval_${VERSION}_${OS}_${ARCH}.tar.gz" aval
-sudo mv aval /usr/local/bin/
-```
-
-Or build it with Go 1.27 or newer: `go install github.com/TrianaLab/aval/cmd/aval@latest`.
-[CONTRIBUTING.md](CONTRIBUTING.md#changesets-and-releases) shows how to check the release signature.
+Windows, release archives, `go install` and what the installers check:
+[Install](https://aval.run/install/).
 
 ## Try it on your laptop
 
@@ -124,26 +103,28 @@ changes, so it reports `miss` and exits 4. Stop the registry with
 ## Use it in CI
 
 In CI, sign without a key: leave out `--key` and put an OIDC token in
-`$SIGSTORE_ID_TOKEN` (on GitHub Actions, request `id-token: write`). The policy
-then trusts the CI identity instead of a key file; see the
-[trust model](docs/trust-model.md#policy-file). Pushing to a real registry uses
-your Docker credentials (`docker login`); see
-[registry credentials](docs/artifact-format.md#registry-credentials).
+`$SIGSTORE_ID_TOKEN` (on GitHub Actions, request `id-token: write`). The
+policy then trusts the CI identity instead of a key file; see the
+[policy file](https://aval.run/trust-model/#policy-file) and
+[registry credentials](https://aval.run/artifact-format/#registry-credentials).
 
 ```sh
-aval run --push --registry ghcr.io/acme/orders-aval --policy policy.yaml   # reuse a verified result, or run and publish
-aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml       # exit 0 verified, 4 miss, 5 verification failed
+aval run --push --registry ghcr.io/acme/orders-aval --policy policy.yaml
 ```
 
-All exit codes are in the [CLI reference](docs/cli-reference.md#exit-codes).
+Every exit code is in the [CLI reference](https://aval.run/cli-reference/#exit-codes).
 
 ## Status: pre-alpha
 
-Contract, fingerprint, signing (keyless and key-based), push to and lookup in an OCI registry, verification against a trust policy and `aval run` reuse or execute work. Formats are frozen at `aval.trianalab.io/v1` (contract and verify report) and predicate `execution/v2`; see [compatibility rules](docs/artifact-format.md#versioning-and-compatibility). `aval run --shadow` verifies and still runs the test, and fails on a false hit.
+Formats are frozen at `aval.trianalab.io/v1` (contract and verify report) and
+predicate `execution/v2`; see the
+[compatibility rules](https://aval.run/artifact-format/#versioning-and-compatibility)
+and the [roadmap](https://aval.run/vision/#roadmap).
 
-## Docs
+## Contributing
 
-[Install](docs/install.md) · [Vision](docs/vision.md) · [Trust model](docs/trust-model.md) · [Artifact format](docs/artifact-format.md) · [Contract](docs/contract.md) · [Integrations](docs/integrations.md) · [CLI reference](docs/cli-reference.md) · [Example: Go + Compose](examples/go-compose)
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and the
+[Go + Compose example](examples/go-compose).
 
 ## License
 
