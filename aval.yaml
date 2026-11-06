@@ -18,7 +18,8 @@ scope:
     - "docs/cli-reference.md"
     - "aval.yaml"
     - "examples/go-compose/aval.yaml"
-  # Results and reports that `aval run` writes; git ignores them.
+  # Redundant since #63 (Aval never hashes .aval/), kept so the canonical
+  # contract, and with it the published results, stay the same.
   exclude: ["**/.aval/**"]
   dependencies: [go.mod, go.sum]
 environment:

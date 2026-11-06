@@ -53,13 +53,19 @@ func (f Fingerprint) Hex() string { return strings.TrimPrefix(f.Digest, "sha256:
 // LookupEnv resolves environment variables; os.LookupEnv in production.
 type LookupEnv func(string) (string, bool)
 
-// Compute fingerprints the contract c rooted at dir.
-func Compute(dir string, c *contract.Contract, env LookupEnv) (Fingerprint, error) {
+// OutputDir is the directory name Aval reserves for its own outputs. A
+// directory with this name is skipped at any depth, like ".git".
+const OutputDir = ".aval"
+
+// Compute fingerprints the contract c rooted at dir. outputs are files Aval
+// itself writes (the --result and --report paths); the ones inside dir are
+// not inputs and are skipped. Empty entries are ignored.
+func Compute(dir string, c *contract.Contract, env LookupEnv, outputs ...string) (Fingerprint, error) {
 	if env == nil {
 		env = os.LookupEnv
 	}
 	canon := canonicalContract(c)
-	files, err := listFiles(dir)
+	files, err := listFiles(dir, outputsUnder(dir, outputs))
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -132,22 +138,44 @@ func canonicalContract(c *contract.Contract) []byte {
 	return b
 }
 
+// outputsUnder returns the outputs that lie inside dir as slash-separated
+// paths relative to dir. An output that cannot be resolved is not skipped:
+// hashing one file too many only causes a miss (fail closed).
+func outputsUnder(dir string, outputs []string) map[string]bool {
+	skip := map[string]bool{}
+	root, err := filepath.Abs(dir)
+	for _, o := range outputs {
+		if o == "" || err != nil {
+			continue
+		}
+		abs, aerr := filepath.Abs(o)
+		rel, rerr := filepath.Rel(root, abs)
+		if aerr == nil && rerr == nil && filepath.IsLocal(rel) {
+			skip[filepath.ToSlash(rel)] = true
+		}
+	}
+	return skip
+}
+
 // listFiles returns all regular files and symlinks under dir as sorted,
-// slash-separated relative paths. VCS metadata is skipped.
-func listFiles(dir string) ([]string, error) {
+// slash-separated relative paths. VCS metadata, Aval's output directories
+// and the paths in skip are left out.
+func listFiles(dir string, skip map[string]bool) ([]string, error) {
 	var out []string
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.IsDir() {
-			if d.Name() == ".git" {
+			if d.Name() == ".git" || d.Name() == OutputDir {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		rel, _ := filepath.Rel(dir, p) // cannot fail: WalkDir yields paths under dir
-		out = append(out, filepath.ToSlash(rel))
+		if rel = filepath.ToSlash(rel); !skip[rel] {
+			out = append(out, rel)
+		}
 		return nil
 	})
 	slices.Sort(out)

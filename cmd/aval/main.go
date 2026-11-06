@@ -127,13 +127,15 @@ func noArgs(c *cobra.Command, args []string) error {
 
 // loadAndFingerprint loads the contract and computes its fingerprint, rooted
 // at the contract's directory. When only the fingerprint fails it still
-// returns the contract, so run can execute the test.
-func loadAndFingerprint(file string) (*contract.Contract, fingerprint.Fingerprint, error) {
+// returns the contract, so run can execute the test. outputs are the files
+// the command writes or reads as Aval output (--result, --report); inside
+// the contract root they are not inputs.
+func loadAndFingerprint(file string, outputs ...string) (*contract.Contract, fingerprint.Fingerprint, error) {
 	c, err := contract.Load(file)
 	if err != nil {
 		return nil, fingerprint.Fingerprint{}, usageError{err}
 	}
-	fp, err := fingerprint.Compute(filepath.Dir(file), c, os.LookupEnv)
+	fp, err := fingerprint.Compute(filepath.Dir(file), c, os.LookupEnv, outputs...)
 	if err != nil {
 		// Cannot prove input equivalence: callers must run the test.
 		return c, fingerprint.Fingerprint{}, fmt.Errorf("fingerprint: %w", err)

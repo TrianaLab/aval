@@ -66,6 +66,8 @@ type fixture struct {
 	dir string
 	c   *contract.Contract
 	env map[string]string
+	// outputs are the --result and --report paths passed to Compute.
+	outputs []string
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -119,7 +121,7 @@ func (f *fixture) parse(yaml string) {
 }
 
 func (f *fixture) compute() (Fingerprint, error) {
-	return Compute(f.dir, f.c, func(k string) (string, bool) { v, ok := f.env[k]; return v, ok })
+	return Compute(f.dir, f.c, func(k string) (string, bool) { v, ok := f.env[k]; return v, ok }, f.outputs...)
 }
 
 type corpusCase struct {
@@ -214,6 +216,20 @@ var corpus = []corpusCase{
 	// Only the exact name .git is skipped: a case-insensitive match would drop
 	// in-scope files under .GIT on every filesystem.
 	{name: "file under .GIT added", change: func(f *fixture) { f.write(".GIT/x.go", "package x\n") }, want: differ},
+	// Aval's own outputs are never inputs (#63): .aval directories at any
+	// depth, and the --result and --report paths inside the root.
+	{name: "file under .aval added", change: func(f *fixture) { f.write(".aval/result.go", "package r\n") }, want: same},
+	{name: "file under a nested .aval added", change: func(f *fixture) { f.write("pkg/a/.aval/r.go", "package r\n") }, want: same},
+	{name: "file under .AVAL added", change: func(f *fixture) { f.write(".AVAL/r.go", "package r\n") }, want: differ},
+	{name: "result path inside the root written", setup: func(f *fixture) {
+		f.outputs = []string{"", f.path("out/sub/../result.go")}
+	}, change: func(f *fixture) { f.write("out/result.go", "package r\n") }, want: same},
+	{name: "result path outside the root, same relative name", setup: func(f *fixture) {
+		f.outputs = []string{filepath.Join(f.t.TempDir(), "out", "result.go")}
+	}, change: func(f *fixture) { f.write("out/result.go", "package r\n") }, want: differ},
+	{name: "file next to the result path", setup: func(f *fixture) {
+		f.outputs = []string{f.path("out/result.go")}
+	}, change: func(f *fixture) { f.write("out/other.go", "package r\n") }, want: differ},
 	{name: "checkout path", change: func(f *fixture) {
 		to := filepath.Join(f.t.TempDir(), "elsewhere")
 		f.do(os.Rename(f.dir, to))
