@@ -52,4 +52,32 @@
          <loc>https://aval.run/main/concepts/trust/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
+    <url>
+         <loc>https://aval.run/main/guides/github-actions/</loc>
+         <lastmod>2026-11-06</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/guides/go-consumer/</loc>
+         <lastmod>2026-11-06</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/guides/measure-reuse/</loc>
+         <lastmod>2026-11-06</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/guides/signing/</loc>
+         <lastmod>2026-11-06</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/guides/troubleshooting/</loc>
+         <lastmod>2026-11-06</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/guides/trust-policy/</loc>
+         <lastmod>2026-11-06</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/guides/write-a-contract/</loc>
+         <lastmod>2026-11-06</lastmod>
+    </url>
 </urlset>
