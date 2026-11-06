@@ -16,7 +16,7 @@
         <link rel="prev" href="..">
       
       
-        <link rel="next" href="../concepts/">
+        <link rel="next" href="../quickstart/">
       
       
         
@@ -460,6 +460,8 @@
       
         
       
+        
+      
     
     
     
@@ -608,6 +610,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#release-archive-by-hand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release archive by hand
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#go-users" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -633,6 +646,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1626,6 +1667,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#release-archive-by-hand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release archive by hand
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#go-users" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1793,6 +1845,23 @@ check a downloaded release by hand:</p>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>sha256sum<span class="w"> </span>--ignore-missing<span class="w"> </span>-c<span class="w"> </span>checksums.txt
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>gh<span class="w"> </span>attestation<span class="w"> </span>verify<span class="w"> </span>aval_0.2.0_linux_amd64.tar.gz<span class="w"> </span>--bundle<span class="w"> </span>provenance.sigstore.json<span class="w"> </span>--repo<span class="w"> </span>TrianaLab/aval
 </span></code></pre></div>
+<h2 id="release-archive-by-hand">Release archive by hand<a class="headerlink" href="#release-archive-by-hand" title="Anchor link">&para;</a></h2>
+<p>Without an installer: download the archive, <code>checksums.txt</code> and its
+signature, check them as above, then put <code>aval</code> on your <code>PATH</code>:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">VERSION</span><span class="o">=</span><span class="m">0</span>.2.0
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">OS</span><span class="o">=</span>linux<span class="w">        </span><span class="c1"># or darwin</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nv">ARCH</span><span class="o">=</span>amd64<span class="w">      </span><span class="c1"># or arm64</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nv">BASE</span><span class="o">=</span>https://github.com/TrianaLab/aval/releases/download/v<span class="nv">$VERSION</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/aval_</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">OS</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span><span class="s2">.tar.gz"</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/checksums.txt"</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/checksums.txt.sigstore.json"</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>cosign<span class="w"> </span>verify-blob<span class="w"> </span>checksums.txt<span class="w"> </span>--bundle<span class="w"> </span>checksums.txt.sigstore.json<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span>--certificate-oidc-issuer<span class="w"> </span>https://token.actions.githubusercontent.com<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span>--certificate-identity<span class="w"> </span><span class="s2">"https://github.com/TrianaLab/aval/.github/workflows/release.yaml@refs/tags/v</span><span class="nv">$VERSION</span><span class="s2">"</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>sha256sum<span class="w"> </span>--ignore-missing<span class="w"> </span>-c<span class="w"> </span>checksums.txt<span class="w">   </span><span class="c1"># macOS: shasum -a 256 --ignore-missing -c checksums.txt</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>tar<span class="w"> </span>-xzf<span class="w"> </span><span class="s2">"aval_</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">OS</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span><span class="s2">.tar.gz"</span><span class="w"> </span>aval
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>sudo<span class="w"> </span>mv<span class="w"> </span>aval<span class="w"> </span>/usr/local/bin/
+</span></code></pre></div>
 <h2 id="go-users">Go users<a class="headerlink" href="#go-users" title="Anchor link">&para;</a></h2>
 <p><code>go install github.com/TrianaLab/aval/cmd/aval@latest</code> builds from source
 instead. The binary reports version <code>dev</code> and skips the release checks above.</p>
@@ -1854,13 +1923,13 @@ user <code>PATH</code>.</p>
         
         
           
-          <a href="../concepts/" class="md-footer__link md-footer__link--next" aria-label="Next: How Aval works">
+          <a href="../quickstart/" class="md-footer__link md-footer__link--next" aria-label="Next: Quickstart">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                How Aval works
+                Quickstart
               </div>
             </div>
             <div class="md-footer__button md-icon">
