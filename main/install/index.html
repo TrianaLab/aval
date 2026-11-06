@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://trianalab.github.io/aval/main/install/">
+        <link rel="canonical" href="https://aval.run/main/install/">
       
       
         <link rel="prev" href="../vision/">
@@ -1544,9 +1544,11 @@
 <p>Aval is one static binary for Linux, macOS and Windows on amd64 and arm64.
 The installers download it from
 <a href="https://github.com/TrianaLab/aval/releases">GitHub Releases</a> and check it
-before installing.</p>
+before installing. This site serves the installers of the latest commit on
+<code>main</code>; the same files are <code>scripts/get-aval.sh</code> and <code>scripts/install.ps1</code> in
+the repository.</p>
 <h2 id="linux-and-macos">Linux and macOS<a class="headerlink" href="#linux-and-macos" title="Anchor link">&para;</a></h2>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>bash
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://aval.run/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>bash
 </span></code></pre></div>
 <p>The script needs <code>curl</code> or <code>wget</code> and <code>sha256sum</code> or <code>shasum</code>, and works with
 the bash 3.2 that macOS ships. It installs <code>aval</code> into <code>/usr/local/bin</code> and
@@ -1582,11 +1584,11 @@ uses <code>sudo</code> only when that directory is not writable.</p>
 </tbody>
 </table>
 <p>Flags need the script as a file, or <code>bash -s --</code> when piped:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>--version<span class="w"> </span>v0.2.0
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://aval.run/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>--version<span class="w"> </span>v0.2.0
 </span></code></pre></div>
 <h2 id="windows">Windows<a class="headerlink" href="#windows" title="Anchor link">&para;</a></h2>
 <p>In PowerShell 5.1 or 7:</p>
-<div class="language-powershell highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">raw</span><span class="p">.</span><span class="n">githubusercontent</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">TrianaLab</span><span class="p">/</span><span class="n">aval</span><span class="p">/</span><span class="n">main</span><span class="p">/</span><span class="n">scripts</span><span class="p">/</span><span class="n">install</span><span class="p">.</span><span class="n">ps1</span> <span class="p">|</span> <span class="nb">iex</span>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">irm </span><span class="n">https</span><span class="p">://</span><span class="n">aval</span><span class="p">.</span><span class="n">run</span><span class="p">/</span><span class="n">install</span><span class="p">.</span><span class="n">ps1</span> <span class="p">|</span> <span class="nb">iex</span>
 </span></code></pre></div>
 <p>It installs <code>aval.exe</code> into <code>%LOCALAPPDATA%\Programs\aval</code> and adds that
 directory to the user <code>PATH</code>, without administrator rights. It reads
@@ -1718,7 +1720,7 @@ user <code>PATH</code>.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": ["^latest$", "^main$"], "provider": "mike"}}</script>
     
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>

@@ -1,59 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://trianalab.github.io/aval/main/</loc>
+         <loc>https://aval.run/main/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/artifact-format/</loc>
+         <loc>https://aval.run/main/artifact-format/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/brand/</loc>
+         <loc>https://aval.run/main/brand/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/changelog/</loc>
+         <loc>https://aval.run/main/changelog/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/cli-reference/</loc>
+         <loc>https://aval.run/main/cli-reference/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/contract/</loc>
+         <loc>https://aval.run/main/contract/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/install/</loc>
+         <loc>https://aval.run/main/install/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/integrations/</loc>
+         <loc>https://aval.run/main/integrations/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/trust-model/</loc>
+         <loc>https://aval.run/main/trust-model/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/vision/</loc>
+         <loc>https://aval.run/main/vision/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/concepts/</loc>
+         <loc>https://aval.run/main/concepts/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/concepts/glossary/</loc>
+         <loc>https://aval.run/main/concepts/glossary/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/concepts/outcomes/</loc>
+         <loc>https://aval.run/main/concepts/outcomes/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
     <url>
-         <loc>https://trianalab.github.io/aval/main/concepts/trust/</loc>
+         <loc>https://aval.run/main/concepts/trust/</loc>
          <lastmod>2026-11-06</lastmod>
     </url>
 </urlset>
