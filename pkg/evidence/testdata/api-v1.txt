@@ -1,0 +1,114 @@
+const ArtifactType untyped string
+const ArtifactTypeFingerprint untyped string
+const MediaTypeDSSE untyped string
+const MediaTypeExecution untyped string
+const OutcomeError Outcome
+const OutcomeMiss Outcome
+const OutcomeVerificationFailed Outcome
+const OutcomeVerified Outcome
+const PayloadType untyped string
+const PredicateType untyped string
+const ReportVersion untyped string
+const ResultFailed Result
+const ResultPassed Result
+const SchemaVersion untyped string
+const StatementType untyped string
+const TrustDeveloper TrustLevel
+const TrustIsolated TrustLevel
+const TrustRunner TrustLevel
+const TrustUnknown TrustLevel
+field Envelope.Payload []byte
+field Envelope.PayloadType string
+field Envelope.Signatures []Signature
+field Execution.Environment map[string]string
+field Execution.ExitCode int
+field Execution.Fingerprint string
+field Execution.FingerprintVersion string
+field Identity.Issuer string
+field Identity.KeyID string
+field Identity.PublicKey string
+field Identity.Subject string
+field Identity.SubjectRegexp string
+field Identity.TrustLevel TrustLevel
+field Predicate.Annotations map[string]string
+field Predicate.Execution Execution
+field Predicate.FinishedAt time.Time
+field Predicate.Result Result
+field Predicate.Runner Runner
+field Predicate.SchemaVersion string
+field Predicate.StartedAt time.Time
+field Predicate.Subject Subject
+field Predicate.Test Test
+field Rejection.Outcome Outcome
+field Rejection.Reason string
+field Rejection.Reference string
+field Report.Fingerprint string
+field Report.Outcome Outcome
+field Report.Predicate *Predicate
+field Report.Reason string
+field Report.Reference string
+field Report.Rejected []Rejection
+field Report.Result Result
+field Report.Signer *Identity
+field Report.TestID string
+field Report.Version string
+field ResourceDigest.Digest map[string]string
+field ResourceDigest.Name string
+field Runner.Identity string
+field Runner.Issuer string
+field Runner.TrustLevel TrustLevel
+field Signature.KeyID string
+field Signature.Sig []byte
+field Signer.Issuer string
+field Signer.KeyID string
+field Signer.Subject string
+field Statement.Predicate encoding/json.RawMessage
+field Statement.PredicateType string
+field Statement.Subject []ResourceDigest
+field Statement.Type string
+field Subject.Digest map[string]string
+field Subject.Name string
+field Test.Cacheability string
+field Test.ID string
+field Verification.Predicate *Predicate
+field Verification.Signer Identity
+field Verification.TrustLevel TrustLevel
+field VerificationError.Reason string
+field VerifyOptions.AllowedCacheability []string
+field VerifyOptions.ExpectedFingerprint string
+field VerifyOptions.ExpectedTestID string
+field VerifyOptions.Identities []Identity
+field VerifyOptions.MinTrustLevel TrustLevel
+field VerifyOptions.Signature SignatureVerifier
+func MatchIdentity([]Identity, string, string) (Identity, bool)
+func MatchSigner([]Identity, Signer) (Identity, bool)
+func Parse([]byte) (*Predicate, error)
+func PublicKeyID(string) (string, error)
+func Verify(context.Context, *Envelope, VerifyOptions) (*Verification, error)
+method (*Predicate) Validate() error
+method (*VerificationError) Error() string
+method (*VerificationError) Unwrap() error
+method (TrustLevel) String() string
+type Envelope struct
+type Execution struct
+type Identity struct
+type Outcome string
+type Predicate struct
+type Rejection struct
+type Report struct
+type ResourceDigest struct
+type Result string
+type Runner struct
+type Signature struct
+type SignatureVerifier interface { VerifySignature(context.Context, *Envelope) (Signer, error) }
+type Signer struct
+type Statement struct
+type Subject struct
+type Test struct
+type TrustLevel int
+type Verification struct
+type VerificationError struct
+type VerifyOptions struct
+var ErrNotFound error
+var ErrNotImplemented error
+var ErrVerification error

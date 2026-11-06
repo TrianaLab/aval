@@ -54,8 +54,17 @@ Trust levels: `1` developer (personal acceleration, not full trust), `2` CI
 runner with verifiable identity, `3` isolated execution with verifiable
 attestation of the environment. `0` (unknown) is never accepted.
 
-Example external consumer. How the envelope bytes are fetched (ORAS, a
-registry client, `aval`) is up to the consumer; fetch by digest, not by tag.
+A complete external consumer lives in
+[`examples/evidence-consumer`](../examples/evidence-consumer/consumer.go): its
+own Go module that imports only `pkg/evidence` and the standard library,
+brings its own `SignatureVerifier` (ed25519 over the DSSE encoding), keeps a
+miss apart from a verification failure, and reads `aval verify` reports. CI
+builds and tests it against the checked-out `pkg/evidence` (`make example`),
+and `tests/architecture` fails if it imports any other Aval package.
+
+The shorter sketch below shows the same flow. How the envelope bytes are
+fetched (ORAS, a registry client, `aval`) is up to the consumer; fetch by
+digest, not by tag.
 
 ```go
 package consumer
@@ -105,6 +114,36 @@ func CheckResult(ctx context.Context, envBytes []byte, sig evidence.SignatureVer
 
 `ErrNotFound` is returned by the lookup step (the registry client), not by
 `Verify`: if there is no envelope to pass in, it is a miss.
+
+#### Go API compatibility
+
+`pkg/evidence` follows semantic versioning as part of the module
+`github.com/TrianaLab/aval`. Within a major version its exported API changes
+additively only: new identifiers, new struct fields, new methods on concrete
+types. Removing or renaming an exported identifier, changing a type, a field
+type, a function or method signature or a receiver, or adding a method to an
+exported interface is a breaking change and needs a new major version, which
+in Go means a new module path (`github.com/TrianaLab/aval/v2`).
+
+This is enforced, not only documented. The exported surface (names, types and
+signatures, without parameter names) is snapshotted in
+[`pkg/evidence/testdata/api-v1.txt`](../pkg/evidence/testdata/api-v1.txt),
+named after the major version in `go.mod`. `make ci-gates`
+(`TestEvidenceAPIIsAppendOnly` in `tests/architecture`) fails when a line of
+the snapshot no longer matches the code, and when the code exports something
+the snapshot lacks. The snapshot is append-only: an additive change appends
+its lines in the same pull request. A new major module path starts a new
+snapshot file.
+
+The Go API and the wire formats are versioned separately. The predicate type,
+media types, report version and `apiVersion` follow
+[artifact-format.md](artifact-format.md#versioning-and-compatibility): a
+breaking format change gets a new identifier. Supporting a new format version
+is an additive Go change (new constants or types next to the old ones); the
+values of the existing constants are format identifiers, so changing them is
+governed by the format rules rather than by the API snapshot. Dropping a type
+or constant a consumer may still use is a breaking Go change and needs a new
+major module path, even when the format it described is retired.
 
 ### 3. `aval verify --output json`
 

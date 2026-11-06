@@ -85,6 +85,7 @@ vuln:
 	GOBIN=$(CURDIR)/bin go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 	bin/govulncheck ./...
 	cd examples/go-compose && ../../bin/govulncheck ./...
+	cd examples/evidence-consumer && ../../bin/govulncheck ./...
 
 # One golangci-lint version for local runs and CI (ci.yaml installs the same
 # one; tests/architecture enforces it).
@@ -126,8 +127,11 @@ docs-lint:
 docs-cli:
 	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval -update
 
+# The example modules: go-compose, and evidence-consumer, a third party that
+# builds against this checkout's pkg/evidence only (#18).
 example:
 	cd examples/go-compose && go vet ./... && go test ./...
+	cd examples/evidence-consumer && go vet ./... && go test ./...
 
 # `make ci` is the gate CI runs and the one agents and humans run before
 # pushing. Each ci-* leg is one job in .github/workflows/ci.yaml, aggregated by
