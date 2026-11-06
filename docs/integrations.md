@@ -54,8 +54,17 @@ Trust levels: `1` developer (personal acceleration, not full trust), `2` CI
 runner with verifiable identity, `3` isolated execution with verifiable
 attestation of the environment. `0` (unknown) is never accepted.
 
-Example external consumer. How the envelope bytes are fetched (ORAS, a
-registry client, `aval`) is up to the consumer; fetch by digest, not by tag.
+A complete external consumer lives in
+[`examples/evidence-consumer`](../examples/evidence-consumer/consumer.go): its
+own Go module that imports only `pkg/evidence` and the standard library,
+brings its own `SignatureVerifier` (ed25519 over the DSSE encoding), keeps a
+miss apart from a verification failure, and reads `aval verify` reports. CI
+builds and tests it against the checked-out `pkg/evidence` (`make example`),
+and `tests/architecture` fails if it imports any other Aval package.
+
+The shorter sketch below shows the same flow. How the envelope bytes are
+fetched (ORAS, a registry client, `aval`) is up to the consumer; fetch by
+digest, not by tag.
 
 ```go
 package consumer
@@ -105,6 +114,74 @@ func CheckResult(ctx context.Context, envBytes []byte, sig evidence.SignatureVer
 
 `ErrNotFound` is returned by the lookup step (the registry client), not by
 `Verify`: if there is no envelope to pass in, it is a miss.
+
+#### Go API compatibility
+
+`pkg/evidence` follows semantic versioning as part of the module
+`github.com/TrianaLab/aval`. Within a major version its exported API changes
+additively only: new identifiers, new struct fields that keep a comparable
+struct comparable, new methods on concrete types. Removing or renaming an
+exported identifier, changing a type, a field type, a function or method
+signature or a receiver, making a struct non-comparable, or adding a method
+to an exported interface is a breaking change and needs a new major version, which
+in Go means a new module path (`github.com/TrianaLab/aval/v2`). The
+release that ships it is tagged v2.0.0 or later (Go rejects a `/v2` module
+tagged v0 or v1), so its changeset sets the version explicitly rather than
+relying on a `major` bump from 0.x.
+
+This is enforced, not only documented. The exported surface is snapshotted in
+[`pkg/evidence/testdata/api-v1.txt`](../pkg/evidence/testdata/api-v1.txt),
+named after the major version in `go.mod`: one line per exported constant,
+variable, function, type, field (embedded fields included, with its struct
+tag: a changed JSON name or `omitempty` is breaking) and method, with types,
+signatures, type parameters and constraints and without parameter names
+(type parameter names and the order of union terms are kept, so changing
+them needs a snapshot change too). Fields promoted through embedding get a
+`promoted <Type>.<Field>` line, so one that becomes ambiguous or changes
+type is breaking. Methods are the full method set, promoted ones included,
+with the receiver (`T` or `*T`) they need. Interfaces are one line with
+their whole method set or type set. A struct that supports `==` also gets a
+`comparable <Type>` line. A constant of a type the package declares
+(`TrustLevel`, `Result`, `Outcome`) is rendered with its value, since
+consumers compare those values and policies store trust levels as numbers:
+renumbering `TrustRunner` is breaking. Untyped constants (the format
+identifiers) are rendered without their value (see below).
+
+`make ci-gates` (`TestEvidenceAPIIsAppendOnly` in `tests/architecture`) fails
+when:
+
+- a line of the snapshot no longer matches the code;
+- the code exports something the snapshot lacks (an additive change appends
+  its lines in the same pull request);
+- the exported API names an unexported type of the package (an embedded,
+  returned or field type), whose members would not be rendered;
+- a non-test file of `pkg/evidence` has any build constraint: a
+  `//go:build` or `// +build` line (GOOS, GOARCH, cgo, a `go1.N` release tag
+  or a custom tag), `import "C"`, or a `_GOOS`/`_GOARCH` file name suffix.
+  The snapshot is taken on one platform and toolchain, and consumers build
+  the library on any, so every file must be built everywhere;
+- a line of the snapshot at the base revision is missing from the current
+  snapshot, so a break cannot be hidden by editing both. The base is the merge
+  base with `origin/<base branch>` on a pull request, the commit `main`
+  pointed to before a push to `main` (`before` of the push event, so all the
+  commits of one push are compared together), and the merge base with
+  `origin/main` otherwise. In CI
+  (`CI` set) an unresolvable base fails the job; locally, without
+  `origin/main`, this one comparison is skipped with a log line.
+
+A new major module path starts a new snapshot file, which has no base to
+compare with.
+
+The Go API and the wire formats are versioned separately. The predicate type,
+media types, report version and `apiVersion` follow
+[artifact-format.md](artifact-format.md#versioning-and-compatibility): a
+breaking format change gets a new identifier. Supporting a new format version
+is an additive Go change (new constants or types next to the old ones); the
+values of the untyped constants are format identifiers, so changing them is
+governed by the format rules rather than by the API snapshot. `Outcome`
+values are both: they are in the snapshot and in the verify report format. Dropping a type
+or constant a consumer may still use is a breaking Go change and needs a new
+major module path, even when the format it described is retired.
 
 ### 3. `aval verify --output json`
 

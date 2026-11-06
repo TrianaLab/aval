@@ -1,0 +1,121 @@
+comparable Identity
+comparable Rejection
+comparable Runner
+comparable Signer
+comparable Test
+comparable Verification
+comparable VerificationError
+const ArtifactType untyped string
+const ArtifactTypeFingerprint untyped string
+const MediaTypeDSSE untyped string
+const MediaTypeExecution untyped string
+const OutcomeError Outcome = "error"
+const OutcomeMiss Outcome = "miss"
+const OutcomeVerificationFailed Outcome = "verification-failed"
+const OutcomeVerified Outcome = "verified"
+const PayloadType untyped string
+const PredicateType untyped string
+const ReportVersion untyped string
+const ResultFailed Result = "failed"
+const ResultPassed Result = "passed"
+const SchemaVersion untyped string
+const StatementType untyped string
+const TrustDeveloper TrustLevel = 1
+const TrustIsolated TrustLevel = 3
+const TrustRunner TrustLevel = 2
+const TrustUnknown TrustLevel = 0
+field Envelope.Payload []byte "json:\"payload\""
+field Envelope.PayloadType string "json:\"payloadType\""
+field Envelope.Signatures []Signature "json:\"signatures\""
+field Execution.Environment map[string]string "json:\"environment,omitempty\""
+field Execution.ExitCode int "json:\"exitCode\""
+field Execution.Fingerprint string "json:\"fingerprint\""
+field Execution.FingerprintVersion string "json:\"fingerprintVersion\""
+field Identity.Issuer string "json:\"issuer\""
+field Identity.KeyID string "json:\"keyId,omitempty\""
+field Identity.PublicKey string "json:\"-\""
+field Identity.Subject string "json:\"subject,omitempty\""
+field Identity.SubjectRegexp string "json:\"subjectRegexp\""
+field Identity.TrustLevel TrustLevel "json:\"trustLevel\""
+field Predicate.Annotations map[string]string "json:\"annotations,omitempty\""
+field Predicate.Execution Execution "json:\"execution\""
+field Predicate.FinishedAt time.Time "json:\"finishedAt\""
+field Predicate.Result Result "json:\"result\""
+field Predicate.Runner Runner "json:\"runner\""
+field Predicate.SchemaVersion string "json:\"schemaVersion\""
+field Predicate.StartedAt time.Time "json:\"startedAt\""
+field Predicate.Subject Subject "json:\"subject\""
+field Predicate.Test Test "json:\"test\""
+field Rejection.Outcome Outcome "json:\"outcome\""
+field Rejection.Reason string "json:\"reason\""
+field Rejection.Reference string "json:\"reference\""
+field Report.Fingerprint string "json:\"fingerprint\""
+field Report.Outcome Outcome "json:\"outcome\""
+field Report.Predicate *Predicate "json:\"predicate,omitempty\""
+field Report.Reason string "json:\"reason,omitempty\""
+field Report.Reference string "json:\"reference,omitempty\""
+field Report.Rejected []Rejection "json:\"rejected,omitempty\""
+field Report.Result Result "json:\"result,omitempty\""
+field Report.Signer *Identity "json:\"signer,omitempty\""
+field Report.TestID string "json:\"testId\""
+field Report.Version string "json:\"version\""
+field ResourceDigest.Digest map[string]string "json:\"digest\""
+field ResourceDigest.Name string "json:\"name\""
+field Runner.Identity string "json:\"identity\""
+field Runner.Issuer string "json:\"issuer,omitempty\""
+field Runner.TrustLevel TrustLevel "json:\"trustLevel\""
+field Signature.KeyID string "json:\"keyid,omitempty\""
+field Signature.Sig []byte "json:\"sig\""
+field Signer.Issuer string
+field Signer.KeyID string
+field Signer.Subject string
+field Statement.Predicate encoding/json.RawMessage "json:\"predicate\""
+field Statement.PredicateType string "json:\"predicateType\""
+field Statement.Subject []ResourceDigest "json:\"subject\""
+field Statement.Type string "json:\"_type\""
+field Subject.Digest map[string]string "json:\"digest\""
+field Subject.Name string "json:\"name\""
+field Test.Cacheability string "json:\"cacheability\""
+field Test.ID string "json:\"id\""
+field Verification.Predicate *Predicate
+field Verification.Signer Identity
+field Verification.TrustLevel TrustLevel
+field VerificationError.Reason string
+field VerifyOptions.AllowedCacheability []string
+field VerifyOptions.ExpectedFingerprint string
+field VerifyOptions.ExpectedTestID string
+field VerifyOptions.Identities []Identity
+field VerifyOptions.MinTrustLevel TrustLevel
+field VerifyOptions.Signature SignatureVerifier
+func MatchIdentity([]Identity, string, string) (Identity, bool)
+func MatchSigner([]Identity, Signer) (Identity, bool)
+func Parse([]byte) (*Predicate, error)
+func PublicKeyID(string) (string, error)
+func Verify(context.Context, *Envelope, VerifyOptions) (*Verification, error)
+method (*Predicate) Validate() error
+method (*VerificationError) Error() string
+method (*VerificationError) Unwrap() error
+method (TrustLevel) String() string
+type Envelope struct
+type Execution struct
+type Identity struct
+type Outcome string
+type Predicate struct
+type Rejection struct
+type Report struct
+type ResourceDigest struct
+type Result string
+type Runner struct
+type Signature struct
+type SignatureVerifier interface { VerifySignature(context.Context, *Envelope) (Signer, error) }
+type Signer struct
+type Statement struct
+type Subject struct
+type Test struct
+type TrustLevel int
+type Verification struct
+type VerificationError struct
+type VerifyOptions struct
+var ErrNotFound error
+var ErrNotImplemented error
+var ErrVerification error

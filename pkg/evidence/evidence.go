@@ -8,7 +8,9 @@
 //
 // The identifiers below and the JSON shape of Predicate, Statement and
 // Report are frozen: within a version they change additively only (see
-// docs/artifact-format.md, "Versioning and compatibility").
+// docs/artifact-format.md, "Versioning and compatibility"). The Go API
+// follows semantic versioning: within a major version it changes additively
+// only (docs/integrations.md, "Go API compatibility").
 package evidence
 
 import (
