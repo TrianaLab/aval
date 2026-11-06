@@ -114,12 +114,27 @@ func TestVerifyWithRealPolicy(t *testing.T) {
 		reason    string
 	}{
 		{"trusted developer key", "developer", signedFor(t, hermetic, keyFile, nil), ExitOK, ""},
-		{"developer key under a runner policy", "runner", signedFor(t, hermetic, keyFile, nil), ExitVerificationFailed, "trust level developer"},
-		{"untrusted key", "developer", signedFor(t, hermetic, otherKey, nil), ExitVerificationFailed, "signature"},
-		{"envelope tampered", "developer", tampered, ExitVerificationFailed, "different envelope"},
-		{"no bundle", "developer", noBundle, ExitVerificationFailed, "no Sigstore bundle"},
-		{"replay for another fingerprint", "developer", signedFor(t, other, keyFile, nil), ExitVerificationFailed, "fingerprint"},
-		{"replay for another test id", "developer", signedFor(t, hermetic, keyFile, func(p *evidence.Predicate) { p.Test.ID = "other" }), ExitVerificationFailed, "test id"},
+		// A listed signer below minTrustLevel is routine non-reuse: a miss,
+		// never a security event, and never reused (issue #65).
+		{"developer key under a runner policy", "runner", signedFor(t, hermetic, keyFile, nil), ExitMiss, "trust level developer, policy requires at least runner"},
+		{"developer key under an isolated policy", "isolated", signedFor(t, hermetic, keyFile, nil), ExitMiss, "policy requires at least isolated"},
+	}
+	// Every forgery stays a verification failure whatever the minimum level:
+	// below the minimum, a false claim is not downgraded to a miss.
+	for _, min := range []string{"developer", "runner"} {
+		cases = append(cases, []struct {
+			name, min string
+			att       *registry.Attestation
+			code      int
+			reason    string
+		}{
+			{"untrusted key/" + min, min, signedFor(t, hermetic, otherKey, nil), ExitVerificationFailed, "signature"},
+			{"envelope tampered/" + min, min, tampered, ExitVerificationFailed, "different envelope"},
+			{"no bundle/" + min, min, noBundle, ExitVerificationFailed, "no Sigstore bundle"},
+			{"replay for another fingerprint/" + min, min, signedFor(t, other, keyFile, nil), ExitVerificationFailed, "fingerprint"},
+			{"replay for another test id/" + min, min, signedFor(t, hermetic, keyFile, func(p *evidence.Predicate) { p.Test.ID = "other" }), ExitVerificationFailed, "test id"},
+			{"signed cacheability differs/" + min, min, signedFor(t, hermetic, keyFile, func(p *evidence.Predicate) { p.Test.Cacheability = "controlled-environment" }), ExitVerificationFailed, "cacheability"},
+		}...)
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -134,8 +149,9 @@ func TestVerifyWithRealPolicy(t *testing.T) {
 	}
 }
 
-// checkReport asserts a verified report names the developer key, and any
-// other report is a visible verification failure mentioning reason.
+// checkReport asserts a verified report names the developer key, a miss
+// lists the below-minimum candidate as a miss, and any other report is a
+// visible verification failure mentioning reason.
 func checkReport(t *testing.T, stdout, reason string, pub []byte) {
 	t.Helper()
 	var r evidence.Report
@@ -149,6 +165,12 @@ func checkReport(t *testing.T, stdout, reason string, pub []byte) {
 		kid, _ := evidence.PublicKeyID(string(pub))
 		if r.Signer == nil || r.Signer.KeyID != kid || r.Signer.TrustLevel != evidence.TrustDeveloper {
 			t.Fatalf("verified report: %s", stdout)
+		}
+		return
+	}
+	if r.Outcome == evidence.OutcomeMiss {
+		if r.Signer != nil || r.Predicate != nil || len(r.Rejected) != 1 || r.Rejected[0].Outcome != evidence.OutcomeMiss {
+			t.Fatalf("below-minimum candidate not reported as a miss: %s", stdout)
 		}
 		return
 	}

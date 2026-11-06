@@ -24,9 +24,10 @@ func TestExitCode(t *testing.T) {
 		nil:                                ExitOK,
 		usageError{errors.New("bad flag")}: ExitUsage,
 		fmt.Errorf("x: %w", evidence.ErrNotFound):        ExitMiss,
+		fmt.Errorf("%w: level", errBelowMinTrust):        ExitMiss,
 		&evidence.VerificationError{Reason: "untrusted"}: ExitVerificationFailed,
 		fmt.Errorf("x: %w", evidence.ErrNotImplemented):  ExitNotImplemented,
-		errors.New("boom"): ExitError,
+		errors.New("boom"):                               ExitError,
 	}
 	for err, want := range cases {
 		if got := exitCode(err); got != want {
@@ -302,6 +303,10 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:bb": {fetchErr: down},
 		}, ExitError, evidence.OutcomeError, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
+		{"vanished candidate beside a verified one fails closed", nil, map[string]candidate{
+			"sha256:aa": {fetchErr: fmt.Errorf("registry.Fetch r@sha256:aa: %w", evidence.ErrNotFound)},
+			"sha256:bb": {trust: evidence.TrustRunner},
+		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
 		{"verify error on a sibling fails closed", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustIsolated},
 			"sha256:bb": {verifyErr: down},
@@ -354,9 +359,83 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			if !slices.Equal(got, tc.rejected) {
 				t.Fatalf("rejected outcomes %v, want %v; report %s", got, tc.rejected, stdout)
 			}
-			if n := strings.Count(stderr, "warning: rejected attestation"); n != len(tc.rejected) {
-				t.Fatalf("%d rejection warnings, want %d; stderr %q", n, len(tc.rejected), stderr)
+			checkRejectionLines(t, stderr, tc.rejected)
+		})
+	}
+}
+
+// checkRejectionLines asserts one stderr line per rejected candidate: SECURITY
+// for a verification failure, even beside a verified one; warning otherwise.
+func checkRejectionLines(t *testing.T, stderr string, rejected []evidence.Outcome) {
+	t.Helper()
+	security := 0
+	for _, o := range rejected {
+		if o == evidence.OutcomeVerificationFailed {
+			security++
+		}
+	}
+	if n := strings.Count(stderr, "aval: SECURITY: rejected attestation"); n != security {
+		t.Fatalf("%d SECURITY rejection lines, want %d; stderr %q", n, security, stderr)
+	}
+	if n := strings.Count(stderr, "aval: warning: rejected attestation"); n != len(rejected)-security {
+		t.Fatalf("%d rejection warnings, want %d; stderr %q", n, len(rejected)-security, stderr)
+	}
+}
+
+// policyMin makes the fake policy require min. Call after fakeCandidates.
+func policyMin(min evidence.TrustLevel) {
+	loadPolicy = func(string) (*policy.Policy, error) { return &policy.Policy{MinTrustLevel: min}, nil }
+}
+
+// Issue #65: a candidate whose signer the policy lists below minTrustLevel is
+// routine non-reuse. It is rejected as a miss, never reused, never exit 5,
+// and it never hides a verification failure or an undecidable sibling.
+func TestVerifyBelowMinTrust(t *testing.T) {
+	untrusted := &evidence.VerificationError{Reason: "untrusted signer"}
+	dev := candidate{trust: evidence.TrustDeveloper}
+	cases := []struct {
+		name     string
+		cands    map[string]candidate
+		code     int
+		outcome  evidence.Outcome
+		ref      string
+		rejected []evidence.Outcome
+	}{
+		{"alone is a miss, not a hit", map[string]candidate{"sha256:aa": dev}, ExitMiss, evidence.OutcomeMiss, "r@sha256:aa", []evidence.Outcome{evidence.OutcomeMiss}},
+		{"below-minimum failure is a miss too", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, failed: true}}, ExitMiss, evidence.OutcomeMiss, "r@sha256:aa", []evidence.Outcome{evidence.OutcomeMiss}},
+		{"does not block a verified sibling", map[string]candidate{"sha256:aa": dev, "sha256:bb": {trust: evidence.TrustRunner}}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
+		{"below-minimum failure does not override a trusted pass", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, failed: true}, "sha256:bb": {trust: evidence.TrustRunner}}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
+		{"error outranks it", map[string]candidate{"sha256:aa": dev, "sha256:bb": {fetchErr: errors.New("registry down")}}, ExitError, evidence.OutcomeError, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeError}},
+		{"verification failure outranks it", map[string]candidate{"sha256:aa": dev, "sha256:ff": {verifyErr: untrusted}}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:ff", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
+		{"verification failure stays visible beside a verified one", map[string]candidate{"sha256:aa": dev, "sha256:bb": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
+		{"signed cacheability lie stays a verification failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, cacheability: "external-dependencies"}}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:aa", []evidence.Outcome{evidence.OutcomeVerificationFailed}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeCandidates(t, nil, tc.cands)
+			policyMin(evidence.TrustRunner)
+			code, stdout, stderr := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "--policy", "p.yaml", "-o", "json")
+			var r evidence.Report
+			if err := json.Unmarshal([]byte(stdout), &r); err != nil {
+				t.Fatal(err)
 			}
+			if code != tc.code || r.Outcome != tc.outcome || r.Reference != tc.ref {
+				t.Fatalf("exit %d outcome %q ref %q; want %d %q %q; report %s", code, r.Outcome, r.Reference, tc.code, tc.outcome, tc.ref, stdout)
+			}
+			if r.Outcome != evidence.OutcomeVerified && (r.Result != "" || r.Signer != nil || r.Predicate != nil) {
+				t.Fatalf("non-verified report carries a result: %s", stdout)
+			}
+			var got []evidence.Outcome
+			for _, rj := range r.Rejected {
+				got = append(got, rj.Outcome)
+				if rj.Outcome == evidence.OutcomeMiss && !strings.Contains(rj.Reason, "trust level developer, policy requires at least runner") {
+					t.Fatalf("miss rejection reason %q", rj.Reason)
+				}
+			}
+			if !slices.Equal(got, tc.rejected) {
+				t.Fatalf("rejected outcomes %v, want %v; report %s", got, tc.rejected, stdout)
+			}
+			checkRejectionLines(t, stderr, tc.rejected)
 		})
 	}
 }

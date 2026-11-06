@@ -206,14 +206,16 @@ message, if any, goes to stderr.
 `reference`, `result`, `signer`, `predicate`, `reason` and `rejected` are
 omitted when empty. `reason` is set for `miss`, `verification-failed` and
 `error`. `rejected` lists candidate attestations that were not used, each
-`{reference, outcome, reason}` with `outcome` `verification-failed` or
-`error`. A `verification-failed` entry is a security event even when the
-report's `outcome` is `verified`.
+`{reference, outcome, reason}` with `outcome` `verification-failed`, `error`
+or `miss`. A `verification-failed` entry is a security event even when the
+report's `outcome` is `verified`. A `miss` entry is an authentic attestation
+from a signer the policy lists below `minTrustLevel`: routine non-reuse, not
+a security event.
 
 | Exit code | `outcome` | Meaning | What to do |
 |---|---|---|---|
 | 0 | `verified` | A valid attestation satisfies the policy. | Reuse `result`. |
-| 4 | `miss` | No attestation for this fingerprint. | Run the test. |
+| 4 | `miss` | No attestation for this fingerprint that the policy can reuse (none found, or only signers the policy lists below `minTrustLevel`). | Run the test. |
 | 5 | `verification-failed` | Attestation exists but failed signature or policy. | Run the test **and** alert. |
 | 1 | `error` (may have no report if fingerprinting failed) | Aval could not decide (registry down, I/O, bad policy file, trusted root unavailable). | Run the test (fail closed). |
 | 2 | (no report) | Bad flags or invalid `aval.yaml`. | Fix the invocation. |
