@@ -189,9 +189,10 @@ func TestOneExitCodeTable(t *testing.T) {
 	}
 }
 
-// siteDeepLink matches a link to a page of aval.run. The site is versioned
-// with mike, so only paths under a version (main/, latest/) resolve.
-var siteDeepLink = regexp.MustCompile(`aval\.run/([a-z][^\s)]*)`)
+// siteDeepLink matches a link to a page of aval.run (a path ending in / or an
+// anchor). The site is versioned with mike, so only pages under a version
+// (main/, latest/) resolve; files at the root (install.sh) are not pages.
+var siteDeepLink = regexp.MustCompile(`aval\.run/([a-z][^\s)]*(/|#[^\s)]*))`)
 
 // The README is a front door into the site, not a copy of it (#76).
 func TestReadmeIsShort(t *testing.T) {
