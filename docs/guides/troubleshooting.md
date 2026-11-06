@@ -5,7 +5,7 @@ Goal: go from an exit code or an error message to its cause and its fix.
 ```mermaid
 flowchart LR
   code{exit code} -- 0 --> ok([passed or verified]):::ok
-  code -- 1 --> e([error: read the aval: line]):::warn
+  code -- 1 --> e([error: read the aval: or reason: line]):::warn
   code -- 2 --> u([fix the command or aval.yaml]):::warn
   code -- 3 --> f([test failed: fix the test]):::warn
   code -- 4 --> m([miss: routine, run the test]):::muted
@@ -21,7 +21,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 | Code | Cause | Fix |
 |---|---|---|
 | 0 | `aval run`: the test passed, or a verified passing result was reused. `aval verify`: a verified result was found, passed or failed | nothing; after `aval verify`, read `result` in `--output json` |
-| 1 | an error (`aval run` still runs the test), or `FALSE HIT` with `--shadow` | read the `aval:` line below |
+| 1 | an error, or `FALSE HIT` with `--shadow`. `aval verify` exits 1 on any error. `aval run` exits 1 only when the test cannot start or the result cannot be published; a lookup error shows as outcome `error` with a `reason:` line, and run exits with the test's code | read the `aval:` or `reason:` line below |
 | 2 | bad flags or an invalid `aval.yaml` | fix the flag or field the message names |
 | 3 | the test failed, or `aval run` reused a failing result | fix the test |
 | 4 | `aval verify` found nothing it may reuse | nothing: run the test |
@@ -58,7 +58,10 @@ Find the message in a section below. Text in `<...>` changes per run.
 
 ## Errors (exit 1)
 
-`aval run` still runs the test when it can.
+`aval verify` exits 1. `aval run` prints the lookup errors below as outcome
+`error` with a `reason:` line, runs the test anyway and exits with its code
+(0 or 3). It exits 1 only when the test cannot start (`running <x>`) or the
+result cannot be published.
 
 ??? failure "Fingerprint and trust policy"
     | Message | Fix |
