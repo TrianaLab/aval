@@ -61,7 +61,8 @@ func TestReadmeQuickstart(t *testing.T) {
 	for _, want := range []string{
 		"pushed " + repo + "@sha256:",
 		"\nverified hello sha256:",
-		"reused passed result " + repo + "@sha256:",
+		"reference: " + repo + "@sha256:",
+		"reused passed result\n",
 	} {
 		if !strings.Contains(string(out), want) {
 			t.Errorf("quickstart output lacks %q\n%s", want, out)

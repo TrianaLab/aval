@@ -55,6 +55,84 @@ func TestVersionFlag(t *testing.T) {
 	}
 }
 
+// oneLine escapes only what could start a line or move the cursor; quotes
+// and backslashes stay readable.
+func TestOneLine(t *testing.T) {
+	cases := map[string]string{
+		`unknown command "version"`: `unknown command "version"`,
+		`C:\path ünï 中`:             `C:\path ünï 中`,
+		"a\nb\r\x1b[31m\t\x00":      `a\nb\r\x1b[31m\t\x00`,
+		"line\u2028sep\u0085\u202e": `line\u2028sep\u0085\u202e`,
+		"bad\xffutf8 \uFFFD":        `bad\xffutf8 ` + "\uFFFD",
+	}
+	for in, want := range cases {
+		if got := oneLine(in); got != want {
+			t.Errorf("oneLine(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// Each errors.Join member gets its own aval: line, with the prefix of the
+// errors that wrap it; text inside a member is never split, and an error the
+// report already showed is not repeated.
+func TestErrorLines(t *testing.T) {
+	joined := errors.Join(errors.New("a: \"x\""), errors.New("b\nforged"))
+	cases := []struct {
+		err  error
+		want string
+	}{
+		{usageError{fmt.Errorf("f.yaml: %w", joined)}, "aval: f.yaml: a: \"x\"\naval: f.yaml: b\\nforged\n"},
+		{errors.Join(shown{evidence.ErrVerification}, errors.New("recording result: disk full")), "aval: recording result: disk full\n"},
+		{fmt.Errorf("%w and %w", errors.New("one"), errors.New("two")), "aval: one and two\n"},
+		{fmt.Errorf("%w; see docs", joined), "aval: a: \"x\"\\nb\\nforged; see docs\n"},
+	}
+	for _, tc := range cases {
+		var b bytes.Buffer
+		for _, p := range errParts(tc.err) {
+			fmt.Fprintln(&b, "aval:", oneLine(p))
+		}
+		if b.String() != tc.want {
+			t.Errorf("%q printed as %q, want %q", tc.err, b.String(), tc.want)
+		}
+	}
+	var out bytes.Buffer
+	if code := run([]string{"version"}, &out, &out); code != ExitUsage || out.String() != "aval: unknown command \"version\"\n" {
+		t.Errorf("aval version: exit %d, output %q", code, out.String())
+	}
+}
+
+// A lookup that fails verification itself (a moved tag) lists no rejected
+// candidate, and still gets its single SECURITY line.
+func TestLookupVerificationFailureIsASecurityEvent(t *testing.T) {
+	fakeCandidates(t, &evidence.VerificationError{Reason: "tag points elsewhere"}, nil)
+	code, stdout, stderr := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "--policy", "p.yaml")
+	if code != ExitVerificationFailed || strings.Count(stdout, "tag points elsewhere") != 1 || !strings.HasPrefix(stderr, "aval: SECURITY: 1 attestation(s) for unit failed") || strings.Count(stderr, "\n") != 1 {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
+// Only non-deterministic is never reusable; external-dependencies is not
+// reusable by default, and the policy may allow it.
+func TestCacheabilityNotice(t *testing.T) {
+	for class, want := range map[string]string{"external-dependencies": "not reusable by default (the policy may allow it)", "non-deterministic": "never reusable"} {
+		_, stdout, _ := runCLI("run", "-f", writeContract(t, class), "--result", filepath.Join(t.TempDir(), "r.json"))
+		if !strings.Contains(stdout, "cacheability "+class+": "+want+"\n") {
+			t.Errorf("%s: stdout %q", class, stdout)
+		}
+	}
+}
+
+// A lookup that never ran is still a miss, but says only why it did not run.
+func TestSkippedLookupIsAMiss(t *testing.T) {
+	err := fmt.Errorf("wrapped: %w", skipped("reuse disabled (--no-reuse)"))
+	if !errors.Is(err, evidence.ErrNotFound) || exitCode(err) != ExitMiss || outcomeOf(err) != evidence.OutcomeMiss {
+		t.Fatalf("%v must be a miss", err)
+	}
+	if err.Error() != "wrapped: reuse disabled (--no-reuse)" || errors.Is(skipped("x"), evidence.ErrVerification) {
+		t.Fatalf("skipped prints %q", err)
+	}
+}
+
 const testContract = `apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
@@ -109,7 +187,7 @@ func TestCLI(t *testing.T) {
 		{"explain", []string{"run", "-f", hermetic, "--explain", "--fingerprint-only"}, ExitOK, "aval-fingerprint/v1\n", ""},
 		{"explain then run", []string{"run", "-f", hermetic, "--explain", "--result", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "ran unit: passed", ""},
 		{"run without registry runs the test", []string{"run", "-f", hermetic, "--result", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "miss unit sha256:", ""},
-		{"non-deterministic", []string{"run", "-f", nondet, "--result", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "cacheability non-deterministic: not reusable by default", ""},
+		{"non-deterministic", []string{"run", "-f", nondet, "--result", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "cacheability non-deterministic: never reusable", ""},
 		{"missing contract", []string{"run", "-f", missing}, ExitUsage, "", "aval:"},
 		{"unprovable inputs", []string{"run", "-f", noSource, "--fingerprint-only"}, ExitError, "", "matched no files"},
 		{"unprovable inputs explained", []string{"run", "-f", noSource, "--explain"}, ExitError, "", "matched no files"},
@@ -119,8 +197,8 @@ func TestCLI(t *testing.T) {
 		{"verify bad output", []string{"verify", "-o", "yaml"}, ExitUsage, "", "--output must be text or json"},
 		{"verify no registry", []string{"verify", "-f", hermetic}, ExitUsage, "", "--registry is required"},
 		{"verify missing contract", []string{"verify", "-f", missing, "--registry", "reg.example/r"}, ExitUsage, "", "aval:"},
-		{"verify no policy", []string{"verify", "-f", hermetic, "--registry", "reg.example/r"}, ExitMiss, "miss unit sha256:", "no trust policy"},
-		{"verify unreadable policy", []string{"verify", "-f", hermetic, "--registry", "reg.example/r", "--policy", "p.yaml"}, ExitError, "error unit sha256:", "p.yaml"},
+		{"verify no policy", []string{"verify", "-f", hermetic, "--registry", "reg.example/r"}, ExitMiss, "reason: no trust policy configured: pass --policy", ""},
+		{"verify unreadable policy", []string{"verify", "-f", hermetic, "--registry", "reg.example/r", "--policy", "p.yaml"}, ExitError, "reason: open p.yaml", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -374,8 +452,9 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 	}
 }
 
-// checkRejectionLines asserts one stderr line per rejected candidate: SECURITY
-// for a verification failure, even beside a verified one; warning otherwise.
+// checkRejectionLines asserts that stderr repeats no rejection from the
+// report, and carries exactly one SECURITY line, counting the verification
+// failures, when there is any, even beside a verified candidate.
 func checkRejectionLines(t *testing.T, stderr string, rejected []evidence.Outcome) {
 	t.Helper()
 	security := 0
@@ -384,11 +463,21 @@ func checkRejectionLines(t *testing.T, stderr string, rejected []evidence.Outcom
 			security++
 		}
 	}
-	if n := strings.Count(stderr, "aval: SECURITY: rejected attestation"); n != security {
-		t.Fatalf("%d SECURITY rejection lines, want %d; stderr %q", n, security, stderr)
+	var lines []string
+	for _, l := range strings.Split(strings.TrimSpace(stderr), "\n") {
+		if l != "" && !strings.HasPrefix(l, "aval: warning: listed attestation") {
+			lines = append(lines, l)
+		}
 	}
-	if n := strings.Count(stderr, "aval: warning: rejected attestation"); n != len(rejected)-security {
-		t.Fatalf("%d rejection warnings, want %d; stderr %q", n, len(rejected)-security, stderr)
+	want := 0
+	if security > 0 {
+		want = 1
+		if len(lines) != 1 || !strings.HasPrefix(lines[0], fmt.Sprintf("aval: SECURITY: %d attestation(s) for unit failed", security)) {
+			t.Fatalf("want one SECURITY line counting %d failures; stderr %q", security, stderr)
+		}
+	}
+	if len(lines) != want {
+		t.Fatalf("stderr repeats the report: %q", stderr)
 	}
 }
 

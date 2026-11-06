@@ -1,0 +1,5 @@
+---
+"aval": patch
+---
+
+Readable errors and reasons. Output escapes only control and non-printable characters (quotes and backslashes print as they are), and each cause of a joined error gets its own `aval:` line (an invalid contract) or is separated by `; ` in the report reason (an invalid policy). A reason is printed once, in the report: stderr no longer repeats it, and a verification failure adds a single `aval: SECURITY: ...` line that links to `docs/trust-model.md`. A signer missing from the policy gets the reason `signer key id "<id>" is not in the trust policy (trust policy <file>)` instead of the Sigstore error. Skipped lookups (no policy, no registry, `--no-reuse`, a cacheability class that is never or not allowed to be reused) say only why they did not look; they stay misses. No `attest.Sign:` or `registry.Lookup` prefixes reach users. Text-mode `verify` prints `signer:` (with the trust level name) and `reference:` lines for a verified result. `non-deterministic` is called "never reusable" everywhere. The JSON verify report is unchanged except for the wording of `reason`, where joined causes are now separated by `; `.

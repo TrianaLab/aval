@@ -155,7 +155,7 @@ func TestPushLookupFetchRoundTrip(t *testing.T) {
 
 func roundTrip(t *testing.T, repo string) {
 	ctx := context.Background()
-	if _, err := Lookup(ctx, repo, fpA); !errors.Is(err, evidence.ErrNotFound) || errors.Is(err, evidence.ErrVerification) {
+	if _, err := Lookup(ctx, repo, fpA); !errors.Is(err, evidence.ErrNotFound) || errors.Is(err, evidence.ErrVerification) || strings.HasPrefix(err.Error(), "registry.") {
 		t.Fatalf("empty registry: want a miss, got %v", err)
 	}
 	bundle := []byte(`{"bundle":true}`)
