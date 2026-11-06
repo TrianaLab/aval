@@ -5,12 +5,14 @@
 //
 // It serves the directory on 127.0.0.1, drives headless Chrome over the
 // DevTools protocol (a pipe, so no dependency) and checks that nothing is
-// fetched before the click, that typing `aval run` twice ends in
-// `verified`, that `tamper` then `aval verify` exits 5, and that without
-// WebAssembly the transcript stays and the page says why.
+// fetched before the visitor starts the demo by clicking the terminal body,
+// that typing `aval run` twice ends in `verified`, that `tamper` then
+// `aval verify` exits 5, and that without WebAssembly (started from the
+// keyboard: focus the terminal, press Enter) the transcript stays and the
+// page says why.
 // CHROME=<path> picks the browser; SCREENSHOTS=<dir> also saves the home
-// "see it run" section before and after the click, in light and dark, at
-// 1440 and 390 pixels wide.
+// "see it run" section before the click, in light and dark, at 1440 and 390
+// pixels wide, and after the second `aval run`.
 import { spawn, execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
@@ -100,13 +102,24 @@ async function screenshots(p, name) {
     for (const width of [1440, 390]) {
       await p.s("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 });
       await p.s("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] });
-      await p.js(`scrollTo(0, document.querySelector(".aval-run").offsetTop - 100); new Promise((r) => setTimeout(r, 300))`);
-      const { data } = await p.s("Page.captureScreenshot", { format: "png" });
+      const r = await p.js(`scrollTo(0, 0); document.querySelectorAll(".aval-term__out").forEach((e) => (e.scrollTop = e.scrollHeight)); new Promise((ok) => setTimeout(() => { const r = document.querySelector(".aval-run").getBoundingClientRect(); ok({ y: r.top + scrollY, h: r.height }); }, 300))`);
+      const { data } = await p.s("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { x: 0, y: r.y, width, height: r.h, scale: 1 } });
       writeFileSync(join(process.env.SCREENSHOTS, `${name}-${scheme}-${width}.png`), Buffer.from(data, "base64"));
     }
   }
   await p.s("Emulation.clearDeviceMetricsOverride");
 }
+
+// A real mouse click in the middle of the element.
+async function click(p, sel) {
+  const { x, y } = await p.js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  for (const type of ["mousePressed", "mouseReleased"]) await p.s("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+}
+
+const enter = async (p) => {
+  await p.s("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
+  await p.s("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+};
 
 const fetched = `performance.getEntriesByType("resource").some((e) => e.name.endsWith("aval.wasm"))`;
 const termText = `document.querySelector(".aval-term pre").textContent`;
@@ -117,35 +130,34 @@ try {
   await p.s("Page.navigate", { url: site });
   await p.until(`document.readyState === "complete" && !!document.querySelector(".aval-term__try:not([hidden])")`, "the Try it button");
   check("the static transcript is shown before the click", (await p.js(termText)).includes("reused passed result"));
+  check("the terminal invites a click", /click to run Aval live/.test(await p.js(`document.querySelector(".aval-term__cta:not([hidden])")?.textContent`)));
   check("nothing is fetched before the click", !(await p.js(fetched)));
   await screenshots(p, "before");
-  await p.js(`document.querySelector(".aval-term__try").click()`);
+  await click(p, ".aval-term pre");
   await p.until(`!!document.querySelector(".aval-term__in input")`, "the prompt");
-  check("aval.wasm is fetched after the click", await p.js(fetched));
+  check("aval.wasm is fetched after a click on the terminal", await p.js(fetched));
+  check("the prompt takes focus and the hint is gone", await p.js(`document.activeElement === document.querySelector(".aval-term__in input") && !document.querySelector(".aval-term__cta")`));
   const type = async (line) => {
     await p.js(`document.querySelector(".aval-term__in input").focus()`);
     await p.s("Input.insertText", { text: line });
-    await p.s("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
-    await p.s("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    await enter(p);
     return p.js(termText);
   };
   let out = await type("aval run");
   check("first aval run misses, runs and pushes", /miss greet[\s\S]*ran greet: passed \(exit 0\)[\s\S]*pushed /.test(out), out);
   out = await type("aval run");
   check("second aval run is verified and reused", /verified greet[\s\S]*reused passed result\n$/.test(out), out);
+  await screenshots(p, "after");
   await type("tamper");
   out = await type("aval verify");
   check("tamper then aval verify is verification-failed, exit 5", /aval: SECURITY[\s\S]*verification-failed greet[\s\S]*\nexit 5\n$/.test(out), out);
-
-  await type("clear");
-  await type("aval run");
-  await screenshots(p, "after");
 
   // Without WebAssembly the transcript stays and the page says why.
   const q = await page("delete window.WebAssembly;");
   await q.s("Page.navigate", { url: site });
   await q.until(`document.readyState === "complete" && !!document.querySelector(".aval-term__try:not([hidden])")`, "the Try it button");
-  await q.js(`document.querySelector(".aval-term__try").click()`);
+  await q.js(`document.querySelector(".aval-term pre").focus()`);
+  await enter(q);
   await q.until(`document.querySelector(".aval-try__status").textContent !== ""`, "the fallback message");
   check("without WebAssembly the transcript stays", (await q.js(termText)).includes("reused passed result") && (await q.js(`document.querySelector(".aval-try__status").textContent`)).includes("cannot run WebAssembly"));
 } catch (e) {

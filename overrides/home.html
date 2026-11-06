@@ -57,10 +57,11 @@
     {# Real output of bin/aval against a local registry:2 with a key-based
        policy; hashes shortened with an ellipsis, the test's own output left
        out. "Try it" (javascripts/try-aval.js) swaps the transcript for the
-       real Aval compiled to WebAssembly (cmd/aval-wasm), fetched only on
-       click; without WebAssembly the transcript stays. #}
+       real Aval compiled to WebAssembly (cmd/aval-wasm), fetched only once
+       the visitor clicks the terminal or the button, or presses a key in
+       the terminal; without WebAssembly the transcript stays. #}
     <figure class="aval-term" data-try aria-label="Terminal: the first aval run misses, runs the test and pushes a signed result; the second, with the same inputs, verifies it and reuses the passed result.">
-      <div class="aval-term__bar"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><span aria-hidden="true">ci / integration</span><button type="button" class="aval-term__try" hidden>Try it</button></div>
+      <div class="aval-term__bar"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><span aria-hidden="true">ci / integration</span><button type="button" class="aval-term__try" aria-label="Try it live: run Aval in your browser" hidden>&#9654; Try it live</button></div>
 <pre><span class="c"># REG=localhost:5055/acme/orders</span>
 <span class="c"># first job: nothing signed for these inputs yet</span>
 <span class="pr">$</span> <span class="w">aval run</span> --push --key keys/ci.pem --registry $REG --policy policy.yaml
@@ -75,7 +76,7 @@ ran integration: <span class="g">passed</span> (exit 0)
 <span class="hit"><span class="g">verified</span> integration sha256:7ebde18f…
 <span class="d">signer: key cZ9tHqSn…, trust level runner</span>
 <span class="d">reference: localhost:5055/acme/orders@sha256:0a4a3ac9…</span>
-<span class="w">reused passed result</span></span><span class="pr">$</span> <span class="cur"></span></pre>
+<span class="w">reused passed result</span></span><span class="pr">$</span> <span class="cur"></span><span class="aval-term__cta" hidden></span></pre>
       <figcaption class="aval-try">Try it runs Aval compiled to WebAssembly entirely in your browser, with a simulated test, an in-memory registry and a throwaway key generated in this tab. Keyless signing is not available here. <span class="aval-try__status" role="status"></span></figcaption>
     </figure>
     <div class="aval-run__explain">
@@ -86,6 +87,7 @@ ran integration: <span class="g">passed</span> (exit 0)
         <li><b>Miss.</b> No signed result for that fingerprint, so the test runs and <code>--push</code> signs the pass.</li>
         <li><b>Verified.</b> Same fingerprint, valid signature, a signer your policy trusts: the run is skipped and exits 0.</li>
       </ol>
+      <p class="aval-run__try"><b>Try it:</b> click the terminal. It runs the real Aval in your browser.</p>
     </div>
   </div>
 </section>

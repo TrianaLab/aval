@@ -1,7 +1,8 @@
 // "Try it" in the home page terminal (overrides/home.html): the real Aval
 // compiled to WebAssembly (cmd/aval-wasm, built by `make docs-wasm` into
-// assets/demo/). Until the visitor clicks, the terminal shows the static
-// transcript and nothing is fetched. wasm_exec.js is vendored next to the
+// assets/demo/). Until the visitor clicks the terminal (or its button) or
+// presses a key in it, the terminal shows the static transcript and nothing
+// is fetched. wasm_exec.js is vendored next to the
 // wasm and pinned to the Go toolchain that builds it (tests/architecture).
 // If WebAssembly is unavailable or loading fails, the transcript stays.
 // Output is inserted as text, never as HTML.
@@ -62,14 +63,27 @@
     });
   }
 
-  function start(fig, btn, note) {
+  var LABEL = "\u25B6 Try it live";
+
+  // start loads the demo once; first is a key the visitor typed in the
+  // terminal to start it, carried into the prompt.
+  function start(fig, btn, note, first) {
+    if (fig.dataset.state) return;
+    fig.dataset.state = "loading";
+    var pre = fig.querySelector("pre");
+    var cta = fig.querySelector(".aval-term__cta");
     btn.disabled = true;
-    btn.textContent = "Loading…";
+    btn.textContent = "Loading\u2026";
+    cta.textContent = "  loading Aval\u2026";
+    note.textContent = "";
     load().then(
       function () {
+        fig.dataset.state = "live";
         btn.hidden = true;
-        var pre = fig.querySelector("pre");
         pre.textContent = "";
+        pre.removeAttribute("tabindex");
+        pre.removeAttribute("role");
+        pre.removeAttribute("aria-label");
         pre.setAttribute("aria-live", "polite");
         pre.classList.add("aval-term__out");
         print(pre, "Aval is running in your browser. Type help, or start with: aval run", "c");
@@ -104,14 +118,26 @@
           at = Math.max(0, Math.min(history.length, at + (e.key === "ArrowUp" ? -1 : 1)));
           input.value = history[at] || "";
         });
+        // A click in the output, unless it selects text, goes to the prompt.
+        pre.addEventListener("click", function () {
+          if (!String(window.getSelection())) input.focus();
+        });
+        if (first) input.value = first;
         input.focus();
       },
       function (err) {
+        delete fig.dataset.state;
         btn.disabled = false;
-        btn.textContent = "Try it";
+        btn.textContent = LABEL;
+        cta.textContent = hint();
         note.textContent = "The demo could not start (" + err.message + "). The transcript above is real output.";
       }
     );
+  }
+
+  function hint() {
+    var verb = window.matchMedia("(hover: none)").matches ? "tap" : "click";
+    return "  \u2190 " + verb + " to run Aval live in your browser";
   }
 
   function init() {
@@ -120,9 +146,34 @@
     fig.dataset.ready = "1";
     var btn = fig.querySelector(".aval-term__try");
     var note = document.querySelector(".aval-try__status");
+    var pre = fig.querySelector("pre");
+    var cta = fig.querySelector(".aval-term__cta");
+    var go = function (first) {
+      start(fig, btn, note, first);
+    };
     btn.hidden = false;
+    cta.textContent = hint();
+    cta.hidden = false;
+    // The whole terminal body is the entry: click it, or focus it and press
+    // Enter, Space or any character (which then lands in the prompt).
+    pre.tabIndex = 0;
+    pre.setAttribute("role", "button");
+    pre.setAttribute("aria-label", "Terminal transcript of two aval runs. Press Enter to run Aval live in your browser.");
+    pre.addEventListener("click", function () {
+      if (!fig.dataset.state && !String(window.getSelection())) go();
+    });
+    pre.addEventListener("keydown", function (e) {
+      if (fig.dataset.state || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        go();
+      } else if (e.key.length === 1) {
+        e.preventDefault();
+        go(e.key);
+      }
+    });
     btn.addEventListener("click", function () {
-      start(fig, btn, note);
+      go();
     });
   }
 

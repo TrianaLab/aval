@@ -153,7 +153,7 @@ docs-wasm:
 	echo "aval.wasm: $$size bytes gzipped, budget $(WASM_BUDGET)"; \
 	if [ "$$size" -gt $(WASM_BUDGET) ]; then echo "aval.wasm is over its size budget"; exit 1; fi
 
-# Headless Chrome against the built site/: clicks "Try it", types aval run
+# Headless Chrome against the built site/: clicks the terminal, types aval run
 # twice (verified), then tamper and aval verify (exit 5). Needs Node and
 # Chrome or Chromium (CHROME=<path> to choose one).
 docs-demo-smoke: docs-site

@@ -998,25 +998,58 @@
 /* "Try it" (javascripts/try-aval.js): the button, the live output, the
    prompt and the note. The terminal stays dark in both schemes. */
 .aval-term__try {
+  display: inline-flex;
+  align-items: center;
   margin-left: auto;
-  padding: 1px 10px;
-  border: 1px solid rgba(52, 211, 153, 0.45);
-  border-radius: 6px;
-  background: rgba(52, 211, 153, 0.12);
-  color: #34d399;
-  font: 600 12px/1.6 var(--font-mono);
+  padding: 5px 12px;
+  border: 1px solid #34d399;
+  border-radius: var(--radius);
+  background: #34d399;
+  box-shadow: 0 6px 18px -8px #34d399;
+  color: #04140e;
+  font: 700 12.5px/1.4 var(--md-text-font-family);
+  white-space: nowrap;
   cursor: pointer;
+  transition: background-color 90ms, border-color 90ms;
 }
 .aval-term__try:hover {
-  background: rgba(52, 211, 153, 0.22);
+  border-color: #6ee7b7;
+  background: #6ee7b7;
 }
-.aval-term__try:focus-visible {
+.aval-term__try:focus-visible,
+.aval-term[data-try] pre:focus-visible {
   outline: 2px solid #34d399;
   outline-offset: 2px;
+}
+.aval-term[data-try] pre:focus-visible {
+  outline-offset: -4px;
+}
+.aval-term__try[hidden] {
+  display: none;
 }
 .aval-term__try:disabled {
   cursor: progress;
   opacity: 0.7;
+}
+/* Until the demo loads, the whole transcript is the entry point. */
+.aval-term[data-ready]:not([data-state="live"]) pre {
+  cursor: pointer;
+}
+.aval-term__cta {
+  color: #34d399;
+  font-weight: 600;
+}
+.aval-term[data-ready]:not([data-state="live"]) pre:hover .aval-term__cta {
+  color: #6ee7b7;
+}
+.aval-term[data-ready]:not([data-state]) .cur {
+  animation: aval-pulse 1.6s ease-in-out infinite;
+}
+@keyframes aval-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.25), 0 0 14px rgba(52, 211, 153, 0.6);
+    opacity: 0.55;
+  }
 }
 .aval-term pre.aval-term__out {
   height: 26.25em;
@@ -1091,6 +1124,15 @@
 .aval-run__explain b {
   color: var(--c-text);
   font-weight: 700;
+}
+.aval-run__explain .aval-run__try {
+  margin: 22px 0 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--c-accent-fill);
+  font-size: 15px;
+}
+.aval-run__explain .aval-run__try b {
+  color: var(--c-accent);
 }
 
 /* Metric strip. */
@@ -1329,7 +1371,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .aval-stack .lift,
-  .aval-term .cur {
+  .aval-term .cur,
+  .aval-term[data-ready]:not([data-state]) .cur {
     animation: none;
   }
 }
