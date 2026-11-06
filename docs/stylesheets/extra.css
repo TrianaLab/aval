@@ -523,6 +523,36 @@
   color: var(--c-on-accent);
 }
 
+/* ---- Diagrams and glossary tooltips --------------------------------------- */
+/* A Mermaid diagram (javascripts/diagrams.js) sits on a hairline card over a
+   faint iso grid, like the home page's art. The diagram's colours are in
+   diagrams.js; they use the tokens above. */
+.md-typeset .aval-diagram {
+  margin: 1.2em 0 1.6em;
+  padding: 1.2rem 1rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  background: var(--aval-iso-grid), var(--c-bg-2);
+  text-align: center;
+  overflow-x: auto;
+}
+.md-typeset .aval-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+/* The fence's source shows, quietly, until the diagram replaces it. */
+.md-typeset pre.aval-mermaid {
+  min-height: 6rem;
+  color: var(--c-text-3);
+}
+/* Glossary terms (docs/includes/abbreviations.md): a dotted emerald
+   underline; Material's content.tooltips shows the definition. */
+.md-typeset abbr {
+  border-bottom: 1px dotted var(--c-accent);
+  text-decoration: none;
+  cursor: help;
+}
+
 /* ---- Footer: prev/next on content pages, then one line -------------------- */
 .md-footer {
   border-top: 1px solid var(--c-border);
@@ -698,6 +728,12 @@
 .aval-home .aval-btn {
   padding: 11px 20px;
   font-size: 15px;
+}
+.aval-btn--gh svg {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  fill: currentColor;
 }
 .aval-install {
   display: inline-flex;

@@ -65,9 +65,11 @@ theme:
     - search.suggest
     - toc.follow
 
-# requirements.in is the input of the hashed requirements.txt, not a page.
+# requirements.in is the input of the hashed requirements.txt, not a page;
+# includes/ holds snippets pulled into pages.
 exclude_docs: |
   requirements.in
+  includes/
 
 # Under --strict (make docs-site) every warning fails the build: a page left
 # out of the nav, a nav entry with no file, a broken link or a missing anchor.
@@ -119,7 +121,18 @@ markdown_extensions:
       # Without this a missing --8<-- path is dropped silently and the strict
       # build still passes.
       check_paths: true
-  - pymdownx.superfences
+      # The glossary terms as abbreviations: a tooltip on every page. The
+      # canonical definitions are docs/concepts/glossary.md.
+      auto_append:
+        - docs/includes/abbreviations.md
+  - pymdownx.superfences:
+      # Not class "mermaid": Material would render those itself and fetch
+      # Mermaid from a CDN. javascripts/diagrams.js renders aval-mermaid with
+      # the vendored copy.
+      custom_fences:
+        - name: mermaid
+          class: aval-mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:
@@ -137,6 +150,9 @@ extra_css:
 extra_javascript:
   # Opens the mike version selector on click instead of hover (see extra.css).
   - javascripts/version-selector.js
+  # Renders Mermaid diagrams; loads javascripts/vendor/mermaid.min.js only on
+  # pages that have one.
+  - javascripts/diagrams.js
 
 # A reader's path: what Aval is, how to use it, the ideas it rests on, then
 # the pages to look things up. Every page under docs/ has exactly one entry.
@@ -148,11 +164,16 @@ nav:
   - Guides:
       - Consume Aval evidence: integrations.md
   - Concepts:
-      - Trust model: trust-model.md
-      - The test contract: contract.md
+      - concepts/index.md
+      - Trust: concepts/trust.md
+      - Outcomes: concepts/outcomes.md
+      - Glossary: concepts/glossary.md
   - Reference:
       - CLI reference: cli-reference.md
-      - Artifact format: artifact-format.md
+      - Specs:
+          - The test contract: contract.md
+          - Trust model: trust-model.md
+          - Artifact format: artifact-format.md
   - Project:
       - Changelog: changelog.md
       - Brand: brand.md

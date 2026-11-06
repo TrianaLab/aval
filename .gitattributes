@@ -1,2 +1,4 @@
 # TestManifestGolden hashes these bytes: no EOL conversion on checkout.
 internal/fingerprint/testdata/golden/** -text
+# TestVendoredMermaid hashes these bytes: no EOL conversion on checkout.
+docs/javascripts/vendor/** -text linguist-vendored
