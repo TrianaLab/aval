@@ -34,7 +34,6 @@ var (
 	rowRe     = regexp.MustCompile("(?m)^ *\\| (`[^|]*`) \\|")
 	spanRe    = regexp.MustCompile("`([^`]+)`")
 	holeRe    = regexp.MustCompile(`<[^>]*>`)
-	exitRe    = regexp.MustCompile(`(?m)^\s+Exit\w+\s+= (\d+)`)
 )
 
 // guideProblems checks one guide: a one-sentence goal, a diagram, a "Read
@@ -126,16 +125,17 @@ func commandProblems(body string, sections map[string]string) []string {
 	return probs
 }
 
-// troubleshootingProblems checks that every exit code has a row and that
-// every message quoted in a table's first column is in the Go source, so a
+// exitCodesInclude pulls in the one generated exit-code table.
+const exitCodesInclude = `--8<-- "docs/cli-reference.md:exit-codes"`
+
+// troubleshootingProblems checks that the page includes the exit-code table
+// and that every message quoted in a table's first column is in the Go source, so a
 // reworded message breaks the page here instead of silently. <...> stands
 // for the parts that change per run.
-func troubleshootingProblems(md, src string, codes []string) []string {
+func troubleshootingProblems(md, src string) []string {
 	var probs []string
-	for _, c := range codes {
-		if !strings.Contains(md, "\n| "+c+" | ") {
-			probs = append(probs, "troubleshooting: no row for exit code "+c)
-		}
+	if !strings.Contains(md, exitCodesInclude) {
+		probs = append(probs, "troubleshooting: must include "+exitCodesInclude)
 	}
 	for _, row := range rowRe.FindAllStringSubmatch(md, -1) {
 		for _, s := range spanRe.FindAllStringSubmatch(row[1], -1) {
@@ -205,15 +205,8 @@ func TestGuides(t *testing.T) {
 	for _, f := range trackedFiles(t, "cmd/*.go", "internal/*.go", "pkg/*.go", ":!*_test.go") {
 		src.WriteString(readFile(t, f))
 	}
-	var codes []string
-	for _, m := range exitRe.FindAllStringSubmatch(readFile(t, "cmd/aval/main.go"), -1) {
-		codes = append(codes, m[1])
-	}
-	if len(codes) < 7 {
-		t.Fatalf("found exit codes %v in cmd/aval/main.go, want 0 to 6", codes)
-	}
 	ts := readFile(t, "docs/guides/troubleshooting.md")
-	for _, p := range troubleshootingProblems(ts, src.String(), codes) {
+	for _, p := range troubleshootingProblems(ts, src.String()) {
 		t.Error(p)
 	}
 	var formats []string
@@ -254,14 +247,18 @@ func TestGuideChecksCatchDrift(t *testing.T) {
 		t.Errorf("a long guide: got %q, want only the line limit", p)
 	}
 
-	md := "\n| 0 | ok | - |\n    | `bad flag <x> here`, `--push requires` | fix |\n"
-	got = troubleshootingProblems(md, `errors.New("--push requires --registry"); fmt.Errorf("bad flag %s there")`, []string{"0", "4"})
-	want := []string{"troubleshooting: no row for exit code 4", `troubleshooting: "bad flag <x> here" is not in the Go source`}
+	md := "\n    | `bad flag <x> here`, `--push requires` | fix |\n"
+	src := `errors.New("--push requires --registry"); fmt.Errorf("bad flag %s there")`
+	got = troubleshootingProblems(md, src)
+	want := []string{"troubleshooting: must include " + exitCodesInclude, `troubleshooting: "bad flag <x> here" is not in the Go source`}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
+	if got := troubleshootingProblems(exitCodesInclude+md, src); len(got) != 1 {
+		t.Errorf("with the include: got %q, want only the unknown message", got)
+	}
 
-	src := `add("kind: got %q, want %q", k); return nil, "signature: " + err.Error(); add("%s: %w", f, err)`
+	src = `add("kind: got %q, want %q", k); return nil, "signature: " + err.Error(); add("%s: %w", f, err)`
 	formats := messageFormats(src, msgRe)
 	if want := []string{"kind: got %q, want %q", "signature: %v", "%s: %w"}; !slices.Equal(formats, want) {
 		t.Errorf("formats %q, want %q", formats, want)

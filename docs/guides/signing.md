@@ -19,9 +19,7 @@ flowchart LR
 
     Run the test, then sign and push the result:
 
-    ```sh
-    aval run --push --key aval.key --registry localhost:5001/demo/hello-aval
-    ```
+    --8<-- "README.md:push"
 
     This is the [quickstart](https://github.com/TrianaLab/aval#try-it-on-your-laptop)
     path; a test runs it as written.

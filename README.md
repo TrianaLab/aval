@@ -80,9 +80,11 @@ EOF
 Run the test, then sign and push the result. The output says `miss`:
 this run has no policy, so it does not look for a result and runs the test:
 
+<!-- --8<-- [start:push] -->
 ```sh
 aval run --push --key aval.key --registry localhost:5001/demo/hello-aval
 ```
+<!-- --8<-- [end:push] -->
 
 Check that a trusted result exists for these exact inputs. It prints
 `verified hello sha256:...` and exits 0:

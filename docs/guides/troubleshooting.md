@@ -18,15 +18,7 @@ flowchart LR
 aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit $?"
 ```
 
-| Code | Cause | Fix |
-|---|---|---|
-| 0 | `aval run`: the test passed, or a verified passing result was reused. `aval verify`: a verified result was found, passed or failed | nothing; after `aval verify`, read `result` in `--output json` |
-| 1 | an error, or `FALSE HIT` with `--shadow`. `aval verify` exits 1 on any error. `aval run` exits 1 only when the test cannot start or the result cannot be published; a lookup error shows as outcome `error` with a `reason:` line, and run exits with the test's code | read the `aval:` or `reason:` line below |
-| 2 | bad flags or an invalid `aval.yaml` | fix the flag or field the message names |
-| 3 | the test failed, or `aval run` reused a failing result | fix the test |
-| 4 | `aval verify` found nothing it may reuse | nothing: run the test |
-| 5 | a result does not verify: a security event | see [Verification failures](#verification-failures-exit-5); never retry it away |
-| 6 | reserved, never returned | nothing |
+--8<-- "docs/cli-reference.md:exit-codes"
 
 Find the message in a section below. Text in `<...>` changes per run.
 
@@ -80,8 +72,8 @@ result cannot be published.
     |---|---|
     | `loading registry credentials: <x>`, `resolving <tag>: <x>`, `listing referrers: <x>`, `fetching manifest <x>`, `fetching layer <x>` | check the address, the network and `docker login` |
     | `signing: <x>`, `publishing: <x>`, `pushing manifest: <x>`, `tagging anchor: <x>` | check the token or key, and write access |
-    | `more than <n> attestations for fingerprint`, `is not listed among the referrers of` | delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)) |
-    | `every listed attestation is gone`, `is gone, skipping it` | someone deleted results during the lookup: run again |
+    | `more than <n> attestations for fingerprint` | delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)) |
+    | `is not listed among the referrers of` | the registry did not list the pushed result in time, or does not support the OCI 1.1 referrers API: push again, or use a registry with referrers support |
     | `running <x>` | install the program `runner.command` starts |
     | `writing report: <x>`, `result not published: <x>` | fix the `--report` path, or the fingerprint error before it |
     | `reading the result recorded by 'aval run'` | run `aval run` first |
@@ -98,6 +90,7 @@ result cannot be published.
     | `no trust policy configured`, `no registry configured`, `reuse disabled (--no-reuse)` | pass `--policy`, `--registry`, drop `--no-reuse` |
     | `cacheability <x> is never reusable`, `is not in allowedCacheability` | by design, or allow the class in the policy |
     | `not reusable under the trust policy`, `signer <x> has trust level <y>, policy requires at least <z>` | the signer is below `minTrustLevel`; raise its `trustLevel` if you trust it |
+    | `every listed attestation is gone`, `is gone, skipping it` | someone deleted results during the lookup: run again |
 
 ## Verification failures (exit 5)
 
