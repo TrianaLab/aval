@@ -1,0 +1,38 @@
+/* Aval brand palette, derived from the logo (docs/brand.md). mkdocs.yml sets
+   primary and accent to `custom`; list this file last in extra_css so these
+   tokens win. The header stays neutral so the emerald mark reads on it. */
+
+[data-md-color-scheme="default"] {
+  --aval-emerald: #059669;      /* the mark on light */
+  --aval-emerald-text: #047857; /* links: 5.5:1 on white, #059669 is 3.8:1 */
+  --aval-ink: #0f172a;          /* the wordmark on light */
+  --aval-surface: #ffffff;
+}
+
+[data-md-color-scheme="slate"] {
+  --aval-emerald: #34d399;      /* the mark on dark */
+  --aval-emerald-text: #34d399;
+  --aval-ink: #e2e8f0;          /* the wordmark on dark */
+  --aval-surface: #0b1220;
+  --md-default-bg-color: var(--aval-surface);
+}
+
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: var(--aval-surface);
+  --md-primary-fg-color--light: var(--aval-surface);
+  --md-primary-fg-color--dark: var(--aval-surface);
+  --md-primary-bg-color: var(--aval-ink);
+  --md-primary-bg-color--light: var(--aval-ink);
+}
+
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: var(--aval-emerald);
+  --md-accent-fg-color--transparent: color-mix(in srgb, var(--aval-emerald) 10%, transparent);
+  --md-accent-bg-color: var(--aval-surface);
+  --md-typeset-a-color: var(--aval-emerald-text);
+}
+
+/* Material shows one theme.logo; swap in the dark variant on slate. */
+[data-md-color-scheme="slate"] .md-logo img {
+  content: url("../assets/images/logo-dark.svg");
+}
