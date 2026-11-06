@@ -3,7 +3,10 @@ package main
 import (
 	"cmp"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/spf13/cobra"
 
 	"github.com/TrianaLab/aval/internal/attest"
@@ -77,23 +81,95 @@ runner.command never sees it.`,
 	return cmd
 }
 
-func (o runFlags) validate() error {
+// validate rejects bad flags before anything runs. token is the keyless
+// signing token, checked only with --push.
+func (o runFlags) validate(token string) error {
 	switch {
 	case o.push && o.repo == "":
 		return usageError{errors.New("--push requires --registry")}
 	case o.shadow && o.noReuse:
 		return usageError{errors.New("--shadow and --no-reuse exclude each other")}
+	case o.repo != "":
+		if err := checkRegistry(o.repo); err != nil {
+			return err
+		}
 	}
-	return checkTimeout(o.registryTimeout)
+	if err := checkTimeout(o.registryTimeout); err != nil || !o.push {
+		return err
+	}
+	return checkSigner(o.key, token)
+}
+
+// keyHint is how to create a key aval can sign with.
+const keyHint = "aval signs with an unencrypted ECDSA P-256 private key in PEM (PKCS#8 or SEC1); cosign keys are encrypted and not supported; create one with: openssl ecparam -name prime256v1 -genkey -noout -out aval.key"
+
+// checkSigner fails fast, before the test runs, when signing could not
+// work: no key and no OIDC token, or a key that does not load.
+func checkSigner(key, token string) error {
+	if key == "" {
+		if token == "" {
+			return usageError{fmt.Errorf("signing needs --key or, for keyless signing, an OIDC token in $%s", idTokenEnv)}
+		}
+		return nil
+	}
+	if err := loadsAsP256(key); err != nil {
+		return usageError{fmt.Errorf("--key %s: %w; %s", key, err, keyHint)}
+	}
+	return nil
+}
+
+// loadsAsP256 checks what attest.Sign will require of the key file.
+// ponytail: mirrors attest's key loading so a bad key fails before the test
+// runs; signing loads it again and stays the authority.
+func loadsAsP256(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	b, _ := pem.Decode(data)
+	switch {
+	case b == nil:
+		return errors.New("not a PEM file")
+	case strings.Contains(b.Type, "ENCRYPTED"):
+		return fmt.Errorf("PEM type %s is encrypted", b.Type)
+	}
+	k, err := cryptoutils.UnmarshalPEMToPrivateKey(data, cryptoutils.SkipPassword)
+	if err != nil {
+		return err
+	}
+	if ec, ok := k.(*ecdsa.PrivateKey); !ok || ec.Curve != elliptic.P256() {
+		return errors.New("not an ECDSA P-256 key")
+	}
+	return nil
+}
+
+// checkOutputs refuses to overwrite an existing file at --result or
+// --report that is not an Aval output, wherever it lies: the scope check
+// cannot see through aliases (a symlinked root, a case-insensitive file
+// system). --fingerprint-only writes nothing.
+func (o runFlags) checkOutputs() error {
+	for _, p := range []string{o.resultFile, o.reportFile} {
+		if !o.fingerprintOnly && existsNonAvalOutput(p) {
+			return usageError{fmt.Errorf("output %s (--result or --report) exists and holds neither an Aval result nor a report; Aval does not overwrite it: choose another path or remove the file", p)}
+		}
+	}
+	return nil
 }
 
 func runTest(cmd *cobra.Command, o runFlags) error {
-	if err := o.validate(); err != nil {
+	// Read the signing token once, before validation needs it, and keep it
+	// out of the environment of anything that runs later.
+	token := os.Getenv(idTokenEnv)
+	_ = os.Unsetenv(idTokenEnv) // ponytail: only fails on an invalid name
+	if err := o.validate(token); err != nil {
 		return err
 	}
 	c, fp, fpErr := loadAndFingerprint(o.file, o.resultFile, o.reportFile)
 	if c == nil {
 		return fpErr
+	}
+	if err := o.checkOutputs(); err != nil {
+		return err
 	}
 	ctx, out, warn := cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr()
 	if o.explain || o.fingerprintOnly {
@@ -101,19 +177,13 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 			return err
 		}
 	}
-	// Read the signing token once and keep it out of the environment, so
-	// neither runner.command nor anything else started later inherits it.
-	token := os.Getenv(idTokenEnv)
-	_ = os.Unsetenv(idTokenEnv) // ponytail: only fails on an invalid name
 	r, lookupErr := decide(ctx, out, warn, c, fp, fpErr, o)
 	_ = writeReport(out, "text", r) // text never fails, like the other lines printed
 	// No I/O failure may skip the test or hide a verification failure
 	// (invariants 3, 4): errors are collected, never returned early.
 	var errs []error
-	if o.reportFile != "" {
-		if err := writeReportFile(o.reportFile, r); err != nil {
-			errs = append(errs, err)
-		}
+	if err := writeReportFile(o.reportFile, r); err != nil {
+		errs = append(errs, err)
 	}
 	if r.Outcome == evidence.OutcomeVerified && !o.shadow && len(errs) == 0 {
 		fmt.Fprintf(out, "reused %s result %s\n", r.Result, r.Reference)
@@ -251,7 +321,11 @@ func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr error
 	return nil
 }
 
+// writeReportFile writes r to path, unless no --report was asked for.
 func writeReportFile(path string, r evidence.Report) error {
+	if path == "" {
+		return nil
+	}
 	if err := writeJSON(path, r); err != nil {
 		return fmt.Errorf("writing report: %w", err)
 	}
@@ -300,7 +374,8 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 			if repo == "" {
 				return usageError{errors.New("--registry is required")}
 			}
-			if err := checkTimeout(timeout); err != nil {
+			token := os.Getenv(idTokenEnv)
+			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout), checkSigner(key, token)); err != nil {
 				return err
 			}
 			c, fp, err := loadAndFingerprint(file, resultFile)
@@ -319,7 +394,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 				return fmt.Errorf("recorded result is for test %q (%s) with fingerprint %s; the contract is %q (%s) with fingerprint %s: run the test again",
 					p.Test.ID, p.Test.Cacheability, p.Execution.Fingerprint, c.Metadata.Name, c.Cacheability, fp.Digest)
 			}
-			ref, err := signAndPush(cmd.Context(), p, repo, key, os.Getenv(idTokenEnv), timeout)
+			ref, err := signAndPush(cmd.Context(), p, repo, key, token, timeout)
 			if err != nil {
 				return err
 			}
