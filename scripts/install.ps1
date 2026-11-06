@@ -4,7 +4,8 @@
 #
 # The Windows counterpart of scripts/get-aval.sh, with the same checks; read
 # that script's header for why each one exists. `docs/install.ps1` is a
-# symlink to this file, so the docs site publishes these same bytes.
+# symlink to this file, so the docs site (#81, not merged yet) can publish
+# these same bytes.
 #
 #   * checksums.txt must exist and list the archive, and the archive must have
 #     that sha256, or nothing is installed. Always checked.
@@ -142,15 +143,17 @@
   }
 
   # User PATH (no admin), compared entry by entry so a prefix of another
-  # directory does not count as present. New shells see it; this one is
-  # updated too so `aval` works right away.
+  # directory does not count as present, and with a trailing backslash
+  # trimmed on both sides so `C:\x\` and `C:\x` are one entry. New shells
+  # see it; this one is updated too so `aval` works right away.
+  $want = $InstallDir.TrimEnd('\')
   $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
   $entries = @($userPath -split ';' | Where-Object { $_ })
-  if ($entries -notcontains $InstallDir) {
+  if (-not ($entries | Where-Object { $_.TrimEnd('\') -eq $want })) {
     [Environment]::SetEnvironmentVariable('Path', (($entries + $InstallDir) -join ';'), 'User')
     Write-Host "  added $InstallDir to the user PATH (open a new terminal to pick it up)"
   }
-  if (($env:Path -split ';') -notcontains $InstallDir) { $env:Path = "$env:Path;$InstallDir" }
+  if (-not (($env:Path -split ';') | Where-Object { $_.TrimEnd('\') -eq $want })) { $env:Path = "$env:Path;$InstallDir" }
 
   Write-Host "aval installed to $(Join-Path $InstallDir 'aval.exe')"
   & (Join-Path $InstallDir 'aval.exe') --version

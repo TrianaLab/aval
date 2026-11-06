@@ -4,8 +4,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/TrianaLab/aval/main/scripts/get-aval.sh | bash
 #
 # Windows uses scripts/install.ps1. `docs/install.sh` is a symlink to this
-# file, so the docs site publishes these same bytes; a copy would drift from
-# the original by the next release.
+# file, so the docs site (#81, not merged yet) can publish these same bytes;
+# a copy would drift from the original by the next release.
 #
 # What it does, in order: detect OS and architecture, resolve the release
 # (latest, or DESIRED_VERSION), download the archive and checksums.txt,
