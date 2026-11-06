@@ -163,21 +163,13 @@ exit code: 5
 
 ## What just happened
 
-```text
-              aval.yaml scope: src/**
-                       |
-                       v
-   src/hello.txt --> fingerprint sha256:fb39...
-                       |
-                       v
-   registry: is there a result tagged sha256-<fingerprint>?
-        |                         |                          |
-       no                        yes, signed by             yes, signed by
-        |                        a key in policy.yaml       any other key
-        v                         |                          |
-   miss: run the test,            v                          v
-   sign, push (--push)       verified: reuse,           verification-failed:
-                             skip the test              run the test, exit 5
+```mermaid
+flowchart LR
+  files[src/hello.txt<br>listed in scope] --> fp[fingerprint<br>sha256:fb39...]
+  fp --> look{result for this<br>fingerprint?}
+  look -- no --> miss([miss: run the test,<br>sign and push<br>steps 4 and 6]):::muted
+  look -- "yes, signer in policy.yaml" --> ok([verified: reuse,<br>skip the test<br>step 5]):::ok
+  look -- "yes, any other signer" --> bad([verification-failed:<br>run the test, exit 5<br>step 7]):::err
 ```
 
 - The fingerprint covers only what `scope` lists. Change one byte there and
