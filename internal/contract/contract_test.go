@@ -1,7 +1,9 @@
 package contract
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -40,8 +42,9 @@ func TestParseInvalid(t *testing.T) {
 	cases := map[string]struct{ from, to, wantErr string }{
 		"bad apiVersion": {"aval.trianalab.io/v1", "aval.trianalab.io/v9", "apiVersion"},
 		// No accept window for the pre-freeze identifiers (fail closed).
-		"pre-freeze apiVersion": {"aval.trianalab.io/v1", "aval.dev/v1alpha1", "apiVersion"},
+		"pre-freeze apiVersion": {"aval.trianalab.io/v1", "aval.dev/v1alpha1", "change the line to apiVersion: aval.trianalab.io/v1"},
 		"alpha apiVersion":      {"aval.trianalab.io/v1", "aval.trianalab.io/v1alpha1", "apiVersion"},
+		"empty apiVersion":      {"apiVersion: aval.trianalab.io/v1", "apiVersion: \"\"", "apiVersion"},
 		"unknown field":         {"cacheability:", "cachability:", "cachability"},
 		"bad class":             {"controlled-environment", "sometimes", "unknown class"},
 		"escaping glob":         {`"compose.yaml"`, `"../secrets"`, "segments"},
@@ -284,7 +287,11 @@ func TestLoad(t *testing.T) {
 	if _, err := Load(bad); err == nil || !strings.Contains(err.Error(), bad) {
 		t.Fatalf("invalid contract error must name the file, got %v", err)
 	}
-	if _, err := Load(filepath.Join(dir, "missing.yaml")); !os.IsNotExist(err) {
+	// A missing contract is still ErrNotExist, plus a next step.
+	if _, err := Load(filepath.Join(dir, "missing.yaml")); !errors.Is(err, fs.ErrNotExist) || !strings.Contains(err.Error(), "pass its path with -f") {
 		t.Fatalf("missing file: got %v", err)
+	}
+	if _, err := Load(dir); err == nil || strings.Contains(err.Error(), "-f") {
+		t.Fatalf("unreadable contract: got %v", err)
 	}
 }

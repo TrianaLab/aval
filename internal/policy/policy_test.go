@@ -99,7 +99,7 @@ func TestLoadErrors(t *testing.T) {
 		"unknown field":               {"kind: Policy", "kind: Policy\nidentitys: []", "decoding policy"},
 		"two documents":               {"kind: Policy", "kind: Policy\n---\nkind: Policy", "multiple YAML documents"},
 		"wrong apiVersion":            {"aval.trianalab.io/v1", "aval.trianalab.io/v2", "apiVersion"},
-		"pre-freeze apiVersion":       {"aval.trianalab.io/v1", "aval.dev/v1alpha1", "apiVersion"},
+		"pre-freeze apiVersion":       {"aval.trianalab.io/v1", "aval.dev/v1alpha1", "change the line to apiVersion: aval.trianalab.io/v1"},
 		"wrong kind":                  {"kind: Policy", "kind: Test", "kind"},
 		"no minTrustLevel":            {"minTrustLevel: runner\n", "", "minTrustLevel"},
 		"numeric minTrustLevel":       {"minTrustLevel: runner", "minTrustLevel: 2", "minTrustLevel"},

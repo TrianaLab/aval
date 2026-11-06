@@ -15,6 +15,25 @@ var update = flag.Bool("update", false, "rewrite docs/cli-reference.md from the 
 
 var cliReference = filepath.Join("..", "..", "docs", "cli-reference.md")
 
+// exitCodes is the one exit-code table (the Exit* constants in main.go).
+// ponytail: hand-written; the codes are frozen API, so it changes with them.
+const exitCodes = `
+## Exit codes
+
+| Code | ` + "`aval run`" + ` | ` + "`aval verify`" + ` | ` + "`aval push`" + ` |
+|---|---|---|---|
+| 0 | the test passed, or a verified passing result was reused | a verified result exists (passing or failing) | pushed |
+| 1 | error (the test still runs when it can), or a false hit in ` + "`--shadow`" + ` | error: registry, policy, trusted root or fingerprint | error: signing, registry or a result that does not match the current inputs |
+| 2 | bad flags or invalid ` + "`aval.yaml`" + ` | bad flags or invalid ` + "`aval.yaml`" + ` | bad flags or invalid ` + "`aval.yaml`" + ` |
+| 3 | the test failed, or a verified failing result was reused | not used | not used |
+| 4 | not used: a miss runs the test | miss: no result the policy can reuse | not used |
+| 5 | verification failed, after running the test: a security event | verification failed: a security event | not used |
+| 6 | reserved, never returned | reserved, never returned | reserved, never returned |
+
+A miss (4) is routine. A verification failure (5) means someone published a
+result the policy does not trust; never hide it or retry it away.
+`
+
 // renderCLIReference writes one section per command, in the order `aval
 // --help` lists them, from the same cobra tree the binary executes.
 func renderCLIReference() []byte {
@@ -27,6 +46,7 @@ func renderCLIReference() []byte {
 	b.WriteString("# CLI reference\n\n")
 	b.WriteString("Generated from the cobra command tree by `make docs-cli`. Do not edit by hand:\n")
 	b.WriteString("`make ci-docs` fails when this file and the CLI disagree.\n")
+	b.WriteString(exitCodes)
 	var walk func(*cobra.Command)
 	walk = func(c *cobra.Command) {
 		c.InitDefaultHelpFlag()

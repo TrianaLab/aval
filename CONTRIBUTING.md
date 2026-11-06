@@ -164,7 +164,8 @@ the version; Aval is not an npm package. To release:
    `ghcr.io/trianalab/aval-attestations`), then tag the merge commit
    `v<version from package.json>` and push the tag. The `release` job
    refuses to publish without a verified, passing e2e attestation for that
-   commit (`aval verify -f aval.e2e.yaml --policy .github/aval/main.yaml`).
+   commit (`aval verify -f aval.e2e.yaml --registry
+   ghcr.io/trianalab/aval-attestations --policy .github/aval/main.yaml`).
    A tag pushed too early fails; re-run the `release` job once `ci` on
    `main` has finished.
 

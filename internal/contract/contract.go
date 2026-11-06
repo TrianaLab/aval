@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"regexp"
@@ -22,6 +23,18 @@ import (
 // APIVersion is the only contract and policy version accepted by this
 // build. Frozen: changes within it are additive only (docs/contract.md).
 const APIVersion = "aval.trianalab.io/v1"
+
+// CheckAPIVersion rejects any apiVersion but APIVersion. A pre-freeze
+// aval.dev/ version gets a hint that says which line to change.
+func CheckAPIVersion(got string) error {
+	if got == APIVersion {
+		return nil
+	}
+	if strings.HasPrefix(got, "aval.dev/") {
+		return fmt.Errorf("apiVersion: got %q, want %q: that is the pre-freeze version, change the line to apiVersion: %s", got, APIVersion, APIVersion)
+	}
+	return fmt.Errorf("apiVersion: got %q, want %q", got, APIVersion)
+}
 
 // Kind is the only contract kind accepted in v1.
 const Kind = "Test"
@@ -113,6 +126,9 @@ var (
 // Load reads and validates a contract file.
 func Load(file string) (*Contract, error) {
 	data, err := os.ReadFile(file)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("%w: create %s (see docs/contract.md) or pass its path with -f", err, file)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -147,8 +163,8 @@ func (c *Contract) Validate() error {
 	var errs []error
 	add := func(format string, a ...any) { errs = append(errs, fmt.Errorf(format, a...)) }
 
-	if c.APIVersion != APIVersion {
-		add("apiVersion: got %q, want %q", c.APIVersion, APIVersion)
+	if err := CheckAPIVersion(c.APIVersion); err != nil {
+		errs = append(errs, err)
 	}
 	if c.Kind != Kind {
 		add("kind: got %q, want %q", c.Kind, Kind)
