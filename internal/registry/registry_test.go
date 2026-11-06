@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	ggcr "github.com/google/go-containerregistry/pkg/registry"
 	"github.com/opencontainers/go-digest"
@@ -33,6 +34,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	_ = os.Setenv("DOCKER_CONFIG", dir)
+	pushConfirmDelay = time.Millisecond
 	code := m.Run()
 	_ = os.RemoveAll(dir)
 	os.Exit(code)
@@ -350,6 +352,7 @@ func TestInputValidation(t *testing.T) {
 func TestCredentialStoreError(t *testing.T) {
 	orig := newCredentialStore
 	t.Cleanup(func() { newCredentialStore = orig })
+	resetClient(t)
 	newCredentialStore = func() (credentials.Store, error) { return nil, errors.New("bad docker config") }
 	if _, err := newRepository("localhost:5000/x"); err == nil || !strings.Contains(err.Error(), "bad docker config") {
 		t.Fatalf("got %v", err)
@@ -614,5 +617,168 @@ func TestFetchTransportErrors(t *testing.T) {
 				t.Fatalf("got %v, want verification failure = %v", err, tc.verErr)
 			}
 		})
+	}
+}
+
+// resetClient drops the process-wide registry client for the test.
+func resetClient(t *testing.T) {
+	t.Helper()
+	reset := func() {
+		clientMu.Lock()
+		client = nil
+		clientMu.Unlock()
+	}
+	reset()
+	t.Cleanup(reset)
+}
+
+// Lookup, every Fetch and Push share one credential store and auth cache.
+func TestClientIsShared(t *testing.T) {
+	ctx := context.Background()
+	repo := serve(t, true, nil)
+	orig := newCredentialStore
+	t.Cleanup(func() { newCredentialStore = orig })
+	resetClient(t)
+	loads := 0
+	newCredentialStore = func() (credentials.Store, error) { loads++; return orig() }
+	for _, sig := range []string{"a", "b"} {
+		if _, err := Push(ctx, repo, fpA, att(sig, nil)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ds, err := Lookup(ctx, repo, fpA)
+	if err != nil || len(ds) != 2 {
+		t.Fatalf("Lookup = %v, %v", ds, err)
+	}
+	for _, d := range ds {
+		if _, err := Fetch(ctx, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if loads != 1 {
+		t.Fatalf("credential store loaded %d times, want 1", loads)
+	}
+}
+
+// A registry that accepts the connection and never answers must not hold the
+// caller past its deadline, and the error is neither a miss nor a
+// verification failure (outcome error: run the test).
+func TestStalledRegistryHonoursDeadline(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
+	t.Cleanup(srv.Close)
+	repo := strings.TrimPrefix(srv.URL, "http://") + "/acme/orders-aval"
+	calls := map[string]func(context.Context) error{
+		"lookup": func(ctx context.Context) error { _, err := Lookup(ctx, repo, fpA); return err },
+		"fetch": func(ctx context.Context) error {
+			_, err := Fetch(ctx, Descriptor{Repository: repo, Digest: fpA})
+			return err
+		},
+		"push": func(ctx context.Context) error { _, err := Push(ctx, repo, fpA, att("ci", nil)); return err },
+	}
+	for name, call := range calls {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			start := time.Now()
+			err := call(ctx)
+			if errors.Is(err, evidence.ErrNotFound) || errors.Is(err, evidence.ErrVerification) || !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("want a deadline error, got %v", err)
+			}
+			if d := time.Since(start); d > 5*time.Second {
+				t.Fatalf("returned after %s", d)
+			}
+		})
+	}
+}
+
+// A registry that keeps answering empty referrers pages with a next link
+// ends the listing after maxReferrerPages requests, with a plain error.
+func TestLookupCapsReferrerPages(t *testing.T) {
+	ctx := context.Background()
+	pages := 0
+	armed := false
+	repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
+		if !armed || !strings.Contains(r.URL.Path, "/referrers/") {
+			return false
+		}
+		pages++
+		w.Header().Set("Content-Type", ocispec.MediaTypeImageIndex)
+		w.Header().Set("Link", fmt.Sprintf(`<%s?last=%d>; rel="next"`, r.URL.Path, pages))
+		_ = json.NewEncoder(w).Encode(ocispec.Index{Versioned: specs.Versioned{SchemaVersion: 2}, MediaType: ocispec.MediaTypeImageIndex, Manifests: []ocispec.Descriptor{}})
+		return true
+	})
+	if _, err := Push(ctx, repo, fpA, att("ci", nil)); err != nil {
+		t.Fatal(err)
+	}
+	armed = true
+	got, err := Lookup(ctx, repo, fpA)
+	if err == nil || errors.Is(err, evidence.ErrNotFound) || errors.Is(err, evidence.ErrVerification) || got != nil {
+		t.Fatalf("Lookup = %+v %v; want a plain error", got, err)
+	}
+	if pages != maxReferrerPages {
+		t.Fatalf("registry served %d pages, want %d", pages, maxReferrerPages)
+	}
+}
+
+// A listed attestation whose manifest was deleted is absent, not unknown.
+func TestFetchDeletedManifestIsAbsent(t *testing.T) {
+	ctx := context.Background()
+	armed := false
+	repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
+		if armed && r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/manifests/sha256:") {
+			http.Error(w, "gone", http.StatusNotFound)
+			return true
+		}
+		return false
+	})
+	d, err := Push(ctx, repo, fpA, att("ci", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	armed = true
+	if _, err := Fetch(ctx, d); !errors.Is(err, evidence.ErrNotFound) || errors.Is(err, evidence.ErrVerification) {
+		t.Fatalf("want a miss, got %v", err)
+	}
+}
+
+// Push confirms the new digest in the referrers listing: a referrer dropped
+// by a concurrent read-modify-write of the referrers index is put again, and
+// one that never shows up fails the push.
+func TestPushConfirmsReferrer(t *testing.T) {
+	_, anchorDesc := anchor(fpA)
+	indexTag := "/manifests/" + Tag(anchorDesc.Digest.String())
+	push := func(ctx context.Context, drop int) (puts int, err error) {
+		resolved := false
+		repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
+			switch {
+			case r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/manifests/sha256:"):
+				puts++
+			case r.Method == http.MethodHead && strings.HasSuffix(r.URL.Path, "/manifests/"+Tag(fpA)):
+				resolved = true
+			case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, indexTag) && resolved && drop != 0:
+				// The listing that follows a resolve misses the new referrer.
+				drop--
+				resolved = false
+				http.Error(w, "not found", http.StatusNotFound)
+				return true
+			}
+			return false
+		})
+		_, err = Push(ctx, repo, fpA, att("ci", nil))
+		return puts, err
+	}
+	if puts, err := push(context.Background(), 1); err != nil || puts != 2 {
+		t.Fatalf("dropped once: %d manifest puts, %v; want 2 and success", puts, err)
+	}
+	if puts, err := push(context.Background(), -1); err == nil || puts != pushConfirmAttempts {
+		t.Fatalf("never listed: %d manifest puts, %v; want %d and an error", puts, err, pushConfirmAttempts)
+	}
+	old := pushConfirmDelay
+	t.Cleanup(func() { pushConfirmDelay = old })
+	pushConfirmDelay = time.Hour
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	if _, err := push(ctx, -1); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("never listed, short deadline: %v", err)
 	}
 }

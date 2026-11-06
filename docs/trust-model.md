@@ -130,9 +130,12 @@ configured", and the test runs. This avoids reporting every attestation it
 finds as a verification failure just because no policy exists. Once a policy
 is configured, an attestation from a signer it does not list *is* a
 verification failure (exit 5); one from a signer it lists below
-`minTrustLevel` is a miss (exit 4). A policy file that cannot be loaded, or a
-trusted root that cannot be loaded, is outcome `error` (exit 1): the test
-runs and nothing is looked up.
+`minTrustLevel` is a miss (exit 4). A policy file that cannot be loaded is
+outcome `error` (exit 1): the test runs and nothing is looked up. The
+trusted root is loaded only when a candidate's Sigstore bundle carries a
+certificate (a key-based bundle never needs it), at most once per command;
+if it cannot be loaded, that candidate is outcome `error` (exit 1, the test
+runs), never a verification failure.
 
 ### Policy file
 

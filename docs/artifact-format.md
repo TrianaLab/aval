@@ -146,10 +146,13 @@ also repairs a tag that was moved.
 Registries without the referrers API (for example GHCR) are supported: oras
 maintains the OCI referrers tag schema (`sha256-<anchor hex>` index) on push
 and reads it on lookup. That index is rewritten on every push, so two concurrent
-pushes for the same fingerprint can drop one entry from it. The dropped
-execution is then not a candidate: with no other execution the result is a
-miss (the test runs again); otherwise the policy picks among the remaining
-ones. It never makes an unsigned or untrusted result reusable. Aval does not
+pushes for the same fingerprint can drop one entry from it. Push therefore
+lists the anchor's referrers after pushing and returns only once the new
+digest is among them; if it is not, it pushes the manifest again (which
+re-adds it to the index) and lists again, three attempts in total, one second
+apart. If the digest is still not listed, `aval push` and `aval run --push`
+fail (exit 1). A dropped execution is never a candidate, so even then it
+never makes an unsigned or untrusted result reusable. Aval does not
 delete the previous referrers index after rewriting it, so pushing does not
 need DELETE rights.
 
@@ -170,9 +173,22 @@ need DELETE rights.
    tags are mutable, digests aren't.
 5. Verify each envelope and apply the trust policy (see below).
 
-Lookup accepts at most 64 candidates per fingerprint. Above that it fails
-with outcome `error` (run the test), so whoever can push cannot make
-`aval verify` fetch an unbounded number of manifests.
+Lookup accepts at most 64 candidates per fingerprint and follows at most 64
+referrers pages. Above either limit it fails with outcome `error` (run the
+test), so whoever can push, or a buggy registry, cannot make `aval verify`
+fetch an unbounded number of manifests or pages.
+
+A listed candidate whose manifest the registry answers with 404 (deleted,
+for example by an "untagged manifests" retention policy) is absent: it is
+skipped with a warning on stderr and is not part of `rejected`. If every
+candidate is absent, the outcome is a miss. Absence never hides a
+verification failure of another candidate.
+
+Every registry call of one command runs under `--registry-timeout` (default
+`1m`): lookup and every fetch share one deadline, and push has its own. A
+registry that stalls past it is outcome `error` (exit 1), so `aval run` runs
+the test; `runner.command` is never under this deadline. One credential store
+and one auth token cache are shared by all registry calls of a process.
 
 A missing tag, or an anchor without executions, is a **miss**
 (`evidence.ErrNotFound`, exit code 4). An artifact that exists but is
@@ -366,9 +382,10 @@ report and exits 1; bad flags or an invalid contract print no report and exit 2.
 reason, and an empty `fingerprint`, and then runs the test.
 
 Without `--policy`, `aval verify` skips the lookup and reports `outcome: "miss"`
-(exit 4), and so it does for a `non-deterministic` contract. With `--policy`, a policy file that cannot be loaded, or a
-trusted root that cannot be loaded, is `outcome: "error"` (exit 1) and no
-lookup is made.
+(exit 4), and so it does for a `non-deterministic` contract. With `--policy`, a policy file that cannot be loaded is
+`outcome: "error"` (exit 1) and no lookup is made. A trusted root that
+cannot be loaded is `outcome: "error"` (exit 1) once a candidate with a
+certificate needs it.
 
 Example (`verified`):
 

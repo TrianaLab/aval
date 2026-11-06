@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -179,8 +180,9 @@ func checkReport(t *testing.T, stdout, reason string, pub []byte) {
 	}
 }
 
-// A policy whose trusted root cannot be loaded decides nothing: outcome
-// error, and the registry is never asked.
+// A policy whose trusted root cannot be loaded decides nothing about a
+// keyless candidate: outcome error, never verification-failed. The root is
+// loaded only once such a candidate shows up.
 func TestVerifyTrustedRootError(t *testing.T) {
 	dir := t.TempDir()
 	pol := filepath.Join(dir, "policy.yaml")
@@ -189,14 +191,26 @@ func TestVerifyTrustedRootError(t *testing.T) {
 	if err := os.WriteFile(pol, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	lk := lookup
-	t.Cleanup(func() { lookup = lk })
-	lookup = func(context.Context, string, string) ([]registry.Descriptor, error) {
-		t.Fatal("lookup without a usable policy")
-		return nil, nil
-	}
+	serve(t, &registry.Attestation{
+		Envelope: &evidence.Envelope{PayloadType: evidence.PayloadType, Payload: []byte("{}")},
+		Bundle:   []byte(`{"verificationMaterial":{"certificate":{"rawBytes":"AA=="}}}`),
+	})
 	code, stdout, _ := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "--policy", pol, "-o", "json")
 	if code != ExitError || !strings.Contains(stdout, `"outcome": "error"`) || !strings.Contains(stdout, "trusted root") {
+		t.Fatalf("exit %d, report %s", code, stdout)
+	}
+}
+
+// A trust policy the Sigstore verifier cannot be built from decides nothing:
+// outcome error, and the registry is never asked.
+func TestVerifyVerifierError(t *testing.T) {
+	fakeCandidates(t, nil, nil)
+	noLookup(t)
+	nv := newVerifier
+	t.Cleanup(func() { newVerifier = nv })
+	newVerifier = func(string, []evidence.Identity) (*attest.Verifier, error) { return nil, errors.New("bad key") }
+	code, stdout, _ := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "--policy", "p.yaml", "-o", "json")
+	if code != ExitError || !strings.Contains(stdout, `"outcome": "error"`) || !strings.Contains(stdout, "bad key") {
 		t.Fatalf("exit %d, report %s", code, stdout)
 	}
 }
