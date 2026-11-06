@@ -1,0 +1,40 @@
+{% extends "main.html" %}
+
+{# Landing hero, ported from Pacto's overrides/home.html. Rendered only for pages
+   with `template: home.html` metadata (docs/index.md). It sits where the tabs
+   render; the page's markdown renders below it. Styles: stylesheets/extra.css.
+   Jinja comments, not HTML ones: an HTML comment is served to every visitor. #}
+{% block tabs %}
+  {{ super() }}
+  <section class="aval-hero md-typeset" aria-label="Introduction">
+    <div class="aval-hero__inner">
+      <div class="aval-hero__brand">
+        {# The paths of assets/images/logo.svg, inline so they take the accent
+           through currentColor in both schemes. #}
+        <svg class="aval-hero__logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3.5 22 9l-10 5.5L2 9z" />
+          <path d="m9.5 9.5 2 1.5 3.2-2.7" />
+          <path d="m2 15 10 5.5L22 15" />
+        </svg>
+        <span class="aval-hero__wordmark">aval</span>
+      </div>
+      <p class="aval-hero__eyebrow">Verified test reuse</p>
+      {# The page's only <h1>. docs/index.md opens with a `hidden` h1 with the same
+         text so Material does not inject a "Home" one. Change both together. #}
+      <h1 class="aval-hero__title">Run a heavy test once. Reuse the result safely everywhere.</h1>
+      <p class="aval-hero__tagline">
+        Aval signs a test result and binds it to a fingerprint of the test's
+        inputs. Another pipeline with the same inputs checks the signature
+        against its own trust policy and skips the run. If anything cannot be
+        proven, the test runs.
+      </p>
+      <div class="aval-hero__actions">
+        <a href="{{ 'vision/' | url }}" class="md-button md-button--primary">Get started</a>
+        <a href="#how-it-works" class="md-button">How it works</a>
+        <a href="{{ config.repo_url }}" class="md-button">GitHub</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}

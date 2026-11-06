@@ -13,13 +13,16 @@ docs_dir: docs
 
 theme:
   name: material
-  # overrides/main.html: the banner on old mike versions.
+  # Ported from Pacto: overrides/main.html (banner on old mike versions),
+  # overrides/home.html (landing hero, opted in by docs/index.md) and
+  # partials/javascripts/outdated.html.
   custom_dir: overrides
-  # Placeholder SVGs until story 8.2 (#72) adds the logo.
+  # The mark from story 8.2 (#72); both files carry the same bytes.
   logo: assets/images/logo.svg
   favicon: favicon.svg
-  # No Google Fonts: nothing is fetched from a font CDN. stylesheets/extra.css
-  # names the faces and falls back to the system stack.
+  # No Google Fonts: Source Serif 4 is bundled in docs/assets/fonts/; Inter and
+  # JetBrains Mono are named in stylesheets/extra.css and fall back to the
+  # system stack.
   font: false
   icon:
     repo: fontawesome/brands/github
@@ -138,6 +141,10 @@ plugins:
 
 extra_css:
   - stylesheets/extra.css
+
+extra_javascript:
+  # Opens the mike version selector on click instead of hover (see extra.css).
+  - javascripts/version-selector.js
 
 # A reader's path: what Aval is, the ideas it rests on, how to use it, then
 # the pages to look things up. Every page under docs/ has exactly one entry.

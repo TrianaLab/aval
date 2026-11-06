@@ -1,6 +1,12 @@
-# Aval
+---
+# The hero (headline, kicker, buttons) lives in overrides/home.html. The hidden
+# h1 below repeats its headline so Material does not inject a "Home" h1.
+template: home.html
+---
 
-Test results as signed, verifiable OCI artifacts.
+# Run a heavy test once. Reuse the result safely everywhere. { hidden=hidden }
+
+## How it works { #how-it-works }
 
 A heavy test runs once. Aval signs the result and binds it to a fingerprint of the test's declared inputs. Another pipeline with the same fingerprint verifies the signature against its trust policy and skips the run.
 
