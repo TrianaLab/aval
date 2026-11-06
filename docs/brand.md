@@ -2,7 +2,8 @@
 
 The mark is two stacked layers with a check on the top one: a result, stored once, reused after it is checked.
 
-![Aval wordmark](assets/images/wordmark.svg)
+![Aval wordmark](assets/images/wordmark.svg#only-light)
+![Aval wordmark](assets/images/wordmark-dark.svg#only-dark)
 
 ## Files
 
@@ -23,7 +24,7 @@ The SVGs are the source. `make brand` renders the PNGs from them; commit both.
 | Mark (emerald) | `#059669` | `#34d399` |
 | Links | `#047857` | `#34d399` |
 | Wordmark (ink) | `#0f172a` | `#e2e8f0` |
-| Background | `#ffffff` | `#0b1220` |
+| Background | `#ffffff` (header and cards; the site page is `#f8fafc`) | `#0b1220` |
 
 `docs/stylesheets/brand.css` holds these tokens for the site. Links use `#047857` on light because `#059669` is below 4.5:1 on white.
 

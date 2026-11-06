@@ -5,7 +5,10 @@
    rule under the page title, italic subsections, small caps labels, a light
    header with a hairline instead of a coloured bar, light and dark palettes.
    Material still owns navigation, search and layout; this file only repaints
-   them. Every colour below derives from the tokens in this block.
+   them. The brand colours come from stylesheets/brand.css (docs/brand.md);
+   every other colour below derives from the tokens in this file. On light,
+   text and filled buttons take the link emerald (#047857), because the mark
+   emerald (#059669) is below 4.5:1 on white.
    =========================================================================== */
 
 /* Source Serif 4 (Adobe, SIL OFL 1.1), the unmodified variable release; licence
@@ -45,7 +48,7 @@
 /* Dark: emerald #34d399 on near-black #0b1220. Surfaces step up from the
    background in the same blue-grey hue. */
 [data-md-color-scheme="slate"] {
-  --c-bg: #0b1220;
+  --c-bg: var(--aval-surface);
   --c-surface: #111a2b;
   --c-surface-raised: #172236;
   --c-surface-hover: #1d2a40;
@@ -65,7 +68,7 @@
   --c-info-bg: rgba(96, 165, 250, 0.08);
   --c-neutral: #94a3b8;
   --c-neutral-bg: rgba(100, 116, 139, 0.08);
-  --c-accent: #34d399;
+  --c-accent: var(--aval-emerald);
   --c-accent-bg: rgba(52, 211, 153, 0.1);
   --c-accent-border: rgba(52, 211, 153, 0.45);
   --c-accent-hover: #6ee7b7;
@@ -100,10 +103,10 @@
   --c-info-bg: rgba(37, 99, 235, 0.06);
   --c-neutral: #64748b;
   --c-neutral-bg: rgba(100, 116, 139, 0.06);
-  --c-accent: #059669;
+  --c-accent: var(--aval-emerald-text);
   --c-accent-bg: rgba(5, 150, 105, 0.07);
   --c-accent-border: rgba(5, 150, 105, 0.4);
-  --c-accent-hover: #047857;
+  --c-accent-hover: #065f46;
   --c-on-accent: #ffffff;
   --c-code-bg: var(--c-surface-inset);
   --c-code-inline-bg: var(--c-surface-inset);
@@ -208,10 +211,10 @@
 [dir="ltr"] .md-header__title {
   margin-left: 0.2rem;
 }
-/* The mark is an <img>, so it cannot take currentColor. logo.svg carries the
-   light accent; in dark mode the same paths are drawn in the dark accent. */
+/* The mark is an <img>, so it cannot take currentColor; swap the file instead.
+   logo.svg is the mark on light, logo-dark.svg the mark on dark. */
 [data-md-color-scheme="slate"] .md-header__button.md-logo img {
-  content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' stroke='%2334d399'%3E%3Cpath d='M12 3.5 22 9l-10 5.5L2 9z'/%3E%3Cpath d='m9.5 9.5 2 1.5 3.2-2.7'/%3E%3Cpath d='m2 15 10 5.5L22 15'/%3E%3C/g%3E%3C/svg%3E");
+  content: url("../assets/images/logo-dark.svg");
 }
 /* The mike version selector is a quiet pill. The
    pill's border is the affordance, so the dropdown chevron goes. */
@@ -487,7 +490,7 @@
 }
 
 /* ---- Landing hero (overrides/home.html) -----------------------------------
-   The title page of the document: serif wordmark, small caps eyebrow, a serif
+   The title page of the document: the wordmark, small caps eyebrow, a serif
    headline closed by the double rule. Elements fade up on load; motion respects
    prefers-reduced-motion. */
 .aval-hero {
@@ -509,18 +512,15 @@
   margin-bottom: 1.5rem;
   animation: aval-fade-up 0.6s ease both;
 }
-.aval-hero .aval-hero__logo {
-  height: 2.5rem;
+/* The wordmark files from story 8.2 (docs/brand.md: never set the name in a
+   font). Two <img>, one per scheme. */
+.aval-hero .aval-hero__wordmark {
+  height: 4rem;
   width: auto;
-  color: var(--c-accent);
 }
-.aval-hero__wordmark {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1;
-  color: var(--c-text);
+[data-md-color-scheme="slate"] .aval-hero__wordmark--light,
+[data-md-color-scheme="default"] .aval-hero__wordmark--dark {
+  display: none;
 }
 .aval-hero .aval-hero__eyebrow {
   margin: 0 0 0.9rem;

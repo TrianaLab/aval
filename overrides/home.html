@@ -9,16 +9,11 @@
   <section class="aval-hero md-typeset" aria-label="Introduction">
     <div class="aval-hero__inner">
       <div class="aval-hero__brand">
-        {# The paths of assets/images/logo.svg, inline so they take the accent
-           through currentColor in both schemes. #}
-        <svg class="aval-hero__logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-             stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 3.5 22 9l-10 5.5L2 9z" />
-          <path d="m9.5 9.5 2 1.5 3.2-2.7" />
-          <path d="m2 15 10 5.5L22 15" />
-        </svg>
-        <span class="aval-hero__wordmark">aval</span>
+        {# The wordmark files (docs/brand.md), one per scheme; CSS shows one. #}
+        <img class="aval-hero__wordmark aval-hero__wordmark--light"
+             src="{{ 'assets/images/wordmark.svg' | url }}" alt="Aval">
+        <img class="aval-hero__wordmark aval-hero__wordmark--dark"
+             src="{{ 'assets/images/wordmark-dark.svg' | url }}" alt="Aval">
       </div>
       <p class="aval-hero__eyebrow">Verified test reuse</p>
       {# The page's only <h1>. docs/index.md opens with a `hidden` h1 with the same
