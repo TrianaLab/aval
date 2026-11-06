@@ -103,7 +103,7 @@ func TestRunPushReuseStory(t *testing.T) {
 		stderr string
 	}{
 		{"run and publish", []string{"--push", "--key", key}, 0, 1, "pushed " + repo + "@sha256:", ""},
-		{"reuse", []string{"--policy", trusted}, 0, 1, "reused passed result " + repo + "@sha256:", ""},
+		{"reuse", []string{"--policy", trusted}, 0, 1, "reused passed result\n", ""},
 		{"untrusted signer is a security event", []string{"--policy", untrusted}, 5, 2, "ran story: passed", "SECURITY"},
 		{"shadow confirms the reuse", []string{"--policy", trusted, "--shadow"}, 0, 3, "would have been correct", ""},
 	}

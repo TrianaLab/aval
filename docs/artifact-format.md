@@ -232,8 +232,8 @@ run, or a re-run). All of them stay listed as referrers of the anchor, so a
 later push cannot hide or replace an earlier one. `aval verify` verifies every
 candidate: the verified one with the highest trust level wins (ties go to a
 non-passed result, then the lowest digest). Candidates that are not used are
-listed in the report's `rejected` field and on stderr: a verification failure
-as `aval: SECURITY: ...`, anything else as `aval: warning: ...`. A candidate
+listed in the report's `rejected` field; when any of them failed verification,
+stderr gets one `aval: SECURITY: ...` line. A candidate
 that cannot be fetched or checked (outcome `error`) might have outranked the
 verified one, so it blocks reuse and the test runs. A candidate that passes
 every check but whose signer the policy lists below `minTrustLevel` is

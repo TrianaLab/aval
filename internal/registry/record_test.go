@@ -137,8 +137,8 @@ func TestRecordsAreNeverCandidates(t *testing.T) {
 
 func TestRecordErrors(t *testing.T) {
 	ctx := context.Background()
-	if _, err := Record(ctx, "localhost:5000/x:tag", runRecord("unit")); err == nil {
-		t.Error("Record must reject a repository with a tag")
+	if _, err := Record(ctx, "localhost:5000/x:tag", runRecord("unit")); err == nil || strings.HasPrefix(err.Error(), "registry.") {
+		t.Errorf("Record must reject a repository with a tag without a package prefix: %v", err)
 	}
 	recRaw, _ := json.Marshal(runRecord("unit"))
 	digestIs := func(r *http.Request, d digest.Digest) bool {
@@ -168,8 +168,8 @@ func TestRecordErrors(t *testing.T) {
 				}
 				return false
 			})
-			if _, err := Record(ctx, repo, tc.rec); err == nil {
-				t.Fatal("want an error")
+			if _, err := Record(ctx, repo, tc.rec); err == nil || strings.HasPrefix(err.Error(), "registry.") {
+				t.Fatalf("want an error without a package prefix, got %v", err)
 			}
 		})
 	}

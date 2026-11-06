@@ -216,8 +216,8 @@ the test runs.
   candidate is verified and the policy picks the verified one with the
   highest trust level. A candidate that fails verification never decides the
   outcome while another verifies, and is listed in `rejected` in the verify
-  report (and on stderr as `aval: SECURITY: ...`), so the security event
-  stays visible. A candidate
+  report (and stderr gets one `aval: SECURITY: ...` line), so the security
+  event stays visible. A candidate
   that cannot be fetched or checked blocks reuse (the test runs), because it
   might have outranked the verified one.
 - **Unknown or missing fields** in `aval.yaml` are rejected (exit 2) rather
@@ -256,10 +256,23 @@ failure.
 the workload identity.
 
 Reasons can carry text from an untrusted attestation, so the text output
-and stderr escape it with Go string escapes (newlines, control and other
-non-printable characters, quotes and backslashes): such text never
-starts a line of its own (a CI log command, a terminal escape). The JSON
-report keeps the reason as is.
+and stderr escape newlines, control and other non-printable characters and
+invalid UTF-8 with Go escapes (`\n`, `\x1b`, `\u2028`); quotes and
+backslashes stay as they are. Such text never starts a line of its own (a CI
+log command, a terminal escape). The JSON report keeps the reason as is.
+
+Each command prints the reason once, in the report: stderr does not repeat
+it. On a verification failure stderr gets a single `aval: SECURITY: ...`
+line that counts the attestations that failed and links here; a signer the
+policy does not list gets the reason `signer key id "<id>" is not in the trust
+policy (trust policy <file>)` (for a certificate, `signer "<subject>"
+(issuer "<issuer>") is not accepted by the policy (trust policy <file>)`;
+when the policy lists only keys the certificate is not verified, so the
+reason is `certificate claiming signer "<subject>" (issuer "<issuer>") is not
+accepted by the policy: it lists no keyless identities (trust policy <file>)`).
+For a `verified` result the text report adds `signer:` (key id, or subject and issuer, with the trust level
+name) and `reference:` lines. Errors joined from several causes print one `aval:` line per cause (an invalid
+`aval.yaml`); in a report (an invalid policy) the causes share the `reason:` line, separated by semicolons.
 
 `--record` publishes a run record for statistics after the decision, for
 every outcome (see [artifact-format.md](artifact-format.md#run-records)).
@@ -325,7 +338,7 @@ declared class.
 | Compromised developer key | Policy grants developer identities level 1 at most; CI sets `MinTrustLevel` >= 2, so a stolen developer key cannot satisfy CI. It can still poison that developer's own reuse. Prefer keyless (short-lived Fulcio certs, Rekor log) over long-lived keys. |
 | Tag swapping (`sha256-<fp>` repointed to another manifest) | Tag is lookup only and must resolve to the fingerprint's deterministic anchor manifest; any other target is `verification-failed`. Candidates are the anchor's referrers, fetched and verified by digest. |
 | Replay of a passing result for a different fingerprint or test id | `Verify` requires `execution.fingerprint == ExpectedFingerprint` and `test.id == ExpectedTestID`, both computed locally. The signed predicate cannot be re-labeled without breaking the signature. Mismatch is `verification-failed`. |
-| Undeclared input changed (file outside scope, unlisted env var, network service) | Out of scope for detection in v0: the fingerprint only covers declared inputs. Mitigated by contract review, `external-dependencies` / `non-deterministic` classes not being reusable by default, and the false-hit suite (roadmap item 4). Observed-input tracing is future work. |
-| Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with outcome `verification-failed` in the verify report (and a warning on stderr). It can delete attestations (forcing misses, i.e. re-runs) or deny service (`error`, re-run). Availability is out of scope. |
+| Undeclared input changed (file outside scope, unlisted env var, network service) | Out of scope for detection in v0: the fingerprint only covers declared inputs. Mitigated by contract review, `external-dependencies` not being reusable by default and `non-deterministic` never being reusable, and the false-hit suite (roadmap item 4). Observed-input tracing is future work. |
+| Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with outcome `verification-failed` in the verify report (and an `aval: SECURITY: ...` line on stderr). It can delete attestations (forcing misses, i.e. re-runs) or deny service (`error`, re-run). Availability is out of scope. |
 | Forged or tampered run records (anyone with push access) | Records are statistics, never evidence: unsigned, hung off a per-test stats anchor, and never fetched by `aval run` or `aval verify`, so they cannot cause reuse or count toward the candidate cap. A record crafted with a fingerprint anchor as its subject is filtered out by artifact type. They can skew statistics; treat them as informational. |
 | Dishonest but trusted signer (ran a modified test and signed "passed") | Out of scope for Aval. A signature proves who claims it, not that the test ran honestly. Limit which identities get which level; level 3 (isolated) exists for this. |
