@@ -91,6 +91,7 @@ func TestCLI(t *testing.T) {
 	hermetic := writeContract(t, "hermetic")
 	nondet := writeContract(t, "non-deterministic")
 	missing := filepath.Join(t.TempDir(), "aval.yaml")
+	key, _ := devKey(t, t.TempDir(), "k")
 	noSource := writeContract(t, "hermetic")
 	if err := os.Remove(filepath.Join(filepath.Dir(noSource), "in.txt")); err != nil {
 		t.Fatal(err)
@@ -114,13 +115,13 @@ func TestCLI(t *testing.T) {
 		{"unprovable inputs", []string{"run", "-f", noSource, "--fingerprint-only"}, ExitError, "", "matched no files"},
 		{"unprovable inputs explained", []string{"run", "-f", noSource, "--explain"}, ExitError, "", "matched no files"},
 		{"push no registry", []string{"push", "-f", hermetic}, ExitUsage, "", "--registry is required"},
-		{"push missing contract", []string{"push", "-f", missing, "--registry", "r"}, ExitUsage, "", "aval:"},
-		{"push without a recorded result", []string{"push", "-f", hermetic, "--registry", "r", "--result", filepath.Join(t.TempDir(), "none.json")}, ExitError, "", "recorded by 'aval run'"},
+		{"push missing contract", []string{"push", "-f", missing, "--registry", "reg.example/r"}, ExitUsage, "", "aval:"},
+		{"push without a recorded result", []string{"push", "-f", hermetic, "--registry", "reg.example/r", "--key", key, "--result", filepath.Join(t.TempDir(), "none.json")}, ExitError, "", "recorded by 'aval run'"},
 		{"verify bad output", []string{"verify", "-o", "yaml"}, ExitUsage, "", "--output must be text or json"},
 		{"verify no registry", []string{"verify", "-f", hermetic}, ExitUsage, "", "--registry is required"},
-		{"verify missing contract", []string{"verify", "-f", missing, "--registry", "r"}, ExitUsage, "", "aval:"},
-		{"verify no policy", []string{"verify", "-f", hermetic, "--registry", "r"}, ExitMiss, "miss unit sha256:", "no trust policy"},
-		{"verify unreadable policy", []string{"verify", "-f", hermetic, "--registry", "r", "--policy", "p.yaml"}, ExitError, "error unit sha256:", "p.yaml"},
+		{"verify missing contract", []string{"verify", "-f", missing, "--registry", "reg.example/r"}, ExitUsage, "", "aval:"},
+		{"verify no policy", []string{"verify", "-f", hermetic, "--registry", "reg.example/r"}, ExitMiss, "miss unit sha256:", "no trust policy"},
+		{"verify unreadable policy", []string{"verify", "-f", hermetic, "--registry", "reg.example/r", "--policy", "p.yaml"}, ExitError, "error unit sha256:", "p.yaml"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -134,7 +135,7 @@ func TestCLI(t *testing.T) {
 }
 
 func TestVerifyJSONReport(t *testing.T) {
-	code, stdout, _ := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "-o", "json")
+	code, stdout, _ := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "-o", "json")
 	var r evidence.Report
 	if err := json.Unmarshal([]byte(stdout), &r); err != nil {
 		t.Fatal(err)
@@ -234,8 +235,8 @@ func (failWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
 
 func TestTextReportListsRejected(t *testing.T) {
 	var b strings.Builder
-	r := evidence.Report{Outcome: evidence.OutcomeVerified, Rejected: []evidence.Rejection{{Reference: "r@sha256:ff", Outcome: evidence.OutcomeVerificationFailed, Reason: "untrusted"}}}
-	if err := writeReport(&b, "text", r); err != nil || !strings.Contains(b.String(), "rejected: r@sha256:ff verification-failed: untrusted\n") {
+	r := evidence.Report{Outcome: evidence.OutcomeVerified, Rejected: []evidence.Rejection{{Reference: "reg.example/r@sha256:ff", Outcome: evidence.OutcomeVerificationFailed, Reason: "untrusted"}}}
+	if err := writeReport(&b, "text", r); err != nil || !strings.Contains(b.String(), "rejected: reg.example/r@sha256:ff verification-failed: untrusted\n") {
 		t.Fatalf("text report %q, %v", b.String(), err)
 	}
 }
@@ -246,7 +247,7 @@ func TestWriteReportPropagatesWriteErrors(t *testing.T) {
 	}
 	root := newRootCmd()
 	root.SetOut(failWriter{})
-	root.SetArgs([]string{"verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "-o", "json"})
+	root.SetArgs([]string{"verify", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "-o", "json"})
 	if err := root.Execute(); err == nil || errors.Is(err, evidence.ErrNotFound) {
 		t.Fatalf("report write failure must win over the outcome, got %v", err)
 	}
@@ -261,9 +262,9 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 	untrusted := &evidence.VerificationError{Reason: "untrusted signer"}
 	down := errors.New("registry down")
 	// What registry.Fetch returns for a malformed or tampered manifest.
-	malformed := fmt.Errorf("registry.Fetch r@sha256:aa: %w", &evidence.VerificationError{Reason: "malformed attestation: not an Aval attestation"})
+	malformed := fmt.Errorf("registry.Fetch reg.example/r@sha256:aa: %w", &evidence.VerificationError{Reason: "malformed attestation: not an Aval attestation"})
 	// What registry.Fetch returns for a listed manifest the registry deleted.
-	gone := fmt.Errorf("registry.Fetch r@sha256:aa: fetching manifest: 404 Not Found: %w", evidence.ErrNotFound)
+	gone := fmt.Errorf("registry.Fetch reg.example/r@sha256:aa: fetching manifest: 404 Not Found: %w", evidence.ErrNotFound)
 	cases := []struct {
 		name    string
 		lookup  error
@@ -279,54 +280,54 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			"sha256:aa": {trust: evidence.TrustDeveloper},
 			"sha256:bb": {trust: evidence.TrustIsolated},
 			"sha256:cc": {trust: evidence.TrustRunner},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, nil},
+		}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", evidence.ResultPassed, nil},
 		{"tie keeps lookup order", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:bb": {trust: evidence.TrustRunner},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", evidence.ResultPassed, nil},
+		}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:aa", evidence.ResultPassed, nil},
 		{"tie prefers a failed result", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:bb": {trust: evidence.TrustRunner, failed: true},
 			"sha256:cc": {trust: evidence.TrustRunner},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultFailed, nil},
+		}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", evidence.ResultFailed, nil},
 		{"higher trust pass beats lower trust fail", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustDeveloper, failed: true},
 			"sha256:bb": {trust: evidence.TrustIsolated},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, nil},
+		}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", evidence.ResultPassed, nil},
 		{"later untrusted push does not replace a trusted result", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:ff": {verifyErr: untrusted},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:aa", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
+		}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:aa", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
 		{"error on a sibling fails closed", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 			"sha256:bb": {trust: evidence.TrustRunner},
-		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
+		}, ExitError, evidence.OutcomeError, "reg.example/r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
 		{"unreachable trusted failure does not let a pass through", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:bb": {fetchErr: down},
-		}, ExitError, evidence.OutcomeError, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
+		}, ExitError, evidence.OutcomeError, "reg.example/r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
 		{"verify error on a sibling fails closed", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustIsolated},
 			"sha256:bb": {verifyErr: down},
-		}, ExitError, evidence.OutcomeError, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
+		}, ExitError, evidence.OutcomeError, "reg.example/r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError}},
 		{"verification failure outranks a sibling error beside a verified one", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 			"sha256:bb": {trust: evidence.TrustRunner},
 			"sha256:cc": {verifyErr: untrusted},
-		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:cc", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed}},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "reg.example/r@sha256:cc", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed}},
 		{"untrusted push does not become a hit", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 			"sha256:ff": {verifyErr: untrusted},
-		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:ff", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed}},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "reg.example/r@sha256:ff", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed}},
 		{"verification failure outranks an earlier error", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 			"sha256:bb": {verifyErr: untrusted},
 			"sha256:cc": {verifyErr: down},
-		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed, evidence.OutcomeError}},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "reg.example/r@sha256:bb", "", []evidence.Outcome{evidence.OutcomeError, evidence.OutcomeVerificationFailed, evidence.OutcomeError}},
 		{"a deleted manifest is absent and the remaining attestation is reused", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: gone},
 			"sha256:bb": {trust: evidence.TrustRunner},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, nil},
+		}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", evidence.ResultPassed, nil},
 		{"every manifest deleted is a miss", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: gone},
 			"sha256:bb": {fetchErr: gone},
@@ -334,24 +335,24 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 		{"a deleted manifest does not hide a verification failure", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: gone},
 			"sha256:ff": {verifyErr: untrusted},
-		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:ff", "", []evidence.Outcome{evidence.OutcomeVerificationFailed}},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "reg.example/r@sha256:ff", "", []evidence.Outcome{evidence.OutcomeVerificationFailed}},
 		{"only errors", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
-		}, ExitError, evidence.OutcomeError, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
+		}, ExitError, evidence.OutcomeError, "reg.example/r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeError}},
 		{"only malformed candidates are a verification failure, not a miss", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: malformed},
 			"sha256:bb": {fetchErr: malformed},
-		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeVerificationFailed, evidence.OutcomeVerificationFailed}},
+		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "reg.example/r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeVerificationFailed, evidence.OutcomeVerificationFailed}},
 		{"malformed candidate is reported beside a verified one", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: malformed},
 			"sha256:bb": {trust: evidence.TrustRunner},
-		}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
+		}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
 		{"empty answer is a miss", nil, map[string]candidate{}, ExitMiss, evidence.OutcomeMiss, "", "", nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			fakeCandidates(t, tc.lookup, tc.cands)
-			code, stdout, stderr := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "--policy", "p.yaml", "-o", "json")
+			code, stdout, stderr := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "--policy", "p.yaml", "-o", "json")
 			var r evidence.Report
 			if err := json.Unmarshal([]byte(stdout), &r); err != nil {
 				t.Fatal(err)
@@ -361,7 +362,7 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			}
 			var got []evidence.Outcome
 			for _, rj := range r.Rejected {
-				if !strings.HasPrefix(rj.Reference, "r@sha256:") || rj.Reason == "" {
+				if !strings.HasPrefix(rj.Reference, "reg.example/r@sha256:") || rj.Reason == "" {
 					t.Fatalf("incomplete rejection %+v", rj)
 				}
 				got = append(got, rj.Outcome)
@@ -411,21 +412,21 @@ func TestVerifyBelowMinTrust(t *testing.T) {
 		ref      string
 		rejected []evidence.Outcome
 	}{
-		{"alone is a miss, not a hit", map[string]candidate{"sha256:aa": dev}, ExitMiss, evidence.OutcomeMiss, "r@sha256:aa", []evidence.Outcome{evidence.OutcomeMiss}},
-		{"below-minimum failure is a miss too", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, failed: true}}, ExitMiss, evidence.OutcomeMiss, "r@sha256:aa", []evidence.Outcome{evidence.OutcomeMiss}},
-		{"does not block a verified sibling", map[string]candidate{"sha256:aa": dev, "sha256:bb": {trust: evidence.TrustRunner}}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
-		{"below-minimum failure does not override a trusted pass", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, failed: true}, "sha256:bb": {trust: evidence.TrustRunner}}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
-		{"error outranks it", map[string]candidate{"sha256:aa": dev, "sha256:bb": {fetchErr: errors.New("registry down")}}, ExitError, evidence.OutcomeError, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeError}},
-		{"beside a deleted manifest is still a miss", map[string]candidate{"sha256:aa": {fetchErr: fmt.Errorf("fetching manifest: 404 Not Found: %w", evidence.ErrNotFound)}, "sha256:bb": dev}, ExitMiss, evidence.OutcomeMiss, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
-		{"verification failure outranks it", map[string]candidate{"sha256:aa": dev, "sha256:ff": {verifyErr: untrusted}}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:ff", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
-		{"verification failure stays visible beside a verified one", map[string]candidate{"sha256:aa": dev, "sha256:bb": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, ExitOK, evidence.OutcomeVerified, "r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
-		{"signed cacheability lie stays a verification failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, cacheability: "external-dependencies"}}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "r@sha256:aa", []evidence.Outcome{evidence.OutcomeVerificationFailed}},
+		{"alone is a miss, not a hit", map[string]candidate{"sha256:aa": dev}, ExitMiss, evidence.OutcomeMiss, "reg.example/r@sha256:aa", []evidence.Outcome{evidence.OutcomeMiss}},
+		{"below-minimum failure is a miss too", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, failed: true}}, ExitMiss, evidence.OutcomeMiss, "reg.example/r@sha256:aa", []evidence.Outcome{evidence.OutcomeMiss}},
+		{"does not block a verified sibling", map[string]candidate{"sha256:aa": dev, "sha256:bb": {trust: evidence.TrustRunner}}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
+		{"below-minimum failure does not override a trusted pass", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, failed: true}, "sha256:bb": {trust: evidence.TrustRunner}}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
+		{"error outranks it", map[string]candidate{"sha256:aa": dev, "sha256:bb": {fetchErr: errors.New("registry down")}}, ExitError, evidence.OutcomeError, "reg.example/r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeError}},
+		{"beside a deleted manifest is still a miss", map[string]candidate{"sha256:aa": {fetchErr: fmt.Errorf("fetching manifest: 404 Not Found: %w", evidence.ErrNotFound)}, "sha256:bb": dev}, ExitMiss, evidence.OutcomeMiss, "reg.example/r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
+		{"verification failure outranks it", map[string]candidate{"sha256:aa": dev, "sha256:ff": {verifyErr: untrusted}}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "reg.example/r@sha256:ff", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
+		{"verification failure stays visible beside a verified one", map[string]candidate{"sha256:aa": dev, "sha256:bb": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
+		{"signed cacheability lie stays a verification failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, cacheability: "external-dependencies"}}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "reg.example/r@sha256:aa", []evidence.Outcome{evidence.OutcomeVerificationFailed}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			fakeCandidates(t, nil, tc.cands)
 			policyMin(evidence.TrustRunner)
-			code, stdout, stderr := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "--policy", "p.yaml", "-o", "json")
+			code, stdout, stderr := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "--policy", "p.yaml", "-o", "json")
 			var r evidence.Report
 			if err := json.Unmarshal([]byte(stdout), &r); err != nil {
 				t.Fatal(err)

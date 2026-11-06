@@ -8,13 +8,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	orasregistry "oras.land/oras-go/v2/registry"
 
 	"github.com/TrianaLab/aval/internal/attest"
 	"github.com/TrianaLab/aval/internal/contract"
@@ -138,6 +141,22 @@ func checkTimeout(d time.Duration) error {
 	return nil
 }
 
+// repoExample shows the --registry form in usage errors.
+const repoExample = "ghcr.io/acme/orders-aval"
+
+// checkRegistry rejects a --registry that is not an OCI repository (host and
+// name, no scheme, tag or digest) before anything runs.
+func checkRegistry(repo string) error {
+	ref, err := orasregistry.ParseReference(repo)
+	if err == nil && ref.Reference != "" {
+		err = errors.New("a tag or digest is not allowed")
+	}
+	if err != nil {
+		return usageError{fmt.Errorf("--registry %s is not an OCI repository (host/name, no scheme, tag or digest), e.g. %s: %w", repo, repoExample, err)}
+	}
+	return nil
+}
+
 // noArgs is cobra.NoArgs with exit code 2 (usage) instead of 1.
 func noArgs(c *cobra.Command, args []string) error {
 	if err := cobra.NoArgs(c, args); err != nil {
@@ -156,12 +175,76 @@ func loadAndFingerprint(file string, outputs ...string) (*contract.Contract, fin
 	if err != nil {
 		return nil, fingerprint.Fingerprint{}, usageError{err}
 	}
+	for _, o := range outputs {
+		if isInput(filepath.Dir(file), c, o) {
+			// Skipping it would silently drop an input from the fingerprint.
+			return nil, fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result or --report) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract directory", o, fingerprint.OutputDir)}
+		}
+	}
 	fp, err := fingerprint.Compute(filepath.Dir(file), c, os.LookupEnv, outputs...)
 	if err != nil {
 		// Cannot prove input equivalence: callers must run the test.
 		return c, fingerprint.Fingerprint{}, fmt.Errorf("fingerprint: %w", err)
 	}
 	return c, fp, nil
+}
+
+// isInput reports whether the output path p holds an input of the test that
+// fingerprint.Compute would skip: the scope of c, rooted at dir, includes p,
+// and p is not missing nor one of Aval's own results or reports (a
+// whole-tree scope finds those on the next run, #63). Anything else there,
+// including what cannot be read, counts as an input (fail closed).
+// ponytail: an input that is itself a valid Aval result or report (a test
+// fixture) is taken for an output; name such a fixture as --result and the
+// run overwrites it anyway.
+func isInput(dir string, c *contract.Contract, p string) bool {
+	if !inScope(dir, c, p) {
+		return false
+	}
+	fi, err := os.Lstat(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	if err != nil || !fi.Mode().IsRegular() {
+		return true
+	}
+	raw, err := os.ReadFile(p)
+	return err != nil || !isAvalOutput(raw)
+}
+
+// isAvalOutput reports whether raw is a result recorded by 'aval run' or a
+// verify report.
+func isAvalOutput(raw []byte) bool {
+	if _, err := evidence.Parse(raw); err == nil {
+		return true
+	}
+	var r evidence.Report
+	return json.Unmarshal(raw, &r) == nil && r.Version == evidence.ReportVersion
+}
+
+// inScope reports whether the scope of c, rooted at dir, would hash the file
+// at path p if it were not an Aval output: it lies inside dir, outside .git
+// and .aval directories, and matches source (not excluded) or dependencies.
+// A path that cannot be resolved is not skipped by fingerprint.Compute either.
+func inScope(dir string, c *contract.Contract, p string) bool {
+	root, err := filepath.Abs(dir)
+	abs, aerr := filepath.Abs(p)
+	if p == "" || err != nil || aerr != nil {
+		return false
+	}
+	rel, err := filepath.Rel(root, abs)
+	if err != nil || !filepath.IsLocal(rel) {
+		return false
+	}
+	segs := strings.Split(filepath.ToSlash(rel), "/")
+	if slices.ContainsFunc(segs[:len(segs)-1], func(s string) bool { return s == ".git" || s == fingerprint.OutputDir }) {
+		return false
+	}
+	match := func(globs []string, m func(contract.Glob, []string) bool) bool {
+		return slices.ContainsFunc(globs, func(g string) bool { return m(contract.SplitGlob(g), segs) })
+	}
+	return match(c.Scope.Source, contract.Glob.Match) && !match(c.Scope.Exclude, contract.Glob.MatchContents) ||
+		match(c.Scope.Dependencies, contract.Glob.Match)
 }
 
 func newVerifyCmd() *cobra.Command {
@@ -183,7 +266,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			if repo == "" {
 				return usageError{errors.New("--registry is required")}
 			}
-			if err := checkTimeout(timeout); err != nil {
+			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout)); err != nil {
 				return err
 			}
 			c, fp, err := loadAndFingerprint(file)

@@ -200,7 +200,10 @@ file out of scope, like any undeclared file.
     `aval push` skips its `--result`, `aval verify` neither. A custom path
     outside `.aval/` is therefore hashed by a command that is not given it
     (a miss, never a false hit); keep results and reports under `.aval/`
-    or outside the root.
+    or outside the root. A `--result` or `--report` path that the scope
+    includes and that holds anything other than an Aval result or report
+    (a real input) exits 2 before the test runs: skipping it would drop
+    that input from the fingerprint.
 - The git commit, branch or any VCS metadata. Two commits with identical
   scope content produce the same fingerprint and can reuse the same result.
   That is intended: a commit that only touches unrelated files should not

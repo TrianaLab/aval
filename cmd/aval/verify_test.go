@@ -143,7 +143,7 @@ func TestVerifyWithRealPolicy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			writePol(tc.min)
 			serve(t, tc.att)
-			code, stdout, _ := runCLI("verify", "-f", hermetic, "--registry", "r", "--policy", pol, "-o", "json")
+			code, stdout, _ := runCLI("verify", "-f", hermetic, "--registry", "reg.example/r", "--policy", pol, "-o", "json")
 			if code != tc.code {
 				t.Fatalf("exit %d, want %d; report %s", code, tc.code, stdout)
 			}
@@ -205,7 +205,7 @@ func TestVerifyTrustedRootError(t *testing.T) {
 		Bundle: []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json","verificationMaterial":{"certificate":{"rawBytes":"` +
 			base64.StdEncoding.EncodeToString(der) + `"}},"dsseEnvelope":{"payload":"e30=","payloadType":"application/vnd.in-toto+json","signatures":[{"sig":"AA=="}]}}`),
 	})
-	code, stdout, _ := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "--policy", pol, "-o", "json")
+	code, stdout, _ := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "--policy", pol, "-o", "json")
 	if code != ExitError || !strings.Contains(stdout, `"outcome": "error"`) || !strings.Contains(stdout, "trusted root") {
 		t.Fatalf("exit %d, report %s", code, stdout)
 	}
@@ -219,7 +219,7 @@ func TestVerifyVerifierError(t *testing.T) {
 	nv := newVerifier
 	t.Cleanup(func() { newVerifier = nv })
 	newVerifier = func(string, []evidence.Identity) (*attest.Verifier, error) { return nil, errors.New("bad key") }
-	code, stdout, _ := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "r", "--policy", "p.yaml", "-o", "json")
+	code, stdout, _ := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "--policy", "p.yaml", "-o", "json")
 	if code != ExitError || !strings.Contains(stdout, `"outcome": "error"`) || !strings.Contains(stdout, "bad key") {
 		t.Fatalf("exit %d, report %s", code, stdout)
 	}
