@@ -9,7 +9,7 @@ compatibility: Requires Go and make; run from the repository root.
 
 # aval-format-change
 
-Rules come from `AGENTS.md` (invariants 9, 10, 11; Style: provisional markers)
+Rules come from `AGENTS.md` (invariants 9, 10, 11; Style: frozen identifiers)
 and `docs/artifact-format.md` "Versioning and compatibility". This skill is the
 process; do not restate those rules in code comments or docs.
 
@@ -65,10 +65,10 @@ readiness, gates, delivery, EvidenceSet). That data belongs in `annotations`
 2. Update the field table and examples in `docs/artifact-format.md` or
    `docs/contract.md`, and `docs/integrations.md` when the verify report,
    outcomes, exit codes or the pkg/evidence API change. Do not document behaviour the code does not have.
-3. Golden files: if `testdata/*.golden.json` tests exist for the format, update
-   them and show the diff to the user. If they do not exist yet (Epic 5 adds
-   them), add one for the touched format with a test that compares marshalled
-   output to it, so the next change shows up as a diff.
+3. Golden files: `pkg/evidence/testdata/*.golden.json` only grow (see
+   `docs/artifact-format.md` "Golden files"). An additive change adds its new
+   field to the golden file of its version; a new version adds a new file
+   next to the old ones. Show the diff to the user.
 4. Add unit tests: a document without the new field still parses, and one with
    it round-trips.
 5. Write a release-notes entry. There is no `CHANGELOG` file yet; put the note
@@ -77,8 +77,8 @@ readiness, gates, delivery, EvidenceSet). That data belongs in `annotations`
 
 ## 3b. Breaking path
 
-1. Mint a new identifier (e.g. `.../execution/v2`, `execution.v2`,
-   `verify-report/v1alpha2`, `aval.dev/v1alpha2`, `aval-fingerprint/v2`). Never
+1. Mint a new identifier (e.g. `.../execution/v3`, `execution.v3`,
+   `verify-report/v2`, `aval.trianalab.io/v2`, `aval-fingerprint/v2`). Never
    reuse or recycle an old identifier, not even one that was never released.
 2. Predicate and media types move together: new `PredicateType`,
    `MediaTypeExecution`, `ArtifactType` and `SchemaVersion` (see
@@ -96,15 +96,15 @@ readiness, gates, delivery, EvidenceSet). That data belongs in `annotations`
    `exitCode` in `cmd/aval/main.go`, and its tests.
 6. Do the additive-path steps 2 to 5 for the new version.
 
-## 4. Provisional markers
+## 4. Frozen identifiers
 
-Until the Epic 5 issue "Freeze predicate, media types and verify report v1"
-lands, every identifier keeps its PROVISIONAL marker in
-`docs/artifact-format.md`, `docs/contract.md`, `docs/integrations.md` and
-`docs/vision.md`. Do not remove them in a format change. Pre-freeze breaking
-changes still get a new identifier. If `docs/artifact-format.md` still says
-the rules only apply from v1, raise it with the user as docs/AGENTS.md drift
-(invariant 10 wins); do not follow the doc.
+Since the freeze (#17) every identifier above is frozen under the
+`trianalab.io` namespace; the current values are in the "Versioning and
+compatibility" table of `docs/artifact-format.md`. A breaking change updates
+that table and its "History" list. The pre-freeze `aval.dev/.../v1alpha1`
+names are never reused and have no accept window. If a doc contradicts
+`docs/artifact-format.md`, raise it with the user as drift (invariant 10
+wins); do not follow the doc.
 
 ## 5. Verify
 

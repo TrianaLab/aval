@@ -112,8 +112,10 @@ assertions go in Go, not in shell. Target: 100% statement coverage outside
 - Conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `ci:`, `chore:`).
 - Prose is concise and concrete: no marketing words, no filler. Docs must not
   claim behaviour the code does not have; mark future work with its milestone.
-- Media types, predicate type and `apiVersion` stay marked provisional until
-  Epic 5 freezes them.
+- Media types, predicate type, verify report version and `apiVersion` are
+  frozen under the `trianalab.io` namespace (`docs/artifact-format.md`
+  "Versioning and compatibility"). They change only through the
+  `aval-format-change` skill.
 
 ## Skills
 

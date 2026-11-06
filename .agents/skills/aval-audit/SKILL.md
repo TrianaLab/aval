@@ -1,6 +1,6 @@
 ---
 name: aval-audit
-description: Reviews the current Aval diff (committed on the branch plus uncommitted changes) against the AGENTS.md invariants, docs/code alignment, test level placement, false-hit coverage, TODO and provisional-marker hygiene, exit code and verify report stability, pkg/evidence API compatibility, consumer coupling and vendor agnosticism. Produces blockers, warnings and nits with file:line, the rule cited and the exact suggested edit. Read-only, never edits files. Use when the user says "audit my changes", "review the diff", "check before push", "check before PR", "does this break an invariant" or "is this ready".
+description: Reviews the current Aval diff (committed on the branch plus uncommitted changes) against the AGENTS.md invariants, docs/code alignment, test level placement, false-hit coverage, TODO hygiene, frozen format identifiers, exit code and verify report stability, pkg/evidence API compatibility, consumer coupling and vendor agnosticism. Produces blockers, warnings and nits with file:line, the rule cited and the exact suggested edit. Read-only, never edits files. Use when the user says "audit my changes", "review the diff", "check before push", "check before PR", "does this break an invariant" or "is this ready".
 license: Apache-2.0
 metadata:
   project: aval
@@ -68,12 +68,14 @@ git diff $base | grep -E 'aval-fingerprint/v|apiVersion|application/vnd\.|predic
 git grep -n -E 'ErrVerification|ErrNotFound|ExitMiss|ExitVerificationFailed' -- '*.go'
 # AGENTS.md "Work tracking": TODOs must name a milestone
 git grep -n -E 'TODO|FIXME|XXX' | grep -v -E 'TODO\(milestone-[0-9]+\)'
-# AGENTS.md "Style": provisional markers kept on formats the diff touches
-git grep -n -i provisional -- docs/
+# AGENTS.md "Style": frozen identifiers change only per aval-format-change
+# (any hit needs a new identifier and docs/artifact-format.md updated)
+git diff $base | grep -E '^-.*(trianalab\.io|vnd\.trianalab|aval-fingerprint/v)'
 ```
 
-If `apidiff` or `gorelease` is installed, also run it on `./pkg/evidence`
-against `main`; otherwise rely on the grep above.
+`make ci-gates` (`TestEvidenceAPIIsAppendOnly`) enforces the append-only
+`pkg/evidence` API snapshot (`docs/integrations.md`); if `apidiff` or
+`gorelease` is installed, also run it on `./pkg/evidence` against `main`.
 
 For invariant 4, read each hit: an `ErrVerification` that is ignored,
 logged-and-continued, retried, mapped to a miss or to exit 1 is a blocker.
@@ -110,8 +112,8 @@ logged-and-continued, retried, mapped to a miss or to exit 1 is a blocker.
 - **Blocker:** breaks an invariant, a failing gate, a non-additive change to a
   versioned format or pkg/evidence, missing false-hit cases on a sensitive
   package, a swallowed `ErrVerification`.
-- **Warning:** docs drift, test at the wrong level, untagged TODO, missing
-  provisional marker, new dependency in pkg/evidence.
+- **Warning:** docs drift, test at the wrong level, untagged TODO, new
+  dependency in pkg/evidence.
 - **Nit:** naming, prose style (AGENTS.md "Style"), comment wording.
 
 ## 6. Output
