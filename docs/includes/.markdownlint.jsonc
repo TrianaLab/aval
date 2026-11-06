@@ -1,0 +1,4 @@
+// Replaces the root config for this directory. Its files are snippets
+// appended to every page (pymdownx.snippets auto_append in mkdocs.yml), so
+// they open with no heading; MD013 is off as at the root.
+{ "MD013": false, "MD041": false }

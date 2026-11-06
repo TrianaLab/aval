@@ -38,6 +38,24 @@ The SVGs are the source. `make brand` renders the PNGs from them; commit both.
 
 All three are SIL OFL 1.1. The site serves them from `docs/assets/fonts/`, each with its licence; it loads no web fonts from a CDN.
 
+## Diagrams
+
+Diagrams are Mermaid flowcharts in a fenced `mermaid` block. The site renders them with a vendored copy of Mermaid (`docs/javascripts/vendor/`, MIT) and colours them with the site's tokens, in light and in dark. Nodes are outlined in emerald on the page background; mark a node with one of these classes when its colour carries meaning:
+
+| Class | Use | Look |
+|---|---|---|
+| `ok` | reuse, `verified` | emerald fill |
+| `warn` | `error`: Aval could not decide | amber outline |
+| `err` | `verification-failed`, a security event | red outline |
+| `muted` | a side step, `miss` | grey |
+
+```text
+flowchart LR
+  a[Look up] --> b([verified]):::ok
+```
+
+Keep a diagram to one idea and about eight nodes, with short labels.
+
 ## Clear space and size
 
 - Keep clear space around the logo of at least half the mark's height.

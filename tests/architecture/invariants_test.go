@@ -115,7 +115,9 @@ func TestNoGoCodeNamesPacto(t *testing.T) {
 }
 
 // AGENTS.md "Work tracking": every TODO names a roadmap milestone. Markdown is
-// prose about the convention and is not scanned; .claude/skills holds symlinks.
+// prose about the convention and is not scanned; .claude/skills holds symlinks;
+// docs/javascripts/vendor holds third-party files kept byte-identical to
+// upstream (TestVendoredMermaid pins their hash).
 var todoRe = regexp.MustCompile(`TODO(\(milestone-[0-9]+\))?`)
 
 func untaggedTODOs(text string) int {
@@ -129,7 +131,7 @@ func untaggedTODOs(text string) int {
 }
 
 func TestEveryTODONamesAMilestone(t *testing.T) {
-	for _, f := range trackedFiles(t, ".", ":!*.md", ":!.claude/skills") {
+	for _, f := range trackedFiles(t, ".", ":!*.md", ":!.claude/skills", ":!docs/javascripts/vendor") {
 		if f == self {
 			continue
 		}
