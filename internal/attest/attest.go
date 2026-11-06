@@ -10,13 +10,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 
-	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/sign"
@@ -26,8 +24,8 @@ import (
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
-// Defaults for keyless signing: the Sigstore public-good instance. Any
-// Fulcio/Rekor deployment can be used through SignOptions.
+// Keyless signing uses the Sigstore public-good instance.
+// TODO(milestone-5): let callers sign against a private Fulcio and Rekor.
 const (
 	DefaultFulcioURL = "https://fulcio.sigstore.dev"
 	DefaultRekorURL  = "https://rekor.sigstore.dev"
@@ -62,19 +60,7 @@ type SignOptions struct {
 	// Obtaining it is vendor specific (CI provider, interactive flow) and is
 	// the caller's job.
 	IDToken string
-	// FulcioURL defaults to DefaultFulcioURL. Keyless only.
-	FulcioURL string
-	// RekorURL is the transparency log. Keyless always records an entry
-	// (default DefaultRekorURL): the short-lived certificate cannot be
-	// verified later without it. Key-based records one only when set.
-	RekorURL string
 }
-
-// Signer is the identity bound to a signature: the OIDC issuer and subject
-// of the Fulcio certificate for keyless signatures, or the key's
-// evidence.PublicKeyID for key-based ones. Trust levels come from matching it
-// against the policy (evidence.MatchSigner), never from the predicate.
-type Signer = evidence.Signer
 
 // Signed is the result of Sign.
 type Signed struct {
@@ -84,19 +70,16 @@ type Signed struct {
 	// verification material (certificate or key hint) and any transparency
 	// log entry. It is what a verifier needs besides the envelope.
 	Bundle []byte
-	// Signer is the identity the signature binds.
-	Signer Signer
 }
 
 // Seams for tests; production talks to real Fulcio and Rekor over HTTP.
 var (
 	newEphemeralKeypair = func() (sign.Keypair, error) { return sign.NewEphemeralKeypair(nil) }
-	marshalBundle       = protojson.Marshal
-	newFulcio           = func(url string) sign.CertificateProvider {
-		return sign.NewFulcio(&sign.FulcioOptions{BaseURL: url, Retries: 1})
+	newFulcio           = func() sign.CertificateProvider {
+		return sign.NewFulcio(&sign.FulcioOptions{BaseURL: DefaultFulcioURL, Retries: 1})
 	}
-	newRekor = func(url string) sign.Transparency {
-		return sign.NewRekor(&sign.RekorOptions{BaseURL: url, Retries: 1})
+	newRekor = func() sign.Transparency {
+		return sign.NewRekor(&sign.RekorOptions{BaseURL: DefaultRekorURL, Retries: 1})
 	}
 )
 
@@ -123,62 +106,46 @@ func Sign(ctx context.Context, s *evidence.Statement, opts SignOptions) (*Signed
 		if keypair, err = newEphemeralKeypair(); err != nil {
 			return nil, fmt.Errorf("attest.Sign: %w", err)
 		}
-		bo.CertificateProvider = newFulcio(orDefault(opts.FulcioURL, DefaultFulcioURL))
+		// The Rekor entry is always recorded: the short-lived certificate
+		// cannot be verified later without its timestamp.
+		bo.CertificateProvider = newFulcio()
 		bo.CertificateProviderOptions = &sign.CertificateProviderOptions{IDToken: opts.IDToken}
-		opts.RekorURL = orDefault(opts.RekorURL, DefaultRekorURL)
-	}
-	if opts.RekorURL != "" {
-		bo.TransparencyLogs = []sign.Transparency{newRekor(opts.RekorURL)}
+		bo.TransparencyLogs = []sign.Transparency{newRekor()}
 	}
 	b, err := sign.Bundle(&sign.DSSEData{Data: payload, PayloadType: evidence.PayloadType}, keypair, bo)
 	if err != nil {
 		return nil, fmt.Errorf("attest.Sign: %w", err)
 	}
-	return signed(b, keypair)
-}
-
-func signed(b *protobundle.Bundle, keypair sign.Keypair) (*Signed, error) {
-	raw, err := marshalBundle(b)
-	if err != nil {
-		return nil, fmt.Errorf("attest.Sign: encoding bundle: %w", err)
-	}
-	signer := Signer{KeyID: string(keypair.GetHint())}
-	if c := b.GetVerificationMaterial().GetCertificate(); c != nil {
-		if signer, err = certSigner(c.GetRawBytes()); err != nil {
+	if opts.Key == "" {
+		if err := checkCert(b.GetVerificationMaterial().GetCertificate().GetRawBytes()); err != nil {
 			return nil, fmt.Errorf("attest.Sign: signing certificate: %w", err)
 		}
 	}
+	raw, _ := protojson.Marshal(b) // ponytail: a bundle sigstore-go just built, cannot fail
 	d := b.GetDsseEnvelope()
 	env := &evidence.Envelope{PayloadType: d.GetPayloadType(), Payload: d.GetPayload()}
 	for _, sig := range d.GetSignatures() {
 		env.Signatures = append(env.Signatures, evidence.Signature{KeyID: sig.GetKeyid(), Sig: sig.GetSig()})
 	}
-	return &Signed{Envelope: env, Bundle: raw, Signer: signer}, nil
+	return &Signed{Envelope: env, Bundle: raw}, nil
 }
 
-// certSigner reads the identity Fulcio certified. A certificate without an
-// issuer or subject cannot be matched by policy, so it is rejected
-// (SummarizeCertificate already fails without a subject).
-func certSigner(der []byte) (Signer, error) {
+// checkCert fails closed on a Fulcio certificate the verifier would reject:
+// without an OIDC issuer and subject no policy can match it, so publishing
+// the attestation would only produce verification failures downstream.
+func checkCert(der []byte) error {
 	cert, err := x509.ParseCertificate(der)
 	if err != nil {
-		return Signer{}, err
+		return err
 	}
-	sum, err := certificate.SummarizeCertificate(cert)
+	sum, err := certificate.SummarizeCertificate(cert) // fails without a subject
 	if err != nil {
-		return Signer{}, err
+		return err
 	}
 	if sum.Issuer == "" {
-		return Signer{}, errors.New("certificate has no OIDC issuer")
+		return errors.New("certificate has no OIDC issuer")
 	}
-	return Signer{Issuer: sum.Issuer, Subject: sum.SubjectAlternativeName}, nil
-}
-
-func orDefault(v, d string) string {
-	if v == "" {
-		return d
-	}
-	return v
+	return nil
 }
 
 // keyPair is a sign.Keypair over a long-lived ECDSA P-256 key.
@@ -202,9 +169,9 @@ func loadKey(path string) (*keyPair, error) {
 	if !ok || priv.Curve != elliptic.P256() {
 		return nil, fmt.Errorf("key %s: only ECDSA P-256 keys are supported", path)
 	}
-	der, _ := x509.MarshalPKIXPublicKey(&priv.PublicKey) // cannot fail for a P-256 key
-	sum := sha256.Sum256(der)
-	return &keyPair{priv: priv, hint: []byte(base64.StdEncoding.EncodeToString(sum[:]))}, nil
+	pub, _ := cryptoutils.MarshalPublicKeyToPEM(&priv.PublicKey) // cannot fail for a P-256 key
+	kid, _ := evidence.PublicKeyID(string(pub))                  // cannot fail: a PKIX PEM just built
+	return &keyPair{priv: priv, hint: []byte(kid)}, nil
 }
 
 func (k *keyPair) GetHashAlgorithm() protocommon.HashAlgorithm {

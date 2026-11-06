@@ -27,7 +27,6 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
@@ -40,7 +39,7 @@ func predicate() *evidence.Predicate {
 		Test:          evidence.Test{ID: "orders-integration", Cacheability: "hermetic"},
 		Result:        evidence.ResultPassed,
 		Execution:     evidence.Execution{Fingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-		Runner:        evidence.Runner{Identity: "ci", TrustLevel: evidence.TrustRunner},
+		Runner:        evidence.Runner{Identity: "ci"},
 		StartedAt:     start,
 		FinishedAt:    start.Add(time.Minute),
 	}
@@ -127,19 +126,53 @@ func (r *fakeRekor) GetTransparencyLogEntry(_ context.Context, _ []byte, b *prot
 }
 
 type seams struct {
-	fulcio              *fakeFulcio
-	rekor               *fakeRekor
-	fulcioURL, rekorURL string
+	fulcio *fakeFulcio
+	rekor  *fakeRekor
 }
 
 func useFakes(t *testing.T) *seams {
 	t.Helper()
 	s := &seams{fulcio: &fakeFulcio{issuer: ghIssuer}, rekor: &fakeRekor{}}
 	oldF, oldR := newFulcio, newRekor
-	newFulcio = func(u string) sign.CertificateProvider { s.fulcioURL = u; return s.fulcio }
-	newRekor = func(u string) sign.Transparency { s.rekorURL = u; return s.rekor }
+	newFulcio = func() sign.CertificateProvider { return s.fulcio }
+	newRekor = func() sign.Transparency { return s.rekor }
 	t.Cleanup(func() { newFulcio, newRekor = oldF, oldR })
 	return s
+}
+
+// keySigner returns the signer the production verifier finds in a
+// key-based bundle, with pub (PEM) the only accepted key.
+func keySigner(t *testing.T, out *Signed, pub string) evidence.Signer {
+	t.Helper()
+	v, err := NewVerifier("", []evidence.Identity{{PublicKey: pub, TrustLevel: evidence.TrustDeveloper}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sig, err := v.For(out.Bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := sig.VerifySignature(context.Background(), out.Envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signer
+}
+
+// certSigner reads the identity in a keyless bundle's certificate. The fake
+// Fulcio and Rekor do not chain to a trusted root, so the verifier cannot
+// be used here; verify_test.go covers keyless verification.
+func certSigner(t *testing.T, out *Signed) evidence.Signer {
+	t.Helper()
+	cert, err := x509.ParseCertificate(parseBundle(t, out.Bundle).GetVerificationMaterial().GetCertificate().GetRawBytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum, err := certificate.SummarizeCertificate(cert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return evidence.Signer{Issuer: sum.Issuer, Subject: sum.SubjectAlternativeName}
 }
 
 func statement(t *testing.T) *evidence.Statement {
@@ -218,32 +251,17 @@ func TestSignKeyBased(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkEnvelope(t, out.Envelope, &key.PublicKey)
-	if out.Signer.Issuer != "" || out.Signer.Subject != "" || out.Signer.KeyID == "" {
-		t.Fatalf("key-based signer must be the key: %+v", out.Signer)
+	pub := pubPEM(t, &key.PublicKey)
+	kid, _ := evidence.PublicKeyID(pub)
+	if got := keySigner(t, out, pub); got != (evidence.Signer{KeyID: kid}) {
+		t.Fatalf("key-based signer must be the key: %+v", got)
 	}
 	b := parseBundle(t, out.Bundle)
-	if b.GetVerificationMaterial().GetPublicKey().GetHint() != out.Signer.KeyID {
-		t.Fatal("bundle must carry the key hint")
+	if b.GetVerificationMaterial().GetPublicKey().GetHint() != kid {
+		t.Fatal("bundle must carry the key's evidence.PublicKeyID as hint")
 	}
-	if s.rekor.calls != 0 || s.fulcioURL != "" || len(b.GetVerificationMaterial().GetTlogEntries()) != 0 {
-		t.Fatal("key-based signing without RekorURL must not contact Fulcio or Rekor")
-	}
-	// The same key always yields the same KeyID.
-	again, err := Sign(context.Background(), statement(t), SignOptions{Key: writePEM(t, key)})
-	if err != nil || again.Signer.KeyID != out.Signer.KeyID {
-		t.Fatalf("KeyID not stable: %v %q %q", err, again.Signer.KeyID, out.Signer.KeyID)
-	}
-}
-
-func TestSignKeyBasedWithRekor(t *testing.T) {
-	s := useFakes(t)
-	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	out, err := Sign(context.Background(), statement(t), SignOptions{Key: writePEM(t, key), RekorURL: "https://rekor.example"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s.rekorURL != "https://rekor.example" || s.rekor.calls != 1 || len(parseBundle(t, out.Bundle).GetVerificationMaterial().GetTlogEntries()) != 1 {
-		t.Fatal("RekorURL must record a transparency log entry")
+	if s.rekor.calls != 0 || s.fulcio.gotTok != "" || len(b.GetVerificationMaterial().GetTlogEntries()) != 0 {
+		t.Fatal("key-based signing must not contact Fulcio or Rekor")
 	}
 }
 
@@ -253,11 +271,11 @@ func TestSignKeyless(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.fulcioURL != DefaultFulcioURL || s.rekorURL != DefaultRekorURL || s.fulcio.gotTok != "oidc-token" {
+	if s.rekor.calls != 1 || s.fulcio.gotTok != "oidc-token" {
 		t.Fatalf("keyless must use Fulcio and Rekor with the token: %+v", s)
 	}
-	if out.Signer != (Signer{Issuer: ghIssuer, Subject: ciSAN}) {
-		t.Fatalf("signer must come from the certificate: %+v", out.Signer)
+	if got := certSigner(t, out); got != (evidence.Signer{Issuer: ghIssuer, Subject: ciSAN}) {
+		t.Fatalf("signer must come from the certificate: %+v", got)
 	}
 	b := parseBundle(t, out.Bundle)
 	cert, err := x509.ParseCertificate(b.GetVerificationMaterial().GetCertificate().GetRawBytes())
@@ -268,14 +286,6 @@ func TestSignKeyless(t *testing.T) {
 	if len(b.GetVerificationMaterial().GetTlogEntries()) != 1 {
 		t.Fatal("keyless bundle must carry the Rekor entry")
 	}
-
-	// Custom instances override the public-good defaults.
-	if _, err := Sign(context.Background(), statement(t), SignOptions{IDToken: "t", FulcioURL: "https://f.example", RekorURL: "https://r.example"}); err != nil {
-		t.Fatal(err)
-	}
-	if s.fulcioURL != "https://f.example" || s.rekorURL != "https://r.example" {
-		t.Fatalf("custom URLs ignored: %+v", s)
-	}
 }
 
 // The trust level comes from who signed, matched against the policy. The
@@ -283,7 +293,10 @@ func TestSignKeyless(t *testing.T) {
 func TestTrustLevelComesFromSignerNotPredicate(t *testing.T) {
 	useFakes(t)
 	st := predicate()
-	st.Runner = evidence.Runner{Identity: ciSAN, Issuer: ghIssuer, TrustLevel: evidence.TrustIsolated}
+	// Set through JSON, as a hostile producer would, to avoid the deprecated fields.
+	if err := json.Unmarshal([]byte(`{"identity":"`+ciSAN+`","issuer":"`+ghIssuer+`","trustLevel":3}`), &st.Runner); err != nil {
+		t.Fatal(err)
+	}
 	stmt, err := NewStatement(st)
 	if err != nil {
 		t.Fatal(err)
@@ -293,11 +306,11 @@ func TestTrustLevelComesFromSignerNotPredicate(t *testing.T) {
 		t.Fatal(err)
 	}
 	dev := []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: `https://github\.com/acme/.*`, TrustLevel: evidence.TrustDeveloper}}
-	if id, ok := evidence.MatchSigner(dev, keyless.Signer); !ok || id.TrustLevel != evidence.TrustDeveloper || id.SubjectRegexp != dev[0].SubjectRegexp {
+	if id, ok := evidence.MatchSigner(dev, certSigner(t, keyless)); !ok || id.TrustLevel != evidence.TrustDeveloper || id.SubjectRegexp != dev[0].SubjectRegexp {
 		t.Fatalf("got %+v, want developer from the policy", id)
 	}
 	other := []evidence.Identity{{Issuer: "https://other.example", SubjectRegexp: `.*`, TrustLevel: evidence.TrustIsolated}}
-	if id, ok := evidence.MatchSigner(other, keyless.Signer); ok {
+	if id, ok := evidence.MatchSigner(other, certSigner(t, keyless)); ok {
 		t.Fatalf("unmatched signer got %+v", id)
 	}
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -306,7 +319,7 @@ func TestTrustLevelComesFromSignerNotPredicate(t *testing.T) {
 		t.Fatal(err)
 	}
 	wildcard := []evidence.Identity{{Issuer: ghIssuer, SubjectRegexp: `.*`, TrustLevel: evidence.TrustIsolated}}
-	if id, ok := evidence.MatchSigner(wildcard, keyed.Signer); ok {
+	if id, ok := evidence.MatchSigner(wildcard, keySigner(t, keyed, pubPEM(t, &key.PublicKey))); ok {
 		t.Fatalf("key-based signer matched a keyless identity: %+v", id)
 	}
 }
@@ -358,24 +371,19 @@ func TestSignRejects(t *testing.T) {
 
 func TestSignSurfacesInternalFailures(t *testing.T) {
 	useFakes(t)
-	oldE, oldM := newEphemeralKeypair, marshalBundle
-	t.Cleanup(func() { newEphemeralKeypair, marshalBundle = oldE, oldM })
+	old := newEphemeralKeypair
+	t.Cleanup(func() { newEphemeralKeypair = old })
 
 	newEphemeralKeypair = func() (sign.Keypair, error) { return nil, errors.New("no entropy") }
 	if _, err := Sign(context.Background(), statement(t), SignOptions{IDToken: "t"}); err == nil {
 		t.Error("keypair failure must surface")
-	}
-	newEphemeralKeypair = oldE
-	marshalBundle = func(proto.Message) ([]byte, error) { return nil, errors.New("boom") }
-	if _, err := Sign(context.Background(), statement(t), SignOptions{IDToken: "t"}); err == nil {
-		t.Error("bundle encoding failure must surface")
 	}
 }
 
 // The production seams build real sigstore-go clients without contacting
 // anything until they are used.
 func TestDefaultSeams(t *testing.T) {
-	if newFulcio(DefaultFulcioURL) == nil || newRekor(DefaultRekorURL) == nil {
+	if newFulcio() == nil || newRekor() == nil {
 		t.Fatal("default clients must be constructed")
 	}
 	if kp, err := newEphemeralKeypair(); err != nil || kp == nil {

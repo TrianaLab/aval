@@ -39,13 +39,15 @@ import (
 )
 
 const (
-	// MediaTypeSigstoreBundle is the media type of the optional Sigstore
-	// bundle layer (Sigstore standard).
+	// MediaTypeSigstoreBundle is the media type of the Sigstore bundle
+	// layer (Sigstore standard).
 	MediaTypeSigstoreBundle = "application/vnd.dev.sigstore.bundle.v0.3+json"
 	// AnnotationFingerprint records the fingerprint on the anchor and on
 	// every attestation manifest. Informational: Verify checks the
 	// fingerprint inside the signed predicate.
 	AnnotationFingerprint = "io.trianalab.aval.fingerprint"
+	// AnnotationTest records the test id on its stats anchor.
+	AnnotationTest = "io.trianalab.aval.test"
 	// maxBlobSize caps every manifest and layer read from the registry,
 	// which is untrusted input.
 	maxBlobSize = 4 << 20
@@ -85,9 +87,16 @@ type Attestation struct {
 	// Envelope is the signed DSSE envelope. Required.
 	Envelope *evidence.Envelope
 	// Bundle is the Sigstore bundle JSON with the verification material
-	// (certificate or key hint, transparency log entry). Optional.
+	// (certificate or key hint, transparency log entry). Required by Push:
+	// without it the attestation can never verify. Fetch leaves it nil when
+	// the manifest has no bundle layer.
 	Bundle []byte
 }
+
+// StatsTag returns the tag of a test's stats anchor. The "stats-" prefix
+// keeps it apart from fingerprint tags and referrers tag schema tags, which
+// start with "sha256-".
+func StatsTag(testID string) string { return "stats-" + testID }
 
 // Tag returns the lookup tag for a fingerprint ("sha256:<hex>").
 func Tag(fingerprint string) string { return strings.Replace(fingerprint, ":", "-", 1) }
@@ -171,13 +180,23 @@ var emptyJSON = ocispec.DescriptorEmptyJSON
 // anchor returns the deterministic anchor manifest for a fingerprint and its
 // descriptor. Its digest depends on the fingerprint alone.
 func anchor(fingerprint string) ([]byte, ocispec.Descriptor) {
+	return anchorFor(evidence.ArtifactTypeFingerprint, AnnotationFingerprint, fingerprint)
+}
+
+// statsAnchor returns the deterministic stats anchor manifest for a test id,
+// the subject of its run records. Its digest depends on the test id alone.
+func statsAnchor(testID string) ([]byte, ocispec.Descriptor) {
+	return anchorFor(evidence.ArtifactTypeStats, AnnotationTest, testID)
+}
+
+func anchorFor(artifactType, key, value string) ([]byte, ocispec.Descriptor) {
 	m := ocispec.Manifest{
 		Versioned:    specs.Versioned{SchemaVersion: 2},
 		MediaType:    ocispec.MediaTypeImageManifest,
-		ArtifactType: evidence.ArtifactTypeFingerprint,
+		ArtifactType: artifactType,
 		Config:       emptyJSON,
 		Layers:       []ocispec.Descriptor{emptyJSON},
-		Annotations:  map[string]string{AnnotationFingerprint: fingerprint},
+		Annotations:  map[string]string{key: value},
 	}
 	raw, _ := json.Marshal(m) // ponytail: plain structs and strings, cannot fail
 	return raw, content.NewDescriptorFromBytes(ocispec.MediaTypeImageManifest, raw)
@@ -204,6 +223,9 @@ func Push(ctx context.Context, repo, fingerprint string, a Attestation) (Descrip
 	if a.Envelope == nil {
 		return Descriptor{}, errors.New("registry.Push: no envelope")
 	}
+	if !json.Valid(a.Bundle) {
+		return Descriptor{}, errors.New("registry.Push: no valid Sigstore bundle; an attestation without one can never verify")
+	}
 	r, err := newRepository(repo)
 	if err != nil {
 		return Descriptor{}, fmt.Errorf("registry.Push: %w", err)
@@ -224,14 +246,11 @@ func push(ctx context.Context, r *remote.Repository, fingerprint string, a Attes
 	if err != nil {
 		return ocispec.Descriptor{}, err
 	}
-	layers := []ocispec.Descriptor{envDesc}
-	if len(a.Bundle) > 0 {
-		bundleDesc, err := pushBlob(ctx, r, MediaTypeSigstoreBundle, a.Bundle)
-		if err != nil {
-			return ocispec.Descriptor{}, err
-		}
-		layers = append(layers, bundleDesc)
+	bundleDesc, err := pushBlob(ctx, r, MediaTypeSigstoreBundle, a.Bundle)
+	if err != nil {
+		return ocispec.Descriptor{}, err
 	}
+	layers := []ocispec.Descriptor{envDesc, bundleDesc}
 	anchorRaw, anchorDesc := anchor(fingerprint)
 	// Re-tagging the deterministic anchor is idempotent and repairs a
 	// moved tag.
@@ -465,4 +484,51 @@ func fetchBlob(ctx context.Context, r *remote.Repository, l ocispec.Descriptor) 
 
 func malformed(format string, args ...any) error {
 	return &evidence.VerificationError{Reason: "malformed attestation: " + fmt.Sprintf(format, args...)}
+}
+
+// Record publishes a run record as a referrer of the test's stats anchor
+// (tagged StatsTag), never of a fingerprint anchor, so Lookup never lists a
+// record and records do not count toward its candidate cap. Records are
+// statistics: unlike Push, Record does not confirm the referrers listing, so
+// on a registry without the referrers API a concurrent push can drop one.
+func Record(ctx context.Context, repo string, rec evidence.RunRecord) (Descriptor, error) {
+	r, err := newRepository(repo)
+	if err != nil {
+		return Descriptor{}, fmt.Errorf("registry.Record: %w", err)
+	}
+	d, err := record(ctx, r, rec)
+	if err != nil {
+		return Descriptor{}, fmt.Errorf("registry.Record %s: %w", repo, err)
+	}
+	return Descriptor{Repository: repo, Digest: d.Digest.String()}, nil
+}
+
+func record(ctx context.Context, r *remote.Repository, rec evidence.RunRecord) (ocispec.Descriptor, error) {
+	if _, err := pushBlob(ctx, r, ocispec.MediaTypeEmptyJSON, emptyJSON.Data); err != nil {
+		return ocispec.Descriptor{}, err
+	}
+	raw, _ := json.Marshal(rec) // ponytail: plain structs, cannot fail
+	layer, err := pushBlob(ctx, r, evidence.MediaTypeRun, raw)
+	if err != nil {
+		return ocispec.Descriptor{}, err
+	}
+	anchorRaw, anchorDesc := statsAnchor(rec.TestID)
+	// oras rejects a tag that is not a valid reference (a malformed test id)
+	// before sending anything.
+	if _, err := oras.TagBytes(ctx, r, ocispec.MediaTypeImageManifest, anchorRaw, StatsTag(rec.TestID)); err != nil {
+		return ocispec.Descriptor{}, fmt.Errorf("tagging stats anchor: %w", err)
+	}
+	m, _ := json.Marshal(ocispec.Manifest{ // ponytail: plain structs and strings, cannot fail
+		Versioned:    specs.Versioned{SchemaVersion: 2},
+		MediaType:    ocispec.MediaTypeImageManifest,
+		ArtifactType: evidence.ArtifactTypeRun,
+		Config:       emptyJSON,
+		Layers:       []ocispec.Descriptor{layer},
+		Subject:      &ocispec.Descriptor{MediaType: anchorDesc.MediaType, Digest: anchorDesc.Digest, Size: anchorDesc.Size},
+	})
+	d, err := oras.PushBytes(ctx, r, ocispec.MediaTypeImageManifest, m)
+	if err != nil {
+		return ocispec.Descriptor{}, fmt.Errorf("pushing run record: %w", err)
+	}
+	return d, nil
 }

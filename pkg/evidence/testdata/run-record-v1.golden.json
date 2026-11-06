@@ -1,0 +1,13 @@
+{
+  "version": "aval.trianalab.io/run-record/v1",
+  "testId": "orders-integration",
+  "fingerprint": "sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7",
+  "outcome": "verified",
+  "reused": true,
+  "result": "passed",
+  "testDurationMs": 0,
+  "savedDurationMs": 1184000,
+  "avalVersion": "0.3.0",
+  "recordedAt": "2026-11-06T09:00:00Z",
+  "ciRunUrl": "https://ci.example.com/acme/orders/runs/42"
+}

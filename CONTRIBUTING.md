@@ -76,8 +76,11 @@ runs the unit suite with `aval run --shadow` and fails on a false hit (exit 1).
 Both fail on a verification failure (exit 5), read
 `ghcr.io/trianalab/aval-attestations` anonymously and upload their reports
 (the `aval verify --output json` format) as artifacts. On `main`,
-`dogfood-publish`, the only job with `packages: write` and `id-token: write`,
-signs keyless and pushes the results that were not reused; it runs no tests.
+`dogfood-publish`, the only job with `id-token: write`, signs keyless and
+pushes the results that were not reused; it runs no tests. Both suites also
+write a run record (`--record-file`), and on `main` `dogfood-record`
+(`packages: write` only, no tests) publishes them with `aval record`, whatever
+the suites' outcome; a record that cannot be published is a warning.
 Trust comes from `.github/aval/main.yaml` (main and releases: only `ci.yaml`
 on `main`, runner level) and `.github/aval/pr.yaml` (pull requests: also
 developer signatures); `tests/architecture/dogfood_test.go` enforces both,
@@ -234,7 +237,7 @@ Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Unfinished work
 
-Stubs return `evidence.ErrNotImplemented` (exit 6) and carry a `TODO(milestone-N): ...` comment naming the roadmap milestone that removes them (see [docs/vision.md](docs/vision.md)). Use the same convention; no bare `TODO`. Stubs still count toward the 100% coverage gate (`make coverage-check`): cover each with a test that asserts it returns `ErrNotImplemented`.
+Deferred work carries a `TODO(milestone-N): ...` comment naming the roadmap milestone that lands it (see [docs/vision.md](docs/vision.md)); no bare `TODO`. Nothing returns `evidence.ErrNotImplemented` (deprecated) and exit 6 stays reserved, never returned. Deferred code still counts toward the 100% coverage gate (`make coverage-check`).
 
 ## License
 

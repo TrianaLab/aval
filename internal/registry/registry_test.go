@@ -89,7 +89,12 @@ func fixReferrers(h http.Handler, w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(idx)
 }
 
+// att is an attestation signed "sig"; a nil bundle gets a placeholder,
+// since Push requires one.
 func att(sig string, bundle []byte) Attestation {
+	if bundle == nil {
+		bundle = []byte(`{}`)
+	}
 	return Attestation{
 		Envelope: &evidence.Envelope{PayloadType: evidence.PayloadType, Payload: []byte(`{"x":1}`), Signatures: []evidence.Signature{{Sig: []byte(sig)}}},
 		Bundle:   bundle,
@@ -172,7 +177,7 @@ func roundTrip(t *testing.T, repo string) {
 		t.Fatalf("Lookup = %+v %v, want %+v", got, err, want)
 	}
 	mustFetch(t, first, "ci", bundle)
-	mustFetch(t, second, "dev", nil)
+	mustFetch(t, second, "dev", []byte(`{}`))
 }
 
 func TestAnchorIsDeterministic(t *testing.T) {
@@ -327,8 +332,14 @@ func TestInputValidation(t *testing.T) {
 	if _, err := Push(ctx, "localhost:5000/x", "sha256:abc", att("ci", nil)); err == nil {
 		t.Error("Push must reject a malformed fingerprint")
 	}
-	if _, err := Push(ctx, "localhost:5000/x", fpA, Attestation{}); err == nil {
+	if _, err := Push(ctx, "localhost:5000/x", fpA, Attestation{Bundle: []byte(`{}`)}); err == nil {
 		t.Error("Push must reject a missing envelope")
+	}
+	if _, err := Push(ctx, "localhost:5000/x", fpA, Attestation{Envelope: att("ci", nil).Envelope}); err == nil || !strings.Contains(err.Error(), "bundle") {
+		t.Errorf("Push must reject a missing bundle, got %v", err)
+	}
+	if _, err := Push(ctx, "localhost:5000/x", fpA, Attestation{Envelope: att("ci", nil).Envelope, Bundle: []byte(" ")}); err == nil || !strings.Contains(err.Error(), "bundle") {
+		t.Errorf("Push must reject a blank bundle, got %v", err)
 	}
 	if _, err := Lookup(ctx, "localhost:5000/x", "sha256:ABC"); err == nil || errors.Is(err, evidence.ErrNotFound) {
 		t.Errorf("Lookup must reject a malformed fingerprint, got %v", err)
@@ -378,7 +389,7 @@ func fail(w http.ResponseWriter) bool {
 
 func TestRegistryErrorsAreNotMisses(t *testing.T) {
 	ctx := context.Background()
-	a := att("ci", []byte("bundle"))
+	a := att("ci", []byte(`{"b":1}`))
 	env, _ := json.Marshal(a.Envelope)
 	digestIs := func(r *http.Request, d digest.Digest) bool {
 		return r.Method == http.MethodPut && r.URL.Query().Get("digest") == d.String()
@@ -386,7 +397,7 @@ func TestRegistryErrorsAreNotMisses(t *testing.T) {
 	pushCases := map[string]func(*http.Request) bool{
 		"config blob": func(r *http.Request) bool { return digestIs(r, emptyJSON.Digest) },
 		"envelope":    func(r *http.Request) bool { return digestIs(r, digest.FromBytes(env)) },
-		"bundle":      func(r *http.Request) bool { return digestIs(r, digest.FromString("bundle")) },
+		"bundle":      func(r *http.Request) bool { return digestIs(r, digest.FromString(`{"b":1}`)) },
 		"anchor tag": func(r *http.Request) bool {
 			return r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/manifests/"+Tag(fpA))
 		},
@@ -787,5 +798,29 @@ func TestPushConfirmsReferrer(t *testing.T) {
 	defer cancel()
 	if _, err := push(ctx, -1); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("never listed, short deadline: %v", err)
+	}
+}
+
+// Push and Lookup check the fingerprint with their own regexp; it must
+// accept exactly what evidence.Parse accepts as execution.fingerprint.
+func TestFingerprintCheckAgreesWithEvidence(t *testing.T) {
+	start := time.Date(2026, 11, 5, 10, 0, 0, 0, time.UTC)
+	for _, fp := range []string{fpA, fpB, "sha256:abc", "sha256:" + strings.Repeat("A", 64), "sha512:" + strings.Repeat("a", 64),
+		fpA + "\n", " " + fpA, fpA + "0", "", "sha256-" + strings.Repeat("a", 64)} {
+		p := evidence.Predicate{
+			SchemaVersion: evidence.SchemaVersion,
+			Subject:       evidence.Subject{Name: "x", Digest: map[string]string{"sha256": "x"}},
+			Test:          evidence.Test{ID: "t"},
+			Result:        evidence.ResultPassed,
+			Execution:     evidence.Execution{Fingerprint: fp},
+			Runner:        evidence.Runner{Identity: "ci"},
+			StartedAt:     start,
+			FinishedAt:    start,
+		}
+		raw, _ := json.Marshal(p)
+		_, perr := evidence.Parse(raw)
+		if (checkFingerprint(fp) == nil) != (perr == nil) {
+			t.Errorf("%q: registry %v, evidence.Parse %v", fp, checkFingerprint(fp), perr)
+		}
 	}
 }

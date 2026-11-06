@@ -53,10 +53,6 @@ func TestKeylessSigningLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	const issuer = "https://token.actions.githubusercontent.com"
-	if out.Signer.Issuer != issuer || out.Signer.Subject == "" {
-		t.Fatalf("signer must be the workflow identity: %+v", out.Signer)
-	}
-	t.Logf("signed as %s (%s)", out.Signer.Subject, out.Signer.Issuer)
 
 	// The bundle verifies against the public-good trusted root: Fulcio
 	// chain, SCT, Rekor inclusion and the workflow identity.
@@ -76,9 +72,15 @@ func TestKeylessSigningLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := v.Verify(&b, verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithCertificateIdentity(id))); err != nil {
+	res, err := v.Verify(&b, verify.NewPolicy(verify.WithoutArtifactUnsafe(), verify.WithCertificateIdentity(id)))
+	if err != nil {
 		t.Fatalf("bundle does not verify: %v", err)
 	}
+	c := res.Signature.Certificate
+	if c.Issuer != issuer || c.SubjectAlternativeName == "" {
+		t.Fatalf("signer must be the workflow identity: %+v", c)
+	}
+	t.Logf("signed as %s (%s)", c.SubjectAlternativeName, c.Issuer)
 
 	// The envelope round-trips through evidence.Parse.
 	var st evidence.Statement
