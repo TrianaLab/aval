@@ -119,14 +119,7 @@ markdown_extensions:
       # Without this a missing --8<-- path is dropped silently and the strict
       # build still passes.
       check_paths: true
-  # ponytail: Material loads the Mermaid runtime from unpkg in the reader's
-  # browser; vendor a pinned copy when the site needs to work
-  # offline or a CSP forbids it.
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:

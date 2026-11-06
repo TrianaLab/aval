@@ -161,36 +161,6 @@
   --md-footer-fg-color: var(--c-text);
   --md-footer-fg-color--light: var(--c-text-3);
   --md-footer-fg-color--lighter: var(--c-text-3);
-
-  /* Mermaid: Material renders diagrams in a closed shadow root and themes
-     them only through these variables. Nodes are the layers of the logo: a
-     soft emerald face with an emerald edge; edges and labels are grey. */
-  --md-mermaid-font-family: var(--md-text-font-family);
-  --md-mermaid-node-bg-color: var(--c-accent-soft);
-  --md-mermaid-node-fg-color: var(--c-accent-fill);
-  --md-mermaid-edge-color: var(--c-text-3);
-  --md-mermaid-label-bg-color: var(--c-bg);
-  --md-mermaid-label-fg-color: var(--c-text);
-  --md-mermaid-sequence-actor-bg-color: var(--c-bg);
-  --md-mermaid-sequence-actor-fg-color: var(--c-text);
-  --md-mermaid-sequence-actor-border-color: var(--c-accent-fill);
-  --md-mermaid-sequence-actor-line-color: var(--c-border);
-  --md-mermaid-sequence-actorman-bg-color: var(--c-bg);
-  --md-mermaid-sequence-actorman-line-color: var(--c-accent-fill);
-  --md-mermaid-sequence-box-bg-color: var(--c-bg-2);
-  --md-mermaid-sequence-box-fg-color: var(--c-text);
-  --md-mermaid-sequence-label-bg-color: var(--c-bg);
-  --md-mermaid-sequence-label-fg-color: var(--c-text);
-  --md-mermaid-sequence-loop-bg-color: var(--c-accent-soft);
-  --md-mermaid-sequence-loop-border-color: var(--c-accent-fill);
-  --md-mermaid-sequence-loop-fg-color: var(--c-text);
-  --md-mermaid-sequence-message-fg-color: var(--c-text);
-  --md-mermaid-sequence-message-line-color: var(--c-text-3);
-  --md-mermaid-sequence-note-bg-color: var(--c-bg-2);
-  --md-mermaid-sequence-note-border-color: var(--c-border);
-  --md-mermaid-sequence-note-fg-color: var(--c-text);
-  --md-mermaid-sequence-number-bg-color: var(--c-accent-fill);
-  --md-mermaid-sequence-number-fg-color: var(--c-on-accent);
 }
 
 /* ---- Header: wordmark, version pill, search box, repo in mono ------------- */
@@ -476,14 +446,6 @@
 }
 .js .md-typeset .tabbed-labels::before {
   background: var(--c-accent-fill);
-}
-
-/* Mermaid diagrams sit on a card. */
-.md-typeset .mermaid {
-  padding: 1rem;
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-lg);
-  background: var(--c-bg);
 }
 
 /* Admonitions: a card with a status edge and a mono title. Material colours
@@ -1193,6 +1155,10 @@
   .aval-install {
     display: flex;
     font-size: 11.5px;
+  }
+  .aval-install code {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .aval-term {
     border-radius: 12px;
