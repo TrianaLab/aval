@@ -1,0 +1,10 @@
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata:
+  name: frontend
+runner:
+  command: ["sh", "test.sh"]
+scope:
+  source: ["src/**", "test.sh"]
+  contracts: ["../backend/aval.yaml"]
+cacheability: hermetic

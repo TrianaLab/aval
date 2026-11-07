@@ -87,7 +87,8 @@ a nightly base image, a tool at `latest`, a fixtures branch.
 - The manifest gets one line per reference, after the `env` lines:
   `resolve <kind> <reference> <version> <id>`, where `<version>` is
   `floating` for a reference that names no exact version. `aval run
-  --explain` shows them, and prints on stderr how long each lookup took.
+  --explain` shows them, and prints on stderr how long each lookup took,
+  including those of the contracts in `scope.contracts`.
 - The list is part of the contract hash; its order and duplicates do not
   matter. Contracts without `scope.resolve` never touch the network and keep
   their fingerprint.

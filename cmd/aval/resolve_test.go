@@ -31,3 +31,18 @@ func TestExplainReportsResolveCost(t *testing.T) {
 		t.Fatalf("no scope.resolve, no cost line: %q", warn.String())
 	}
 }
+
+// The cost covers referenced contracts too, a shared one counted once.
+func TestExplainResolveCostIncludesContracts(t *testing.T) {
+	shared := fingerprint.Dependency{Path: "../s/aval.yaml", Fingerprint: fingerprint.Fingerprint{Digest: "sha256:s",
+		Resolved: []resolve.Result{{Kind: "npm", Ref: "s@1", ID: "x", Took: time.Second}}}}
+	a := fingerprint.Dependency{Path: "../a/aval.yaml", Fingerprint: fingerprint.Fingerprint{Digest: "sha256:a",
+		Resolved: []resolve.Result{{Kind: "url", Ref: "https://e/a", ID: "y", Took: time.Second}}, Contracts: []fingerprint.Dependency{shared}}}
+	fp := fingerprint.Fingerprint{Contracts: []fingerprint.Dependency{a, shared}}
+	var warn bytes.Buffer
+	printResolveCost(&warn, fp)
+	if !strings.Contains(warn.String(), "resolved npm s@1 to x in 1s\n") ||
+		!strings.HasSuffix(warn.String(), "resolved 2 reference(s) in 2s\n") {
+		t.Fatalf("stderr %q", warn.String())
+	}
+}

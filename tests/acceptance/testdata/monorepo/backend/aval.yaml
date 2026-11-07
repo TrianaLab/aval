@@ -1,0 +1,9 @@
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata:
+  name: backend
+runner:
+  command: ["go", "test", "./..."]
+scope:
+  source: ["api/**"]
+cacheability: hermetic

@@ -49,6 +49,7 @@ Find the message in a section below. Text in `<...>` changes per run.
     | `environment.toolchain: invalid key`, `invalid variable name` | lower case tool names, valid variable names |
     | `scope.allowMutable[<i>]: ref and reason are both required` | give each entry a `ref` and a `reason` ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
     | `scope.resolve[<i>]: <x>`, `unknown kind <x>`, `the reference must be non-empty`, `credentials in the reference are not allowed`, `a scope.resolve entry is one` | one `kind: reference` per entry, a known kind, no spaces, no credentials ([Resolve references](../resolve/index.md)) |
+    | `scope.contracts[<i>]: <x>`, `must be slash-separated`, `must be a clean relative path`, `must name a contract file`, `is listed twice` | a relative path to a `.yaml` contract, such as `../backend/aval.yaml`, listed once ([Depend on another part of the repo](depend-on-a-contract.md)) |
     | `not a valid <kind> package name`, `is not a registry version, range or tag`, `want group:artifact:version` | a registry name that follows the ecosystem's naming rules and a version, range or tag, not a path, file or URL ([Resolve references](../resolve/index.md#exact-or-floating)) |
 
 ## Errors (exit 1)
@@ -64,6 +65,7 @@ result cannot be published.
     | `scope.source matched no files`, `glob <x> matched no files` | fix the glob, or create the file |
     | `is excluded only by a trailing` | exclude the file by name |
     | `only regular files are supported in scope`, `control characters in path are not supported` | keep symlinks and odd names out of scope |
+    | `scope.contracts <path>: <x>` | a referenced contract cannot be fingerprinted: fix it or the path ([Depend on another part of the repo](depend-on-a-contract.md)) |
     | `resolve <kind> <ref>: <x>` | a `scope.resolve` reference did not resolve: check the name, the version, the network and the credentials ([Resolve references](../resolve/index.md)) |
     | `decoding policy: <x>`, `minTrustLevel: <x> must be developer, runner or isolated`, `identities: at least one is required`, `identities[<i>]: <x>`, `trustLevel: <x> must be developer, runner or isolated` | fix the field ([Write a trust policy](trust-policy.md)) |
     | `publicKey cannot be combined with issuer or subjectRegexp`, `issuer and subjectRegexp are required (or publicKey)` | one kind of signer per identity |

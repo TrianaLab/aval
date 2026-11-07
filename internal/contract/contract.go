@@ -121,6 +121,11 @@ type Scope struct {
 	// (internal/resolve). Omitted when empty, so contracts without it hash
 	// as before.
 	Resolve []Reference `yaml:"resolve,omitempty" json:"resolve,omitempty"`
+	// Contracts are paths to other contracts, relative to this one's
+	// directory (../backend/aval.yaml). The fingerprint of each goes into
+	// this one's manifest. Omitted when empty, so contracts without it
+	// hash as before.
+	Contracts []string `yaml:"contracts,omitempty" json:"contracts,omitempty"`
 }
 
 // ResolveKinds are the ecosystems scope.resolve accepts, one resolver each.
@@ -258,6 +263,29 @@ func (s Scope) validate(add func(string, ...any)) {
 			add("scope.resolve[%d]: %v", i, err)
 		}
 	}
+	for i, p := range s.Contracts {
+		if err := validateContractPath(p); err != nil {
+			add("scope.contracts[%d]: %v", i, err)
+		} else if slices.Index(s.Contracts, p) < i {
+			add("scope.contracts[%d]: %q is listed twice", i, p)
+		}
+	}
+}
+
+// validateContractPath accepts a clean, relative, slash-separated path to a
+// .yaml or .yml file, without spaces or control characters (it goes into a
+// manifest line). Leading ".." segments are allowed: where the path may
+// lead is checked when the fingerprint is computed.
+func validateContractPath(p string) error {
+	switch {
+	case strings.IndexFunc(p, func(c rune) bool { return unicode.IsSpace(c) || unicode.IsControl(c) || c == '\\' }) >= 0:
+		return fmt.Errorf("%q: must be slash-separated, without spaces or control characters", p)
+	case path.IsAbs(p) || path.Clean(p) != p:
+		return fmt.Errorf("%q: must be a clean relative path (no leading '/', no '.' or empty segments, '..' only at the start)", p)
+	case !strings.HasSuffix(p, ".yaml") && !strings.HasSuffix(p, ".yml"):
+		return fmt.Errorf("%q: must name a contract file (.yaml or .yml)", p)
+	}
+	return nil
 }
 
 func (r Reference) validate() error {
