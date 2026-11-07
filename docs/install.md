@@ -1,11 +1,8 @@
 # Install
 
-Aval is one static binary for Linux, macOS and Windows on amd64 and arm64.
-The installers download it from
-[GitHub Releases](https://github.com/TrianaLab/aval/releases) and check it
-before installing. This site serves the installers of the latest commit on
-`main`; the same files are `scripts/get-aval.sh` and `scripts/install.ps1` in
-the repository.
+One static binary for Linux, macOS and Windows (amd64, arm64), from
+[GitHub Releases](https://github.com/TrianaLab/aval/releases). The installers
+check the download before they install it.
 
 ## Linux and macOS
 
@@ -13,19 +10,19 @@ the repository.
 curl -fsSL https://aval.run/install.sh | bash
 ```
 
-The script needs `curl` or `wget` and `sha256sum` or `shasum`, and works with
-the bash 3.2 that macOS ships. It installs `aval` into `/usr/local/bin` and
-uses `sudo` only when that directory is not writable.
+Installs into `/usr/local/bin`, with `sudo` only if that directory is not
+writable. Needs `curl` or `wget`, and `sha256sum` or `shasum`. Works with the
+bash 3.2 that macOS ships.
 
-| Variable or flag | Effect |
-|---|---|
-| `DESIRED_VERSION=v0.2.0`, `--version v0.2.0` | install this release instead of the latest |
-| `AVAL_INSTALL_DIR=$HOME/.local/bin` | install into this directory |
-| `USE_SUDO=false`, `--no-sudo` | never use `sudo` |
-| `AVAL_NO_VERIFY=1`, `--no-verify` | skip the signature and provenance checks (the sha256 is still checked) |
-| `AVAL_DOWNLOAD_URL` | download from a mirror of the release files; the signer identity does not change |
+| Variable | Flag | Windows | Effect |
+|---|---|---|---|
+| `DESIRED_VERSION=v0.2.0` | `--version v0.2.0` | yes | install this release, not the latest |
+| `AVAL_INSTALL_DIR=<dir>` | | yes | install here |
+| `USE_SUDO=false` | `--no-sudo` | no | never use `sudo` |
+| `AVAL_NO_VERIFY=1` | `--no-verify` | yes | skip the cosign and gh checks (sha256 still runs) |
+| `AVAL_DOWNLOAD_URL=<url>` | | yes | download from a mirror; the signer stays pinned |
 
-Flags need the script as a file, or `bash -s --` when piped:
+Piped, pass flags after `bash -s --`:
 
 ```sh
 curl -fsSL https://aval.run/install.sh | bash -s -- --version v0.2.0
@@ -39,38 +36,24 @@ In PowerShell 5.1 or 7:
 irm https://aval.run/install.ps1 | iex
 ```
 
-It installs `aval.exe` into `%LOCALAPPDATA%\Programs\aval` and adds that
-directory to the user `PATH`, without administrator rights. It reads
-`DESIRED_VERSION`, `AVAL_INSTALL_DIR`, `AVAL_NO_VERIFY` and
-`AVAL_DOWNLOAD_URL` from the environment.
+Installs `aval.exe` into `%LOCALAPPDATA%\Programs\aval` and adds it to your
+user `PATH`, without admin rights. Settings: the variables marked Windows
+above.
 
 ## What the installers check
 
-Both scripts stop without installing anything when a check fails:
+| Check | Runs |
+|---|---|
+| the archive's sha256 matches `checksums.txt` | always |
+| `checksums.txt` has a Sigstore signature from Aval's release workflow at that tag | if `cosign` is on `PATH` |
+| the archive matches the release's SLSA provenance | if `gh` 2.49 or later is on `PATH` (no login) |
 
-1. `checksums.txt` must exist in the release and list the archive, and the
-   archive must have that sha256. This check always runs.
-2. If `cosign` is on `PATH`, `checksums.txt` must carry a keyless Sigstore
-   signature from `https://github.com/TrianaLab/aval/.github/workflows/release.yaml@refs/tags/<tag>`.
-3. If `gh` 2.49 or later is on `PATH`, the archive must match the SLSA
-   provenance from the same workflow (`gh attestation verify` with the
-   `provenance.sigstore.json` bundle of the release; no GitHub login needed).
+A failed check installs nothing. A check that cannot run is reported.
 
-Without `cosign` or `gh`, the installer prints which check did not run. To
-check a downloaded release by hand:
+## By hand
 
-```sh
-cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity https://github.com/TrianaLab/aval/.github/workflows/release.yaml@refs/tags/v0.2.0
-sha256sum --ignore-missing -c checksums.txt
-gh attestation verify aval_0.2.0_linux_amd64.tar.gz --bundle provenance.sigstore.json --repo TrianaLab/aval
-```
-
-## Release archive by hand
-
-Without an installer: download the archive, `checksums.txt` and its
-signature, check them as above, then put `aval` on your `PATH`:
+Download the archive, `checksums.txt` and the signatures, check them, then put
+`aval` on your `PATH`:
 
 ```sh
 VERSION=0.2.0
@@ -80,21 +63,22 @@ BASE=https://github.com/TrianaLab/aval/releases/download/v$VERSION
 curl -fsSLO "$BASE/aval_${VERSION}_${OS}_${ARCH}.tar.gz"
 curl -fsSLO "$BASE/checksums.txt"
 curl -fsSLO "$BASE/checksums.txt.sigstore.json"
+curl -fsSLO "$BASE/provenance.sigstore.json"
 cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity "https://github.com/TrianaLab/aval/.github/workflows/release.yaml@refs/tags/v$VERSION"
 sha256sum --ignore-missing -c checksums.txt   # macOS: shasum -a 256 --ignore-missing -c checksums.txt
+gh attestation verify "aval_${VERSION}_${OS}_${ARCH}.tar.gz" --bundle provenance.sigstore.json --repo TrianaLab/aval
 tar -xzf "aval_${VERSION}_${OS}_${ARCH}.tar.gz" aval
 sudo mv aval /usr/local/bin/
 ```
 
-## Go users
+## From source
 
-`go install github.com/TrianaLab/aval/cmd/aval@latest` builds from source
-instead. The binary reports version `dev` and skips the release checks above.
+`go install github.com/TrianaLab/aval/cmd/aval@latest`. The binary reports
+version `dev` and has no release checks.
 
 ## Uninstall
 
-Delete the binary: `/usr/local/bin/aval` (or your `AVAL_INSTALL_DIR`), or
-`%LOCALAPPDATA%\Programs\aval` on Windows, and remove that directory from the
-user `PATH`.
+Delete `/usr/local/bin/aval` (or your `AVAL_INSTALL_DIR`), or
+`%LOCALAPPDATA%\Programs\aval` on Windows and remove it from your user `PATH`.

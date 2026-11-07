@@ -1,215 +1,73 @@
-# Aval: vision
-
-Status: pre-alpha. Milestones 1 (contract + fingerprint) and 2 (sign, push
-and verify against a registry, `aval run` reuse or execute) are implemented.
+# Vision and roadmap
 
 ## Thesis
 
 Aval turns test results into signed, verifiable OCI artifacts. An expensive
-test runs once, locally or in CI. The result is published to an OCI registry as
-a signed attestation bound to a deterministic fingerprint of the test's inputs.
-Any other environment computes the same fingerprint, finds the attestation,
-verifies it, and if the trust policy allows it, reuses the result instead of
-running the test again.
+test runs once, locally or in CI. The result is published to an OCI registry
+as a signed attestation bound to a deterministic fingerprint of the test's
+inputs. Any other environment computes the same fingerprint, finds the
+attestation, verifies it, and if the trust policy allows it, reuses the result
+instead of running the test again.
 
-This is not a test cache. It is a CI primitive: **verifiable test execution
-reuse**. A cache optimizes for hit rate and quietly tolerates a stale entry now
-and then. Aval optimizes for being able to justify every reuse, and when it
-can't, it runs the test.
+This is not a test cache. A cache optimizes for hit rate and quietly tolerates
+a stale entry now and then. Aval optimizes for being able to justify every
+reuse, and when it can't, it runs the test.
 
-A signature alone does not get you there. A signature proves *who claims* the
-test passed, not that it ran honestly or against the inputs you have now.
-Reuse is only safe when two things hold:
-
-- an explicit **input contract** (`aval.yaml`) that says what the test depends
-  on, so "same inputs" is something you can check, and
-- a **trust policy** over signer identities, so "who ran it" is something you
-  can accept or reject.
+A signature proves *who claims* the test passed, not that it ran honestly or
+against the inputs you have now. So reuse needs an explicit **input
+contract** (`aval.yaml`), so "same inputs" can be checked, and a **trust
+policy** over signer identities, so "who ran it" can be accepted or rejected.
 
 ## Problem
 
-Heavy tests (integration, end-to-end, hardware, long suites) get re-run on
-every pipeline, branch and environment even when nothing they depend on has
-changed. Teams either pay for it in time and compute, or they skip tests based
-on informal judgment ("that service didn't change"), which nobody can audit.
-Existing build caches solve this for teams that buy into a hermetic build
-system. Most teams have not, and their CI cannot prove that a result from one
-environment is valid in another.
-
-## Goals
-
-- A test contract (`aval.yaml`) that declares a test's identity, its runner
-  command, its input scope, the environment conditions that matter, and its
-  cacheability class.
-- A deterministic execution fingerprint over the declared inputs, independent
-  of checkout path and file iteration order.
-- Signed in-toto attestations of execution results, stored in any OCI 1.1
-  registry and found by fingerprint.
-- Verification that keeps "no result" (miss) separate from "result exists
-  but can't be trusted" (verification failure), in both code and exit codes.
-- A versioned output format and a public Go package (`pkg/evidence`) that
-  other tools can consume without depending on Aval internals.
-
-## Non-goals
-
-- **No registry, server or database of our own.** Storage, lookup and linking
-  go through standard OCI registries.
-- **No runtime tracing or input inference in v0.** Scope is declared, not
-  observed. Recording the files a test actually reads ("observed inputs") is
-  future work, and would be used to check declared scope, not to replace it.
-- **Not a build system and not a Bazel replacement.** Aval doesn't model
-  build graphs, actions or outputs. Teams already on Bazel's remote cache may
-  not need it.
-- **Not a test framework.** Aval runs an arbitrary command and records its exit
-  code. It doesn't discover, select or report individual test cases.
-- **No knowledge of Pacto or any other consumer.** Aval doesn't import Pacto
-  or model its concepts. Consumers integrate through the stable formats below,
-  and their adapters live in their own repositories.
+Heavy tests (integration, end-to-end, hardware, long suites) re-run on every
+pipeline, branch and environment even when nothing they depend on changed.
+Teams pay for it in time and compute, or skip tests on informal judgment that
+nobody can audit. Build caches solve this only for teams on a hermetic build
+system.
 
 ## Design decisions
 
-1. **Standard supply-chain plumbing, no own infrastructure.** Publishing and
-   fetching use ORAS, signatures use Cosign/Sigstore, attestations use
-   in-toto Statements in DSSE envelopes, and evidence is linked through OCI 1.1
-   referrers. Lookup goes only through the registry, via the tag
-   `sha256-<fingerprint hex>`, and artifacts are always consumed by digest.
-   *Rationale:* registries, signing and access control already exist and are
-   already operated; tags are mutable, digests aren't.
-2. **Scope belongs to the test contract, not the runner.** Every test declares
-   its inputs in `aval.yaml` (`scope.source`, `scope.exclude`,
-   `scope.dependencies`, `environment`). Nothing is inferred or traced in v0.
-   *Rationale:* the test author is the one who knows what the test depends on,
-   and a declared scope can be reviewed in a PR.
-3. **Fail closed.** If input equivalence can't be proven, the test runs. That
-   covers unknown contract fields, dependency globs that match nothing,
-   symlinks in scope, and an empty scope. A miss (exit 4, `ErrNotFound`) and
-   a verification failure (exit 5, `ErrVerification`) are separate outcomes.
-   A verification failure is a security event and is never downgraded to a
-   miss. *Rationale:* a false hit costs more than a re-run, and a forged or
-   mis-signed result is something someone needs to look at.
-4. **Trust tiers.** Level 1 is a developer signature, meant as personal
-   acceleration and not full trust. Level 2 is a runner with a verifiable
-   identity. Level 3 is isolated execution with a verifiable attestation. The
-   policy decides which signer identities are accepted, at which level, and
-   the minimum level needed for reuse. With no policy, nothing is accepted.
-   *Rationale:* how much a signed claim is worth depends on where it was
-   produced, and that call belongs to whoever consumes the result.
-5. **Test identity vs execution fingerprint.** `metadata.name` / `test.id` says
-   *what* is checked. The fingerprint says *which concrete inputs and
-   conditions* a particular run had. *Rationale:* the same check gets many
-   executions, and policy and reporting need to tell the two apart.
-6. **Cacheability classes.** `hermetic` and `controlled-environment` are
-   reusable by default. `external-dependencies` needs an explicit policy
-   opt-in. `non-deterministic` is never reusable. *Rationale:* a
-   matching fingerprint only means something if the result depends on the
-   declared inputs.
-7. **Language-, framework- and CI-agnostic.** v0 ships only a generic runner:
-   an argv command with no shell interpolation, where the exit code is the
-   result. *Rationale:* one generic runner covers every stack, and
-   framework-specific runners can come later if there's demand.
+| Decision | Why |
+|---|---|
+| No own infrastructure: ORAS, Sigstore (sigstore-go), in-toto/DSSE, OCI 1.1 referrers. Lookup by the tag `sha256-<fingerprint hex>`, consumption by digest | registries, signing and access control already exist and are operated; tags are mutable, digests aren't |
+| Scope belongs to the test contract (`aval.yaml`); nothing is inferred or traced | the test author knows what the test depends on, and a declared scope can be reviewed in a PR |
+| Fail closed: if input equivalence can't be proven, the test runs. A miss (exit 4) and a verification failure (exit 5) stay separate, and the latter is never downgraded | a false hit costs more than a re-run, and a forged result is something someone needs to look at |
+| Trust levels (developer, runner, isolated) granted by the policy; no policy, no reuse | how much a signed claim is worth depends on where it was produced, and that call belongs to the consumer |
+| Test identity (`metadata.name`) is not the execution fingerprint | the same check gets many executions, and policy and reporting need to tell them apart |
+| Cacheability classes; `non-deterministic` is never reusable | a matching fingerprint only means something if the result depends on the declared inputs |
+| One generic runner: an argv command, the exit code is the result | it covers every language, framework and CI vendor |
 
-### Consumption contract
+## Non-goals
 
-External tools consume Aval results through:
-
-- versioned artifact and predicate formats with Aval's own media types
-  (frozen: predicate type
-  `https://aval.trianalab.io/attestation/execution/v2`, media type
-  `application/vnd.trianalab.aval.execution.v2+json`, artifact type
-  `application/vnd.trianalab.aval.execution.v2`, contract `apiVersion`
-  `aval.trianalab.io/v1`),
-- neutral predicate fields: `subject`, `test.id`, `result`,
-  `execution.fingerprint`, `execution.environment`, `runner` identity,
-  `startedAt`/`finishedAt`, plus a free `annotations` map that Aval never
-  reads,
-- the public Go package `pkg/evidence` (`Parse`, `Verify`),
-- `aval verify --output json`.
-
-These formats are frozen; within a version they change additively only (see
-[artifact-format.md](artifact-format.md#versioning-and-compatibility)).
+- No registry, server or database of our own.
+- No runtime tracing or input inference in v0; "observed inputs" is future
+  work, to check declared scope, not replace it.
+- Not a build system or a Bazel replacement.
+- Not a test framework: Aval records an exit code, not test cases.
+- No knowledge of Pacto or any other consumer; consumers use the
+  [stable formats](integrations.md).
 
 ## Risks
 
-- **Bazel or a remote cache is already enough for some teams.** Mitigation:
-  don't compete there. Aval targets tests outside a hermetic build graph
-  (integration, e2e, cross-environment). We'll know it isn't working if early
-  users are mostly Bazel shops that also want Aval for build actions.
-- **Declaring scope can cost more than it saves.** Mitigation: keep the
-  contract small (globs, lockfiles, a toolchain map) and make it debuggable
-  with `aval run --explain`. Detection: contracts that drift away from the code
-  they cover, or teams that give up on tests with a wide scope.
-- **Real savings are small if inputs always change.** If every commit touches
-  the scope, the fingerprint never matches. Detection: the hit rate in the
-  milestone 3 example and in early adopters' pipelines. A test whose scope is
-  "the whole repo" is a bad fit, and the docs should say so.
-- **Security policies may reject attestations from developer machines.**
-  Mitigation: this is expected, and it's why trust tiers exist. CI policies
-  should require level 2 or higher, and level 1 stays personal acceleration.
-  Detection: whether the value holds up when only runner and isolated
-  signatures are accepted.
+| Risk | Mitigation | Signal it isn't working |
+|---|---|---|
+| Bazel or a remote cache is already enough | target tests outside a hermetic build graph (integration, e2e, cross-environment) | early users are mostly Bazel shops that want Aval for build actions |
+| Declaring scope costs more than it saves | a small contract (globs, lockfiles, a toolchain map), debuggable with `aval run --explain` | contracts drift from the code, or teams give up on wide-scope tests |
+| Inputs always change, so savings are small | the docs say a "whole repo" scope is a bad fit | a low hit rate in the example and in early adopters' pipelines |
+| Security policies reject developer signatures | expected: CI requires runner or higher; developer stays personal | the value does not hold with only runner and isolated signatures |
 
 ## Roadmap
 
-1. **Fingerprint + contract.** *Implemented.* Exit criterion: `aval.yaml` is
-   parsed and validated with unknown fields rejected, and
-   `aval run --fingerprint-only` / `--explain` produce a deterministic
-   `aval-fingerprint/v1` digest and manifest that fail closed on undeclared
-   or unprovable inputs.
-2. **Push/verify against a local registry with Cosign signing.**
-   *Implemented* (`aval run` exits with the test's own result after a miss,
-   and reports the miss). Exit criterion: `aval run --push` signs and publishes an attestation to a local
-   OCI registry. `aval verify` and `aval run` against that registry reuse a
-   policy-accepted result (exit 0), report a miss (exit 4), and report a
-   tampered or untrusted attestation as a verification failure (exit 5). The
-   policy file format is defined.
-3. **End-to-end example in GitHub Actions.** Exit criterion: a public example
-   repo where one workflow run executes and publishes, a second run with
-   unchanged inputs reuses the result, and a run with changed inputs misses
-   and re-executes, all visible in the workflow logs.
-   *In progress:* the `example-go-compose` job in `.github/workflows/ci.yaml`
-   runs this story for `examples/go-compose` in this repository on every
-   push to `main` (see [its README](https://github.com/TrianaLab/aval/blob/main/examples/go-compose/README.md)).
-   The release pipeline for signed `aval` binaries (checksums, SBOMs, SLSA
-   provenance) is in place and dry-runs on every PR. The example and the
-   dogfood shadow and publish jobs install the pinned release, verified
-   before use. While the pin is v0.1.0, which cannot read the frozen
-   `aval.trianalab.io/v1` contracts, they build `aval` from the commit
-   instead (#17).
-   Aval also dogfoods itself (#28): `ci-e2e` runs the heavy suite
-   (`aval.e2e.yaml`) through `aval run` and reuses a verified result,
-   `dogfood-shadow` runs the unit suite (`aval.yaml`) with `--shadow`, and on
-   `main` `dogfood-publish` signs and pushes both results to
-   `ghcr.io/trianalab/aval-attestations`. A release requires a verified e2e
-   attestation for its commit. See [CONTRIBUTING.md](https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#ci-quality-gates).
-4. **False-hit suite.** *Implemented.* Exit criterion: an automated suite
-   that applies every known kind of relevant change (source, dependency,
-   toolchain, env var, exec bit, contract edit, symlink, file rename) and
-   asserts that none of them can reuse a previous execution.
-   The table-driven corpus in `internal/fingerprint/corpus_test.go` covers
-   these kinds and pins the known gaps (see
-   [contract.md](contract.md#known-gaps)). The `ci-false-hit` CI job runs it
-   on every PR and push, together with golden manifests of a fixed tree that
-   fail on any change to them without an `aval-fingerprint/vN` bump (a
-   mutation sweep of the manifest code found no manifest-changing mutant
-   that passes; see [contract.md](contract.md#false-hit-corpus)).
-   Committed goldens are append-only, so the golden cannot be rewritten
-   instead.
-5. **Stable consumption contract for external integrations.** Exit criterion:
-   the predicate type, media types, predicate fields, `pkg/evidence` API and
-   `aval verify --output json` report are declared stable and versioned,
-   with only additive changes allowed within v1, and an external consumer
-   can verify results using `pkg/evidence` alone.
-   *In progress:* the predicate type, media types, contract `apiVersion`
-   and verify report version are frozen, with compatibility rules in
-   [artifact-format.md](artifact-format.md#versioning-and-compatibility)
-   and golden files guarding the JSON shape (#17).
-6. **Contract composition for monorepos (Epic 10).** Exit criterion: a test
-   in a monorepo reruns when, and only when, the declared inputs of the
-   parts it depends on change.
-   *In progress:* `scope.contracts` binds the fingerprints of other local
-   contracts, transitively (#124; see
-   [Depend on another part of the repo](guides/depend-on-a-contract.md)).
-   Follow-up idea, not built: a remote dependency (another repository, by
-   OCI reference). Its files are not available to fingerprint, so it would
-   bind a published, verified result instead, which raises its own trust
-   questions (whose signature, which policy, what a revoked result means).
+| # | Milestone | Status | Done when |
+|---|---|---|---|
+| 1 | Fingerprint and contract | implemented | `aval.yaml` is validated with unknown fields rejected, and `--fingerprint-only` / `--explain` give a deterministic `aval-fingerprint/v1` digest that fails closed on unprovable inputs |
+| 2 | Push and verify against a registry, with signing | implemented | `aval run --push` signs and publishes; `aval verify` and `aval run` reuse a trusted result (exit 0), report a miss (exit 4) and a tampered or untrusted one (exit 5); the policy format is defined |
+| 3 | End-to-end example in GitHub Actions | in progress ([CI quality gates](https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#ci-quality-gates)) | a public example where one run publishes, an unchanged run reuses, and a changed run misses, all visible in the logs |
+| 4 | False-hit suite | implemented ([false-hit suite](https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#false-hit-suite), [known gaps](contract.md#known-gaps)) | every known kind of relevant change is shown not to reuse a previous execution |
+| 5 | Stable consumption contract | in progress | the formats, `pkg/evidence` and the verify report are versioned with only additive changes in v1, and an external consumer verifies with `pkg/evidence` alone |
+| 6 | Contract composition for monorepos (Epic 10) | in progress: `scope.contracts` binds other local contracts, transitively ([guide](guides/depend-on-a-contract.md)) | a test in a monorepo reruns when, and only when, the declared inputs of the parts it depends on change |
+
+A remote dependency (another repository, by OCI reference) is an idea, not
+built: its files are not available to fingerprint, so it would bind a
+published, verified result instead, which raises its own trust questions.

@@ -29,44 +29,31 @@ test instead of reusing an old result.
 
 ## Exact or floating
 
-An exact version binds that version. For npm, PyPI, crates, gems and
-Maven, anything else (a range, latest, a tag) binds the whole release
-list, so any new release of the package makes the test run again; use an
-exact version (or a lockfile) for stable reuse. Go differs: a `vX.Y.Z`
-version is exact, a branch, a commit or another non-semver query is
-resolved through the proxy to a version (usually a pseudo-version) whose
-zip is bound, and only `latest`, a prefix (`v1.2`), a comparison or a
-`+incompatible` version binds the version list
-([Go modules](go.md)).
+<!-- --8<-- [start:floating] -->
 
-Aval never picks a version from a range. Each tool reads ranges its own
-way, and a version Aval picked differently from the tool would be a false
-hit. What a floating reference hashes:
+An exact version binds that release. Anything else (a range, `latest`, a tag)
+binds the whole release list, so any new release runs the test again. Aval
+never picks a version from a range.
 
-- npm: every version with its `dist.integrity` and deprecation, and every
-  dist-tag.
-- PyPI: every file of every release with its sha256 and yanked flag.
-- Crates: every index entry with its checksum and yanked flag.
-- Gems: every version and platform with its checksum.
-- Maven: every version in `maven-metadata.xml` with its POM and published
-  checksum, plus `<latest>` and `<release>`; more than 100 versions fail.
-- Go (`latest`, a prefix, a comparison, `+incompatible`): the proxy's
-  version list and `@latest` with the `h1:` hash of the version it names;
-  other versions by name (the checksum database keeps them fixed; a module
-  the go command would not verify against it fails).
+<!-- --8<-- [end:floating] -->
 
-A publish, a yank or a moved tag changes the id: the test runs more
-often, never on stale inputs. What counts as exact is on each ecosystem
-page; when in doubt, a spec is floating. A spec the tool installs from
-somewhere else than the registry (an npm alias `npm:x`, `github:`,
-`org/repo`, `git+https:`, `file:`, `./dir`) fails: use the `git` or `url`
-kind, or pin. A package name must match its ecosystem's naming rules
-(npm's rules for old packages, so uppercase is allowed; PEP 508, crates.io, RubyGems, Maven
-coordinates, Go module paths), checked when the contract is read and
-again before the lookup, so a path, a file or a URL never passes for a
-name (`left-pad/`, `./x`, `x.tgz`): `not a valid npm package name`. An
-image tag and a git branch are resolved to their current
-digest or commit.
+| Kind | Exact | Floating hashes |
+|---|---|---|
+| `npm` | `x.y.z[-pre]` | every version's `dist.integrity` and deprecation, every dist-tag |
+| `pypi` | one `==` without `*` | every file's sha256 and yanked flag |
+| `crate` | `=x.y.z` | every index entry's checksum and yanked flag |
+| `gem` | a plain version | every version and platform checksum |
+| `maven` | a plain version | every listed version's POM and checksums (100 versions at most) |
+| `go` | `vX.Y.Z` (a branch or commit resolves to a version) | the version list, plus `@latest` and its `h1:` hash, for `latest`, a prefix, a comparison or `+incompatible` |
+| `image` | | the tag's manifest digest |
+| `git` | a full commit | the commit a branch or tag points to |
+| `url` | | the bytes |
+
+A publish, a yank or a moved tag changes the id: the test runs more often,
+never on stale inputs. When in doubt, a spec is floating. A spec the tool
+installs from elsewhere (`npm:x`, `github:`, `file:`, `./dir`) or a name
+outside the ecosystem's rules fails: use `git` or `url`, or pin. Each page
+lists the rules.
 
 ## Pin or resolve?
 
@@ -81,17 +68,13 @@ a nightly base image, a tool at `latest`, a fixtures branch.
 
 ## How it works
 
-- Each entry is `kind: reference`. The kinds: [`image`](images.md),
-  [`npm`](npm.md), [`pypi`](pypi.md), [`go`](go.md), [`maven`](maven.md),
-  [`crate`](crates.md), [`gem`](gems.md), [`git`](git.md), [`url`](urls.md).
 - The manifest gets one line per reference, after the `env` lines:
   `resolve <kind> <reference> <version> <id>`, where `<version>` is
   `floating` for a reference that names no exact version. `aval run
   --explain` shows them, and prints on stderr how long each lookup took,
   including those of the contracts in `scope.contracts`.
 - The list is part of the contract hash; its order and duplicates do not
-  matter. Contracts without `scope.resolve` never touch the network and keep
-  their fingerprint.
+  matter. Contracts without `scope.resolve` never touch the network.
 - `scope.resolve` binds the artifact you name, not its dependencies. npm,
   pip, `cargo install` without `--locked` and `gem install` still pick
   transitive versions when they install. Pin those with a lockfile.
@@ -99,22 +82,14 @@ a nightly base image, a tool at `latest`, a fixtures branch.
 
 ## scope.resolve and the scanner
 
-`scope.resolve` never clears a finding of the
-[mutable-reference scanner](../pinning.md). A resolved reference makes a
-move change the fingerprint: a repushed tag, a moved branch, new bytes at a
-URL or a new release all give a miss. But the scanner still reports the
-reference, and it still blocks reuse.
+<!-- --8<-- [start:scanner] -->
 
-To clear the finding, pin it in place: a digest, a commit, a lockfile, a
-vendored file. Or accept it on purpose with
-[`scope.allowMutable`](../pinning.md#accept-a-reference-on-purpose) and the
-reason. `scope.resolve` and `scope.allowMutable` work well together: the
-first catches a move, the second says why the reference may stay mutable.
+`scope.resolve` never clears a [scanner](../pinning.md) finding: a move
+changes the fingerprint, but the reference still blocks reuse. Pin it in
+place, or accept it with
+[`scope.allowMutable`](../pinning.md#accept-a-reference-on-purpose).
 
-The resolved id vouches for the registry, not for the machine that runs
-the test. An engine or a node can run a copy of a tag it pulled earlier:
-Compose without `pull_policy: always`, Kubernetes with `IfNotPresent`. Pull
-before the test, or pin by digest.
+<!-- --8<-- [end:scanner] -->
 
 ## When resolution fails
 
@@ -139,33 +114,37 @@ Nothing is looked up, the test runs, and the reason names the reference:
 | `git` | the URL in the reference | git's own (credential helpers, SSH keys) |
 | `url` | the URL in the reference | `~/.netrc` |
 
-`$NETRC` and `$npm_config_userconfig` (any letter case, as npm reads
-it) point to other files. Only a
-`machine` entry of `~/.netrc` is used, never `default`, and credentials are
-sent only over `https` or to a loopback host (also after a redirect).
-Credentials go in headers, never in the manifest, a URL or an error. A user, a password or a path
-in a registry variable (`GOPROXY=https://user:token@host`,
-`https://npm-proxy.fury.io/<token>/user/`) is masked in errors (every URL
-in an error shows only its host), and refused over plain `http` to a host that is not loopback. Credentials written in a reference (a password, a user name
-in an `http(s)` or scheme-less `//user@host` URL, or a query parameter
-such as `token`, `private_token`, `sig`, `client_secret` or
-`X-Amz-Signature`, in any case and with `-` or `_`) are
-rejected without echoing them; an `ssh://git@host` user is allowed. The registry address is not hashed: the same
-content on a mirror resolves to the same id. Requests carry the
-User-Agent `aval/<version> (+https://github.com/TrianaLab/aval)`.
+- Only `machine` entries of `~/.netrc` (or `$NETRC`) are used, never
+  `default`, and only over `https` or to a loopback host (also after a
+  redirect). `$npm_config_userconfig` (any letter case) points npm's file
+  elsewhere. Credentials go in headers, never in the manifest, a URL or an
+  error; a user, password or path in a registry variable is masked in errors
+  and refused over plain `http` to a host that is not loopback.
+- A reference with credentials is rejected without echoing it: a password in
+  any URL, a user in an `http(s)` or scheme-less `//user@host` URL (an
+  `ssh://git@host` user is fine), an `@` in the authority of a URL that does
+  not parse, or a query parameter named `token`, `private_token`,
+  `access_token`, `key`, `apikey`, `api_key`, `sig`, `signature`,
+  `X-Amz-Signature`, `X-Goog-Signature`, `auth`, `password`, `secret`,
+  `credential`, `security_token`, `x_amz_security_token`, `client_secret`,
+  `session` or `sessionid` (any case, `-` read as `_`, a trailing `[]`
+  ignored).
+- The registry address is not hashed: the same content on a mirror resolves
+  to the same id. Requests carry the User-Agent
+  `aval/<version> (+https://github.com/TrianaLab/aval)`.
 
 The resolved id vouches for the registry in the table, not for the one the
-tool installs from. Where the tool's own setting is known to point
-elsewhere, resolution fails: an npm `@scope:registry` or `registry` line in
-`~/.npmrc`, an `npm_config_@scope:registry` variable,
-two spellings of an `npm_config_*` variable (npm reads any letter case, with `_` equal to `-` after the first character) that differ, `$GOPRIVATE`, `$GONOPROXY` or a `$GOPROXY` that starts with
-`direct` or `off`, a Go module the checksum database would not verify
-(`GOSUMDB=off`, `$GONOSUMDB`, `$GOINSECURE`, `-insecure` in `$GOFLAGS`),
-`$PIP_INDEX_URL`, `$PIP_PYPI_URL` (pip's alias of `--index-url`), `$PIP_EXTRA_INDEX_URL`, `$PIP_FIND_LINKS` or
-`$PIP_NO_INDEX` (in any spelling pip reads, such as `PIP_index-url`), and a
-Maven `<latest>` or `<release>` that is a SNAPSHOT or not listed. A
-`~/.npmrc` line Aval cannot read fails too. Other tool configuration files are not read:
-`pip.conf`, a project `.npmrc`, `go env -w` settings, Cargo's
+tool installs from. Where the tool's own setting points elsewhere, resolution
+fails:
+
+| Kind | Fails when |
+|---|---|
+| `npm` | `~/.npmrc` has a `@scope:registry` or `registry` line, or an `npm_config_@scope:registry` variable is set, that differs from Aval's registry; two spellings of an `npm_config_*` variable differ; a `~/.npmrc` line cannot be read |
+| `go` | `$GOPROXY` starts with `direct` or `off`; `$GOPRIVATE` or `$GONOPROXY` matches; `GOSUMDB=off`, `$GONOSUMDB`, `$GOINSECURE` or `-insecure` in `$GOFLAGS` |
+| `pypi` | `$PIP_INDEX_URL` or `$PIP_PYPI_URL` names another index; `$PIP_EXTRA_INDEX_URL` or `$PIP_FIND_LINKS` is set; `$PIP_NO_INDEX` is true (any spelling pip reads) |
+| `maven` | `<latest>` or `<release>` is a SNAPSHOT or not listed |
+
+Not read: `pip.conf`, a project `.npmrc`, `go env -w` settings, Cargo's
 `config.toml`, Maven's `settings.xml`, `.gemrc`. If one of them points the
 tool to another registry, set the Aval variable to the same registry.
 

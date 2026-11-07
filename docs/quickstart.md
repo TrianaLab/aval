@@ -1,29 +1,24 @@
 # Quickstart
 
-Go from an empty folder to a reused, verified test result in five minutes.
-You will see the four things Aval does: a miss, a reuse, a changed input and a
-rejected attestation.
+On your laptop, in five minutes: a miss, a reuse, a changed input and a
+rejected result.
 
-You need `aval` ([Install](install.md), one line), Docker and `openssl`.
-Copy each block into one shell, in order. The `text` block under it is what
-you should see. `...` stands for a digest that is different on every run.
+You need `aval` ([Install](install.md)), Docker and `openssl`. Run the blocks
+in order in one shell. Each `text` block is the expected output; `...` is a
+digest that changes on every run.
 
 <!-- quickstart:start (tests/acceptance/readme_test.go runs the sh blocks and checks the text blocks) -->
 
-## 1. Start a registry
+## 1. Set up
 
-Aval keeps results in an OCI registry. Start one on your laptop. Port 5001,
-because macOS uses 5000 for AirPlay:
+A local OCI registry (port 5001: macOS uses 5000 for AirPlay):
 
 ```sh
 docker run -d --name aval-registry -p 5001:5000 registry:2
 ```
 
-## 2. Make a project
-
-One input file and a contract, `aval.yaml`. The contract names the test
-command and the files it reads (`scope`). Aval hashes those files into a
-fingerprint:
+A project: one input file and `aval.yaml`, which names the test command and
+the files it reads (`scope`):
 
 ```sh
 mkdir aval-demo && cd aval-demo
@@ -41,11 +36,9 @@ cacheability: hermetic
 EOF
 ```
 
-## 3. Make a key and a policy
+A signing key (ECDSA P-256) and a policy that trusts it:
 
-The key signs your results. The policy says which signers you trust. Aval
-accepts ECDSA P-256 keys:
-
+<!-- --8<-- [start:key] (the guides include this block) -->
 ```sh
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out aval.key
 openssl pkey -in aval.key -pubout -out aval.pub
@@ -58,17 +51,20 @@ identities:
     trustLevel: developer
 EOF
 ```
+<!-- --8<-- [end:key] -->
 
-## 4. First run: a miss
+## 2. First run: a miss
 
 ![aval run prints miss, runs the test, which passes, and pushes the signed result to localhost:5001](assets/gifs/miss.gif)
 
-No result exists for these inputs, so the test runs. Aval signs the passing
-result with `aval.key` and pushes it:
+This run has no `--policy`, so Aval does not look for a result. It runs the
+test, then `--push` signs the result with `aval.key` and pushes it:
 
+<!-- --8<-- [start:push] -->
 ```sh
 aval run --push --key aval.key --registry localhost:5001/demo/hello-aval
 ```
+<!-- --8<-- [end:push] -->
 
 ```text
 test hello fingerprint sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
@@ -78,7 +74,7 @@ ran hello: passed (exit 0)
 pushed localhost:5001/demo/hello-aval@sha256:...
 ```
 
-## 5. Second run: a reuse
+## 3. Second run: a reuse
 
 ![aval verify prints verified, then aval run prints reused passed result without running the test](assets/gifs/hit.gif)
 
@@ -96,7 +92,7 @@ reference: localhost:5001/demo/hello-aval@sha256:...
 exit code: 0
 ```
 
-Run again. Aval finds the verified result and skips the test:
+Run again. Aval finds the trusted result and skips the test:
 
 ```sh
 aval run --registry localhost:5001/demo/hello-aval --policy policy.yaml
@@ -110,11 +106,11 @@ reference: localhost:5001/demo/hello-aval@sha256:...
 reused passed result
 ```
 
-## 6. Change an input: a miss again
+## 4. Change an input: a miss again
 
 ![after editing src/hello.txt, aval run prints a new fingerprint, miss, and runs the test](assets/gifs/changed-input.gif)
 
-Edit a file in `scope`. The fingerprint changes, no result matches it, and the
+Edit a file in `scope`. The fingerprint changes, so nothing matches and the
 test runs:
 
 ```sh
@@ -129,15 +125,13 @@ reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
 ran hello: passed (exit 0)
 ```
 
-## 7. A result from an untrusted signer: exit 5
+## 5. A result from an untrusted signer: exit 5
 
 ![a result signed with a key the policy does not trust, other.key, is pushed; aval run prints SECURITY, verification-failed, runs the test and exits 5](assets/gifs/tampered.gif)
 
-Someone who can push to the registry, but has a key your policy does not
-trust, publishes a passing result for the new inputs. Aval rejects it, runs
-the test anyway and exits 5. Exit 5 is a security event, not a miss.
-Changing the bytes of a signed result breaks its signature and ends the same
-way:
+Someone who can push to the registry, but with a key your policy does not
+trust, publishes a result. Aval rejects it, runs the test and exits 5: a
+security event, not a miss. A tampered result ends the same way:
 
 ```sh
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out other.key
@@ -169,17 +163,13 @@ exit code: 5
 flowchart LR
   files[src/hello.txt<br>listed in scope] --> fp[fingerprint<br>sha256:fb39...]
   fp --> look{result for this<br>fingerprint?}
-  look -- no --> miss([miss: run the test,<br>sign and push<br>steps 4 and 6]):::muted
-  look -- "yes, signer in policy.yaml" --> ok([verified: reuse,<br>skip the test<br>step 5]):::ok
-  look -- "yes, only untrusted signers" --> bad([verification-failed:<br>run the test, exit 5<br>step 7]):::err
+  look -- no --> miss([miss: run the test<br>steps 2 and 4]):::muted
+  look -- "yes, signer in policy.yaml" --> ok([verified: reuse,<br>skip the test<br>step 3]):::ok
+  look -- "yes, only untrusted signers" --> bad([verification-failed:<br>run the test, exit 5<br>step 5]):::err
 ```
 
-- The fingerprint covers only what `scope` lists. Change one byte there and
-  it is a new fingerprint (step 6).
-- A result is reused only if its signer is in your policy (step 5). A result
-  from any other signer is reported as a security event. If no trusted result
-  exists, the test runs and Aval exits 5 (step 7).
-- When Aval cannot prove a result is safe to reuse, the test runs.
+The fingerprint covers only what `scope` lists. See
+[Outcomes](concepts/outcomes.md) and [Trust](concepts/trust.md).
 
 Stop the registry when you are done:
 
@@ -187,6 +177,6 @@ Stop the registry when you are done:
 docker rm -f aval-registry
 ```
 
-Next: [the test contract](contract.md) for real scopes, the
-[trust model](trust-model.md) for keyless signing in CI, and the
-[CLI reference](cli-reference.md#exit-codes) for every exit code.
+Next: [write a contract](guides/write-a-contract.md) for your own test, then
+[use GitHub Actions](guides/github-actions.md) and
+[sign results](guides/signing.md) without a key.

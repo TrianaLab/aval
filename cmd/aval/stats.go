@@ -34,11 +34,10 @@ time, per test (or per source repository with --by repository) and in total.
 It reads every test with a stats anchor, or only --test. It writes nothing,
 locally or to the registry.
 
-Run records are unsigned statistics: they never affect reuse. Records that
-cannot be read, are oversized, malformed or inconsistent are skipped and
-counted. Reading stops after 1000 records or 64 pages per listing, with a
-warning; prune old records to stay below it. Records are read one at a time:
-raise --registry-timeout for many records.
+Run records are unsigned statistics and never affect reuse. Unreadable or
+invalid records are skipped and counted. Reading stops after 1000 records or
+64 pages per listing; prune old records. Raise --registry-timeout for many
+records.
 
 --since keeps records made at or after a time: a duration back from now
 (168h, 30d) or a date (2026-11-01, or RFC 3339).

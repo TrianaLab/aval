@@ -53,6 +53,162 @@ Two more rules once you have picked:
   with false-hit cases**: a relevant change must never produce a reusable
   result.
 
+### False-hit suite
+
+`TestFalseHitCorpus` applies every known kind of change to one base project
+and asserts its outcome: a relevant change (content, rename, add, delete,
+exec bit, lockfile, toolchain, env value or presence, command, any contract
+field, re-included excludes) changes the fingerprint; an irrelevant one
+(out-of-scope or excluded files, `.git`, Aval's own outputs, checkout path, ordering,
+duplicates, timestamps, non-exec permission bits, YAML formatting) does not;
+an unprovable one (see "Fail-closed errors" in [docs/contract.md](docs/contract.md#fail-closed-errors)) fails closed; a repushed
+image tag (in a compose file or in `runner.command`) keeps the fingerprint
+but is reported as an unacknowledged mutable reference, so it is refused.
+The scanner has its own false-hit table per ecosystem, mutable and pinned
+variants, in `internal/pinning`, and a fuzz target over every detector. The test fails if
+a manifest section is changed by no differ row, so a new section must come
+with corpus cases; a new attribute in an existing section or a new contract
+field needs its row added by review.
+
+`TestResolveFalseHits` runs the same outcomes through the real resolvers
+and in-process fakes: a republished download or a repushed image tag in
+`scope.resolve` changes the fingerprint, reordering or repeating entries
+does not, and an unresolvable reference fails closed; `internal/resolve`
+has the per-ecosystem tables. `TestResolveManifestGolden` pins the
+`resolve` lines in `testdata/golden/resolve-aval-fingerprint-vN.manifest`.
+
+`TestContractsFalseHits` and `TestContractsFailClosed` cover
+`scope.contracts`: a change inside a referenced contract's scope (also two
+levels down) changes the dependent's fingerprint, a change outside it does
+not, and a missing, invalid, escaping, symlinked, cyclic or too deep
+reference fails closed. `TestContractsFindings` checks that a referenced
+contract's mutable references block the dependent. `TestContractsManifestGolden`
+pins the `contract <path>` lines in
+`testdata/golden/contracts-aval-fingerprint-vN.manifest`.
+
+`TestManifestGolden` pins, per manifest version, the manifests of three
+contracts over a fixed tree (`internal/fingerprint/testdata/golden/tree`),
+concatenated in `testdata/golden/aval-fingerprint-vN.manifest`. One
+contract sets every field: `source`, `exclude`, `dependencies` and `env`
+each unsorted and with a repeat, a toolchain map with six keys, argv with
+`&`, `<`, `>` and non-ASCII characters, and env vars that are set, set to
+the empty string and unset. One omits every optional field; one sets every
+optional field to an empty list or map and must encode like the one that
+omits them (`TestGoldenOmittedEqualsEmpty`). The tree has a nested path, a
+path with a space, a file that sorts differently by full path than in walk
+order (`pkg.go` before `pkg/...`), an empty file under a dot-directory,
+content with CRLF line endings, an excluded file and a file outside the
+scope. The test adds a top-level and a nested `.git` directory (skipped)
+and a regular file named `.git` (in scope), and fixes the env values and
+the file modes: one exec bit each for owner (0744), group (0654) and other
+(0645), all three (0755), and a file with setuid, setgid and sticky but no
+exec bit. Any change to how these manifests are built (their lines, the
+hashes in them or the canonical contract JSON) fails it unless the header
+version is bumped too, so an old fingerprint can never mean different
+inputs.
+
+What this covers was measured by mutation: each conditional, constant,
+format string and normalization in `Compute`, `canonicalContract`,
+`listFiles`, `hashMatching`, `hashFile`, `sum` and the glob matcher was
+mutated and `make ci-false-hit` run; every mutant that changes the manifest
+of some input fails it, through the golden, the corpus, the glob tables or
+the fail-closed tests. The two mutants that pass are equivalent on the
+platforms CI runs: dropping `filepath.ToSlash` (the separator is already
+`/` on Unix) and masking with `Mode().Perm()&0o111` instead of
+`Mode()&0o111`. A path the tree does not exercise (a new manifest feature)
+is caught only by the corpus, so it must come with a case in the golden
+tree.
+
+`TestGoldensAppendOnly` stops the golden being rewritten to match: a
+committed `*.manifest` golden may be added (a new version) but never
+modified, renamed or deleted. It diffs the goldens against the merge base of
+`HEAD` and `AVAL_GOLDEN_BASE`; in CI that is the PR base branch or the commit
+before the push, and the test fails if it does not resolve (after a
+force-push to `main` the old commit may be unreachable, and the job fails
+until the next normal push). Locally `make ci-false-hit` sets it to
+`origin/main` when it is unset, and the test fails when that ref is missing,
+so set `AVAL_GOLDEN_BASE` to the upstream main if your remote is named
+differently. A plain `go test` without `AVAL_GOLDEN_BASE` (the `ci-engine`
+job and the dogfood suite, which check out shallow) skips this one test;
+the `ci-false-hit` leg never does. `TestGoldenEditsCatchesEdits` is
+its negative test; by hand, append a line to the golden and run
+`AVAL_GOLDEN_BASE=HEAD go test ./internal/fingerprint -run TestGoldensAppendOnly`.
+The `ci-false-hit` CI job (`make ci-false-hit`, part of `make ci`) runs these
+tests and the glob tables on every PR and push, with no path filter.
+`TestFalseHitGateIsBinding` (`tests/architecture`) fails if that job or leg
+is removed, made conditional, allowed to fail (`continue-on-error`), checked
+out shallow, or given any other `AVAL_GOLDEN_BASE`, or if the recipe of
+`make ci-false-hit` changes in any way (a `-skip`, a dropped package, a
+dropped `-count=1`, a dropped `AVAL_GOLDEN_BASE` default). Edits to the tests themselves are left to review.
+
+### Golden files
+
+`pkg/evidence/testdata/statement-execution-v2.golden.json`,
+`pkg/evidence/testdata/verify-report-v1.golden.json`,
+`pkg/evidence/testdata/run-record-v1.golden.json` and
+`pkg/evidence/testdata/stats-report-v1.golden.json` set every field of the
+statement, predicate, verify report, run record and stats report. A test decodes each strictly into the
+current types and requires the same JSON back, so dropping, renaming or
+retyping a field, or adding a required one, fails. Another test requires
+every JSON field of those types to be set in its golden file, so a new field
+fails until it is added there. Golden files only grow: an existing field or
+value is never removed or changed, an additive change adds its new field to
+the golden file of its version, and a new version adds a new file next to
+the old ones.
+
+### Go API snapshot
+
+The `pkg/evidence` compatibility rule ([docs/integrations.md](docs/integrations.md#go-api-compatibility))
+is enforced. The exported surface is snapshotted in
+[`pkg/evidence/testdata/api-v1.txt`](https://github.com/TrianaLab/aval/blob/main/pkg/evidence/testdata/api-v1.txt),
+named after the major version in `go.mod`: one line per exported constant,
+variable, function, type, field (embedded fields included, with its struct
+tag: a changed JSON name or `omitempty` is breaking) and method, with types,
+signatures, type parameters and constraints and without parameter names
+(type parameter names and the order of union terms are kept, so changing
+them needs a snapshot change too). Fields promoted through embedding get a
+`promoted <Type>.<Field>` line, so one that becomes ambiguous or changes
+type is breaking. Methods are the full method set, promoted ones included,
+with the receiver (`T` or `*T`) they need. Interfaces are one line with
+their whole method set or type set. A struct that supports `==` also gets a
+`comparable <Type>` line. A constant of a type the package declares
+(`TrustLevel`, `Result`, `Outcome`) is rendered with its value, since
+consumers compare those values: policy files write trust levels by name,
+but verify reports and predicates carry them as numbers (the mapping is in
+[docs/trust-model.md](docs/trust-model.md#trust-levels)), so renumbering `TrustRunner`
+is breaking. Untyped constants (the format
+identifiers) are rendered without their value: those values are format
+identifiers, governed by the format rules rather than by the snapshot.
+
+`make ci-gates` (`TestEvidenceAPIIsAppendOnly` in `tests/architecture`) fails
+when:
+
+- a line of the snapshot no longer matches the code;
+- the code exports something the snapshot lacks (an additive change appends
+  its lines in the same pull request);
+- the exported API names an unexported type of the package (an embedded,
+  returned or field type), whose members would not be rendered;
+- a non-test file of `pkg/evidence` has any build constraint: a
+  `//go:build` or `// +build` line (GOOS, GOARCH, cgo, a `go1.N` release tag
+  or a custom tag), `import "C"`, or a `_GOOS`/`_GOARCH` file name suffix.
+  The snapshot is taken on one platform and toolchain, and consumers build
+  the library on any, so every file must be built everywhere;
+- a line of the snapshot at the base revision is missing from the current
+  snapshot, so a break cannot be hidden by editing both. The base is the merge
+  base with `origin/<base branch>` on a pull request, the commit `main`
+  pointed to before a push to `main` (`before` of the push event, so all the
+  commits of one push are compared together), and the merge base with
+  `origin/main` otherwise. In CI
+  (`CI` set) an unresolvable base fails the job; locally, without
+  `origin/main`, this one comparison is skipped with a log line.
+
+A new major module path starts a new snapshot file, which has no base to
+compare with.
+
+A release with a new major module path is tagged v2.0.0 or later (Go rejects
+a `/v2` module tagged v0 or v1), so its changeset sets the version explicitly
+rather than relying on a `major` bump from 0.x.
+
 ### CI quality gates
 
 `make ci` runs these legs; each is one job of the same name in
@@ -94,7 +250,11 @@ developer signatures); `tests/architecture/dogfood_test.go` enforces both,
 and fails if a dogfood suite reads a tracked file outside its contract's
 scope.
 The release job refuses to publish without a verified, passing e2e
-attestation for the tagged commit. CI also runs, on pull
+attestation for the tagged commit. Roadmap milestone 3 (an end-to-end example
+in GitHub Actions) is in progress: the `example-go-compose` job runs the
+publish, reuse and miss story for `examples/go-compose` on every push to
+`main`, and the release pipeline for signed binaries (checksums, SBOMs, SLSA
+provenance) dry-runs on every PR. CI also runs, on pull
 requests, `dependency-review` and `pr-title` (the PR title is a conventional commit, see [Commits](#commits)). `dependency-review` is skipped until a
 maintainer enables Settings > Code security > Dependency graph and sets the
 repository variable `DEPENDENCY_REVIEW=true`; without the dependency graph the
@@ -150,6 +310,28 @@ releases newer than `0.1.0`, `tests/architecture` fails until the pin moves.
 Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
 marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint
 every Markdown file except `.agents/`, `.claude/`, `CLAUDE.md`, `.changeset/` and the generated `CHANGELOG.md`.
+
+### Join the public stats
+
+A repository appears on the [Stats](https://aval.run/main/stats/) page once it publishes run records to
+`ghcr.io/trianalab/aval-stats`:
+
+1. A TrianaLab maintainer grants the repository write access to the package
+   (package settings, "Manage Actions access"). GHCR offers this only to
+   repositories of the TrianaLab organization; to ask, open an issue.
+2. A job on `main` with `packages: write`, which runs no tests, publishes the
+   records the test jobs wrote:
+
+    ```sh
+    aval record --record-file record.json --repository "$GITHUB_REPOSITORY" \
+      --registry ghcr.io/trianalab/aval-stats
+    ```
+
+    Without `--repository` here or on `aval run`, the repository shows as
+    `unknown`. Aval's own `dogfood-record` job in `ci.yaml` does this.
+
+A maintainer can refresh the site's `stats.json` at any time from the Actions
+tab: open the `docs` workflow and choose "Run workflow" on `main`.
 
 ## Commits
 
@@ -280,7 +462,7 @@ Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 - **Miss is not verification failure.** No attestation is exit 4 (`ErrNotFound`); an attestation that fails signature or policy is exit 5 (`ErrVerification`), a security event. Keep them separate in code, output and exit codes, and never hide the second.
 - **No Pacto dependency.** Aval does not import Pacto or model its concepts. Integrations consume Aval through `pkg/evidence` and `aval verify --output json`; adapters live in the consumer's repo.
 - **`pkg/evidence` is public API.** Breaking changes (rename, removal, type or meaning change) to exported identifiers, the predicate or the verify report JSON need a version bump (`PredicateType`, `ReportVersion`) and a note in `docs/artifact-format.md`; additive changes do not. The rules are in `docs/artifact-format.md` ("Versioning and compatibility"); golden files in `pkg/evidence/testdata` guard the JSON shape.
-- **Fingerprint changes bump the manifest version** (`aval-fingerprint/v1`) so old and new fingerprints never collide. `TestManifestGolden` (`ci-false-hit`) enforces it: it pins, per version, the manifests of three contracts over `internal/fingerprint/testdata/golden/tree` (one sets every field, one omits every optional field, one sets them empty) and fails on any byte change to them under the same version. The golden tree and the corpus together catch every manifest-changing mutant of the manifest code (the mutation sweep is described in docs/contract.md); a path that tree does not exercise is covered only by the corpus, so a new manifest feature needs a case in the golden tree (see [docs/contract.md](docs/contract.md#false-hit-corpus)). `TestGoldensAppendOnly` stops the golden being rewritten to match: a committed `*.manifest` golden may be added but never modified, renamed or deleted, checked against the merge base with `AVAL_GOLDEN_BASE` (CI: the PR base branch or the previous push; the job fails if it does not resolve, and after a force-push the old `before` may be unreachable, so the job fails until a normal push) or, under `make ci-false-hit` without it, `origin/main` (fails if that ref is missing; a plain `go test` without `AVAL_GOLDEN_BASE` skips this one test). After a bump, `go test ./internal/fingerprint -run TestManifestGolden -update` writes the golden of the new version.
+- **Fingerprint changes bump the manifest version** (`aval-fingerprint/v1`) so old and new fingerprints never collide. `TestManifestGolden` (`ci-false-hit`) enforces it: it pins, per version, the manifests of three contracts over `internal/fingerprint/testdata/golden/tree` (one sets every field, one omits every optional field, one sets them empty) and fails on any byte change to them under the same version. The golden tree and the corpus together catch every manifest-changing mutant of the manifest code (the mutation sweep is described under [False-hit suite](#false-hit-suite)); a path that tree does not exercise is covered only by the corpus, so a new manifest feature needs a case in the golden tree (see [False-hit suite](#false-hit-suite)). `TestGoldensAppendOnly` stops the golden being rewritten to match: a committed `*.manifest` golden may be added but never modified, renamed or deleted, checked against the merge base with `AVAL_GOLDEN_BASE` (CI: the PR base branch or the previous push; the job fails if it does not resolve, and after a force-push the old `before` may be unreachable, so the job fails until a normal push) or, under `make ci-false-hit` without it, `origin/main` (fails if that ref is missing; a plain `go test` without `AVAL_GOLDEN_BASE` skips this one test). After a bump, `go test ./internal/fingerprint -run TestManifestGolden -update` writes the golden of the new version.
 
 ## Unfinished work
 

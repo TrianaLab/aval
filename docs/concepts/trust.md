@@ -16,32 +16,23 @@ flowchart LR
   lvl -- yes --> ok([verified<br>reuse]):::ok
 ```
 
-All exit codes, from the [CLI reference](../cli-reference.md#exit-codes):
+What each outcome means: [Outcomes](outcomes.md).
 
---8<-- "docs/cli-reference.md:exit-codes"
+## Signers and levels
 
-## Signers
+| Signer | Signs with | Usual level |
+|---|---|---|
+| CI job (keyless) | a short-lived Sigstore certificate for its OIDC identity | runner |
+| developer | a local ECDSA P-256 key file | developer |
 
-A **signer** is who signed a result. There are two kinds:
-
-- **A CI job (keyless).** The job signs with a short-lived certificate from
-  Sigstore, tied to its OIDC identity, such as one GitHub Actions workflow
-  on `main`.
-- **A key.** A developer signs with a local key file.
-
-## Trust levels
-
-Your policy gives each signer a trust level:
+Your policy sets the level. The level the result claims is ignored.
 
 --8<-- "docs/trust-model.md:trust-levels"
 
-The predicate inside a result also claims a level. Aval ignores that claim:
-the level always comes from your policy.
-
 ## The policy
 
-A policy is a YAML file you keep in your repository. This one trusts the
-`main` branch workflow for CI reuse, and Alice's key at developer level:
+A policy is a YAML file in your repository. This one trusts the `main`
+workflow at runner level and Alice's key at developer level:
 
 --8<-- "docs/trust-model.md:policy-file"
 
@@ -56,6 +47,5 @@ Without `--policy`, nothing is trusted and every test runs.
 
 So only grant a level to signers you would trust to run the test yourself.
 
-!!! info "The full spec"
-    [The trust model](../trust-model.md) covers keyless verification, the
-    policy fields and the threats Aval defends against.
+Details: [the trust model](../trust-model.md) (keyless verification, every
+policy field, threats).

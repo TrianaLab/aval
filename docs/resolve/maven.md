@@ -1,13 +1,10 @@
 # Maven artifacts
 
 `maven: <group>:<artifact>:<version>` hashes the POM of that version
-together with the checksums the repository publishes for its `.jar` and
-its main artifact (`.sha256`, else `.sha1`).
+together with the checksums the repository publishes for its artifacts
+(`.sha256`, else `.sha1`).
 
-An exact version binds that version. Anything else (a range, latest, a
-tag) binds the whole release list, so any new release of the package
-makes the test run again; use an exact version (or a lockfile) for stable
-reuse.
+--8<-- "docs/resolve/index.md:floating"
 
 ```yaml
 scope:
@@ -17,45 +14,32 @@ scope:
     - maven: org.apache.commons:commons-lang3:RELEASE # floating
 ```
 
-- The group and artifact ids must be a letter, digit or `_`, then
-  letters, digits, `_`, `.` or `-`, with no `..`. Anything else fails.
+- Group and artifact ids: a letter, digit or `_`, then letters, digits, `_`,
+  `.` or `-`, with no `..`.
 - Exact means a plain version: no `+`, `[`, `(` or `,`, and not `LATEST`,
   `RELEASE` or `latest.*`.
-- For anything else the id is a hash of the `<versioning>` block of
-  `maven-metadata.xml` (every version, `<latest>` and `<release>`) and of
-  each listed version's POM and artifact checksums, as for an exact
-  version. A new version, a moved `<release>` or a redeployed release
-  changes the id. The manifest line says `floating`. A
-  `maven-metadata.xml` without versions, or with more than 100 (up to six
-  requests each), fails: use an exact version. So does a `<latest>` or
-  `<release>` that is a SNAPSHOT or is not in `<versions>`: Maven
-  installs it for `LATEST` or `RELEASE`, and its content would not be
-  bound. Floating specs are
-  impractical for popular artifacts (guava, jackson-databind list more
-  than 200 versions).
-- A version ending in `SNAPSHOT` (`1.0-SNAPSHOT`, `1.0.SNAPSHOT`), in any
-  letter case, fails, and so does a floating version whose list holds
-  one: a snapshot is redeployed under the same name. Resolve a release,
-  or pin.
-- A tool that names `group:artifact:version` downloads the `.jar`
-  whatever the POM `packaging` says, so the `.jar` checksum is bound
-  whenever the repository has a `.jar`. The packaging adds its own file:
-  `war`, `ear`, `rar` and `aar` bind that file's checksum too. A `.jar`
-  is required for `jar` (the default), `bundle`, `maven-plugin` and
-  `ejb`; for `pom` (a BOM or parent) and the other packagings it is bound
-  only when present. Another packaging, a missing checksum, a `.jar`
-  served without one, or a checksum file that holds no checksum (a
-  proxy's error page), fails the fingerprint, so the test runs. Aval
-  never downloads the jar: the id is only as fresh as the repository's
-  published checksum. A jar overwritten under the same version on a
-  private repository changes the id only if its checksum file is
-  redeployed with it. Classifier
-  artifacts (`-sources`, `-linux-x86_64`) are not hashed, nor is the
-  Gradle module metadata (`.module`), from which Gradle can pick another
-  file: on a private repository, a redeployed `.module` does not change
-  the id.
-- When the repository publishes only a `.sha1`, the id rests on SHA-1.
-- Repository: `$AVAL_MAVEN_URL`. Credentials: `~/.netrc`.
+- Floating: the `<versioning>` block of `maven-metadata.xml` and each listed
+  version's POM and checksums. No versions, more than 100 (popular artifacts
+  such as guava list more than 200), or a `<latest>`/`<release>` that is a
+  SNAPSHOT or not listed fails: use an exact version.
+- A `SNAPSHOT` version, in any case, fails, and so does a floating list that
+  holds one: a snapshot is redeployed under the same name.
+
+| Packaging | Bound |
+|---|---|
+| `jar` (default), `bundle`, `maven-plugin`, `ejb` | POM and `.jar` checksum (required) |
+| `war`, `ear`, `rar`, `aar` | POM, that file's checksum, and the `.jar` checksum if present |
+| `pom` and others | POM, and the `.jar` checksum if present |
+
+A missing checksum, a checksum file that holds none (a proxy's error page) or
+another packaging fails. Aval never downloads the jar. Not covered:
+
+- classifier artifacts (`-sources`, `-linux-x86_64`)
+- Gradle module metadata (`.module`), from which Gradle can pick another file
+- a jar overwritten on a private repository without redeploying its checksum
+- a repository that publishes only `.sha1`: the id rests on SHA-1
+
+Repository `$AVAL_MAVEN_URL`; credentials from `~/.netrc`.
 
 **Pin instead** in `pom.xml` or `build.gradle` with exact versions; Gradle
 can also lock dependencies (`gradle.lockfile`).

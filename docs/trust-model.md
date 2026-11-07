@@ -1,79 +1,46 @@
 # Trust model
 
-Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
-Signing (`attest.Sign`), push, lookup and fetch (`internal/registry`),
-verification (`evidence.Verify`, `attest.Verifier`) and the policy file
-(`policy.Load`) are implemented; `aval verify`, `aval run` and `aval push`
-use them. This document describes the model the code is built around; where
-behavior is not implemented yet, it says so.
-
-The predicate type, media types and the `aval.trianalab.io/v1` apiVersion are
-frozen; see [artifact-format.md](artifact-format.md#versioning-and-compatibility).
+Formats are frozen; see
+[artifact format](artifact-format.md#versioning-and-compatibility).
 
 ## What a signature proves
 
-An Aval attestation is a DSSE envelope around an in-toto Statement whose
-predicate (`evidence.Predicate`) says: "test `test.id`, with inputs hashing
-to `execution.fingerprint`, produced `result` on `subject`".
+An attestation is a DSSE envelope around an in-toto Statement whose predicate
+says: "test `test.id`, with inputs hashing to `execution.fingerprint`,
+produced `result` on `subject`".
 
-A valid signature proves:
+| Proves | Does not prove |
+|---|---|
+| who signed: an OIDC issuer and subject (keyless), or a key | that the test ran |
+| that nobody changed the claim since | that it ran honestly (unmodified test code, no skipped cases, no patched runner) |
+| | that inputs not declared in `aval.yaml` were the same |
 
-- **Who claims it.** The signer identity (OIDC issuer + certificate subject
-  for keyless, or a key) is bound to the claim.
-- **Integrity of the claim.** The predicate has not been modified since it
-  was signed.
-
-A valid signature does not prove:
-
-- that the test actually ran;
-- that it ran honestly (unmodified test code, no skipped cases, no patched
-  runner);
-- that inputs not declared in `aval.yaml` were the same. The fingerprint
-  only covers what the contract declares (see [contract.md](contract.md)).
-  Anything else is invisible to Aval.
-
-So reuse is never "the signature is valid". It is "the signature is valid,
-the signer is someone the policy trusts at a sufficient level, and the
-fingerprint and test id match what we computed locally".
-
-`runner.identity`, `runner.issuer` and `runner.trustLevel` inside the
-predicate are what the signer *claims*. The authoritative identity is the
-verified signer, and the trust level is the one the policy grants to that
-signer, not the one written in the predicate. In code: `attest.Verifier`
-verifies the Sigstore bundle and returns the `evidence.Signer` it binds (the
-OIDC issuer and subject of the Fulcio certificate, or the key's id), and
-`evidence.Verify` looks that signer up in the policy's `Identities` with
-`evidence.MatchSigner`. A key-based signer only matches identities that list
-its public key; a keyless one only matches issuer and subject entries.
+Reuse needs all three: a valid signature, a signer the policy trusts at a high
+enough level, and a fingerprint and test id that match what Aval computed
+locally. The predicate's `runner` block is only a claim: identity comes from
+the verified signer, level from the policy. A key signer matches only
+`publicKey` entries, a keyless signer only `issuer` + `subjectRegexp`
+entries.
 
 ## Signing
 
-`attest.Sign` (sigstore-go) signs the in-toto statement as a DSSE envelope
-in one of two modes:
+| Mode | Where | Signs with | Rekor | Usual level |
+|---|---|---|---|---|
+| keyless | CI | an ephemeral key and a short-lived Fulcio certificate for the OIDC token in `$SIGSTORE_ID_TOKEN` | always (the certificate expires in minutes; Rekor's timestamp keeps it verifiable) | runner |
+| key | local | an unencrypted ECDSA P-256 PEM key (PKCS#8 or SEC1); Cosign keys are encrypted and not supported | no | developer |
 
-- **Keyless** (CI): an ephemeral key, a short-lived Fulcio certificate for
-  the OIDC token the caller passes in, and a Rekor entry (always recorded,
-  since the certificate expires in minutes and Rekor's timestamp is what
-  makes it verifiable later). Signing always uses the Sigstore public-good
-  instance (`https://fulcio.sigstore.dev`, `https://rekor.sigstore.dev`);
-  the endpoints cannot be configured (TODO(milestone-5): signing against a
-  private Sigstore deployment; verification already accepts its pinned
-  `trustedRoot`). Obtaining the OIDC token is the caller's job, so no CI
-  vendor or issuer is assumed.
-- **Key-based** (local): an unencrypted ECDSA P-256 PEM key (PKCS#8 or SEC1),
-  for example from `openssl ecparam -name prime256v1 -genkey -noout -out
-  aval.key`. Cosign keys are encrypted and not supported. No Rekor entry.
-  The bundle's key hint is the key's `evidence.PublicKeyID`. Expect policies
-  to grant such signatures at most level 1.
+Make a key with
+`openssl ecparam -name prime256v1 -genkey -noout -out aval.key`. Getting the
+OIDC token is the caller's job, so no CI vendor or issuer is assumed.
 
-Besides the envelope, `Sign` returns the Sigstore bundle (v0.3 JSON) with the
-verification material (certificate or key hint, Rekor entry). `registry.Push`
-requires it and stores it next to the envelope as the second layer of the
-execution manifest (see [artifact-format.md](artifact-format.md#oci-layout)).
+Signing always uses the Sigstore public-good instance
+(`https://fulcio.sigstore.dev`, `https://rekor.sigstore.dev`)
+(TODO(milestone-5): signing against a private Sigstore deployment;
+verification already accepts its pinned `trustedRoot`).
 
 ## Trust levels
 
-`evidence.TrustLevel`, higher is stronger:
+Higher is stronger:
 
 <!-- --8<-- [start:trust-levels] -->
 
@@ -86,65 +53,9 @@ execution manifest (see [artifact-format.md](artifact-format.md#oci-layout)).
 
 <!-- --8<-- [end:trust-levels] -->
 
-Level 1 exists because a local signature is still useful to its author.
-Expect many security policies to refuse it outright; that is the intended
-use of `MinTrustLevel`.
-
 ## Policy
 
-The trust policy decides which signers are accepted and at what level. It
-is `policy.Policy` (`internal/policy`), converted to
-`evidence.VerifyOptions` for `evidence.Verify`:
-
-| Field | Meaning |
-|---|---|
-| `Identities` | accepted signers. Each `evidence.Identity` is either an OIDC `Issuer` plus a `SubjectRegexp` matched against the whole certificate subject (SAN), or a `PublicKey`, and the `TrustLevel` that signer is granted. Empty means nothing is accepted. |
-| `MinTrustLevel` | minimum granted level required for reuse. Level 0 (unknown) and levels above 3 are never accepted, whatever this says. |
-| `AllowedCacheability` | cacheability classes that may be reused besides `hermetic` and `controlled-environment`. Only `external-dependencies` has an effect; `non-deterministic` is never reusable. |
-| `TrustedRoot` | Sigstore trusted root for keyless signatures (policy file only). |
-| `ExpectedFingerprint`, `ExpectedTestID` | set by Aval from the local contract, not by the policy file. Must equal the predicate's `execution.fingerprint` and `test.id`. Required. |
-
-`evidence.Verify` checks, in order: the signature (through
-`VerifyOptions.Signature`), that the signer matches an accepted identity,
-that the granted level is at least `MinTrustLevel`, that the payload is an
-Aval in-toto statement whose subject equals the predicate's, the predicate
-structure, the expected fingerprint and test id, and the cacheability. Any
-failure is a `*VerificationError` (`ErrVerification`). The verified
-`Signer` is the policy entry that matched, plus the `subject` or `keyId` the
-signature actually carried, so the verify report shows who really signed.
-
-The CLI (`aval verify`, `aval run`) checks the minimum level last instead:
-it calls `evidence.Verify` with `MinTrustLevel` developer, then checks the
-signed cacheability against the contract, then the policy's
-`minTrustLevel`. An attestation that passes every other check but whose
-signer the policy lists below `minTrustLevel` is routine non-reuse, like a
-developer result under a CI policy: outcome `miss` (exit 4), listed in
-`rejected` with outcome `miss`, never reused and never a security event. Any
-other failure, including a false claim from such a signer, is
-`verification-failed` (exit 5). Library callers of `evidence.Verify` still
-get `ErrVerification` for a level below `MinTrustLevel`.
-
-`attest.Verifier` checks signatures with sigstore-go against the Sigstore
-bundle stored next to the envelope. A keyless signature must chain to a
-Fulcio CA in the trusted root, carry an embedded SCT from a trusted CT log,
-have a Rekor entry, and have a trusted timestamp (Rekor or a TSA) inside the
-certificate's validity. A key-based signature must verify with one of the
-policy's public keys; no Rekor entry is required. The envelope must be
-byte-for-byte the one the bundle signs. An attestation without a bundle
-never verifies.
-
-Without `--policy` nothing is trusted. Aval does not even query the
-registry: the outcome is `miss` (exit 4) with the reason "no trust policy
-configured", and the test runs. This avoids reporting every attestation it
-finds as a verification failure just because no policy exists. Once a policy
-is configured, an attestation from a signer it does not list *is* a
-verification failure (exit 5); one from a signer it lists below
-`minTrustLevel` is a miss (exit 4). A policy file that cannot be loaded is
-outcome `error` (exit 1): the test runs and nothing is looked up. The
-trusted root is loaded only when a candidate's Sigstore bundle carries a
-certificate (a key-based bundle never needs it), at most once per command;
-if it cannot be loaded, that candidate is outcome `error` (exit 1, the test
-runs), never a verification failure.
+The trust policy decides which signers are accepted and at what level.
 
 ### Policy file
 
@@ -166,26 +77,66 @@ allowedCacheability: [external-dependencies]
 
 <!-- --8<-- [end:policy-file] -->
 
-`policy.Load` rejects, rather than ignores: unknown fields, more than one
-YAML document, another `apiVersion` or `kind`, a missing or unknown
-`minTrustLevel` or `trustLevel` (levels are written by name), no identities,
-an identity with both `publicKey` and `issuer`/`subjectRegexp` or with
-neither, a `subjectRegexp` that does not compile alone and anchored, a
-`publicKey` file that is not a PEM public key, and `non-deterministic` or an
-unknown class in `allowedCacheability`. Relative `trustedRoot` and
-`publicKey` paths are resolved against the policy file's directory.
+<!-- --8<-- [start:policy-fields] -->
+
+| Field | Meaning |
+|---|---|
+| `identities` | the signers you accept: each is an OIDC `issuer` plus a `subjectRegexp` matched against the whole certificate subject, or a `publicKey` PEM file. At least one. |
+| `trustLevel` | the level an identity gets: `developer`, `runner` or `isolated`. |
+| `minTrustLevel` | the lowest level a result needs to be reused. |
+| `allowedCacheability` | classes reused besides `hermetic` and `controlled-environment`; only `external-dependencies` has an effect, and `non-deterministic` is rejected. |
+| `trustedRoot` | a pinned Sigstore trusted root for keyless signatures; without it, the public-good root is fetched. |
+
+<!-- --8<-- [end:policy-fields] -->
+
+Relative `publicKey` and `trustedRoot` paths are read from the policy file's
+directory. A policy with an unknown field, a bad level or identity, or more
+than one document is rejected, never half-read
+([every policy error](guides/troubleshooting.md#errors-exit-1)).
+
+### Verification order
+
+```mermaid
+flowchart TB
+  sig{signature valid?} -- yes --> who{signer in<br>the policy?}
+  who -- yes --> st{statement and predicate<br>well-formed, subject matches?}
+  st -- yes --> fp{fingerprint and<br>test id match?}
+  fp -- yes --> cls{signed cacheability equals<br>the contract's and is allowed?}
+  cls -- yes --> lvl{level ≥<br>minTrustLevel?}
+  lvl -- yes --> ok([verified]):::ok
+  lvl -- no --> miss([miss, exit 4]):::muted
+  sig -- no --> bad([verification-failed, exit 5]):::err
+  who -- no --> bad
+  st -- no --> bad
+  fp -- no --> bad
+  cls -- no --> bad
+```
+
+A result whose only problem is a level below `minTrustLevel`, such as a
+developer result under a CI policy, is routine non-reuse: a miss, listed in
+`rejected`, never a security event. Go callers of `evidence.Verify` get
+`ErrVerification` for a level below the minimum; the CLI treats it as a miss.
+
+Signature checks (sigstore-go, against the bundle stored next to the
+envelope):
+
+- **Keyless:** chains to a Fulcio CA in the trusted root, has an embedded SCT
+  from a trusted CT log, a Rekor entry, and a trusted timestamp inside the
+  certificate's validity.
+- **Key:** verifies with one of the policy's public keys; no Rekor entry.
+- **Both:** the envelope must be the exact one the bundle signs; no bundle
+  means no verification.
+
+Without `--policy` nothing is trusted and nothing is looked up: miss. A policy
+or trusted root that cannot load: outcome `error` (exit 1), and the test runs.
 
 ### Keyless verification needs the network and a writable HOME
 
-A policy with an `issuer` identity and no `trustedRoot` uses the Sigstore
-public-good trusted root. sigstore-go fetches it with TUF from
-`tuf-repo-cdn.sigstore.dev` and caches it under `$HOME/.sigstore`. Aval loads
-it only when a candidate's Sigstore bundle carries a certificate, at most once
-per command. A miss or a key-based attestation never fetches it. Without
-network access, or with a HOME that cannot be written, the trusted root does
-not load: that candidate is outcome `error` (exit 1, never
-`verification-failed`), and `aval run` runs the test. Reuse is lost, never
-faked.
+Keyless policies without `trustedRoot` fetch the Sigstore root with TUF
+(`tuf-repo-cdn.sigstore.dev`) the first time a candidate carries a
+certificate, and cache it in `$HOME/.sigstore`. Offline or with a read-only
+HOME, that candidate is `error` (never `verification-failed`) and the test
+runs. A miss or a key-based result never fetches it.
 
 To avoid the dependency, pin the trusted root in the policy:
 
@@ -205,155 +156,70 @@ Policies with only `publicKey` identities never fetch anything.
 If Aval cannot prove that a previous execution is equivalent and trusted,
 the test runs.
 
-- **Fingerprint errors** (empty source scope, missing or mismatched
-  dependency, symlink in scope, unreadable file): input equivalence cannot
-  be proven, so there is nothing to look up. Run the test.
-- **Registry errors** (unreachable, auth failure): outcome `error`, exit 1.
-  For execution purposes this is a miss: run the test. A malformed
-  attestation manifest, or a fingerprint tag that does not point at the
-  fingerprint anchor, is a verification failure (exit 5).
-- **Consume by digest.** `registry.Lookup` resolves the tag
-  `sha256-<fingerprint hex>`, checks that it points at the fingerprint's
-  deterministic anchor manifest (a moved tag is a verification failure), and
-  returns the anchor's referrers as candidate manifest digests; everything
-  after that (fetch, verify, report `reference`) uses `repo@sha256:...`. The
-  tag is only an index for lookup. It is mutable and is never trusted on its
-  own.
-- **No silent replacement.** Pushes only add referrers to the anchor; a later
-  push for the same fingerprint cannot replace an earlier attestation. Every
-  candidate is verified and the policy picks the verified one with the
-  highest trust level. A candidate that fails verification never decides the
-  outcome while another verifies, and is listed in `rejected` in the verify
-  report (and stderr gets one `aval: SECURITY: ...` line), so the security
-  event stays visible. A candidate
-  that cannot be fetched or checked blocks reuse (the test runs), because it
-  might have outranked the verified one.
-- **Unknown or missing fields** in `aval.yaml` are rejected (exit 2) rather
-  than ignored.
+- **Fingerprint errors** (empty scope, a glob that matches nothing, a symlink,
+  an unreadable file): nothing to look up; the test runs.
+- **Registry errors** (unreachable, auth): outcome `error`, exit 1; the test
+  runs.
+- **Malformed manifest or moved tag:** verification failure, exit 5.
+- **Consume by digest:** the tag `sha256-<fingerprint hex>` is only an index;
+  everything after lookup uses `repo@sha256:...`
+  ([lookup](artifact-format.md#lookup-and-consumption)).
+- **No silent replacement:** pushes only add results. Every candidate is
+  verified and the highest trusted level wins. A candidate that fails
+  verification is listed in `rejected` and stays visible; one that cannot be
+  fetched or checked blocks reuse.
+- **Unknown or missing fields** in `aval.yaml`: rejected, exit 2.
 
-`aval run --no-reuse` always runs and never looks anything up.
+`aval run --no-reuse` always runs and never looks anything up. What each
+outcome does: [Outcomes](concepts/outcomes.md).
 
-## What `aval run` does with each outcome
+## Safeguards in `aval run`
 
-`aval run` makes the same decision as `aval verify` and prints it as the
-verify text report (`--report <file>` also writes the JSON report). Only
-`verified` reuses; everything else runs `runner.command` in the contract's
-directory:
-
-| Lookup outcome | `aval run` |
-|---|---|
-| `verified`, result `passed` | reuse, do not run |
-| `verified`, result `failed` | reuse the failure, do not run |
-| `miss` (also: no `--registry`, no `--policy`, `--no-reuse`, `non-deterministic`, `external-dependencies` not in `AllowedCacheability`, only signers below `minTrustLevel`) | run |
-| `error` (registry, policy or fingerprint error) | run |
-| `verification-failed` | run, print `aval: SECURITY: ...` on stderr |
-
-The exit codes, from the [CLI reference](cli-reference.md#exit-codes):
-
---8<-- "docs/cli-reference.md:exit-codes"
-
-A fingerprint error leaves nothing to look up or record: the test runs, the
-report has outcome `error` with the reason, and `--push` fails (exit 1).
-Otherwise the run is recorded as an unsigned predicate in `--result`
-(default `.aval/result.json`) and, with `--push`, signed and published.
-`aval push` publishes a recorded result later, only if its test id,
-cacheability and fingerprint still match the contract.
-
-A `--report` file that cannot be written does not skip the test: `aval run`
-then never reuses, runs the test, and still exits 5 on a verification
-failure.
-
-`$SIGSTORE_ID_TOKEN` is read once and removed from the environment before
-`runner.command` starts: the code under test cannot use it to sign results as
-the workload identity.
-
-Reasons can carry text from an untrusted attestation, so the text output
-and stderr escape newlines, control and other non-printable characters and
-invalid UTF-8 with Go escapes (`\n`, `\x1b`, `\u2028`); quotes and
-backslashes stay as they are. Such text never starts a line of its own (a CI
-log command, a terminal escape). The JSON report keeps the reason as is.
-
-Each command prints the reason once, in the report: stderr does not repeat
-it. On a verification failure stderr gets a single `aval: SECURITY: ...`
-line that counts the attestations that failed and links here; a signer the
-policy does not list gets the reason `signer key id "<id>" is not in the trust
-policy (trust policy <file>)` (for a certificate, `signer "<subject>"
-(issuer "<issuer>") is not accepted by the policy (trust policy <file>)`;
-when the policy lists only keys the certificate is not verified, so the
-reason is `certificate claiming signer "<subject>" (issuer "<issuer>") is not
-accepted by the policy: it lists no keyless identities (trust policy <file>)`).
-For a `verified` result the text report adds `signer:` (key id, or subject and issuer, with the trust level
-name) and `reference:` lines. Errors joined from several causes print one `aval:` line per cause (an invalid
-`aval.yaml`); in a report (an invalid policy) the causes share the `reason:` line, separated by semicolons.
-
-`--record` publishes a run record for statistics after the decision, for
-every outcome (see [artifact-format.md](artifact-format.md#run-records)).
-Records are unsigned, never read by `aval run` or `aval verify`, and never
-affect reuse or the exit code: a record that cannot be published is a
-warning.
-
-`--shadow` verifies and runs the test anyway. If a verified result disagrees
-with the real run, that is a false hit: `aval run` prints `aval: FALSE HIT:
-...` on stderr and exits 1. If they agree, it says reuse would have been
-correct.
-
-Defense in depth for cacheability (invariant 7): a `non-deterministic`
-contract is a miss without any lookup, in `aval run` and `aval verify`, and
-so is an `external-dependencies` contract that the policy does not list in
-`AllowedCacheability` (routine non-reuse, not a security event). Also,
-a candidate whose signed `test.cacheability` differs from the local
-contract's is a verification failure, even if the policy would allow its
-class.
+- `$SIGSTORE_ID_TOKEN` is removed from the environment before
+  `runner.command` starts, so the code under test cannot sign as the CI job.
+- A `--report` that cannot be written disables reuse: the test runs, and a
+  verification failure still exits 5.
+- Reasons from attestations are escaped on text output and stderr (`\n`,
+  `\x1b`, `\u2028`), so they never start a line of their own; the JSON report
+  keeps them as is.
+- `--shadow` verifies and runs the test anyway, and exits 1 with
+  `aval: FALSE HIT: ...` when a verified result disagrees with the real run.
+- `--record` publishes an unsigned run record for every outcome; it never
+  affects reuse or the exit code
+  ([run records](artifact-format.md#run-records)).
 
 ## Miss vs verification failure
 
-These are different outcomes, in code and in exit codes:
+| Outcome | Go error |
+|---|---|
+| `verified` | nil |
+| `miss` | wraps `evidence.ErrNotFound` (a level below `minTrustLevel`: CLI only) |
+| `verification-failed` | wraps `evidence.ErrVerification`; `*evidence.VerificationError` carries the reason |
+| `error` | any other |
 
-| Situation | `aval verify` outcome | Go error |
-|---|---|---|
-| valid attestation, policy satisfied | `verified` | nil |
-| no attestation for this fingerprint | `miss` | wraps `evidence.ErrNotFound` |
-| only authentic attestations whose signer the policy lists below `minTrustLevel` | `miss` | CLI only (see [Policy](#policy)) |
-| attestation exists but fails signature or policy | `verification-failed` | wraps `evidence.ErrVerification` (`*evidence.VerificationError` carries the reason) |
-| Aval could not decide (registry down, I/O) | `error` | other |
-
-Each outcome has its own exit code; see the [exit codes](cli-reference.md#exit-codes).
-
-A miss is routine: inputs changed, nobody ran this yet. Run the test.
-
-A verification failure is a security event. Someone published a result
-under this fingerprint that does not verify, or was signed by an identity
-the policy does not trust, or claims a different test id or fingerprint
-than the tag it sits under. Possible causes range from a misconfigured
-policy to a compromised publisher. The caller must run the test **and**
-surface the failure: fail the job, page, or at least emit a visible alert.
-Never collapse it into a silent re-run; doing so hides exactly the case the
-trust model exists to catch. That is why it has its own exit code (5) and
-its own `outcome` in `aval verify --output json`.
+A verification failure means someone published a result under this
+fingerprint that does not verify. Run the test and surface it: fail the job
+or alert. Never fold it into a silent re-run.
 
 ## Cacheability classes
 
-Declared per test in `aval.yaml` (`cacheability`), copied into the
-predicate as `test.cacheability`. The contract (including this field) is
-hashed into the fingerprint, so a matching fingerprint implies the same
-declared class.
+The class is part of the contract, so it is part of the fingerprint, and it is
+copied into the predicate as `test.cacheability`.
 
-| Class | Meaning | Reusable by default |
-|---|---|---|
-| `hermetic` | depends only on declared files and toolchain | yes |
-| `controlled-environment` | depends on declared services/images pinned in scope (e.g. compose file with digests) | yes |
-| `external-dependencies` | talks to things outside the scope (SaaS APIs, shared databases) | no, only if the policy lists it in `AllowedCacheability` |
-| `non-deterministic` | results vary across runs with identical inputs | never |
+--8<-- "docs/contract.md:cacheability"
+
+A candidate whose signed `test.cacheability` differs from the local
+contract's is a verification failure.
 
 ## Threats
 
 | Threat | Mitigation |
 |---|---|
-| Compromised developer key | Policy grants developer identities level 1 at most; CI sets `MinTrustLevel` >= 2, so a stolen developer key cannot satisfy CI. It can still poison that developer's own reuse. Prefer keyless (short-lived Fulcio certs, Rekor log) over long-lived keys. |
+| Compromised developer key | Policy grants developer identities level 1 at most; CI sets `minTrustLevel` >= 2, so a stolen developer key cannot satisfy CI. It can still poison that developer's own reuse. Prefer keyless (short-lived Fulcio certs, Rekor log) over long-lived keys. |
 | Tag swapping (`sha256-<fp>` repointed to another manifest) | Tag is lookup only and must resolve to the fingerprint's deterministic anchor manifest; any other target is `verification-failed`. Candidates are the anchor's referrers, fetched and verified by digest. |
-| Replay of a passing result for a different fingerprint or test id | `Verify` requires `execution.fingerprint == ExpectedFingerprint` and `test.id == ExpectedTestID`, both computed locally. The signed predicate cannot be re-labeled without breaking the signature. Mismatch is `verification-failed`. |
-| Undeclared input changed (file outside scope, unlisted env var, network service) | Out of scope for detection in v0: the fingerprint only covers declared inputs. Mitigated by contract review, `external-dependencies` not being reusable by default and `non-deterministic` never being reusable, and the false-hit suite (roadmap item 4). Observed-input tracing is future work. |
-| Content behind a declared name changed (repushed image tag, new upstream release, changed remote script) | A static scanner (`internal/pinning`) reports the mutable references it recognizes in the scope and `runner.command`; for `hermetic` and `controlled-environment` an unacknowledged one makes the lookup a `miss` and blocks publishing. Accepting one needs `scope.allowMutable` in the contract, which changes the fingerprint and shows in review. References it does not recognize stay a known gap ([Pin your dependencies](pinning.md)). |
-| Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with outcome `verification-failed` in the verify report (and an `aval: SECURITY: ...` line on stderr). It can delete attestations (forcing misses, i.e. re-runs) or deny service (`error`, re-run). Availability is out of scope. |
-| Forged or tampered run records (anyone with push access) | Records are statistics, never evidence: unsigned, hung off a per-test stats anchor, and never fetched by `aval run` or `aval verify`, so they cannot cause reuse or count toward the candidate cap. A record crafted with a fingerprint anchor as its subject is filtered out by artifact type. They can skew statistics; treat them as informational. `aval stats` skips and counts records that are malformed, oversized or inconsistent (a reuse with any outcome but `verified`, or with test time), and bounds how many it reads. |
+| Replay of a passing result for a different fingerprint or test id | Verification requires the signed fingerprint and test id to equal the ones computed locally. The signed predicate cannot be re-labeled without breaking the signature. Mismatch is `verification-failed`. |
+| Undeclared input changed (file outside scope, unlisted env var, network service) | Not detected: the fingerprint only covers declared inputs. Mitigated by contract review, `external-dependencies` not being reusable by default and `non-deterministic` never being reusable, and the false-hit suite. Observed-input tracing is future work. |
+| Content behind a declared name changed (repushed image tag, new upstream release, changed remote script) | The scanner reports the mutable references it recognizes in the scope and `runner.command`; for `hermetic` and `controlled-environment` an unaccepted one makes the lookup a `miss` and blocks publishing. Accepting one needs `scope.allowMutable`, which changes the fingerprint and shows in review. References it does not recognize stay a known gap ([Pin your dependencies](pinning.md)). |
+| Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with an `aval: SECURITY: ...` line on stderr. It can delete attestations (forcing re-runs) or deny service (`error`, re-run). Availability is out of scope. |
+| Forged or tampered run records (anyone with push access) | Unsigned statistics, never read by `aval run` or `aval verify`; `aval stats` skips malformed records and caps how many it reads. |
 | Dishonest but trusted signer (ran a modified test and signed "passed") | Out of scope for Aval. A signature proves who claims it, not that the test ran honestly. Limit which identities get which level; level 3 (isolated) exists for this. |

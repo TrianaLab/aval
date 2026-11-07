@@ -4,12 +4,10 @@ Goal: go from an exit code or an error message to its cause and its fix.
 
 ```mermaid
 flowchart LR
-  code{exit code} -- 0 --> ok([passed or verified]):::ok
-  code -- 1 --> e([error: read the aval: or reason: line]):::warn
-  code -- 2 --> u([fix the command or aval.yaml]):::warn
-  code -- 3 --> f([test failed: fix the test]):::warn
-  code -- 4 --> m([miss: routine, run the test]):::muted
-  code -- 5 --> s([security event: look]):::err
+  code{exit code} -- 2 --> u([Flags and files]):::warn
+  code -- 1 --> e([Errors]):::warn
+  code -- 4 --> m([Misses]):::muted
+  code -- 5 --> s([Verification failures]):::err
 ```
 
 ## Start with the exit code
@@ -20,7 +18,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 
 --8<-- "docs/cli-reference.md:exit-codes"
 
-Find the message in a section below. Text in `<...>` changes per run.
+Text in `<...>` changes per run.
 
 ## Flags and files (exit 2)
 
@@ -47,17 +45,16 @@ Find the message in a section below. Text in `<...>` changes per run.
     | `empty glob`, `must be a relative, slash-separated path`, `empty, '.' or '..' segments are not allowed`, `'**' must be a whole path segment` | write globs like `src/**/*.go` |
     | `cacheability: required`, `cacheability: unknown class` | pick a [class](write-a-contract.md#step-by-step) |
     | `environment.toolchain: invalid key`, `invalid variable name` | lower case tool names, valid variable names |
-    | `scope.allowMutable[<i>]: ref and reason are both required`, `file <x> must be a slash-separated path relative to the contract` | give each entry a `ref` and a `reason`, and a `file` as the finding prints it ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
-    | `scope.resolve[<i>]: <x>`, `unknown kind <x>`, `the reference must be non-empty`, `credentials in the reference are not allowed`, `a scope.resolve entry is one` | one `kind: reference` per entry, a known kind, no spaces, no credentials ([Resolve references](../resolve/index.md)) |
-    | `scope.contracts[<i>]: <x>`, `must be slash-separated`, `must be a clean relative path`, `must name a contract file`, `is listed twice` | a relative path to a `.yaml` contract, such as `../backend/aval.yaml`, listed once ([Depend on another part of the repo](depend-on-a-contract.md)) |
-    | `not a valid <kind> package name`, `is not a registry version, range or tag`, `want group:artifact:version` | a registry name that follows the ecosystem's naming rules and a version, range or tag, not a path, file or URL ([Resolve references](../resolve/index.md#exact-or-floating)) |
+    | `scope.allowMutable[<i>]: ref and reason are both required`, `file <x> must be a slash-separated path relative to the contract` | give each entry a `ref`, a `reason` and, if needed, a `file` as the finding prints it ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
+    | `scope.resolve[<i>]: <x>`, `unknown kind <x>`, `the reference must be non-empty`, `credentials in the reference are not allowed`, `a scope.resolve entry is one` | one known `kind: reference` per entry, no credentials ([Resolve references](../resolve/index.md)) |
+    | `scope.contracts[<i>]: <x>`, `must be slash-separated`, `must be a clean relative path`, `must name a contract file`, `is listed twice` | a relative path to a `.yaml` contract, listed once ([Depend on another part of the repo](depend-on-a-contract.md)) |
+    | `not a valid <kind> package name`, `is not a registry version, range or tag`, `want group:artifact:version` | use the registry name and a version, range or tag, not a path, file or URL ([Resolve references](../resolve/index.md#exact-or-floating)) |
 
 ## Errors (exit 1)
 
-`aval verify` exits 1. `aval run` prints the lookup errors below as outcome
-`error` with a `reason:` line, runs the test anyway and exits with its code
-(0 or 3). It exits 1 only when the test cannot start (`running <x>`) or the
-result cannot be published.
+`aval verify` exits 1. `aval run` prints these as outcome `error`, runs the
+test and exits with the test's code. It exits 1 only when the test cannot
+start (`running <x>`) or the result cannot be published.
 
 ??? failure "Fingerprint and trust policy"
     | Message | Fix |
@@ -65,8 +62,8 @@ result cannot be published.
     | `scope.source matched no files`, `glob <x> matched no files` | fix the glob, or create the file |
     | `is excluded only by a trailing` | exclude the file by name |
     | `only regular files are supported in scope`, `control characters in path are not supported` | keep symlinks and odd names out of scope |
-    | `scope.contracts <path>: <x>` | a referenced contract cannot be fingerprinted: fix it or the path ([Depend on another part of the repo](depend-on-a-contract.md)) |
-    | `resolve <kind> <ref>: <x>` | a `scope.resolve` reference did not resolve: check the name, the version, the network and the credentials ([Resolve references](../resolve/index.md)) |
+    | `scope.contracts <path>: <x>` | fix the referenced contract or the path ([Depend on another part of the repo](depend-on-a-contract.md)) |
+    | `resolve <kind> <ref>: <x>` | check name, version, network, credentials ([Resolve references](../resolve/index.md)) |
     | `decoding policy: <x>`, `minTrustLevel: <x> must be developer, runner or isolated`, `identities: at least one is required`, `identities[<i>]: <x>`, `trustLevel: <x> must be developer, runner or isolated` | fix the field ([Write a trust policy](trust-policy.md)) |
     | `publicKey cannot be combined with issuer or subjectRegexp`, `issuer and subjectRegexp are required (or publicKey)` | one kind of signer per identity |
     | `publicKey: <x>`, `publicKey <file>: <x>`, `not a PEM public key`, `larger than <n> bytes`, `subjectRegexp: <x>` | fix the key file or the regexp |
@@ -79,7 +76,7 @@ result cannot be published.
     | `loading registry credentials: <x>`, `resolving <tag>: <x>`, `listing referrers: <x>`, `fetching manifest <x>`, `fetching layer <x>` | check the address, the network and `docker login` |
     | `signing: <x>`, `publishing: <x>`, `pushing manifest: <x>`, `tagging anchor: <x>` | check the token or key, and write access |
     | `more than <n> attestations for fingerprint` | delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)) |
-    | `is not listed among the referrers of` | the registry did not list the pushed result in time, or does not support the OCI 1.1 referrers API: push again, or use a registry with referrers support |
+    | `is not listed among the referrers of` | push again, or use a registry with OCI 1.1 referrers |
     | `running <x>` | install the program `runner.command` starts |
     | `writing report: <x>`, `result not published: <x>` | fix the `--report` path, or the fingerprint error before it |
     | `reading the result recorded by 'aval run'` | run `aval run` first |
@@ -95,15 +92,15 @@ result cannot be published.
     | `no attestation found for fingerprint` | none: the inputs changed or nobody pushed yet |
     | `no trust policy configured`, `no registry configured`, `reuse disabled (--no-reuse)` | pass `--policy`, `--registry`, drop `--no-reuse` |
     | `cacheability <x> is never reusable`, `is not in allowedCacheability` | by design, or allow the class in the policy |
-    | `not reusable under the trust policy`, `signer <x> has trust level <y>, policy requires at least <z>` | the signer is below `minTrustLevel`; raise its `trustLevel` if you trust it |
-    | `mutable references in the inputs` | pin each reference the line lists, or acknowledge it with `scope.allowMutable`; for `lists this ref without file:`, add `file:` to the entry ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
+    | `not reusable under the trust policy`, `signer <x> has trust level <y>, policy requires at least <z>` | raise the signer's `trustLevel` if you trust it |
+    | `mutable references in the inputs` | pin each reference the line lists, or acknowledge it with `scope.allowMutable`; for `lists this ref without file:`, add `file:` ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
     | `every listed attestation is gone`, `is gone, skipping it` | someone deleted results during the lookup: run again |
 
 ## Verification failures (exit 5)
 
-`aval: SECURITY: <n> attestation(s) for <test> failed signature or policy verification`
-comes first. The `reason:` line says why. A wrong policy is the common cause;
-an attacker is the dangerous one. Fail the job and look.
+The `aval: SECURITY:` line comes first and `reason:` says why. Usually a wrong
+policy; possibly an attacker. See
+[Outcomes](../concepts/outcomes.md#a-verification-failure-is-a-security-event).
 
 ??? danger "Reasons"
     | Reason | Fix |
@@ -117,4 +114,4 @@ an attacker is the dangerous one. Fail the job and look.
 ## Read next
 
 - [Outcomes](../concepts/outcomes.md)
-- [CLI reference](../cli-reference.md#exit-codes)
+- [Pin your dependencies](../pinning.md)

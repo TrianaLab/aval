@@ -15,18 +15,16 @@ scope:
 - A name without a host is a Docker Hub name: `postgres:16` is
   `docker.io/library/postgres:16`, and so are `docker.io/postgres:16` and
   `index.docker.io/postgres:16`. No tag means `latest`.
-- The [scanner](../pinning.md#container-images) still reports the tag:
-  `scope.resolve` never clears a finding. Pin by digest, or accept the
-  tag with `scope.allowMutable`. The entry makes a repushed tag change the
-  fingerprint.
-- Compose without `pull_policy: always`, or Kubernetes with
-  `IfNotPresent`, can run a copy of the tag pulled earlier. The digest Aval
-  reads is the registry's, not the runner's: pull before the test, or pin
-  by digest.
-- Also covers what the scanner cannot see, such as Helm values that split
-  `repository` and `tag`: declare the image those values make.
+- The digest Aval reads is the registry's, not the runner's. Compose without
+  `pull_policy: always`, or Kubernetes with `IfNotPresent`, can run a copy
+  pulled earlier: pull before the test, or pin by digest.
+- Also covers what the [scanner](../pinning.md#container-images) cannot see,
+  such as Helm values that split `repository` and `tag`: declare the image
+  those values make.
 - Credentials come from `docker login` (`$DOCKER_CONFIG`). A loopback
   registry (`localhost:5000`) is reached over plain HTTP.
+
+--8<-- "docs/resolve/index.md:scanner"
 
 **Pin instead** when you want what you run to be exactly what you hashed:
 `image: postgres:16@sha256:<digest>` in the file. Find the digest with

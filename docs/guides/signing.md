@@ -1,4 +1,4 @@
-# Sign with a key or keyless
+# Sign results
 
 Goal: sign a test result so that others can check who published it.
 
@@ -15,14 +15,11 @@ flowchart LR
 
     Make a P-256 key and a policy that trusts it:
 
-    --8<-- "README.md:key"
+    --8<-- "docs/quickstart.md:key"
 
     Run the test, then sign and push the result:
 
-    --8<-- "README.md:push"
-
-    This is the [quickstart](https://github.com/TrianaLab/aval#try-it-on-your-laptop)
-    path; a test runs it as written.
+    --8<-- "docs/quickstart.md:push"
 
 === "Keyless"
 
@@ -34,22 +31,20 @@ flowchart LR
     ```
 
     On GitHub Actions the job gets the token itself; see
-    [Use Aval in GitHub Actions](github-actions.md).
+    [Use GitHub Actions](github-actions.md).
 
 ## Which one
 
 | | Key | Keyless |
 |---|---|---|
-| Who signs | whoever holds the key file | a CI workload or a person, proven by an OIDC token |
+| Who signs | whoever holds the key file | a CI job or a person, proven by an OIDC token |
 | Policy entry | `publicKey: aval.pub` | `issuer` and `subjectRegexp` |
 | Typical trust level | `developer` | `runner` |
 | Needs network to verify | no | yes, unless the policy pins `trustedRoot` |
 
-Use keyless in CI. Use a key on your laptop or in a closed network.
-
 ??? info "Which keys work"
-    Aval signs with an unencrypted ECDSA P-256 private key in PEM (PKCS#8 or
-    SEC1). Cosign keys are encrypted and do not work. Make one with
+    An unencrypted ECDSA P-256 key in PEM (PKCS#8 or SEC1). Cosign keys are
+    encrypted and do not work. Make one with
     `openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out aval.key`.
 
 ??? info "Sign later with aval push"
@@ -62,12 +57,8 @@ Use keyless in CI. Use a key on your laptop or in a closed network.
     aval push --registry ghcr.io/acme/orders-aval
     ```
 
-??? info "What a signature proves"
-    A signature proves who published the result, not that the test ran
-    honestly. That is why the policy decides how much each signer is trusted.
-    See [Trust](../concepts/trust.md).
-
 ## Read next
 
 - [Write a trust policy](trust-policy.md)
+- [Trust](../concepts/trust.md#what-a-signature-proves)
 - [Trust model: signing](../trust-model.md#signing)

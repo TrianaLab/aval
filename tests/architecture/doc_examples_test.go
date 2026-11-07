@@ -136,7 +136,7 @@ func TestDocExamplesParse(t *testing.T) {
 			t.Error(p)
 		}
 	}
-	// The README quickstart and the specs carry both kinds; finding none
+	// The specs and guides carry both kinds; finding none
 	// means the extraction broke, not that the docs are clean.
 	if tests == 0 || policies == 0 {
 		t.Fatalf("found %d contract and %d policy examples, want both > 0", tests, policies)

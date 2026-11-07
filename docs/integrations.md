@@ -1,217 +1,72 @@
-# Integrations
+# Consume evidence
 
-Status: pre-alpha. Milestone 1 (contract + fingerprint) is implemented.
-Milestone 2 (sign, push, verify, `aval run` reuse or execute) is
-implemented. The consumption contract is stable: the media types, the
-predicate type and the report version are frozen, and the compatibility rules
-are in [artifact-format.md](artifact-format.md#versioning-and-compatibility).
+Three surfaces are stable: the OCI artifact, the Go package `pkg/evidence`,
+and `aval verify -o json`. Nothing else (internal packages, CLI text output,
+the manifest layout) is a contract. The formats are frozen
+([compatibility rules](artifact-format.md#versioning-and-compatibility)).
 
-## Consuming Aval evidence
+## 1. OCI artifact and predicate
 
-Aval produces signed test execution results. Other tools (CI systems, release
-gates, dashboards, policy engines) may consume them. There are three surfaces
-meant for that. Anything else in the repository (`internal/...`, the text
-output of the CLI, the fingerprint manifest layout) is not a consumption
-contract.
+A result is an in-toto v1 Statement in a DSSE envelope, found through the tag
+`sha256-<fingerprint hex>` and the OCI 1.1 referrers of the manifest it points
+at, and consumed by digest. Predicate type
+`https://aval.trianalab.io/attestation/execution/v2`; fields and layout:
+[artifact format](artifact-format.md).
 
-### 1. OCI artifact and predicate format
-
-An execution result is an in-toto v1 Statement wrapped in a DSSE envelope,
-stored in an OCI registry, found through the tag `sha256-<fingerprint hex>`
-and the OCI 1.1 referrers of the manifest it points at, and consumed by
-digest. The predicate type is
-`https://aval.trianalab.io/attestation/execution/v2`.
-
-See [artifact-format.md](artifact-format.md) for the media types, manifest
-layout and predicate fields.
-
-Predicate fields are neutral on purpose: `subject`, `test.id`,
-`test.cacheability`, `result`, `execution.fingerprint`,
-`execution.fingerprintVersion`, `execution.environment`, `execution.exitCode`,
-`runner`, `startedAt`, `finishedAt`, and a free `annotations` map. Within `v2`
-only additive changes are allowed.
-
-### 2. Go package `github.com/TrianaLab/aval/pkg/evidence`
+## 2. Go package `github.com/TrianaLab/aval/pkg/evidence`
 
 `pkg/evidence` has no dependency on the rest of the module and is the only
-public Go API. It exposes:
+public Go API:
 
 | Symbol | Purpose |
 |---|---|
-| `Parse(data []byte) (*Predicate, error)` | Decode predicate JSON and run `Validate`. Does not check signatures. |
-| `(*Predicate).Validate() error` | Structural checks: `schemaVersion == "v2"`, subject, `test.id`, `result`, fingerprint format `sha256:<64 hex>`, `runner.identity`, timestamps. |
-| `Verify(ctx, *Envelope, VerifyOptions) (*Verification, error)` | Check the signature with `VerifyOptions.Signature`, match the signer against the accepted identities, enforce the minimum trust level, decode the statement and predicate, and require the expected fingerprint, test id and a reusable cacheability. Every failure is a `*VerificationError`. |
-| `SignatureVerifier`, `Signer` | `VerifySignature(ctx, *Envelope) (Signer, error)` checks the signature cryptographically and returns the signer it binds (`Issuer` and `Subject` of a keyless certificate, or `KeyID`). It applies no policy. `pkg/evidence` ships no implementation, to stay free of Sigstore dependencies; Aval's own is `internal/attest.Verifier` over the Sigstore bundle. A public Sigstore implementation for consumers is planned for milestone 5. |
-| `MatchIdentity(ids, issuer, subject) (Identity, bool)` | The accepted keyless identity that grants a signer the highest trust level. The issuer must be equal; `SubjectRegexp` must match the whole subject (anchored); an invalid regexp matches nothing. Entries with a `PublicKey` never match. The level comes from the policy, never from the predicate. |
-| `MatchSigner(ids, Signer) (Identity, bool)` | `MatchIdentity` for keyless signers; for key-based ones, the entries whose `PublicKey` has the signer's `KeyID`. The returned identity carries the signer's real `Subject` / `KeyID`. |
-| `PublicKeyID(pem) (string, error)` | `base64(sha256(DER))` of a PEM public key: the key hint in key-based Sigstore bundles. |
-| `VerifyOptions` | Expected fingerprint and test id (both required), accepted `Identities` (empty accepts nothing), `MinTrustLevel` (level `0` and levels above `3` are never accepted), `AllowedCacheability` (`hermetic` and `controlled-environment` always; `external-dependencies` only if listed; `non-deterministic` never), `Signature` (required). |
-| `ErrNotFound` | No attestation exists for the fingerprint. A miss; re-run. |
-| `ErrVerification` | An attestation exists but failed signature or policy checks. Security event. `*VerificationError` wraps it with a reason. |
-| `Report`, `ReportVersion` | The document printed by `aval verify --output json`. |
-| `RunRecord`, `RunRecordVersion`, `ParseRunRecord(data []byte) (*RunRecord, error)` | A run record published by `aval run --record` (see [artifact-format.md](artifact-format.md#run-records)). Unsigned statistics: never a basis for reuse or trust. `ParseRunRecord` checks the version, `testId`, the closed sets and consistency (`reused` requires outcome `verified` and `testDurationMs` 0; `verifiedResult` requires outcome `verified`). |
-| `StatsReport`, `TestStats`, `RepositoryStats`, `RunStats`, `MissCauses`, `StatsReportVersion`, `StatsUnknownRepository` | The document printed by `aval stats --output json` (see [artifact-format.md](artifact-format.md#stats-report-json)). Informational, from unsigned records. |
+| `Parse(data []byte) (*Predicate, error)` | decode predicate JSON and run `Validate`; no signature check |
+| `(*Predicate).Validate() error` | structural checks: `schemaVersion == "v2"`, subject, `test.id`, `result`, fingerprint format, `runner.identity`, timestamps |
+| `Verify(ctx, *Envelope, VerifyOptions) (*Verification, error)` | check the signature, match the signer against the policy, enforce the minimum level, decode the statement, require the expected fingerprint, test id and a reusable cacheability; every failure is a `*VerificationError` |
+| `SignatureVerifier`, `Signer` | checks a signature cryptographically and returns the signer it binds, with no policy. `pkg/evidence` ships no implementation, to stay free of Sigstore; a public Sigstore one is planned for milestone 5 |
+| `MatchIdentity(ids, issuer, subject) (Identity, bool)` | the keyless identity that grants a signer the highest level; `SubjectRegexp` matches the whole subject |
+| `MatchSigner(ids, Signer) (Identity, bool)` | `MatchIdentity` for keyless signers, `PublicKey` entries for key signers |
+| `PublicKeyID(pem) (string, error)` | `base64(sha256(DER))` of a PEM public key, the key hint in key-based bundles |
+| `VerifyOptions` | expected fingerprint and test id, accepted `Identities`, `MinTrustLevel`, `AllowedCacheability`, `Signature` (required) |
+| `ErrNotFound` | no attestation for the fingerprint: a miss, run the test |
+| `ErrVerification` | an attestation failed signature or policy checks: a security event |
+| `Report`, `ReportVersion` | the document `aval verify --output json` prints |
+| `RunRecord`, `RunRecordVersion`, `ParseRunRecord` | a run record ([run records](artifact-format.md#run-records)); unsigned statistics, never a basis for trust |
+| `StatsReport`, `TestStats`, `RepositoryStats`, `RunStats`, `MissCauses`, `StatsReportVersion`, `StatsUnknownRepository` | the document `aval stats --output json` prints ([stats report](artifact-format.md#stats-report-json)) |
 
-Trust levels, from the [trust model](trust-model.md#trust-levels):
+`ExpectedFingerprint` and `ExpectedTestID` come from your local contract,
+never from the attestation; both are required and must equal the predicate's
+`execution.fingerprint` and `test.id`. Levels are numbers in reports: 0
+unknown, 1 developer, 2 runner, 3 isolated
+([trust model](trust-model.md#trust-levels)).
 
---8<-- "docs/trust-model.md:trust-levels"
+A complete consumer that imports only `pkg/evidence`:
+[Consume from Go](guides/go-consumer.md). `ErrNotFound` comes from your lookup
+step, not from `Verify`.
 
-A complete external consumer lives in
-[`examples/evidence-consumer`](https://github.com/TrianaLab/aval/blob/main/examples/evidence-consumer/consumer.go): its
-own Go module that imports only `pkg/evidence` and the standard library,
-brings its own `SignatureVerifier` (ed25519 over the DSSE encoding), keeps a
-miss apart from a verification failure, and reads `aval verify` reports. CI
-builds and tests it against the checked-out `pkg/evidence` (`make example`),
-and `tests/architecture` fails if it imports any other Aval package.
-
-The shorter sketch below shows the same flow. How the envelope bytes are
-fetched (ORAS, a registry client, `aval`) is up to the consumer; fetch by
-digest, not by tag.
-
-```go
-package consumer
-
-import (
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-
-	"github.com/TrianaLab/aval/pkg/evidence"
-)
-
-// CheckResult returns the verified predicate for testID at fingerprint, or an
-// error. envBytes is the DSSE envelope layer, fetched by digest; sig checks
-// its signature, typically with sigstore-go over the bundle layer.
-func CheckResult(ctx context.Context, envBytes []byte, sig evidence.SignatureVerifier, testID, fingerprint string) (*evidence.Predicate, error) {
-	var env evidence.Envelope
-	if err := json.Unmarshal(envBytes, &env); err != nil {
-		return nil, fmt.Errorf("decoding envelope: %w", err)
-	}
-	v, err := evidence.Verify(ctx, &env, evidence.VerifyOptions{
-		ExpectedFingerprint: fingerprint,
-		ExpectedTestID:      testID,
-		Identities: []evidence.Identity{{
-			Issuer:        "https://token.actions.githubusercontent.com",
-			SubjectRegexp: `^https://github\.com/acme/orders/\.github/workflows/ci\.yml@refs/heads/main$`,
-			TrustLevel:    evidence.TrustRunner,
-		}},
-		MinTrustLevel: evidence.TrustRunner,
-		Signature:     sig,
-	})
-	switch {
-	case errors.Is(err, evidence.ErrVerification):
-		// Someone published a result we do not trust. Alert, do not reuse.
-		return nil, err
-	case err != nil:
-		// Not reachable from Verify today, but fail closed. Do not reuse.
-		return nil, err
-	}
-	if v.Predicate.Result != evidence.ResultPassed {
-		return nil, fmt.Errorf("test %s failed at %s", testID, fingerprint)
-	}
-	return v.Predicate, nil
-}
-```
-
-`ErrNotFound` is returned by the lookup step (the registry client), not by
-`Verify`: if there is no envelope to pass in, it is a miss.
-
-#### Go API compatibility
+### Go API compatibility
 
 `pkg/evidence` follows semantic versioning as part of the module
 `github.com/TrianaLab/aval`. Within a major version its exported API changes
 additively only: new identifiers, new struct fields that keep a comparable
-struct comparable, new methods on concrete types. Removing or renaming an
-exported identifier, changing a type, a field type, a function or method
-signature or a receiver, making a struct non-comparable, or adding a method
-to an exported interface is a breaking change and needs a new major version, which
-in Go means a new module path (`github.com/TrianaLab/aval/v2`). The
-release that ships it is tagged v2.0.0 or later (Go rejects a `/v2` module
-tagged v0 or v1), so its changeset sets the version explicitly rather than
-relying on a `major` bump from 0.x.
+struct comparable, new methods on concrete types. Anything else (removing or
+renaming, changing a type or signature, adding a method to an exported
+interface) needs a new module path, `github.com/TrianaLab/aval/v2`. The
+exported surface is snapshotted in
+[`pkg/evidence/testdata/api-v1.txt`](https://github.com/TrianaLab/aval/blob/main/pkg/evidence/testdata/api-v1.txt)
+and checked in CI.
 
-This is enforced, not only documented. The exported surface is snapshotted in
-[`pkg/evidence/testdata/api-v1.txt`](https://github.com/TrianaLab/aval/blob/main/pkg/evidence/testdata/api-v1.txt),
-named after the major version in `go.mod`: one line per exported constant,
-variable, function, type, field (embedded fields included, with its struct
-tag: a changed JSON name or `omitempty` is breaking) and method, with types,
-signatures, type parameters and constraints and without parameter names
-(type parameter names and the order of union terms are kept, so changing
-them needs a snapshot change too). Fields promoted through embedding get a
-`promoted <Type>.<Field>` line, so one that becomes ambiguous or changes
-type is breaking. Methods are the full method set, promoted ones included,
-with the receiver (`T` or `*T`) they need. Interfaces are one line with
-their whole method set or type set. A struct that supports `==` also gets a
-`comparable <Type>` line. A constant of a type the package declares
-(`TrustLevel`, `Result`, `Outcome`) is rendered with its value, since
-consumers compare those values: policy files write trust levels by name,
-but verify reports and predicates carry them as numbers (the mapping is in
-[trust-model.md](trust-model.md#trust-levels)), so renumbering `TrustRunner`
-is breaking. Untyped constants (the format
-identifiers) are rendered without their value (see below).
+The Go API and the wire formats are versioned separately: a breaking format
+change gets a new identifier, and supporting it is an additive Go change.
 
-`make ci-gates` (`TestEvidenceAPIIsAppendOnly` in `tests/architecture`) fails
-when:
+## 3. `aval verify --output json`
 
-- a line of the snapshot no longer matches the code;
-- the code exports something the snapshot lacks (an additive change appends
-  its lines in the same pull request);
-- the exported API names an unexported type of the package (an embedded,
-  returned or field type), whose members would not be rendered;
-- a non-test file of `pkg/evidence` has any build constraint: a
-  `//go:build` or `// +build` line (GOOS, GOARCH, cgo, a `go1.N` release tag
-  or a custom tag), `import "C"`, or a `_GOOS`/`_GOARCH` file name suffix.
-  The snapshot is taken on one platform and toolchain, and consumers build
-  the library on any, so every file must be built everywhere;
-- a line of the snapshot at the base revision is missing from the current
-  snapshot, so a break cannot be hidden by editing both. The base is the merge
-  base with `origin/<base branch>` on a pull request, the commit `main`
-  pointed to before a push to `main` (`before` of the push event, so all the
-  commits of one push are compared together), and the merge base with
-  `origin/main` otherwise. In CI
-  (`CI` set) an unresolvable base fails the job; locally, without
-  `origin/main`, this one comparison is skipped with a log line.
-
-A new major module path starts a new snapshot file, which has no base to
-compare with.
-
-The Go API and the wire formats are versioned separately. The predicate type,
-media types, report version and `apiVersion` follow
-[artifact-format.md](artifact-format.md#versioning-and-compatibility): a
-breaking format change gets a new identifier. Supporting a new format version
-is an additive Go change (new constants or types next to the old ones); the
-values of the untyped constants are format identifiers, so changing them is
-governed by the format rules rather than by the API snapshot. `Outcome`
-values are both: they are in the snapshot and in the verify report format. Dropping a type
-or constant a consumer may still use is a breaking Go change and needs a new
-major module path, even when the format it described is retired.
-
-### 3. `aval verify --output json`
-
-`aval verify` computes the fingerprint from `aval.yaml`, looks up the
-attestation, verifies it against the trust policy and runs nothing. With
-`--output json` (`-o json`) it prints an `evidence.Report` on stdout. Once
-the report is printed its `reason` is the only copy of the error message;
-stderr adds one `aval: SECURITY: ...` line when an attestation failed
-verification. Errors before there is a report (flags, `aval.yaml`) go to
-stderr.
-
-The report, from the [artifact format](artifact-format.md#verify-report):
-
---8<-- "docs/artifact-format.md:verify-report"
-
-The exit codes, from the [CLI reference](cli-reference.md#exit-codes). Exit 2
-prints no report, and neither does exit 1 when fingerprinting failed:
-
---8<-- "docs/cli-reference.md:exit-codes"
-
-Exit 2 also covers: a `--registry` that is not an OCI repository
-(`ghcr.io/acme/orders-aval`, no scheme, tag or digest); `--push` or `aval push`
-with a `--key` that does not load, or with neither a key nor
-`$SIGSTORE_ID_TOKEN`; a `--result` or `--report` path that holds an input of
-the test or, for `aval run`, any existing file that is not an Aval result or
-report.
+`aval verify` computes the fingerprint, looks up the attestation, verifies it
+against the trust policy and runs nothing. With `-o json` it prints the
+[verify report](artifact-format.md#verify-report) on stdout; stderr adds one
+`aval: SECURITY: ...` line when an attestation failed verification. Exit 2
+prints no report, and neither does exit 1 when fingerprinting failed
+([exit codes](cli-reference.md#exit-codes)).
 
 CI snippet that keeps miss and verification failure apart:
 
@@ -247,34 +102,16 @@ esac
 ```
 
 Check both the exit code and `outcome`; if they disagree, treat it as `error`.
-The policy file format (`--policy`) is described in
-[trust-model.md](trust-model.md#policy-file).
 
-### Guidance for consumers
+## Guidance
 
-- **Always verify.** `Parse` and `Validate` only check structure. A parsed
-  predicate is a claim, not evidence. `runner.identity` inside the predicate is
-  self-reported; the authoritative identity is the verified signer.
-- **Treat `verification-failed` as a security event.** Log it, alert on it,
-  never fold it into "miss" or silently re-run without a trace.
-- **Fail closed.** Any outcome other than `verified` means run the test.
-- **Consume by digest.** Tags are only for lookup.
+- **Always verify.** `Parse` and `Validate` only check structure; a parsed
+  predicate is a claim, and `runner.identity` is self-reported.
 - **Pin versions.** Check `schemaVersion == "v2"` on predicates (`Validate`
   does this) and `version == "aval.trianalab.io/verify-report/v1"` on reports.
-  Reject versions you do not know. Within a version, ignore unknown fields:
-  changes are additive.
-- **Respect cacheability.** `non-deterministic` results are never reusable;
-  do not widen that in your adapter.
-
-### Example: Pacto as an external consumer
-
-This is a conceptual example of an integration that lives outside Aval. Aval
-does not import or depend on Pacto and knows nothing about Pacto concepts.
-
-Pacto could consume Aval results through `pkg/evidence` or
-`aval verify --output json`: verify the attestation, convert the verified
-predicate into Pacto's own typed evidence, and evaluate Pacto's own
-requirements against it. That adapter lives in Pacto's repository, never in
-Aval. Aval will not grow Pacto-specific fields; any metadata Pacto (or any
-other tool) needs to carry goes in `annotations`, using reverse-DNS keys
-(for example `dev.pacto.service`). Aval never interprets `annotations`.
+  Reject versions you do not know. Within a version, ignore unknown fields.
+- Treat `verification-failed` as a security event, fail closed, consume by
+  digest and never widen cacheability: see [fail closed](trust-model.md#fail-closed).
+- **Your metadata goes in `annotations`** with reverse-DNS keys
+  (`dev.pacto.service`). Aval never reads them and will not add consumer
+  fields.
