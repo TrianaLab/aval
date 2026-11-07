@@ -3,6 +3,7 @@ package pinning
 import (
 	"bytes"
 	"cmp"
+	"encoding/json"
 	"errors"
 	"io"
 	"path"
@@ -134,44 +135,43 @@ func (kustomize) Applies(p string) bool {
 }
 
 func (kustomize) Detect(in Input) []Finding {
-	docs, err := yamlDocs(in.Data)
-	if err != nil {
-		return []Finding{{File: in.Path, Ecosystem: "scan", Ref: in.Path, Fix: "not valid YAML, so its images cannot be checked: " + err.Error()}}
+	// Decode like kustomize does: YAML to JSON (merge keys resolved), then
+	// encoding/json, which matches field names case-insensitively.
+	scanErr := func(err error) []Finding {
+		return []Finding{{File: in.Path, Ecosystem: "scan", Ref: in.Path, Fix: "images cannot be read as kustomize reads them: " + err.Error()}}
 	}
-	last := lastLine(in.Data)
+	dec := yaml.NewDecoder(bytes.NewReader(in.Data))
 	var out []Finding
-	for _, d := range docs {
-		for _, e := range kustomizeImages(d) {
-			f := map[string]string{}
-			for i := 0; i+1 < len(e.Content); i += 2 {
-				f[scalar(e.Content[i])] = scalar(e.Content[i+1])
-			}
-			if f["newName"] == "" && f["newTag"] == "" && f["digest"] == "" {
+	for {
+		var v any
+		if err := dec.Decode(&v); errors.Is(err, io.EOF) {
+			return out
+		} else if err != nil {
+			return scanErr(err)
+		}
+		j, err := json.Marshal(v)
+		if err != nil {
+			return scanErr(err)
+		}
+		var k struct {
+			Images []struct{ Name, NewName, NewTag, Digest string }
+		}
+		if err := json.Unmarshal(j, &k); err != nil {
+			return scanErr(err)
+		}
+		for _, e := range k.Images {
+			if e.NewName == "" && e.NewTag == "" && e.Digest == "" {
 				continue // the image is left as the manifests write it
 			}
-			ref := cmp.Or(f["newName"], f["name"])
-			if f["newTag"] != "" {
-				ref += ":" + f["newTag"]
+			ref := cmp.Or(e.NewName, e.Name)
+			if e.NewTag != "" {
+				ref += ":" + e.NewTag
 			}
-			if f["digest"] != "" {
-				ref += "@" + f["digest"]
+			if e.Digest != "" {
+				ref += "@" + e.Digest
 			}
-			out = append(out, image(in.Path, min(e.Line, last), ref, nil)...)
+			// ponytail: line 0, the decoded value has no position.
+			out = append(out, image(in.Path, 0, ref, nil)...)
 		}
 	}
-	return out
-}
-
-// kustomizeImages returns the entries of the top-level images: list.
-func kustomizeImages(doc *yaml.Node) []*yaml.Node {
-	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
-		return nil
-	}
-	m := doc.Content[0].Content
-	for i := 0; i+1 < len(m); i += 2 {
-		if scalar(m[i]) == "images" && m[i+1].Kind == yaml.SequenceNode {
-			return m[i+1].Content
-		}
-	}
-	return nil
 }

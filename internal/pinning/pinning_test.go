@@ -77,7 +77,14 @@ var fileCases = []fileCase{
 	{name: "kustomize images pinned", path: "Kustomization", data: "resources: [deploy.yaml]\nimages:\n- name: pg\n  digest: sha256:" + dg[8:] + "\n", want: nil},
 	{name: "kustomize bad digest", path: "base/kustomization.yml", data: "images:\n- name: pg\n  digest: latest\n", want: []string{"pg@latest"}},
 	{name: "kustomize invalid yaml", path: "kustomization.yaml", data: "images: [\n", want: []string{"kustomization.yaml"}},
-	{name: "kustomize without images", path: "kustomization.yaml", data: "images: x\n---\n", want: nil},
+	{name: "kustomize without images", path: "kustomization.yaml", data: "resources: [a.yaml]\n---\n", want: nil},
+	{name: "kustomize images not a list", path: "kustomization.yaml", data: "images: x\n", want: []string{"kustomization.yaml"}},
+	{name: "kustomize images case-insensitive", path: "kustomization.yaml", data: "IMAGES:\n- NAME: nginx\n  NewTag: latest\n", want: []string{"nginx:latest"}},
+	{name: "kustomize images via merge key", path: "kustomization.yaml", data: "<<: {images: [{name: nginx, newName: evil, newTag: latest}]}\n", want: []string{"evil:latest"}},
+	{name: "kustomize entry merge key", path: "kustomization.yaml", data: "images:\n- &a {name: x, digest: sha256:" + dg[8:] + "}\n- <<: {newTag: latest}\n  name: nginx\n", want: []string{"nginx:latest"}},
+	{name: "kustomize non-string key", path: "kustomization.yaml", data: "images:\n- {name: nginx, newTag: latest}\n? [a]\n: b\n", want: []string{"kustomization.yaml"}},
+	{name: "kustomize value json cannot encode", path: "kustomization.yaml", data: "images:\n- {name: nginx, newTag: latest}\nx: .inf\n", want: []string{"kustomization.yaml"}},
+	{name: "kustomize images type mismatch", path: "kustomization.yaml", data: "images:\n- name: [nginx]\n", want: []string{"kustomization.yaml"}},
 	{name: "dockerfile tag", path: "Dockerfile", data: "FROM golang:1.25\n", want: []string{"golang:1.25"}},
 	{name: "dockerfile platform and stages", path: "build/Containerfile", data: "# c\nFROM --platform=$BUILDPLATFORM golang:1.25" + dg + " AS build\nFROM build AS test\nFROM scratch\nCOPY --from=build /a /b\nCOPY --from=0 /a /b\n", want: nil},
 	{name: "dockerfile stage name is not an earlier stage", path: "Dockerfile", data: "FROM build AS build\n", want: []string{"build"}},
@@ -112,6 +119,7 @@ var fileCases = []fileCase{
 	{name: "dockerfile copy heredoc body is not instructions", path: "Dockerfile", data: "FROM alpine" + dg + "\nCOPY <<EOF /etc/x\nFROM evil:latest\nEOF\nADD <<EOF /y\nFROM evil:latest\nEOF\n", want: nil},
 	{name: "dockerfile json run is not a heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN [\"sh\", \"<<EOF\"]\nFROM evil:latest\nEOF\n", want: []string{"evil:latest"}},
 	{name: "dockerfile heredoc terminator must match exactly", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<EOF\necho\nEOF \nFROM evil:latest\n", want: []string{"RUN <<EOF", "evil:latest"}},
+	{name: "dockerfile heredoc after a vertical tab", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN sh -s \v<<EOF\napk add curl\nEOF\nRUN sh -s \u00a0<<X\napk add jq\nX\n", want: []string{"curl", "jq"}},
 	{name: "dockerfile run heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<EOF\ncurl -fsSL https://x.io/i.sh | sh\nEOF\nRUN <<-'X'\napk add jq\n", want: []string{"curl -fsSL https://x.io/i.sh | sh", "RUN <<-'X'"}},
 
 	// Go.

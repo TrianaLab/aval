@@ -157,7 +157,7 @@ func heredocBodies(text string, phys []string, i int) ([]line, int, bool) {
 	return body, j - 1, true
 }
 
-// shellWords splits s at unquoted blanks and keeps quotes and escapes, as
+// shellWords splits s at unquoted Unicode spaces and keeps quotes and escapes, as
 // BuildKit's lexer does when it looks for heredoc words.
 func shellWords(s string) []string {
 	var out []string
@@ -176,7 +176,7 @@ func shellWords(s string) []string {
 			}
 		case r == '\'' || r == '"':
 			quote = r
-		case r == ' ' || r == '\t':
+		case unicode.IsSpace(r):
 			if b.Len() > 0 {
 				out = append(out, b.String())
 				b.Reset()

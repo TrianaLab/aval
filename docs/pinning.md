@@ -75,7 +75,10 @@ images:
     digest: sha256:<digest>
 ```
 
-A kustomization that is not valid YAML is reported in the `scan` ecosystem.
+Aval reads `images:` as kustomize does: field names match case-insensitively
+(`IMAGES:`, `NewTag:`) and merge keys (`<<:`) are resolved. A kustomization
+that is not valid YAML, or whose `images:` kustomize could not decode, is
+reported in the `scan` ecosystem.
 
 Find the digest with `docker buildx imagetools inspect <image:tag>` or
 `crane digest <image:tag>`. Images in `docker run`, `podman run` and
@@ -87,11 +90,11 @@ that comes from a variable Aval cannot resolve (`${DB_IMAGE}`) or from a
 Helm template (`{{ .Values.image }}`) is reported: write the digest into a
 file in the scope, or render the chart into the scope. A YAML alias
 (`image: *img`), a block scalar (`image: >-`) or a tag (`image: !!str ...`)
-is reported too: write the reference inline. A plain value on the line after
-`image:` is checked like an inline one. Keys are matched by their decoded value, so
-`"ima\x67e":`, `? image` and `!!str image:` are checked too. In a file that
-is not valid YAML, a quoted key with an escape YAML cannot decode is
-reported in the `scan` ecosystem.
+is reported too: write the reference inline. A plain value on the line
+after `image:` is checked like an inline one. Keys are matched by their
+decoded value, so `"ima\x67e":`, `? image` and `!!str image:` are checked
+too. In a file that is not valid YAML, a quoted key with an escape YAML
+cannot decode is reported in the `scan` ecosystem.
 
 ### Go
 
