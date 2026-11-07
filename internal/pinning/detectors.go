@@ -11,7 +11,9 @@ import (
 )
 
 // composeImages checks image: keys in YAML: Compose files, Kubernetes and
-// rendered Helm manifests, CI service definitions.
+// rendered Helm manifests, Helm templates and helpers (*.tpl), CI service
+// definitions; and in JSON: Compose files, files under templates/ and (see
+// Scan) files a kustomization lists in resources.
 type composeImages struct{}
 
 // lockfiles are hashed but not scanned: they hold no image: keys, and a
@@ -23,24 +25,62 @@ func (composeImages) Applies(p string) bool {
 	if slices.Contains(lockfiles, b) {
 		return false
 	}
-	return e == ".yaml" || e == ".yml" || e == ".json" && strings.Contains(b, "compose")
+	return e == ".yaml" || e == ".yml" || e == ".tpl" ||
+		e == ".json" && (strings.Contains(b, "compose") || strings.Contains("/"+path.Dir(p)+"/", "/templates/"))
 }
 
 // yamlImageRe finds a block-style image: key (quoted or not); its value is
 // the rest of the line. flowImageRe finds image: keys inside flow mappings
 // ({image: x, ...}), whose value ends at , or }.
 var (
-	yamlImageRe = regexp.MustCompile(`^\s*(?:-\s+)?["']?image["']?\s*:\s*(.*)$`)
-	flowImageRe = regexp.MustCompile(`[{,]\s*["']?image["']?\s*:\s*([^,}]*)`)
+	yamlImageRe = regexp.MustCompile(`^\s*(?:-\s+)?(["']?image["']?)\s*:\s*(.*)$`)
+	flowImageRe = regexp.MustCompile(`[{,]\s*(["']?image["']?)\s*:\s*([^,}]*)`)
 	// yamlKeyRe finds a line that starts a mapping key or a list item, so it
 	// is not the continuation of an image: value on the next line.
 	yamlKeyRe = regexp.MustCompile(`^\s*(-(\s|$)|["']?[\w.-]+["']?\s*:(\s|$))`)
 )
 
+// Detect is the union of two passes, so the parser only adds findings: the
+// line-by-line regexes (the scanner's original pass, kept on every file, so
+// an image: inside a block scalar a template renders is still read) and,
+// for what the parser decodes, every image: key by its decoded value. The
+// escaped-key, prefixed-key and templated-key fallbacks read what the
+// parser cannot: a file it rejects, and Helm templates.
 func (composeImages) Detect(in Input) []Finding {
+	s := string(in.Data)
+	out := textImages(in, logicalLines(s)) // the original pass, as it read lines
+	var phys []line                        // YAML has no line continuation
+	for i, l := range strings.Split(s, "\n") {
+		phys = append(phys, line{i + 1, strings.TrimSuffix(l, "\r")})
+	}
+	out = append(out, textImages(in, phys)...)
+	docs, err := yamlDocs(in.Data)
+	var dec []Finding
+	for _, d := range docs {
+		dec = append(dec, decodedImages(in, d)...)
+	}
+	lines := physLines(in.Data)
+	for i := range dec {
+		dec[i].Line = lines[min(dec[i].Line, len(lines))-1] // clamped: see valueText
+	}
+	out = append(out, dec...)
+	if err != nil {
+		out = append(out, escapedKeys(in)...)
+		out = append(out, prefixedKeys(in)...)
+		out = append(out, taggedKeys(in)...)
+	}
+	if err != nil || path.Ext(in.Path) == ".tpl" || strings.Contains("/"+in.Path, "/templates/") {
+		out = append(out, templatedKeys(in)...)
+	}
+	slices.SortStableFunc(out, func(a, b Finding) int { return cmp.Or(a.Line-b.Line, strings.Compare(a.Ref, b.Ref)) })
+	return slices.Compact(out)
+}
+
+// textImages finds image: keys line by line.
+func textImages(in Input, lines []line) []Finding {
 	var out []Finding
 	pending := -1 // indent of an image: key whose value may be on the next line
-	for _, l := range logicalLines(string(in.Data)) {
+	for _, l := range lines {
 		t := strings.TrimSpace(l.text)
 		if t == "" || isComment(t) {
 			continue
@@ -50,15 +90,17 @@ func (composeImages) Detect(in Input) []Finding {
 			out = append(out, yamlImage(in.Path, l.n, t)...) // a plain scalar on the next line
 		}
 		pending = -1
-		ms := flowImageRe.FindAllStringSubmatch(l.text, -1)
-		if m := yamlImageRe.FindStringSubmatch(l.text); m != nil {
-			ms = [][]string{m}
-			if v, _, _ := strings.Cut(" "+m[1], " #"); strings.TrimSpace(v) == "" {
-				pending = indent
-			}
+		ms := flowImageRe.FindAllStringSubmatchIndex(l.text, -1)
+		if m := yamlImageRe.FindStringSubmatchIndex(l.text); m != nil {
+			ms = append([][]int{m}, ms...) // and flow keys inside its value
 		}
 		for _, m := range ms {
-			out = append(out, yamlImage(in.Path, l.n, m[1])...)
+			// an empty or anchor-only value continues on the next line
+			v, _, _ := strings.Cut(" "+l.text[m[4]:m[5]], " #")
+			if f := strings.Fields(v); len(f) == 0 || len(f) == 1 && f[0][0] == '&' {
+				pending = indent
+			}
+			out = append(out, yamlImage(in.Path, l.n, l.text[m[4]:m[5]])...)
 		}
 	}
 	return out
@@ -72,7 +114,11 @@ func yamlImage(file string, n int, v string) []Finding {
 	if i := strings.Index(" "+v, " #"); i >= 0 { // a comment, also right after the colon
 		v = v[:i]
 	}
-	if v = strings.Trim(strings.TrimSpace(v), `"'`); v == "" {
+	v = strings.TrimSpace(v)
+	if strings.HasSuffix(v, `",`) || strings.HasSuffix(v, `',`) { // a JSON member: "image": "x",
+		v = v[:len(v)-1]
+	}
+	if v = strings.Trim(v, `"'`); v == "" {
 		return nil
 	}
 	if strings.HasPrefix(v, "&") { // an anchor: the value follows it
@@ -82,7 +128,7 @@ func yamlImage(file string, n int, v string) []Finding {
 		}
 	}
 	if strings.ContainsAny(v[:1], "|>*!") {
-		return []Finding{{File: file, Line: n, Ecosystem: "container", Ref: v, Fix: "image is a YAML alias, block scalar or tag Aval cannot resolve: write the reference inline with its digest (name@sha256:...)"}}
+		return []Finding{{File: file, Line: n, Ecosystem: "container", Ref: v, Fix: unresolvedFix}}
 	}
 	return image(file, n, v, nil)
 }
@@ -97,13 +143,45 @@ func (dockerfile) Applies(p string) bool {
 		strings.HasSuffix(b, ".dockerfile") || strings.HasSuffix(b, ".containerfile")
 }
 
+// buildkitFile reports whether a file Applies matches is named as a
+// Dockerfile (Dockerfile, Dockerfile-dev, Dockerfile.ci, app.dockerfile),
+// not a source file that merely starts with the word (dockerfile_test.go):
+// only those get the BuildKit pass.
+func buildkitFile(p string) bool {
+	b := strings.ToLower(path.Base(p))
+	for _, n := range []string{"dockerfile", "containerfile"} {
+		if strings.HasPrefix(b, n) && !strings.Contains(b, ".") || strings.HasPrefix(b, n+".") || strings.HasSuffix(b, "."+n) {
+			return true
+		}
+	}
+	return false
+}
+
+// Detect is the union of two passes, so the BuildKit rules only add
+// findings: the scanner's original line pass, kept on every file Applies
+// matches (it also reads a heredoc an old frontend ignores), and the
+// BuildKit pass (dockerLines) on files named as Dockerfiles.
 func (dockerfile) Detect(in Input) []Finding {
+	return detectDockerfile(in, buildkitFile(in.Path))
+}
+
+func detectDockerfile(in Input, buildkit bool) []Finding {
+	out := textDockerfile(in)
+	if buildkit {
+		out = append(out, buildkitDockerfile(in)...)
+	}
+	slices.SortStableFunc(out, func(a, b Finding) int { return cmp.Or(a.Line-b.Line, strings.Compare(a.Ref, b.Ref)) })
+	return slices.Compact(out)
+}
+
+// textDockerfile is the scanner's original Dockerfile pass, unchanged.
+func textDockerfile(in Input) []Finding {
 	lines := logicalLines(string(in.Data))
 	vars := assignments(lines)
 	stages := map[string]bool{}
 	var out []Finding
 	var heredoc string // the delimiter of an open RUN <<EOF body
-	var body []string
+	var body []line
 	start := 0
 	directives := true // parser directives (# syntax=) come before anything else
 	for _, l := range lines {
@@ -116,10 +194,10 @@ func (dockerfile) Detect(in Input) []Finding {
 		}
 		if heredoc != "" {
 			if strings.TrimSpace(l.text) == heredoc {
-				out = append(out, heredocFindings(in, start, body)...)
+				out = append(out, heredocFindings(in, body)...)
 				heredoc, body = "", nil
 			} else {
-				body = append(body, l.text)
+				body = append(body, line{start + len(body) + 1, l.text})
 			}
 			continue
 		}
@@ -128,28 +206,71 @@ func (dockerfile) Detect(in Input) []Finding {
 			continue
 		}
 		out = append(out, instruction(in, l.n, f, stages)...)
-		if m := heredocRe.FindStringSubmatch(l.text); m != nil && strings.EqualFold(f[0], "RUN") {
+		if m := textHeredocRe.FindStringSubmatch(l.text); m != nil && strings.EqualFold(f[0], "RUN") {
 			heredoc, start = m[1], l.n
 		}
 	}
 	if heredoc != "" { // an unterminated body is still checked (fail closed)
-		out = append(out, heredocFindings(in, start, body)...)
+		out = append(out, heredocFindings(in, body)...)
+	}
+	return out
+}
+
+// textHeredocRe finds a RUN heredoc (RUN <<EOF, <<-"EOF") and its delimiter
+// for textDockerfile.
+var textHeredocRe = regexp.MustCompile(`<<-?\s*["']?([A-Za-z_][A-Za-z0-9_]*)["']?`)
+
+// buildkitDockerfile reads a Dockerfile as BuildKit splits it.
+func buildkitDockerfile(in Input) []Finding {
+	lines, out := dockerLines(in.Path, string(in.Data))
+	plain := make([]line, len(lines))
+	for i, l := range lines {
+		plain[i] = l.line
+	}
+	vars := assignments(plain)
+	dockerArgs(lines, vars)
+	globals := globalArgs(lines)
+	stages := map[string]bool{}
+	directives := true // parser directives (# syntax=) come before anything else
+	for _, l := range lines {
+		if directives {
+			if m := syntaxRe.FindStringSubmatch(l.text); m != nil {
+				out = append(out, image(in.Path, l.n, m[1], nil)...)
+				continue
+			}
+			directives = isComment(l.text)
+		}
+		f := strings.Fields(vars.expand(l.text))
+		if len(f) < 2 || isComment(f[0]) {
+			continue
+		}
+		if strings.EqualFold(f[0], "FROM") {
+			out = append(out, buildkitFrom(in.Path, l.line, strings.Fields(globals.expand(l.text)), stages)...)
+			continue
+		}
+		out = append(out, instruction(in, l.n, f, stages)...)
+		if strings.EqualFold(f[0], "RUN") {
+			out = append(out, heredocFindings(in, l.body)...)
+		}
 	}
 	return out
 }
 
 // syntaxRe finds the BuildKit frontend image of a # syntax= directive.
+// ponytail: looser than BuildKit (also after comments and blank lines), so
+// it reports more, never less.
 var syntaxRe = regexp.MustCompile(`(?i)^\s*#\s*syntax\s*=\s*(\S+)`)
 
-// heredocRe finds a BuildKit heredoc (RUN <<EOF, <<-"EOF") and its delimiter.
-var heredocRe = regexp.MustCompile(`<<-?\s*["']?([A-Za-z_][A-Za-z0-9_]*)["']?`)
-
-// heredocFindings checks the body of a RUN heredoc like a shell script; its
-// lines are numbered from the RUN line.
-func heredocFindings(in Input, start int, body []string) []Finding {
-	fs := scanShell(in.Path, strings.Join(body, "\n"), in.Has)
+// heredocFindings checks the body of a RUN heredoc like a shell script,
+// numbered by its physical lines.
+func heredocFindings(in Input, body []line) []Finding {
+	texts := make([]string, len(body))
+	for i, l := range body {
+		texts[i] = l.text
+	}
+	fs := scanShell(in.Path, strings.Join(texts, "\n"), in.Has)
 	for i := range fs {
-		fs[i].Line += start
+		fs[i].Line = body[fs[i].Line-1].n
 	}
 	return fs
 }
@@ -172,16 +293,39 @@ func instruction(in Input, n int, f []string, stages map[string]bool) []Finding 
 		}
 	case "COPY":
 		for _, fl := range flags {
-			if from, ok := strings.CutPrefix(fl, "--from="); ok && strings.Trim(from, "0123456789") != "" {
-				out = append(out, image(in.Path, n, from, stages)...)
+			if from, ok := strings.CutPrefix(fl, "--from="); ok {
+				out = append(out, fromImage(in.Path, n, from, stages)...)
 			}
 		}
 	case "ADD":
 		out = remoteAdd(in.Path, n, flags, rest)
 	case "RUN":
+		out = mountFrom(in.Path, n, flags, stages)
 		for _, fd := range scanShell(in.Path, strings.Join(rest, " "), in.Has) {
 			fd.Line = n
 			out = append(out, fd)
+		}
+	}
+	return out
+}
+
+// fromImage checks a --from= value: a stage index or name, or an image.
+func fromImage(file string, n int, from string, stages map[string]bool) []Finding {
+	if strings.Trim(from, "0123456789") == "" {
+		return nil
+	}
+	return image(file, n, from, stages)
+}
+
+// mountFrom checks the from= of each RUN --mount=type=bind,from=<ref>.
+func mountFrom(file string, n int, flags []string, stages map[string]bool) []Finding {
+	var out []Finding
+	for _, fl := range flags {
+		opts, _ := strings.CutPrefix(fl, "--mount=")
+		for _, o := range strings.Split(opts, ",") {
+			if k, v, _ := strings.Cut(strings.Trim(o, `"'`), "="); strings.EqualFold(k, "from") {
+				out = append(out, fromImage(file, n, v, stages)...)
+			}
 		}
 	}
 	return out
