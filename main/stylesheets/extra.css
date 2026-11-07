@@ -995,6 +995,103 @@
     opacity: 0;
   }
 }
+/* "Try it" (javascripts/try-aval.js): the button, the live output, the
+   prompt and the note. The terminal stays dark in both schemes. */
+.aval-term__try {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 5px 12px;
+  border: 1px solid #34d399;
+  border-radius: var(--radius);
+  background: #34d399;
+  box-shadow: 0 6px 18px -8px #34d399;
+  color: #04140e;
+  font: 700 12.5px/1.4 var(--md-text-font-family);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 90ms, border-color 90ms;
+}
+.aval-term__try:hover {
+  border-color: #6ee7b7;
+  background: #6ee7b7;
+}
+.aval-term__try:focus-visible,
+.aval-term[data-try] pre:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}
+.aval-term[data-try] pre:focus-visible {
+  outline-offset: -4px;
+}
+.aval-term__try[hidden] {
+  display: none;
+}
+.aval-term__try:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+/* Until the demo loads, the whole transcript is the entry point. */
+.aval-term[data-ready]:not([data-state="live"]) pre {
+  cursor: pointer;
+}
+.aval-term__cta {
+  color: #34d399;
+  font-weight: 600;
+}
+.aval-term[data-ready]:not([data-state="live"]) pre:hover .aval-term__cta {
+  color: #6ee7b7;
+}
+.aval-term[data-ready]:not([data-state]) .cur {
+  animation: aval-pulse 1.6s ease-in-out infinite;
+}
+@keyframes aval-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.25), 0 0 14px rgba(52, 211, 153, 0.6);
+    opacity: 0.55;
+  }
+}
+.aval-term pre.aval-term__out {
+  height: 26.25em;
+  overflow: auto;
+  padding-bottom: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  scrollbar-color: #273244 transparent;
+}
+.aval-term .r {
+  color: #f87171;
+}
+.aval-term__in label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 12px;
+  padding: 2px 8px;
+  border: 1px solid #1c2738;
+  border-radius: 6px;
+}
+.aval-term__in label:focus-within {
+  border-color: #34d399;
+}
+.aval-term__in input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #f1f5f9;
+  font: inherit;
+  caret-color: #34d399;
+}
+.aval-try {
+  padding: 10px 20px 14px;
+  border-top: 1px solid #1c2738;
+  color: #8193a8;
+  font-size: 12px;
+  line-height: 1.6;
+}
 .aval-run__explain ol {
   margin: 26px 0 0;
   padding: 0;
@@ -1027,6 +1124,15 @@
 .aval-run__explain b {
   color: var(--c-text);
   font-weight: 700;
+}
+.aval-run__explain .aval-run__try {
+  margin: 22px 0 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--c-accent-fill);
+  font-size: 15px;
+}
+.aval-run__explain .aval-run__try b {
+  color: var(--c-accent);
 }
 
 /* Metric strip. */
@@ -1222,6 +1328,9 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
+  .aval-try {
+    padding: 10px 14px 12px;
+  }
   .aval-term .hit {
     margin-right: -14px;
     margin-left: -14px;
@@ -1262,7 +1371,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .aval-stack .lift,
-  .aval-term .cur {
+  .aval-term .cur,
+  .aval-term[data-ready]:not([data-state]) .cur {
     animation: none;
   }
 }
