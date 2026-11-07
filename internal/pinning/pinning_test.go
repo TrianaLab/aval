@@ -231,7 +231,7 @@ func TestScan(t *testing.T) {
 	write(t, dir, "main.go", "package main\n")
 	write(t, dir, "big.sh", strings.Repeat("#", MaxFileSize+1))
 	write(t, dir, "pnpm-lock.yaml", strings.Repeat("#", MaxFileSize+1)) // hashed, not scanned
-	got := Scan(dir, []string{"Dockerfile", "big.sh", "gone.sh", "main.go", "pnpm-lock.yaml", "z/compose.yaml"}, []string{"docker", "run", "e:3"})
+	got := Scan(os.DirFS(dir), []string{"Dockerfile", "big.sh", "gone.sh", "main.go", "pnpm-lock.yaml", "z/compose.yaml"}, []string{"docker", "run", "e:3"})
 	var lines []string
 	for _, f := range got {
 		lines = append(lines, f.String())
@@ -240,7 +240,7 @@ func TestScan(t *testing.T) {
 		"Dockerfile:1 (container) a:1: a tag can be repushed: pin the image by digest (name:tag@sha256:...)",
 		"Dockerfile:2 (container) a:1: a tag can be repushed: pin the image by digest (name:tag@sha256:...)",
 		"big.sh (scan) big.sh: larger than 1 MiB: Aval cannot check its references; shrink or split the file",
-		"gone.sh (scan) gone.sh: open " + filepath.Join(dir, "gone.sh") + ": no such file or directory: Aval cannot check its references; shrink or split the file",
+		"gone.sh (scan) gone.sh: open gone.sh: no such file or directory: Aval cannot check its references; shrink or split the file",
 		"runner.command:1 (container) e:3: a tag can be repushed: pin the image by digest (name:tag@sha256:...)",
 		"z/compose.yaml:3 (container) b:1: a tag can be repushed: pin the image by digest (name:tag@sha256:...)",
 		"z/compose.yaml:5 (container) d:2: a tag can be repushed: pin the image by digest (name:tag@sha256:...)",
@@ -256,7 +256,7 @@ func TestScan(t *testing.T) {
 
 func TestScanDedupesAndSkipsUnknownFiles(t *testing.T) {
 	dir := t.TempDir()
-	if got := Scan(dir, []string{"README.md"}, []string{"docker", "run", "a:1", "&&", "docker", "run", "a:1", "&&", "docker", "compose", "up"}); len(got) != 2 {
+	if got := Scan(os.DirFS(dir), []string{"README.md"}, []string{"docker", "run", "a:1", "&&", "docker", "run", "a:1", "&&", "docker", "compose", "up"}); len(got) != 2 {
 		t.Fatalf("got %v, want the image once and the compose file", got)
 	}
 }
@@ -270,7 +270,7 @@ func TestScanShebangScripts(t *testing.T) {
 	write(t, dir, "LICENSE", "curl https://x.io/i | sh\n")
 	write(t, dir, "run", "#!/usr/bin/python3\nimport os\n")
 	var refs []string
-	for _, f := range Scan(dir, []string{"LICENSE", "bin/ci", "run", "setup", "gone"}, nil) {
+	for _, f := range Scan(os.DirFS(dir), []string{"LICENSE", "bin/ci", "run", "setup", "gone"}, nil) {
 		refs = append(refs, f.File+" "+f.Ref)
 	}
 	want := []string{"bin/ci curl", "gone gone", "setup curl https://x.io/i | sh"}

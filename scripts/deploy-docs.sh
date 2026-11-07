@@ -9,7 +9,8 @@
 # are copied to the gh-pages root, so <site>/install.sh and <site>/install.ps1
 # serve main's installers even when a tag on an older commit is deployed. PUSH=true pushes gh-pages to origin; without it the
 # commits stay local (scripts/test-deploy-docs.sh runs it both ways).
-# Needs mike and the packages in docs/requirements.txt.
+# Needs mike and the packages in docs/requirements.txt, and Go for
+# `make docs-wasm`.
 set -euo pipefail
 
 ref_type=${1:?usage: deploy-docs.sh branch|tag <ref name>}
@@ -20,6 +21,10 @@ export NO_MKDOCS_2_WARNING=1
 
 git fetch origin gh-pages:gh-pages 2>/dev/null || echo "no gh-pages branch on origin yet; mike creates it"
 git fetch -q origin main 2>/dev/null || echo "no main on origin; publishing the installers from HEAD"
+
+# The home page's "Try it" terminal: mike's build ships the WebAssembly
+# build it finds in docs/assets/demo/, so build it from this checkout first.
+make docs-wasm
 
 if [ "$ref_type" = "tag" ]; then
   mike deploy --update-aliases "${ref_name#v}" latest
