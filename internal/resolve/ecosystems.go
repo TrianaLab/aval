@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -76,10 +77,22 @@ func entry(fields ...string) string {
 var semverRe = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`)
 
 // npmEnv returns npm_config_<key> and the spelling that set it, in any
-// letter case as npm reads it (@npmcli/config: /^npm_config_/i).
+// letter case as npm reads it (@npmcli/config: /^npm_config_/i), with a
+// non-leading _ read as - (npm_config_@my_org:registry is @my-org:registry).
 func npmEnv(key string) (name, val string, err error) {
-	return env(func(k string) bool { return strings.EqualFold(k, "npm_config_"+key) })
+	return env(func(k string) bool {
+		if len(k) < 11 || !strings.EqualFold(k[:11], "npm_config_") {
+			return false
+		}
+		rest := k[11:]
+		if len(rest) > 1 && !strings.HasPrefix(rest, "//") { // @npmcli/config loadEnv
+			rest = rest[:1] + strings.ReplaceAll(rest[1:], "_", "-")
+		}
+		return strings.EqualFold(rest, key)
+	})
 }
+
+var goos = runtime.GOOS // a variable so tests cover the Windows case
 
 // pipEnv returns pip's option opt (index-url) from the environment and the
 // spelling that set it, as pip reads it: PIP_, then the option in any
@@ -87,6 +100,9 @@ func npmEnv(key string) (name, val string, err error) {
 func pipEnv(opt string) (name, val string, err error) {
 	return env(func(k string) bool {
 		rest, ok := strings.CutPrefix(k, "PIP_")
+		if !ok && goos == "windows" && len(k) > 4 && strings.EqualFold(k[:4], "PIP_") { // Python uppercases os.environ keys on Windows
+			rest, ok = k[4:], true
+		}
 		return ok && strings.TrimPrefix(strings.ReplaceAll(strings.ToLower(rest), "_", "-"), "--") == opt // pip _normalize_name: one leading -- is dropped
 	})
 }
@@ -245,7 +261,7 @@ func pypi(ctx context.Context, ref string) (string, string, error) {
 // pipIndex fails when the environment points pip to another index than
 // base.
 func pipIndex(base string) error {
-	for _, opt := range []string{"find-links", "no-index", "index-url", "extra-index-url"} {
+	for _, opt := range []string{"find-links", "no-index", "index-url", "pypi-url", "extra-index-url"} { // pypi-url: pip's alias of --index-url
 		k, v, err := pipEnv(opt)
 		switch {
 		case err != nil:

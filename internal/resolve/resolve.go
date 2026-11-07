@@ -173,8 +173,8 @@ func redact(s string) string {
 	if u.User != nil {
 		u.User = neturl.User("xxxxx")
 	}
-	if strings.Trim(u.Path, "/") != "" || u.RawQuery != "" {
-		u.Path, u.RawPath, u.RawQuery = "/xxxxx", "", ""
+	if strings.Trim(u.Path, "/") != "" || u.RawQuery != "" || u.Opaque != "" {
+		u.Path, u.RawPath, u.RawQuery, u.Opaque = "/xxxxx", "", "", ""
 	}
 	u.Fragment = ""
 	return u.String()
@@ -270,7 +270,7 @@ func npmToken(hostPath string) string {
 // JSON other than a string, or a section named like a setting, fails: Aval
 // cannot tell what npm would use.
 func npmrc() (map[string]string, error) {
-	_, userconfig, err := npmEnv("userconfig")
+	userconfig, err := npmUserconfig()
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +279,7 @@ func npmrc() (map[string]string, error) {
 	lines := strings.Split(strings.NewReplacer("\r\n", "\n", "\r", "\n").Replace(configFile(userconfig, ".npmrc")), "\n")
 	for i, l := range lines {
 		bad := fmt.Errorf(".npmrc line %d: Aval cannot read it as a key=value setting: fix it", i+1)
-		if t := strings.TrimSpace(l); t == "" || t[0] == ';' || t[0] == '#' {
+		if t := jsTrim(l); t == "" || t[0] == ';' || t[0] == '#' {
 			continue
 		}
 		// ini's (.*)$ does not match across U+2028/U+2029: npm drops the line.
@@ -310,6 +310,18 @@ func npmrc() (map[string]string, error) {
 	return vals, nil
 }
 
+// npmUserconfig is $npm_config_userconfig as npm parseField reads it:
+// trimmed, ${VAR} expanded, then a leading ~/ is $HOME.
+func npmUserconfig() (string, error) {
+	_, p, err := npmEnv("userconfig")
+	p = npmEnvReplace(strings.TrimSpace(p))
+	if rest, ok := strings.CutPrefix(p, "~/"); ok {
+		home, _ := os.UserHomeDir()
+		p = filepath.Join(home, rest)
+	}
+	return p, err
+}
+
 var npmEnvRe = regexp.MustCompile(`(\\*)\$\{([^${}?]+)(\?)?\}`)
 
 // npmEnvReplace expands ${VAR} as @npmcli/config does: an undefined
@@ -336,7 +348,7 @@ var iniSectionRe = regexp.MustCompile(`^\[([^\]]*)\]\s*$`)
 // string unquoted, else cut at the first unescaped ; or #, with \; \# \\
 // unescaped, and trimmed.
 func iniValue(s string) string {
-	s = strings.TrimSpace(s)
+	s = jsTrim(s)
 	if len(s) >= 2 && (s[0] == '"' || s[0] == '\'') && s[len(s)-1] == s[0] {
 		if s[0] == '\'' {
 			s = s[1 : len(s)-1]
@@ -372,7 +384,13 @@ loop:
 	if esc {
 		b.WriteByte('\\')
 	}
-	return strings.TrimSpace(b.String())
+	return jsTrim(b.String())
+}
+
+// jsTrim trims as JavaScript's String.trim (ini, npm): U+FEFF is space,
+// U+0085 is not.
+func jsTrim(s string) string {
+	return strings.TrimFunc(s, func(r rune) bool { return r == '\uFEFF' || r != '\u0085' && unicode.IsSpace(r) })
 }
 
 // netrc returns the login and password of the machine entry for host in

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -1068,6 +1069,10 @@ func TestNpmRegistryFromEnvironment(t *testing.T) {
 	mustFail(t, "npm", "@acme/left@1.0.0", "set one")
 	_ = os.Unsetenv("npm_config_@acme:registry")
 	_ = os.Unsetenv("NPM_CONFIG_@ACME:REGISTRY")
+	// npm reads a non-leading _ in npm_config_ keys as - (@npmcli/config).
+	t.Setenv("npm_config_@my_org:registry", "https://evil.example/")
+	mustFail(t, "npm", "@my-org/x@1.0.0", "npm_config_@my_org:registry")
+	_ = os.Unsetenv("npm_config_@my_org:registry")
 	t.Setenv("NPM_CONFIG_REGISTRY", f.url+"/")
 	mustResolve(t, "npm", "left@1.0.0")
 	t.Setenv("NPM_CONFIG_REGISTRY", "https://evil.example")
@@ -1138,6 +1143,7 @@ func TestPipEnvSpellings(t *testing.T) {
 		"PIP_Extra-Index_URL": "https://evil.example/simple", "PIP_find-links": "./wheels", "PIP_no_index": "1",
 		"PIP_FIND_LINKS": "/", "PIP_EXTRA_INDEX_URL": "/",
 		"PIP___INDEX_URL": "https://evil.example/simple", "PIP_--find-links": "./wheels",
+		"PIP_PYPI_URL": "https://evil.example/simple", "PIP_pypi-url": "https://evil.example/simple", // pip's alias of --index-url
 	} {
 		t.Setenv(k, v)
 		mustFail(t, "pypi", "x==1.0", k)
@@ -1151,6 +1157,10 @@ func TestPipEnvSpellings(t *testing.T) {
 	_ = os.Unsetenv("PIP_index_url")
 	t.Setenv("pip_INDEX_URL", "https://ignored.example/simple")
 	mustResolve(t, "pypi", "x==1.0")
+	// On Windows Python uppercases environment keys: pip reads pip_INDEX_URL.
+	goos = "windows"
+	t.Cleanup(func() { goos = runtime.GOOS })
+	mustFail(t, "pypi", "x==1.0", "pip_INDEX_URL")
 }
 
 // TestNpmrcIni: ~/.npmrc is read as npm reads it (the ini package): quotes
@@ -1194,6 +1204,9 @@ func TestNpmrcIni(t *testing.T) {
 		`'["registry"]'=http://evil/`:                            "cannot read",
 		`'["@acme:registry"]'=http://evil/`:                      "cannot read",
 		`registry='["http://evil/"]'`:                            "cannot read",
+		"\ufeffregistry=http://evil/":                            "registry", // ini trims as JS trim: U+FEFF too
+		"\ufeff\"registry\"\ufeff=http://evil/":                  "registry",
+		"x=1\n\ufeff@acme:registry=http://evil/":                 "@acme:registry",
 	} {
 		if err := os.WriteFile(npmrc, []byte(rc), 0o600); err != nil {
 			t.Fatal(err)
@@ -1203,6 +1216,19 @@ func TestNpmrcIni(t *testing.T) {
 			t.Errorf(".npmrc %q: %v, want %q", rc, err, wantErr)
 		}
 	}
+	// npm expands the userconfig path: trimmed, ${VAR}, then ~/ is $HOME.
+	t.Setenv("D", filepath.Dir(npmrc))
+	t.Setenv("HOME", filepath.Dir(npmrc))
+	if err := os.WriteFile(npmrc, []byte("registry=http://evil/\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, uc := range []string{"${D}/npmrc", " ${D}/npmrc ", "~/npmrc"} {
+		t.Setenv("NPM_CONFIG_USERCONFIG", uc)
+		if err := npmRegistry("@acme/left", base); err == nil || !strings.Contains(err.Error(), "registry") {
+			t.Errorf("userconfig %q: %v, want registry", uc, err)
+		}
+	}
+	t.Setenv("NPM_CONFIG_USERCONFIG", npmrc)
 	for rc, want := range map[string]string{
 		`"//h.example/:_authToken"="t"`:          "t",
 		"//h.example/:_authToken='t' ; c":        "'t'", // not quoted as a whole: npm keeps the quotes
@@ -1257,6 +1283,9 @@ func TestTokenInRegistryPathMasked(t *testing.T) {
 		if _, err := resolveOne(t, kind, ref); err == nil || strings.Contains(err.Error(), "T0KEN") {
 			t.Errorf("%s error must not show the token: %v", kind, err)
 		}
+	}
+	if got := redact("http:npm-proxy.fury.io/T0KEN/user"); strings.Contains(got, "T0KEN") {
+		t.Errorf("opaque URL shown as %q", got)
 	}
 	t.Setenv("PIP_INDEX_URL", "https://npm-proxy.fury.io/T0KEN/user/")
 	if _, err := resolveOne(t, "pypi", "x==1.0"); err == nil || strings.Contains(err.Error(), "T0KEN") || !strings.Contains(err.Error(), "npm-proxy.fury.io") {

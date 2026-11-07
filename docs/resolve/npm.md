@@ -36,7 +36,9 @@ scope:
   moved tag changes the id. The manifest line says `floating`.
 - Registry: `$npm_config_registry`. Token: the `//host/:_authToken=` line
   of `~/.npmrc` (or `$npm_config_userconfig`), `${VAR}` expanded. As in
-  npm, `npm_config_*` variables are read in any letter case; two
+  npm, `npm_config_*` variables are read in any letter case, with `_` equal
+  to `-` after the first character, and the userconfig path is expanded
+  as npm expands it (`${VAR}`, a leading `~/`); two
   spellings of one variable set to different values fail.
 - If the environment or `~/.npmrc` points the package elsewhere,
   resolution fails instead of binding the wrong registry: a

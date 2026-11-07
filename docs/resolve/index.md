@@ -157,10 +157,10 @@ The resolved id vouches for the registry in the table, not for the one the
 tool installs from. Where the tool's own setting is known to point
 elsewhere, resolution fails: an npm `@scope:registry` or `registry` line in
 `~/.npmrc`, an `npm_config_@scope:registry` variable,
-two spellings of an `npm_config_*` variable (npm reads any letter case) that differ, `$GOPRIVATE`, `$GONOPROXY` or a `$GOPROXY` that starts with
+two spellings of an `npm_config_*` variable (npm reads any letter case, with `_` equal to `-` after the first character) that differ, `$GOPRIVATE`, `$GONOPROXY` or a `$GOPROXY` that starts with
 `direct` or `off`, a Go module the checksum database would not verify
 (`GOSUMDB=off`, `$GONOSUMDB`, `$GOINSECURE`, `-insecure` in `$GOFLAGS`),
-`$PIP_INDEX_URL`, `$PIP_EXTRA_INDEX_URL`, `$PIP_FIND_LINKS` or
+`$PIP_INDEX_URL`, `$PIP_PYPI_URL` (pip's alias of `--index-url`), `$PIP_EXTRA_INDEX_URL`, `$PIP_FIND_LINKS` or
 `$PIP_NO_INDEX` (in any spelling pip reads, such as `PIP_index-url`), and a
 Maven `<latest>` or `<release>` that is a SNAPSHOT or not listed. A
 `~/.npmrc` line Aval cannot read fails too. Other tool configuration files are not read:
