@@ -2471,6 +2471,58 @@ check, or one it cannot read, is itself a finding. Lockfiles
 </span></code></pre></div>
 <p>A <code># syntax=</code> parser directive names the BuildKit frontend image: pin it too
 (<code># syntax=docker/dockerfile:1@sha256:&lt;digest&gt;</code>).</p>
+<p>Aval reads a Dockerfile in two passes and reports what either finds:</p>
+<ul>
+<li>The line pass reads each line as an instruction. It joins a continued
+  line with a space and reads a <code>RUN</code> heredoc body as a script.</li>
+<li>The BuildKit pass splits the file the way BuildKit does. It runs on files
+  named <code>Dockerfile</code>, <code>Dockerfile.*</code>, <code>*.dockerfile</code> or any name that
+  starts with <code>Dockerfile</code> and has no dot (<code>Dockerfile-dev</code>,
+  <code>Dockerfile_windows</code>), and the same with <code>Containerfile</code>. A comment line
+  stands alone, even when it ends in <code>\</code>. A continued line joins the next
+  one with nothing between (<code>FROM db:1\</code> then <code>6</code> is <code>db:16</code>). A leading
+  <code># escape=</code> sets the continuation character. <code>RUN</code>, <code>COPY</code> and <code>ADD</code>
+  heredoc bodies are kept apart.</li>
+</ul>
+<p>Both passes check <code>COPY --from=</code> and <code>RUN --mount=...,from=</code> like a <code>FROM</code>:
+a stage name or index is fine, an image needs a digest. The line pass can
+misread a heredoc or a continuation; that costs a needless miss, never a
+false hit.</p>
+<p>The BuildKit pass also reports:</p>
+<ul>
+<li>a file BuildKit refuses: an invalid <code># escape=</code>, a repeated directive,
+  an unterminated heredoc;</li>
+<li>a heredoc name with a quote, <code>\</code> or <code>$</code> in it (<code>&lt;&lt;#\\x</code>, <code>&lt;&lt;E$X</code>), or an
+  empty one (<code>&lt;&lt;""</code>), which Aval does not decode;</li>
+<li>a <code>FROM</code> image with a variable that is not a global <code>ARG</code> with a value.
+  In <code>FROM</code>, BuildKit expands only the <code>ARG</code>s declared before the first
+  <code>FROM</code>. A stage <code>ARG</code>, an <code>ENV</code> or an <code>ARG</code> without a value is reported
+  by its line (<code>FROM alpine:$V</code>): give the global <code>ARG</code> a default, or
+  write the image.</li>
+</ul>
+<p>A <code>kustomization.yaml</code> that retargets an image in <code>images:</code> (or the legacy
+<code>imageTags:</code>) with <code>newName</code> or <code>newTag</code> needs a <code>digest:</code> too.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">images</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">newTag</span><span class="p">:</span><span class="w"> </span><span class="s">"16"</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">digest</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sha256:&lt;digest&gt;</span>
+</span></code></pre></div>
+<p>Aval reads the kustomization as kustomize does (field names in any case,
+merge keys resolved), but it does not build the overlay. It reports these
+entries by name and index (<code>resources[2]</code>, <code>patches[0]</code>):</p>
+<ul>
+<li>a <code>resources</code>, <code>components</code> or <code>bases</code> entry that is remote (a URL,
+  <code>git::</code>, <code>github.com/...</code>) or not in the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>: vendor it into the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>;</li>
+<li>a <code>patches</code>, <code>patchesStrategicMerge</code>, <code>patchesJson6902</code> or
+  <code>replacements</code> entry that sets an image (an <code>image:</code> key, a JSON6902
+  <code>path</code> or <code>from</code> ending in <code>/image</code>, a <code>fieldPath</code> ending in <code>.image</code>);</li>
+<li>a <code>transformers</code> or <code>generators</code> entry with an image transformer, or a
+  path not in the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>;</li>
+<li>a <code>helmCharts</code> entry with <code>valuesInline</code>.</li>
+</ul>
+<p>A <code>tagSuffix</code> is always reported: kustomize drops the digest when it adds
+the suffix. A kustomization that is not valid YAML, or that kustomize could
+not decode, is reported by its path.</p>
 <p>Find the digest with <code>docker buildx imagetools inspect &lt;image:tag&gt;</code> or
 <code>crane digest &lt;image:tag&gt;</code>. Images in <code>docker run</code>, <code>podman run</code> and
 <code>docker compose</code> commands, and <code>kubectl run</code>/<code>create --image</code>, follow the
@@ -2481,26 +2533,41 @@ that comes from a variable Aval cannot resolve (<code>${DB_IMAGE}</code>) or fro
 Helm template (<code>{{ .Values.image }}</code>) is reported: write the digest into a
 file in the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, or render the chart into the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>. A YAML alias
 (<code>image: *img</code>), a block scalar (<code>image: &gt;-</code>) or a tag (<code>image: !!str ...</code>)
-is reported too: write the reference inline. A plain value on the line after
-<code>image:</code> is checked like an inline one.</p>
+is reported too: write the reference inline.</p>
+<p>YAML is read in two passes too. The line pass matches <code>image:</code> in every
+line, also inside a block scalar a template renders
+(<code>extraContainers: |</code>). The YAML parser matches every key that decodes to
+<code>image</code> (<code>"ima\x67e":</code>, <code>? image</code>, <code>!!str image:</code>, <code>!!binary aW1hZ2U=:</code>),
+wherever its value is. A key with another tag (<code>!custom image:</code>) is
+reported. A Compose <code>build.dockerfile_inline</code> is checked as a Dockerfile,
+and <code>build.additional_contexts</code> values with <code>docker-image://</code> as images.</p>
+<p>When the parser rejects a file (a Helm template), Aval reports what it
+cannot decode: a tagged key, a quoted key with an escape YAML cannot
+decode, an escaped <code>image</code> key whose value is elsewhere, and a quoted key
+that continues on the next line. In <code>*.tpl</code> files, files under
+<code>templates/</code> and files the parser rejects, a key a template writes
+(<code>ima{{ "ge" }}:</code>, <code>{{ $k }}:</code>) is reported by its text.</p>
+<p>JSON is read the same way, but only in Compose files (<code>compose.json</code>),
+files under <code>templates/</code> and files a kustomization in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> lists in
+<code>resources</code>, so <code>package.json</code> and other data files stay quiet.</p>
 <h3 id="go">Go<a class="headerlink" href="#go" title="Anchor link">&para;</a></h3>
 <p>Commit <code>go.sum</code> and add it to <code>scope.dependencies</code>. It pins every module by
 hash. In commands, use release versions:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>go<span class="w"> </span>install<span class="w"> </span>golang.org/x/tools/cmd/stringer@v0.30.0<span class="w">   </span><span class="c1"># not @latest or @main</span>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>go<span class="w"> </span>install<span class="w"> </span>golang.org/x/tools/cmd/stringer@v0.30.0<span class="w">   </span><span class="c1"># not @latest or @main</span>
 </span></code></pre></div>
 <h3 id="javascript-npm-yarn-pnpm-bun">JavaScript: npm, yarn, pnpm, bun<a class="headerlink" href="#javascript-npm-yarn-pnpm-bun" title="Anchor link">&para;</a></h3>
 <p>Commit the lockfile (<code>package-lock.json</code>, <code>yarn.lock</code>, <code>pnpm-lock.yaml</code> or
 <code>bun.lock</code>) and add it to <code>scope.dependencies</code>. Without one, every range
 (<code>^1.2.0</code>, <code>latest</code>, <code>*</code>) is reported. Install from the lockfile and pin what
 you run:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>npm<span class="w"> </span>ci
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>npx<span class="w"> </span>--yes<span class="w"> </span>prettier@3.3.3
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>npm<span class="w"> </span>ci
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>npx<span class="w"> </span>--yes<span class="w"> </span>prettier@3.3.3
 </span></code></pre></div>
 <h3 id="python">Python<a class="headerlink" href="#python" title="Anchor link">&para;</a></h3>
 <p>Pin every requirement with <code>==</code> and, better, with hashes. Generate the file
 instead of writing it by hand:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uv<span class="w"> </span>pip<span class="w"> </span>compile<span class="w"> </span>--generate-hashes<span class="w"> </span>requirements.in<span class="w"> </span>-o<span class="w"> </span>requirements.txt
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pip<span class="w"> </span>install<span class="w"> </span>--require-hashes<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>pip<span class="w"> </span>compile<span class="w"> </span>--generate-hashes<span class="w"> </span>requirements.in<span class="w"> </span>-o<span class="w"> </span>requirements.txt
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>pip<span class="w"> </span>install<span class="w"> </span>--require-hashes<span class="w"> </span>-r<span class="w"> </span>requirements.txt
 </span></code></pre></div>
 <p>If a requirements file uses hashes, every entry needs one. Poetry needs
 <code>poetry.lock</code> and Pipenv needs <code>Pipfile.lock</code> next to the manifest. A
@@ -2558,11 +2625,11 @@ use a lockfile for those. See <a href="../resolve/">Resolve references</a>.</p>
 <p>Sometimes a mutable reference is acceptable, for example an image your team
 rebuilds and scans every night. Acknowledge it in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, with the
 reason:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">scope</span><span class="p">:</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"**/*.go"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"compose.yaml"</span><span class="p p-Indicator">]</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">allowMutable</span><span class="p">:</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:16</span><span class="w">          </span><span class="c1"># exactly as Aval prints it</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rebuilt and scanned nightly; the tag is ours</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"**/*.go"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"compose.yaml"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">allowMutable</span><span class="p">:</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:16</span><span class="w">          </span><span class="c1"># exactly as Aval prints it</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rebuilt and scanned nightly; the tag is ours</span>
 </span></code></pre></div>
 <p><code>ref</code> must match the reference text Aval prints (for a missing lockfile, the
 manifest path, such as <code>go.mod</code>). Aval drops quotes from references it finds
@@ -2572,22 +2639,41 @@ in shell commands, so <code>"curl" -fsSL URL | bash</code> prints as
 see it in the diff. <code>aval run</code> still prints the finding, marked
 <code>(allowed: &lt;reason&gt;)</code>. A file Aval cannot read (larger than 1 MiB, or
 unreadable) is reported in the <code>scan</code> ecosystem and cannot be accepted:
-shrink or split it.</p>
+shrink or split it. A finding Aval reports because it cannot tell (a
+templated or tagged key, a kustomize entry such as <code>resources[2]</code>, a heredoc
+name, a <code>FROM</code> line) is in the <code>container</code> ecosystem: acknowledge it by the
+<code>ref</code> Aval prints.</p>
 <h2 id="limits">Limits<a class="headerlink" href="#limits" title="Anchor link">&para;</a></h2>
-<p>The detectors read text; they do not run your build. A reference they do not
-recognize is not reported, so the scanner narrows the gap but does not close
-it: keep the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> honest, prefer lockfiles and digests, and use
-<code>aval run --shadow</code> to catch false hits. Shell commands are split without a
-full shell parser: a quoted <code>;</code> or <code>&gt;</code> also splits, and a token misread as a
-package is reported as unpinned (a needless miss). Options before a
-subcommand (<code>apk --no-cache add</code>, <code>git -C dir clone</code>) are skipped, but an
-option Aval does not know to take a value (<code>tool --opt value install x</code>)
-hides the subcommand: like any reference the detectors do not recognize,
-it is not reported. Not detected: a download from an unversioned URL
-other than <code>releases/latest</code> (<code>curl -o tool URL</code>, <code>curl URL | tar x</code>), and
-Helm values that split an image into <code>repository</code> and <code>tag</code> before
-rendering. Declare those in <code>scope.resolve</code> (a <a href="../resolve/urls/"><code>url</code></a>,
-an <a href="../resolve/images/"><code>image</code></a>), so their content is hashed.</p>
+<p>The scanner is a best-effort safety net, not a guarantee. The guarantee is
+the declared <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> and the pins you write in place: a digest, a lockfile,
+a commit id. The detectors read text; they do not run your build, render
+your chart or apply your overlays, and a reference they do not recognize is
+not reported. Keep the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> honest, pin in place, and use
+<code>aval run --shadow</code> to catch false hits. Known limits:</p>
+<ul>
+<li>Shell commands are split without a full shell parser: a quoted <code>;</code> or
+  <code>&gt;</code> also splits, and a token misread as a package is reported as
+  unpinned (a needless miss). An option Aval does not know to take a value
+  (<code>tool --opt value install x</code>) hides the subcommand.</li>
+<li>A download from an unversioned URL other than <code>releases/latest</code>
+  (<code>curl -o tool URL</code>, <code>curl URL | tar x</code>) is not detected.</li>
+<li>Helm: values that split an image into <code>repository</code> and <code>tag</code>, and YAML a
+  template prints (<code>{{ include ... }}</code>, <code>{{ toYaml ... }}</code>), are not read.
+  In a template the parser rejects, a key written as a block scalar or an
+  alias is not decoded.</li>
+<li>Kustomize: the overlay is not built. A JSON6902 patch file named by
+  <code>path:</code> that sets an image is not read.</li>
+<li>JSON outside Compose files, <code>templates/</code> and kustomize <code>resources</code> is not
+  read.</li>
+<li>Dockerfile variables: outside <code>FROM</code>, the last value of a name wins, with
+  no stage scoping. Values given at build time (<code>--build-arg</code>) are not
+  seen: Aval checks the <code>ARG</code> default.</li>
+<li>A source file whose name starts with <code>dockerfile</code> and has a dot
+  (<code>dockerfile_test.go</code>) gets only the line pass.</li>
+</ul>
+<p>Declare what the scanner cannot see in <code>scope.resolve</code> (a
+<a href="../resolve/urls/"><code>url</code></a>, an <a href="../resolve/images/"><code>image</code></a>), so its content
+is hashed.</p>
 
 
 
