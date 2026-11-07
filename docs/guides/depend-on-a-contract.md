@@ -1,7 +1,7 @@
 # Depend on another part of the repo
 
-Goal: in a monorepo, rerun the frontend tests when the backend's declared
-inputs change, without copying the backend's globs.
+Goal: in a monorepo, rerun the frontend tests when the backend's inputs
+change, without copying the backend's globs.
 
 ```mermaid
 flowchart LR
@@ -23,46 +23,38 @@ The frontend names the backend's contract:
 --8<-- "tests/acceptance/testdata/monorepo/backend/aval.yaml"
 ```
 
-The frontend's fingerprint now includes the backend contract's fingerprint.
-A change to a file in the backend's scope makes the frontend miss and run.
-A change to a backend file outside that scope (a README) keeps the reuse.
-References are transitive: if the backend names another contract, its
-inputs count too.
+The frontend's fingerprint now includes the backend's fingerprint:
 
-`aval run --explain` prints the tree after the manifest:
+- a change in the backend's scope makes the frontend miss and run;
+- a change outside it (a backend README) keeps the reuse;
+- if the backend names another contract, that one counts too.
+
+`aval run --explain` shows the reference:
 
 ```text
-contract ../backend/aval.yaml backend sha256:8441...
-depends on ../backend/aval.yaml (backend) sha256:8441...
+contract ../backend/aval.yaml backend sha256:<backend fingerprint>
+depends on ../backend/aval.yaml (backend) sha256:<backend fingerprint>
 ```
 
-## Rules
+## What to know
 
-- Paths are relative to the contract that names them and must stay inside
-  the git working tree: Aval walks up from the contract's directory to the
-  nearest directory with a `.git` entry. No
-  symlinks on the way, no cycles, at most 8 levels and 64 contracts. If
-  the contract's own directory is a symlink, `../` is resolved from its
-  real location, as the test sees it.
-- Anything Aval cannot prove fails closed: a missing or invalid contract, a
-  scope that matches nothing, an unresolvable `scope.resolve`. The test runs.
-- A mutable reference the backend's scanner finds blocks the frontend's reuse
-  too. Only the backend's own `scope.allowMutable` can accept it, with
-  `file` relative to the backend's contract.
-- Only local files. A contract in another repository cannot be referenced.
+- Paths are relative to the contract and stay inside its git working tree.
+  Only local files: no contract from another repository.
+- If Aval cannot read or fingerprint the referenced contract, the test runs.
+- A mutable reference in the backend blocks the frontend's reuse too. Only
+  the backend's own `scope.allowMutable` can accept it.
+
+Limits and errors: [`scope.contracts`](../contract.md).
 
 ## A contract, or an API file?
 
-Point at a contract when the test exercises the other part's code: the
-frontend end-to-end tests start the real backend, so every backend input
-matters.
+Name the contract when the test runs the other part's code, like frontend
+end-to-end tests against the real backend.
 
-List the API file (an OpenAPI document, a `.proto` file) in
-`scope.dependencies` instead when the test only relies on the interface:
-the frontend unit tests use a generated client and a mocked backend. Then
-only an interface change reruns them, not every backend edit. Globs cannot
-reach outside the contract's directory, so keep the API file in the
-frontend's tree (a vendored copy, a shared `api/` directory under it).
+When the test only uses the interface (a generated client, a mocked
+backend), list the API file (OpenAPI, `.proto`) in `scope.dependencies`
+instead. Only an interface change reruns the test. Globs cannot leave the
+contract's directory, so keep the file in the frontend's tree.
 
 ## Read next
 

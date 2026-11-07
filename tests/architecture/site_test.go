@@ -59,8 +59,8 @@ func TestConceptPagesAreShort(t *testing.T) {
 		t.Fatal("no concept pages found")
 	}
 	for _, p := range pages {
-		if n := strings.Count(readFile(t, p), "\n"); n > 120 {
-			t.Errorf("%s: %d lines, the limit for a concept page is 120", p, n)
+		if n := strings.Count(readFile(t, p), "\n"); n > 80 {
+			t.Errorf("%s: %d lines, the limit for a concept page is 80", p, n)
 		}
 	}
 }

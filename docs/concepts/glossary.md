@@ -1,55 +1,16 @@
 # Glossary
 
-Each word Aval uses with a special meaning, defined once. Across the docs,
-hover a dotted word to see its short form.
+Hover a dotted word anywhere in the docs to see its short form.
 
-## Attestation
-
-A signed statement: "test X, with inputs that hash to fingerprint F,
-produced result R". Aval stores it in your OCI registry. See
-[the artifact format](../artifact-format.md).
-
-## Cacheability
-
-How safe a test is to reuse, declared in the contract. `hermetic` and
-`controlled-environment` are reusable. `external-dependencies` is reusable
-only if the policy allows it. `non-deterministic` is never reusable. See
-[cacheability classes](../contract.md#cacheability-classes).
-
-## Contract
-
-The `aval.yaml` file next to a test. It says what the test is, how to run
-it, and which inputs it reads. See [the test contract](../contract.md).
-
-## Fingerprint
-
-One `sha256` hash of every input the contract declares: the contract
-itself (the command included), the files in scope, and the declared tool
-versions and environment variables. Same inputs, same fingerprint. See [How Aval works](index.md).
-
-## Outcome
-
-The decision on a lookup: `verified`, `miss`, `verification-failed` or
-`error`. Only `verified` skips the test. See [Outcomes](outcomes.md).
-
-## Policy
-
-A YAML file you write that lists the signers you trust and the trust level
-each one gets. Without a policy, nothing is reused. See [Trust](trust.md).
-
-## Scope
-
-The files the contract lists as test inputs: `source` files and
-`dependencies` such as `go.mod`. Aval sees nothing outside it. See
-[what goes into the fingerprint](../contract.md#what-goes-into-the-fingerprint).
-
-## Signer
-
-The identity behind a signature: a CI job's OIDC identity (keyless), or a
-key. See [Trust](trust.md#signers).
-
-## Trust level
-
-How much the policy trusts a signer: 1 developer, 2 runner, 3 isolated. A
-result is reused only if its signer's level is at least the policy's
-`minTrustLevel`. See [Trust](trust.md#trust-levels).
+| Term | Meaning | More |
+|---|---|---|
+| Attestation | a signed statement: test X, with inputs that hash to fingerprint F, produced result R, stored in your OCI registry | [artifact format](../artifact-format.md) |
+| Cacheability | how safe a test is to reuse: `hermetic` and `controlled-environment` yes, `external-dependencies` only if the policy allows it, `non-deterministic` never | [classes](../contract.md#cacheability-classes) |
+| Contract | `aval.yaml`: what the test is, how to run it, which inputs it reads | [the test contract](../contract.md) |
+| Fingerprint | one `sha256` of every declared input: the contract (command included), files in scope, toolchain, env var values, resolved references. Same inputs, same fingerprint | [what goes in](../contract.md#what-goes-into-the-fingerprint) |
+| Mutable reference | a tag or range that can point at other content later, such as `postgres:16`. In a hermetic or controlled-environment test it blocks reuse until you pin it or list it in `scope.allowMutable` | [Pin your dependencies](../pinning.md) |
+| Outcome | the decision on a lookup: `verified`, `miss`, `verification-failed` or `error`. Only `verified` skips the test | [Outcomes](outcomes.md) |
+| Policy | your YAML file listing trusted signers and their levels. No policy, no reuse | [Trust](trust.md#the-policy) |
+| Scope | the inputs the contract lists: `source`, `dependencies` (such as `go.mod`), `resolve` and `contracts`. Aval sees nothing else | [the test contract](../contract.md#fields) |
+| Signer | who signed a result: a CI job (keyless, OIDC) or a key | [Trust](trust.md#signers-and-levels) |
+| Trust level | how much the policy trusts a signer: developer, runner, isolated. Reuse needs at least `minTrustLevel` | [Trust](trust.md#signers-and-levels) |

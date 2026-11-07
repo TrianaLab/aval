@@ -12,51 +12,23 @@ flowchart LR
 
 ## The steps
 
-1. **Fingerprint.** Aval reads `aval.yaml`, the test's contract. It hashes
-   the contract and every file it lists into one fingerprint.
-2. **Look up.** Aval asks your registry for results stored under that
-   fingerprint.
-3. **Verify.** Each result must carry a valid signature from a signer your
-   policy trusts. See [Trust](trust.md).
-4. **Reuse or run.** A verified result is reused and the test does not run.
-   Anything else runs the test. See [Outcomes](outcomes.md).
-5. **Sign and push.** With `--push`, Aval signs the new result and pushes it,
-   so the next job can reuse it.
+| Step | What happens |
+|---|---|
+| Fingerprint | hash `aval.yaml` and every input it declares into one `sha256` |
+| Look up | ask your registry for results under that fingerprint |
+| Verify | the signature must come from a signer your [policy](trust.md) trusts |
+| Reuse or run | verified: the test is skipped. Anything else: it runs ([Outcomes](outcomes.md)) |
+| Push | with `--push`, sign the new result and push it |
 
-If Aval cannot prove that reuse is safe, the test runs.
-
-## An example
-
-A contract for a Go integration test, from [the test contract](../contract.md#example):
-
---8<-- "docs/contract.md:example"
-
-The first job finds nothing, runs the test and pushes a signed result:
-
-```console
-$ aval run --push --key keys/ci.pem --registry $REG --policy policy.yaml
-miss orders-integration sha256:b40e9fac…
-ran orders-integration: passed (exit 0)
-pushed localhost:5055/acme/orders-aval@sha256:2496759a…
-```
-
-A second job with the same inputs reuses it:
-
-```console
-$ aval run --registry $REG --policy policy.yaml
-verified orders-integration sha256:b40e9fac…
-reused passed result …/orders-aval@sha256:2496759a…
-```
-
-Change one file in scope and the fingerprint changes: the test runs again.
+If Aval cannot prove reuse is safe, the test runs. See it run:
+[Quickstart](../quickstart.md).
 
 ## What Aval does not do
 
-- It does not guess inputs. A file the contract does not list is invisible
-  to it.
+- It does not guess inputs: a file the contract does not list is invisible to
+  it.
 - It runs no server. Results live in an OCI registry you already have.
 
-!!! info "The full specs"
-    These pages keep things short. The details are in the specs:
-    [the test contract](../contract.md), [the trust model](../trust-model.md)
-    and [the artifact format](../artifact-format.md).
+Details: [the test contract](../contract.md),
+[the trust model](../trust-model.md),
+[the artifact format](../artifact-format.md).

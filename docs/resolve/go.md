@@ -1,24 +1,13 @@
 # Go modules
 
 `go: <module>@<query>` hashes the module zip the way `go.sum` does
-(`h1:`).
+(`h1:`). What a query binds depends on its form, as the go command reads it:
 
-What a query binds depends on its form, as the go command reads it:
-
-- `vX.Y.Z`, with an optional `-pre` (pseudo-versions too), is exact: it
-  binds that version's zip.
-- A branch, a commit or any other query that is not a semver version
-  (`main`, `4f3c2a1`) is resolved by the proxy (`/@v/<query>.info`, as the
-  go command does) to the version it names, usually a pseudo-version, and
-  that version's zip is bound. A moved branch changes the id; the manifest
-  line names the resolved version.
-- `latest`, a prefix (`v1.2`), a comparison (`<v1.3.0`) or a
-  `+incompatible` version binds the proxy's version list, its `@latest`
-  and the `h1:` hash of the version `@latest` names. A new version, a
-  retraction or a republished `@latest` version changes the id. Other
-  versions are bound by name: the checksum database keeps every version
-  the go command accepts fixed. The manifest line says `floating`. No
-  query means `latest`.
+| Query | Binds |
+|---|---|
+| `vX.Y.Z`, optional `-pre` (pseudo-versions too) | that version's zip (exact) |
+| a branch, a commit or another non-semver query (`main`, `4f3c2a1`) | the zip of the version the proxy resolves it to, usually a pseudo-version; the manifest line names it |
+| `latest` (or no query), a prefix (`v1.2`), a comparison (`<v1.3.0`), `+incompatible` | the proxy's version list, its `@latest` and that version's `h1:` hash (`floating`) |
 
 ```yaml
 scope:
@@ -28,25 +17,20 @@ scope:
     - go: golang.org/x/net@latest      # floating: binds the version list
 ```
 
-- The module path must be a valid module path (`golang.org/x/mod`'s
-  `module.CheckPath`): a relative or absolute path, a Windows path or a
-  first element that is not a lowercase domain fails.
-- The module path is the module, not a package inside it:
-  `golang.org/x/tools`, unless the package is its own module.
-- Proxy: the first entry of `$GOPROXY` (`https://proxy.golang.org`).
-  Credentials: `~/.netrc`.
-- Resolution fails when the go command would fetch the module directly
-  instead of from that proxy: the first `$GOPROXY` entry is `direct` or
-  `off`, or `$GOPRIVATE` or `$GONOPROXY` matches the module (the go
-  command's glob prefix rules). Aval never clones: pin the module or use
-  the `git` kind.
-- Resolution also fails when the go command would not verify the module
-  against the checksum database: `GOSUMDB=off`, `$GONOSUMDB` or
-  `$GOINSECURE` matches the module, or `$GOFLAGS` holds `-insecure`. A
-  proxy could then serve other content for a version than the one Aval
-  hashed. Settings saved with `go env -w` are not read.
+- For a floating query, other versions are bound by name: the checksum
+  database keeps every version the go command accepts fixed.
+- The module path must pass `golang.org/x/mod`'s `module.CheckPath`, and
+  names the module, not a package inside it.
+- Proxy: the first entry of `$GOPROXY` (`https://proxy.golang.org`);
+  credentials from `~/.netrc`.
+- Fails when the go command would bypass the proxy or the checksum database:
+  `$GOPROXY` starting with `direct` or `off`, `$GOPRIVATE` or `$GONOPROXY`
+  matching, `GOSUMDB=off`, `$GONOSUMDB` or `$GOINSECURE` matching, or
+  `-insecure` in `$GOFLAGS`. `go env -w` settings are not read. Aval never
+  clones: pin the module or use `git`.
 
 **Pin instead** for your module's dependencies: commit `go.sum` and add it
 to `scope.dependencies`. Resolve is for `go install tool@v1.2.3` in
-`runner.command`. The scanner still reports that install, so accept it
-with `scope.allowMutable`.
+`runner.command`.
+
+--8<-- "docs/resolve/index.md:scanner"

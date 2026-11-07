@@ -1,14 +1,14 @@
-# Consume evidence from Go
+# Consume from Go
 
 Goal: check an Aval result from your own Go program with `pkg/evidence`, and
 tell a miss from a security event.
 
 ```mermaid
 flowchart LR
-  fetch([envelope, fetched by digest]) --> check[evidence.Verify]
+  fetch([envelope bytes,<br>fetched by digest]) --> check[Check]
+  check -- nil bytes --> miss([ErrNotFound:<br>run the test]):::muted
+  check -- ErrVerification --> alert([alert,<br>do not reuse]):::err
   check -- ok --> p([predicate]):::ok
-  check -- ErrVerification --> alert([alert, do not reuse]):::err
-  none([nothing found]) --> miss([ErrNotFound: run the test]):::muted
 ```
 
 ## The example
@@ -51,12 +51,8 @@ Branch on what it returns, with `errors.Is`:
     `evidence.Report`. The example's `Reuse` function does this and fails
     closed on any `verification-failed` candidate.
 
-??? info "Compatibility"
-    `pkg/evidence` changes additively within a major version. A test compares
-    its exported API with a committed snapshot. See
-    [Go API compatibility](../integrations.md#go-api-compatibility).
-
 ## Read next
 
-- [Consume Aval evidence](../integrations.md): every symbol of `pkg/evidence`
+- [Consume evidence](../integrations.md): every symbol of `pkg/evidence`
+- [Go API compatibility](../integrations.md#go-api-compatibility): additive within a major version
 - [Outcomes](../concepts/outcomes.md)

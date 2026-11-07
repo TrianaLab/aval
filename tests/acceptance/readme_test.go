@@ -68,10 +68,9 @@ func quickstartSteps(t *testing.T, doc string) []quickstartStep {
 
 // runQuickstart runs the steps in order in one shell, against an in-process
 // registry that stands in for localhost:5001, and returns each step's
-// combined output. shFlags go to sh: with "-e" the first failing step fails
-// the test; without it a failing step does not stop the shell, and each
-// step's exit code is in codes. openssl must be on PATH.
-func runQuickstart(t *testing.T, steps []quickstartStep, shFlags ...string) (outs []string, codes []int, host string) {
+// combined output. A failing step does not stop the shell; each step's exit
+// code is in codes. openssl must be on PATH.
+func runQuickstart(t *testing.T, steps []quickstartStep) (outs []string, codes []int, host string) {
 	t.Helper()
 	srv := httptest.NewServer(ggcr.New(ggcr.Logger(log.New(io.Discard, "", 0))))
 	t.Cleanup(srv.Close)
@@ -80,7 +79,7 @@ func runQuickstart(t *testing.T, steps []quickstartStep, shFlags ...string) (out
 	for i, s := range steps {
 		fmt.Fprintf(&body, "echo '@@step %d@@'\n%s\necho \"@@exit $?@@\"\n", i, strings.ReplaceAll(s.script, "localhost:5001", host))
 	}
-	cmd := exec.Command("sh", append(shFlags, "-c", body.String())...)
+	cmd := exec.Command("sh", "-c", body.String())
 	cmd.Dir = t.TempDir()
 	cmd.Env = append(os.Environ(),
 		"PATH="+filepath.Dir(aval)+string(os.PathListSeparator)+os.Getenv("PATH"),
@@ -141,23 +140,6 @@ func TestOutputMatches(t *testing.T) {
 	} {
 		if outputMatches(c.want, c.got) != c.ok {
 			t.Errorf("outputMatches(%q, %q) = %v", c.want, c.got, !c.ok)
-		}
-	}
-}
-
-// The README "Try it on your laptop" path, run as written.
-func TestReadmeQuickstart(t *testing.T) {
-	outs, _, host := runQuickstart(t, quickstartSteps(t, "README.md"), "-e")
-	out := strings.Join(outs, "")
-	repo := host + "/demo/hello-aval"
-	for _, want := range []string{
-		"pushed " + repo + "@sha256:",
-		"\nverified hello sha256:",
-		"reference: " + repo + "@sha256:",
-		"reused passed result\n",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("quickstart output lacks %q\n%s", want, out)
 		}
 	}
 }

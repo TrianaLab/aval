@@ -27,7 +27,7 @@ func goldenFile(version string) string {
 
 // goldenContracts are fingerprinted over the same tree. With the tree,
 // goldenModes and goldenEnv they reach the encoding branches listed in
-// docs/contract.md ("False-hit corpus"):
+// CONTRIBUTING.md ("False-hit suite"):
 //   - contract.yaml: source, exclude, dependencies and env each unsorted and
 //     with a repeat, a six-key toolchain map, argv order, JSON escaping, and
 //     env vars that are set, set to "" and unset;

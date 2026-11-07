@@ -1,5 +1,5 @@
 site_name: Aval
-site_description: Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.
+site_description: Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.
 # GitHub Pages project site. Publishing is .github/workflows/docs.yaml.
 site_url: https://aval.run/
 repo_url: https://github.com/TrianaLab/aval
@@ -167,10 +167,8 @@ extra_javascript:
   # assets/demo/ (make docs-wasm) only when the visitor clicks.
   - javascripts/try-aval.js
 
-# A reader's path: user pages first (Get started, Concepts, Guides), then
-# the pages to look things up. The dense design documents live under
-# Reference -> Specs and are no section's entry point. Every page under docs/
-# has exactly one entry.
+# Guides follow the path after the quickstart. Lookup tables (CLI, resolvers,
+# specs) live under Reference. Every page under docs/ has exactly one entry.
 nav:
   - Home: index.md
   - Get started:
@@ -182,10 +180,17 @@ nav:
       - Outcomes: concepts/outcomes.md
       - Glossary: concepts/glossary.md
   - Guides:
-      - GitHub Actions: guides/github-actions.md
       - Write a contract: guides/write-a-contract.md
       - Depend on another part of the repo: guides/depend-on-a-contract.md
+      - Use GitHub Actions: guides/github-actions.md
+      - Write a trust policy: guides/trust-policy.md
+      - Sign results: guides/signing.md
       - Pin your dependencies: pinning.md
+      - Measure reuse: guides/measure-reuse.md
+      - Consume from Go: guides/go-consumer.md
+      - Troubleshooting: guides/troubleshooting.md
+  - Reference:
+      - CLI: cli-reference.md
       - Resolve references:
           - resolve/index.md
           - Container images: resolve/images.md
@@ -197,21 +202,14 @@ nav:
           - Ruby gems: resolve/gems.md
           - Git: resolve/git.md
           - Downloaded files: resolve/urls.md
-      - Sign results: guides/signing.md
-      - Write a trust policy: guides/trust-policy.md
-      - Consume from Go: guides/go-consumer.md
-      - Measure reuse: guides/measure-reuse.md
-      - Troubleshooting: guides/troubleshooting.md
-  - Reference:
-      - CLI reference: cli-reference.md
       - Specs:
           - The test contract: contract.md
           - Trust model: trust-model.md
           - Artifact format: artifact-format.md
-          - Consuming evidence: integrations.md
-          - Vision and roadmap: vision.md
+          - Consume evidence: integrations.md
   - Project:
       - Changelog: changelog.md
+      - Vision and roadmap: vision.md
       - Stats: stats.md
       - Contributing: https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md
       - Security policy: https://github.com/TrianaLab/aval/blob/main/SECURITY.md

@@ -33,23 +33,20 @@ aval run --explain --fingerprint-only
 2. **Say how to run it.** `runner.command` is an argv list. Aval does not use
    a shell unless you call one, like the example does.
 3. **List the inputs.** `scope.source` lists the files the test reads.
-   `scope.dependencies` lists lockfiles. Globs are relative to the contract's
+   `scope.dependencies` lists dependency manifests and lockfiles (`go.mod`,
+   `go.sum`). Globs are relative to the contract's
    directory; `**` matches any number of directories.
 4. **Pick a cacheability class.** It tells Aval and the policy how safe reuse
-   is.
+   is. Tags, ranges and branches block reuse for `hermetic` and
+   `controlled-environment`: see
+   [Pin your dependencies](../pinning.md).
 
-| Class | Use it when | Reused |
-|---|---|---|
-| `hermetic` | the test reads only the declared files | yes |
-| `controlled-environment` | it uses services you pin, such as a Compose image by digest | yes |
-| `external-dependencies` | it calls something you do not control | only if the policy allows it |
-| `non-deterministic` | the same inputs can give a different result | never |
+--8<-- "docs/contract.md:cacheability"
 
 ## Check the scope
 
-`--explain` prints every file, toolchain entry and variable that went into the
-fingerprint. A file that is not listed is not an input: changing it does not
-change the fingerprint. If the test reads it, add it to `scope`.
+`--explain` lists every input. Not listed means not hashed: if the test reads
+it, add it.
 
 ??? example "What `--explain` prints"
     One line per input: kind, sha256, `x` for an executable file, path.
@@ -64,11 +61,12 @@ change the fingerprint. If the test reads it, add it to `scope`.
     globs may match nothing.
 
 ??? info "Environment"
-    `environment.toolchain` records versions, such as `go: "1.25"`. Aval does
-    not check them. `environment.env` names variables whose values go into the
-    fingerprint.
+    The `environment.toolchain` values (`go: "1.25"`) go into the fingerprint
+    as written; Aval does not check what is installed. `environment.env`
+    names variables whose values go into the fingerprint.
 
 ## Read next
 
 - [Write a trust policy](trust-policy.md)
+- [Pin your dependencies](../pinning.md)
 - [The test contract](../contract.md): every field and rule

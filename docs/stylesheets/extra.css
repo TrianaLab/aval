@@ -1092,47 +1092,9 @@
   font-size: 12px;
   line-height: 1.6;
 }
-.aval-run__explain ol {
-  margin: 26px 0 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: aval-step;
-}
-.aval-run__explain li {
-  position: relative;
-  padding: 14px 0 14px 44px;
-  border-top: 1px solid var(--c-border);
-  counter-increment: aval-step;
+.aval-run__explain p:not(.aval-eyebrow) {
+  margin: 18px 0 0;
   font-size: 16px;
-}
-.aval-run__explain li:last-child {
-  border-bottom: 1px solid var(--c-border);
-}
-.aval-run__explain li::before {
-  content: counter(aval-step);
-  position: absolute;
-  top: 14px;
-  left: 0;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  background: var(--c-accent-soft);
-  color: var(--c-accent);
-  font: 600 12.5px/26px var(--font-mono);
-  text-align: center;
-}
-.aval-run__explain b {
-  color: var(--c-text);
-  font-weight: 700;
-}
-.aval-run__explain .aval-run__try {
-  margin: 22px 0 0;
-  padding-left: 12px;
-  border-left: 3px solid var(--c-accent-fill);
-  font-size: 15px;
-}
-.aval-run__explain .aval-run__try b {
-  color: var(--c-accent);
 }
 
 /* Metric strip. */

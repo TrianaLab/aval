@@ -1,18 +1,9 @@
 # Artifact format
 
-This document describes how Aval stores an execution result in an OCI
-registry, the attestation it signs, and the JSON that `aval verify --output json`
-prints. It is the contract external tools consume through `pkg/evidence`.
-
-Status: pre-alpha. The Go types in `pkg/evidence` are the source of truth.
-Signing, push, lookup, fetch, verification and the policy file are
-implemented (`attest.Sign`, `registry.Push`, `registry.Lookup`,
-`registry.Fetch`, `evidence.Verify`, `policy.Load`). `aval verify`,
-`aval run` and `aval push` use them.
-
-The identifiers below and the JSON shape of the statement, predicate and
-verify report are **frozen**. Within a version they change additively only;
-see [Versioning and compatibility](#versioning-and-compatibility).
+How Aval stores a result in an OCI registry, what it signs, and the JSON
+`aval verify -o json` prints. The Go types in `pkg/evidence` are the source of
+truth. The identifiers and JSON shapes below are frozen; see
+[Versioning](#versioning-and-compatibility).
 
 ## Identifiers
 
@@ -35,179 +26,141 @@ All constants live in `pkg/evidence`.
 | `ArtifactTypeStats` | `application/vnd.trianalab.aval.stats.v1` | `artifactType` of the per-test stats anchor manifest | provisional |
 | `StatsReportVersion` | `aval.trianalab.io/stats-report/v1` | `version` of the `aval stats --output json` document | provisional |
 
-Registry identifiers (`internal/registry`): the bundle layer uses the
-Sigstore media type `application/vnd.dev.sigstore.bundle.v0.3+json`
-(`MediaTypeSigstoreBundle`), and manifests carry the annotation
-`io.trianalab.aval.fingerprint` (`AnnotationFingerprint`, informational:
-verification reads the fingerprint from the signed predicate). The
-annotation key is frozen. The stats anchor carries `io.trianalab.aval.test`
-(`AnnotationTest`, provisional) with the test id.
-
-Related identifiers from other packages: the fingerprint manifest format is
-`aval-fingerprint/v1` (`internal/fingerprint`), and the contract and policy
-`apiVersion` is `aval.trianalab.io/v1` (`internal/contract`, see
-[contract.md](contract.md#versioning)). Both are frozen. The fingerprint
-manifest version is a format tag, not a namespaced identifier: it names the
-canonical manifest layout and hash, not a resource, so it stays outside
-`aval.trianalab.io` and is frozen as `aval-fingerprint/v1`; a breaking change
-mints `aval-fingerprint/v2`.
+The bundle layer uses the Sigstore media type
+`application/vnd.dev.sigstore.bundle.v0.3+json`. Manifests carry the
+annotation `io.trianalab.aval.fingerprint` (informational, frozen: verification
+reads the fingerprint from the signed predicate); the stats anchor carries
+`io.trianalab.aval.test` (provisional) with the test id. The contract
+`apiVersion` and the `aval-fingerprint/v1` manifest version are also frozen
+(see the table under [Versioning](#versioning-and-compatibility)).
 
 ## OCI layout
 
 There is no Aval server or database. The registry is the only index.
 
+```mermaid
+flowchart LR
+  tag[tag sha256-FP] --> anchor[fingerprint anchor]
+  e1[execution manifest] -- subject --> anchor
+  e2[execution manifest] -- subject --> anchor
+  e1 --> layers[layers: DSSE envelope,<br>Sigstore bundle]
+  stag[tag stats-TEST] --> sanchor[stats anchor]
+  r1[run record] -- subject --> sanchor
+```
+
 Per fingerprint there is one **anchor** manifest, and one **execution**
 manifest per execution whose `subject` is the anchor, so the OCI 1.1
-referrers API lists every execution for a fingerprint.
+referrers API lists every execution for a fingerprint. The anchor is
+deterministic: its bytes, and so its digest, depend only on the fingerprint.
+It is tagged `sha256-<fingerprint hex>`.
 
-The anchor is deterministic: its bytes, and so its digest, depend only on the
-fingerprint. It is tagged `sha256-<fingerprint hex>` (`registry.Tag`):
-
-```json
-{
-  "schemaVersion": 2,
-  "mediaType": "application/vnd.oci.image.manifest.v1+json",
-  "artifactType": "application/vnd.trianalab.aval.fingerprint.v1",
-  "config": {
-    "mediaType": "application/vnd.oci.empty.v1+json",
-    "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-    "size": 2,
-    "data": "e30="
-  },
-  "layers": [
+??? example "Anchor manifest"
+    ```json
     {
-      "mediaType": "application/vnd.oci.empty.v1+json",
-      "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-      "size": 2,
-      "data": "e30="
+      "schemaVersion": 2,
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "artifactType": "application/vnd.trianalab.aval.fingerprint.v1",
+      "config": {
+        "mediaType": "application/vnd.oci.empty.v1+json",
+        "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "size": 2,
+        "data": "e30="
+      },
+      "layers": [
+        {
+          "mediaType": "application/vnd.oci.empty.v1+json",
+          "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "size": 2,
+          "data": "e30="
+        }
+      ],
+      "annotations": {
+        "io.trianalab.aval.fingerprint": "sha256:<fingerprint hex>"
+      }
     }
-  ],
-  "annotations": {
-    "io.trianalab.aval.fingerprint": "sha256:<fingerprint hex>"
-  }
-}
-```
+    ```
 
-One execution = one OCI 1.1 image manifest, following the OCI 1.1 artifact
-guidance (`artifactType` set, empty config):
-
-```json
-{
-  "schemaVersion": 2,
-  "mediaType": "application/vnd.oci.image.manifest.v1+json",
-  "artifactType": "application/vnd.trianalab.aval.execution.v2",
-  "config": {
-    "mediaType": "application/vnd.oci.empty.v1+json",
-    "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-    "size": 2,
-    "data": "e30="
-  },
-  "layers": [
+??? example "Execution manifest"
+    ```json
     {
-      "mediaType": "application/vnd.dsse.envelope.v1+json",
-      "digest": "sha256:<envelope digest>",
-      "size": 1834
-    },
-    {
-      "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
-      "digest": "sha256:<bundle digest>",
-      "size": 4210
+      "schemaVersion": 2,
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "artifactType": "application/vnd.trianalab.aval.execution.v2",
+      "config": {
+        "mediaType": "application/vnd.oci.empty.v1+json",
+        "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "size": 2,
+        "data": "e30="
+      },
+      "layers": [
+        {
+          "mediaType": "application/vnd.dsse.envelope.v1+json",
+          "digest": "sha256:<envelope digest>",
+          "size": 1834
+        },
+        {
+          "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+          "digest": "sha256:<bundle digest>",
+          "size": 4210
+        }
+      ],
+      "subject": {
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "digest": "sha256:<anchor digest>",
+        "size": 512
+      },
+      "annotations": {
+        "io.trianalab.aval.fingerprint": "sha256:<fingerprint hex>"
+      }
     }
-  ],
-  "subject": {
-    "mediaType": "application/vnd.oci.image.manifest.v1+json",
-    "digest": "sha256:<anchor digest>",
-    "size": 512
-  },
-  "annotations": {
-    "io.trianalab.aval.fingerprint": "sha256:<fingerprint hex>"
-  }
-}
-```
+    ```
 
-- **config**: the OCI empty descriptor (`{}`, media type
-  `application/vnd.oci.empty.v1+json`).
-- **layers**: the signed DSSE envelope (see below), then the Sigstore
-  bundle with the verification material. `registry.Push` refuses an
-  attestation whose bundle is missing or is not valid JSON. If
-  `registry.Fetch` reads a manifest without a bundle layer, the attestation
-  can never verify, so it ends as a verification failure.
-  `registry.Fetch` rejects any other layer, a repeated layer, or a missing
-  envelope as a verification failure, and so a manifest that is not
-  sha256-addressed, is larger than 4 MiB, or does not match the digest it
-  was fetched by.
+- **config**: the OCI empty descriptor (`{}`).
+- **layers**: the signed DSSE envelope, then the Sigstore bundle. Push refuses
+  an attestation without a valid bundle. Fetch treats a missing bundle or
+  envelope, any other or repeated layer, a manifest that is not
+  sha256-addressed, over 4 MiB, or not matching its digest as a verification
+  failure.
 - **subject**: always the anchor of the execution's fingerprint. The tested
-  revision or artifact is recorded inside the statement (`subject`), not in
-  the manifest, so the referrers of a tested image do not list its evidence.
-
-The `execution.v2` identifiers replace `execution.v1`, whose manifest had the
-tested artifact as an optional `subject` and exactly one layer. Aval no
-longer reads or writes v1: there is no accept window, and a v1 artifact is
-never a candidate.
+  revision or artifact is recorded inside the statement, not in the manifest,
+  so the referrers of a tested image do not list its evidence.
 
 ### Push
 
-`registry.Push` uploads the blobs, pushes the anchor and (re)tags it, then
-pushes the execution manifest by digest. It never moves or replaces an
-earlier execution: pushing the same bytes again is a no-op, and anything else
-becomes one more referrer of the anchor. Re-tagging the deterministic anchor
-also repairs a tag that was moved.
-
-Registries without the referrers API (for example GHCR) are supported: oras
-maintains the OCI referrers tag schema (`sha256-<anchor hex>` index) on push
-and reads it on lookup. That index is rewritten on every push, so two concurrent
-pushes for the same fingerprint can drop one entry from it. Push therefore
-lists the anchor's referrers after pushing and returns only once the new
-digest is among them; if it is not, it pushes the manifest again (which
-re-adds it to the index) and lists again, three attempts in total, one second
-apart. If the digest is still not listed, `aval push` and `aval run --push`
-fail (exit 1). A registry that indexes referrers asynchronously for longer
-than about two seconds also fails the push; rerun it. Once a fingerprint has more than 64 attestations the
-confirmation listing fails too, so push exits 1. A dropped execution is never
-a candidate, so even then it never makes an unsigned or untrusted result
-reusable. Aval does not
-delete the previous referrers index after rewriting it, so pushing does not
-need DELETE rights.
+- Push never replaces: identical bytes are a no-op, anything else adds a
+  referrer. Re-tagging the deterministic anchor also repairs a moved tag.
+- Registries without the referrers API (GHCR): oras keeps the referrers tag
+  schema index, which concurrent pushes can overwrite. Aval checks that the
+  new digest is listed, re-pushing up to 3 times, 1 s apart; otherwise exit 1.
+  A registry that indexes for longer than about 2 s, or more than 64
+  attestations, also makes the check fail. A dropped execution is never a
+  candidate.
+- Push needs no DELETE rights.
 
 ### Lookup and consumption
 
-1. Compute the fingerprint locally (`aval run --fingerprint-only`), e.g.
-   `sha256:3f9a...`.
-2. Resolve the tag `sha256-<fingerprint hex>` in the repository passed via
-   `--registry`. It must point at the anchor digest Aval computes locally for
-   that fingerprint; anything else is a verification failure (the tag was
-   moved).
-3. List the anchor's referrers with `artifactType`
-   `application/vnd.trianalab.aval.execution.v2`. Each one is a candidate,
-   identified by its manifest **digest**, even when the referrer entry is
-   malformed (not an image manifest, not sha256): Fetch then rejects it as a
-   verification failure, so it never turns into a miss.
-4. Fetch each candidate by digest (`repo@sha256:...`). Never fetch by tag:
-   tags are mutable, digests aren't.
-5. Verify each envelope and apply the trust policy (see below).
+1. Compute the fingerprint locally (`aval run --fingerprint-only`).
+2. Resolve the tag `sha256-<fingerprint hex>` in the `--registry` repository.
+   It must point at the anchor digest Aval computes for that fingerprint;
+   anything else is a verification failure (the tag was moved).
+3. List the anchor's execution referrers; each is a candidate, by digest. A
+   malformed referrer entry is still a candidate, and fetching it fails
+   verification, so it never turns into a miss.
+4. Fetch each candidate by digest (`repo@sha256:...`), never by tag.
+5. Verify each envelope and apply the trust policy.
 
-Lookup accepts at most 64 candidates per fingerprint and makes at most 64
-requests to list referrers, whatever paths the registry's `Link` headers
-point at. Above either limit it fails with outcome `error` (run the
-test), so whoever can push, or a buggy registry, cannot make `aval verify`
-fetch an unbounded number of manifests or pages.
-
-A listed candidate whose manifest the registry answers with 404 (deleted,
-for example by an "untagged manifests" retention policy) is absent: it is
-skipped with a warning on stderr and is not part of `rejected`. If every
-candidate is absent, the outcome is a miss. Absence never hides a
-verification failure of another candidate.
-
-Every registry call of one command runs under `--registry-timeout` (default
-`1m`): lookup and every fetch share one deadline, and push has its own. A
-registry that stalls past it is outcome `error` (exit 1), so `aval run` runs
-the test; `runner.command` is never under this deadline. One credential store
-and one auth token cache are shared by all registry calls of a process.
+| Limit | Value | When exceeded |
+|---|---|---|
+| candidates per fingerprint | 64 | `error` (the test runs) |
+| referrer listing requests | 64 | `error` |
+| manifest size | 4 MiB | `verification-failed` |
+| `--registry-timeout` | `1m`; lookup and fetch share it, push has its own; `runner.command` is never under it | `error` |
+| a listed candidate returns 404 | | skipped with a warning; all gone: miss |
 
 A missing tag, or an anchor without executions, is a **miss**
-(`evidence.ErrNotFound`, exit code 4). An artifact that exists but is
-malformed or fails signature or policy checks is a **verification failure**
-(`evidence.ErrVerification`, exit code 5) and is a security event.
+(`evidence.ErrNotFound`, exit 4). An artifact that exists but is malformed or
+fails signature or policy checks is a **verification failure**
+(`evidence.ErrVerification`, exit 5) and a security event.
 
 ### Registry credentials
 
@@ -218,8 +171,6 @@ is not set, including the credential helpers it names (`credsStore`,
 `docker-credential-ecr-login`). Log in with `docker login <registry>` (or
 `oras login`, which writes the same file). Without an entry for the registry,
 Aval connects anonymously, which is enough to read a public repository.
-Every registry call runs under `--registry-timeout` (default `1m`; see
-[Lookup and consumption](#lookup-and-consumption)).
 
 A config file that cannot be parsed, or a helper that fails, is outcome
 `error` (exit 1): `aval run` runs the test and nothing is reused. Loopback
@@ -228,37 +179,32 @@ registry uses HTTPS.
 
 ### Multiple attestations per fingerprint
 
-Several executions can produce the same fingerprint (a developer run and a CI
-run, or a re-run). All of them stay listed as referrers of the anchor, so a
-later push cannot hide or replace an earlier one. `aval verify` verifies every
-candidate: the verified one with the highest trust level wins (ties go to a
-non-passed result, then the lowest digest). Candidates that are not used are
-listed in the report's `rejected` field; when any of them failed verification,
-stderr gets one `aval: SECURITY: ...` line. A candidate
-that cannot be fetched or checked (outcome `error`) might have outranked the
-verified one, so it blocks reuse and the test runs. A candidate that passes
-every check but whose signer the policy lists below `minTrustLevel` is
-rejected as `miss`: it was fully evaluated, so it does not block a verified
-sibling. When nothing is reused, the outcome is `verification-failed` when
-any candidate failed verification, otherwise `error` when any could not be
-checked, otherwise `miss`.
+Every execution stays a referrer of the anchor, so a later push cannot hide an
+earlier one. `aval verify` verifies every candidate:
+
+- The verified candidate with the highest level wins; on a tie a non-passed
+  result, then the lowest digest.
+- A candidate that cannot be checked (`error`) blocks reuse: it might have
+  outranked the winner.
+- A signer below `minTrustLevel` is rejected as `miss` and does not block.
+- If nothing is reused: `verification-failed` beats `error` beats `miss`.
+
+Unused candidates are listed in the report's `rejected`; any that failed
+verification add one `aval: SECURITY: ...` line on stderr.
 
 ### The 64-candidate cap and cleanup
 
-Every push adds one execution, even for the same inputs: the hostname and
-timestamps in the predicate differ. Aval never deletes one. Once a
-fingerprint has more than 64 executions, every lookup for it is outcome
-`error`: the test always runs. Every push for it still adds an execution,
-then fails its confirmation and exits 1. It stays
-that way until someone deletes executions. Other fingerprints are not
-affected, so the next change to an input also ends it.
+Every push adds one execution, even for the same inputs (hostname and
+timestamps differ), and Aval never deletes one. Past 64 executions, every
+lookup for that fingerprint is `error` and the test always runs; every push
+still adds one, then exits 1. Other fingerprints are not affected, so the next
+input change also ends it.
 
-To stay below the cap, push from one place (for example CI on the main
-branch). `aval run --push` does not push after it reuses a result, but
-`aval run --shadow --push` runs and pushes every time.
+Push from one place (for example CI on the main branch). `aval run --push`
+does not push after a reuse, but `aval run --shadow --push` pushes every time.
 
-To clean up a fingerprint, list its executions and delete the ones you no
-longer need, for example with [ORAS](https://oras.land):
+To clean up, list the executions and delete the ones you no longer need, for
+example with [ORAS](https://oras.land):
 
 ```sh
 aval run --fingerprint-only            # prints sha256:<hex>
@@ -269,38 +215,25 @@ oras manifest delete <repo>@sha256:<execution digest>
 The registry must allow deletes (`registry:2` needs
 `REGISTRY_STORAGE_DELETE_ENABLED=true`; on GHCR, delete the package
 versions). Deleting executions is safe: it can make a result stop being
-reusable, never make an untrusted one reusable. Keep the one you still want
-to reuse, and keep any execution that failed verification until you have
-looked into it.
+reusable, never make an untrusted one reusable. Keep any execution that failed
+verification until you have looked into it.
 
 ## Run records
 
-`aval run --record` publishes one run record per run, for every outcome
-(`verified`, `miss`, `error`, `verification-failed`), so reuse can be
-measured from the registry alone. `--record-file <path>` writes the same
-record to a file, and `aval record --record-file <path>` publishes it later,
-for example from a CI job that has write credentials but runs no tests.
+`aval run --record` publishes one run record per run, for every outcome, so
+reuse can be measured from the registry alone. `--record-file <path>` writes
+the same record to a file, and `aval record --record-file <path>` publishes it
+later, for example from a job that has write credentials but runs no tests.
 
-Records are **statistics, never evidence**. They are unsigned and
-informational. `aval run` and `aval verify` never fetch or read them, so a
-record, forged or not, cannot cause reuse, change an outcome or count toward
-the 64-candidate cap.
+Records are **statistics, never evidence**: unsigned, and never read by
+`aval run` or `aval verify`, so a record, forged or not, cannot cause reuse,
+change an outcome or count toward the 64-candidate cap.
 
-Recording is best-effort: a record that cannot be published (no write
-credentials, registry down, past `--registry-timeout`) or written prints
-`aval: warning: run record not ...` on stderr and never changes the exit
-code. Publishing has its own `--registry-timeout` deadline, so it cannot
-hold the command longer. `--record` needs `--registry`. Aval keeps no local
-state; a record file exists only when `--record-file` asks for one. An
-existing file at `--record-file` that is not an Aval result, report or valid
-run record is never overwritten: the run warns and goes on, and inside the
-contract scope that file stays an input of the fingerprint. A `--record-file`
-that is also `--result` or `--report` is not written either.
-
-A run that stops before the lookup publishes no record: bad flags, an
-invalid `aval.yaml`, an output path that would clobber an input (exit 2),
-and `--fingerprint-only`. So does `--explain` when the fingerprint cannot be
-computed.
+Recording never changes the exit code: a record that cannot be published or
+written is a warning (`aval: warning: run record not ...`). `--record` needs
+`--registry`. An existing `--record-file` that is not an Aval file is never
+overwritten. A run that stops before the lookup (bad flags, an invalid
+contract, `--fingerprint-only`) publishes no record.
 
 ### Layout
 
@@ -344,69 +277,33 @@ limit, publishing a record fails with a warning; prune old records (see
 | `ciRunUrl` | string | when passed | `--ci-run-url`, a link to the CI run. Aval does not derive it from any CI vendor. |
 | `repository` | string | when passed | `--repository` on `aval run` (or `aval record`, which overrides the record's), the source repository, e.g. `acme/orders`. Aval does not derive it from any CI vendor. `aval stats --by repository` counts records without it (made before it was added, #88) as `unknown`. |
 
-Example:
-
 ```json
-{
-  "version": "aval.trianalab.io/run-record/v1",
-  "testId": "orders-integration",
-  "fingerprint": "sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7",
-  "outcome": "verified",
-  "reused": true,
-  "result": "passed",
-  "verifiedResult": "passed",
-  "testDurationMs": 0,
-  "savedDurationMs": 1184000,
-  "avalVersion": "0.3.0",
-  "recordedAt": "2026-11-06T09:00:00Z",
-  "ciRunUrl": "https://ci.example.com/acme/orders/runs/42",
-  "repository": "acme/orders"
-}
+--8<-- "pkg/evidence/testdata/run-record-v1.golden.json"
 ```
 
-`evidence.ParseRunRecord` also rejects an inconsistent record: `reused`
-`true` with an `outcome` other than `verified` or a `testDurationMs` other
-than `0`, and a `verifiedResult` with an `outcome` other than `verified`. A
-hand-edited record cannot claim a reuse that never happened; `aval record`
-refuses it and `aval stats` skips it.
+`evidence.ParseRunRecord` rejects an inconsistent record: `reused` `true` with
+an `outcome` other than `verified` or a non-zero `testDurationMs`, and a
+`verifiedResult` without outcome `verified`. `aval record` refuses it and
+`aval stats` skips it.
 
 ### Statistics: `aval stats`
 
-`aval stats --registry <repo> [--test <id>] [--since <duration|date>]
-[--by test|repository] [--output text|json]` reads the run records and aggregates them on demand.
-It lists the `stats-<test id>` tags of the repository (or takes `--test`),
-lists each stats anchor's referrers with artifact type
-`application/vnd.trianalab.aval.run.v1`, and fetches each record by digest.
-It writes nothing, locally or to the registry, and needs only read access.
-`--since` keeps records whose `recordedAt` is at or after a time: a duration
-back from now (`168h`, `30d`) or a date (`2026-11-01`, or RFC 3339).
-`--by` groups the records by test (default) or by `repository`, the source
-repository in each record; records without one count as `unknown`.
+`aval stats` reads the run records of a repository and aggregates them on
+demand (flags: [CLI reference](cli-reference.md#aval-stats)). It writes
+nothing and needs only read access. Records are unsigned, so anyone with push
+access can skew the numbers; they never affect reuse. Registry data is
+untrusted, so reading is bounded:
 
-Statistics are informational: records are unsigned, so anyone with push
-access can skew them, and they never affect reuse.
+| Case | Result |
+|---|---|
+| a record that is unreadable, over 64 KiB, inconsistent or of another test | skipped and counted in `skipped` |
+| more than 1000 records, or 64 pages in one listing | `aval: warning: stopped reading run records: ...` and `truncated` |
+| a listing fails, or `--registry-timeout` passes | exit 1 |
+| `--since` | filters after reading: bounds, timeout and `skipped` cover every record listed |
 
-Registry data is untrusted, so reading is bounded:
-
-- A record whose manifest is not a run record of that stats anchor, whose
-  layer is over 64 KiB, that cannot be fetched or parsed, that is
-  inconsistent (see above) or that names another test is **skipped and
-  counted** (`skipped`), never an error.
-- Reading stops after 1000 records in total, or 64 pages in one tag or
-  referrers listing. The statistics then cover only what was read before,
-  `aval stats` prints `aval: warning: stopped reading run records: ...` on
-  stderr and the JSON report sets `truncated`. Which records come first is up
-  to the registry; prune old records to stay below the bound.
-- A listing that fails for any other reason (registry down, no read
-  access) is exit 1, and so is exceeding `--registry-timeout` while listing
-  or fetching records: a deadline never shows up as skipped records.
-- `--since` filters after reading: the read bound, the timeout and
-  `skipped` cover every record listed, whatever its `recordedAt`. Records
-  are fetched one at a time, two requests each (about 0.7 s per record on
-  GHCR), so the default `1m` timeout covers some 80 records; raise
-  `--registry-timeout` or prune old records.
-
-Exit codes: 0 statistics printed, 1 error, 2 usage.
+Records are fetched one at a time (about 0.7 s each on GHCR), so the default
+`1m` timeout covers some 80 records; raise `--registry-timeout` or prune old
+records.
 
 #### Stats report JSON
 
@@ -475,27 +372,21 @@ The layer is a DSSE envelope (`evidence.Envelope`):
 }
 ```
 
-Signing uses sigstore-go (`attest.Sign`, keyless with a Fulcio certificate
-and Rekor entry, or key-based; see [trust-model.md](trust-model.md#signing)).
-It also produces a Sigstore bundle (`application/vnd.dev.sigstore.bundle.v0.3+json`)
-carrying the certificate or key hint and the Rekor entry; it is stored as the
-second layer of the execution manifest. `registry.Push` requires it:
-`aval verify` checks the signature through the bundle (`attest.Verifier`),
-so an attestation without one could only ever be a verification failure.
+Signed by sigstore-go ([trust model](trust-model.md#signing)).
 
 ## in-toto Statement
 
 The envelope payload is an in-toto Statement v1 (`evidence.Statement`). Its
-`subject` is the tested revision or artifact, the same one recorded in
-`predicate.subject`.
+`subject` is the same one recorded in `predicate.subject`. `aval run` writes
+the test id as `name` and the fingerprint as the digest:
 
 ```json
 {
   "_type": "https://in-toto.io/Statement/v1",
   "subject": [
     {
-      "name": "git+https://github.com/acme/orders",
-      "digest": { "gitCommit": "9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d" }
+      "name": "orders-integration",
+      "digest": { "sha256": "<fingerprint hex>" }
     }
   ],
   "predicateType": "https://aval.trianalab.io/attestation/execution/v2",
@@ -503,14 +394,10 @@ The envelope payload is an in-toto Statement v1 (`evidence.Statement`). Its
 }
 ```
 
-For an image, use `"digest": {"sha256": "<hex>"}` with the image reference as
-`name`.
-
-`aval run` records `name` = the test id and `digest` = `{"sha256": "<fingerprint
-hex>"}` (the declared inputs), `runner.identity` = the host name (a claim;
-trust comes from the signer), `runner.trustLevel` = 0, and
-`execution.environment` = `os` and `arch` plus the declared toolchain.
-Recording a git commit or image as the subject is milestone 3 work.
+`runner.identity` is the host name (a claim; trust comes from the signer),
+`runner.trustLevel` is 0, and `execution.environment` holds `os` and `arch`
+plus the declared toolchain. Recording a git commit or image as the subject is
+milestone 3 work (TODO(milestone-3)).
 
 ## Predicate
 
@@ -540,14 +427,9 @@ checked by `Predicate.Validate` (called by `evidence.Parse`).
 | `finishedAt` | RFC 3339 timestamp | yes, not before `startedAt` | Execution end. |
 | `annotations` | map string to string | no (omitted when empty) | Free third-party metadata. Aval never reads it. |
 
-`runner.identity`, `runner.issuer` and `runner.trustLevel` are claims written
-by whoever produced the predicate. The authoritative identity and trust level
-are those of the **verified signer**, matched against the policy's accepted
-identities (`evidence.Verification.Signer` and its `TrustLevel`). Consumers
-must not make trust decisions from the `runner` block. The Go fields
-`Runner.Issuer`, `Runner.TrustLevel` and `Verification.TrustLevel` are
-deprecated: Aval leaves the first two empty, and the third duplicates
-`Verification.Signer.TrustLevel`.
+The `runner` block is a claim: trust comes from the verified signer and the
+policy, never from it. The Go fields `Runner.Issuer`, `Runner.TrustLevel` and
+`Verification.TrustLevel` are deprecated.
 
 `evidence.Parse` only checks structure. A parsed predicate is a claim, not
 evidence; use `evidence.Verify` to get something you can rely on.
@@ -564,8 +446,8 @@ put secrets there: the predicate is published to the registry.
 {
   "schemaVersion": "v2",
   "subject": {
-    "name": "git+https://github.com/acme/orders",
-    "digest": { "gitCommit": "9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d" }
+    "name": "orders-integration",
+    "digest": { "sha256": "3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7" }
   },
   "test": {
     "id": "orders-integration",
@@ -576,16 +458,15 @@ put secrets there: the predicate is published to the registry.
     "fingerprint": "sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7",
     "fingerprintVersion": "aval-fingerprint/v1",
     "environment": {
-      "go": "1.23.4",
+      "go": "1.25",
       "os": "linux",
       "arch": "amd64"
     },
     "exitCode": 0
   },
   "runner": {
-    "identity": "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main",
-    "issuer": "https://token.actions.githubusercontent.com",
-    "trustLevel": 2
+    "identity": "ci-runner-7",
+    "trustLevel": 0
   },
   "startedAt": "2026-11-05T10:12:03Z",
   "finishedAt": "2026-11-05T10:31:47Z",
@@ -627,25 +508,15 @@ Outcomes:
 
 <!-- --8<-- [end:verify-report] -->
 
-Exit codes, from the [CLI reference](cli-reference.md#exit-codes):
+`aval verify` exits with the outcome
+([exit codes](cli-reference.md#exit-codes)); `aval run` acts on it and exits
+with the test result ([Outcomes](concepts/outcomes.md)).
 
---8<-- "docs/cli-reference.md:exit-codes"
-
-`aval verify` exits with the outcome. `aval run` acts on the outcome and
-exits with the result instead; see
-[trust-model.md](trust-model.md#what-aval-run-does-with-each-outcome).
-
-If the fingerprint cannot be computed (empty scope, missing dependency,
-symlink, control characters in a path, I/O error), `aval verify` prints no
-report and exits 1; bad flags or an invalid contract print no report and exit 2.
-`aval run --report` still writes one in that case, with outcome `error`, the
-reason, and an empty `fingerprint`, and then runs the test.
-
-Without `--policy`, `aval verify` skips the lookup and reports `outcome: "miss"`
-(exit 4), and so it does for a `non-deterministic` contract. With `--policy`, a policy file that cannot be loaded is
-`outcome: "error"` (exit 1) and no lookup is made. A trusted root that
-cannot be loaded is `outcome: "error"` (exit 1) once a candidate with a
-certificate needs it.
+- A fingerprint error: `aval verify` prints no report and exits 1;
+  `aval run --report` writes outcome `error` with an empty `fingerprint`, then
+  runs the test. Bad flags or an invalid contract: no report, exit 2.
+- No `--policy`, or a `non-deterministic` contract: `miss`, no lookup.
+- A policy, or a trusted root a candidate needs, that cannot load: `error`.
 
 Example (`verified`):
 
@@ -755,42 +626,29 @@ is announced in the release notes of the release that removes it.
 
 ### Golden files
 
-`pkg/evidence/testdata/statement-execution-v2.golden.json`,
-`pkg/evidence/testdata/verify-report-v1.golden.json`,
-`pkg/evidence/testdata/run-record-v1.golden.json` and
-`pkg/evidence/testdata/stats-report-v1.golden.json` set every field of the
-statement, predicate, verify report, run record and stats report. A test decodes each strictly into the
-current types and requires the same JSON back, so dropping, renaming or
-retyping a field, or adding a required one, fails. Another test requires
-every JSON field of those types to be set in its golden file, so a new field
-fails until it is added there. Golden files only grow: an existing field or
-value is never removed or changed, an additive change adds its new field to
-the golden file of its version, and a new version adds a new file next to
-the old ones.
+`pkg/evidence/testdata/*.golden.json` set every field of the statement,
+predicate, verify report, run record and stats report, and only grow: an
+additive change adds its field to the golden of its version, and a new
+version adds a new file. The tests that enforce this:
+[CONTRIBUTING.md](https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#golden-files).
 
 ### History
 
-- Predicate `v1` became `v2` when the execution manifest's `subject` changed
-  from the tested artifact to the fingerprint anchor and the optional
-  Sigstore bundle layer was added.
-- At the freeze (#17), the verify report moved from
-  `aval.dev/verify-report/v1alpha1` to `aval.trianalab.io/verify-report/v1`
-  and the contract and policy `apiVersion` from `aval.dev/v1alpha1` to
-  `aval.trianalab.io/v1`, without other changes. The contract hash covers
-  `apiVersion`, so every fingerprint changed: results published before
-  are misses and the tests run once.
-- Within `verify-report/v1` (#65), a signer the policy lists below
-  `minTrustLevel` became `miss` instead of `verification-failed`, and
-  `rejected[].outcome` may now also be `miss`. No new value, field or exit
-  code; the maintainers confirmed this as additive, so the version stays.
-- Within the provisional `run-record/v1` (#88), records gained the optional
-  `verifiedResult` and `repository`, and `evidence.ParseRunRecord` started rejecting
-  inconsistent records (a reuse with an outcome other than `verified` or
-  with test time, a `verifiedResult` without outcome `verified`). Tightening
-  validation is breaking for a frozen format; the identifier stays because
-  it is provisional and no record `aval` writes is affected; the maintainers
-  confirmed keeping `run-record/v1` (#88).
-- Within `aval-fingerprint/v1` (#102), the optional `scope.resolve`
-  contract field adds `resolve` lines after the `env` lines. Manifests of
-  contracts without it are unchanged (the v1 golden is untouched); the new
-  lines are pinned by their own golden.
+??? info "History"
+    - Predicate `v1` became `v2` when the execution manifest's `subject`
+      changed from the tested artifact to the fingerprint anchor and the
+      Sigstore bundle layer was added. Aval no longer reads or writes v1: a
+      v1 artifact is never a candidate.
+    - At the freeze (#17), the verify report moved from
+      `aval.dev/verify-report/v1alpha1` to `aval.trianalab.io/verify-report/v1`
+      and the contract and policy `apiVersion` from `aval.dev/v1alpha1` to
+      `aval.trianalab.io/v1`; every fingerprint changed, so older results are
+      misses and the tests run once.
+    - Within `verify-report/v1` (#65), a signer below `minTrustLevel` became
+      `miss` instead of `verification-failed`, and `rejected[].outcome` may be
+      `miss`. No new value, field or exit code, so the version stays.
+    - Within the provisional `run-record/v1` (#88), records gained
+      `verifiedResult` and `repository`, and inconsistent records are
+      rejected; no record `aval` writes is affected.
+    - Within `aval-fingerprint/v1` (#102), `scope.resolve` adds `resolve`
+      lines after the `env` lines; manifests without it are unchanged.

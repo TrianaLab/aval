@@ -13,10 +13,7 @@ flowchart LR
   valid -- no --> failed([verification-failed<br>exit 5]):::err
 ```
 
-The exit codes are those of `aval verify`. `aval run` turns every outcome
-except `verified` into a test run.
-
-All exit codes, from the [CLI reference](../cli-reference.md#exit-codes):
+The exit codes in the diagram are those of `aval verify`. All of them:
 
 --8<-- "docs/cli-reference.md:exit-codes"
 
@@ -31,32 +28,26 @@ All exit codes, from the [CLI reference](../cli-reference.md#exit-codes):
 
 ## A miss is routine
 
-You changed a file, so the fingerprint changed, so there is nothing to reuse
-yet. The test runs. This is the normal path for most pull requests.
+The normal case for a pull request: you changed an input, so there is nothing
+to reuse yet. Aval also reports a miss when:
 
-A few other cases are also a miss: no `--policy`, a `non-deterministic`
-test, or a result signed below `minTrustLevel`.
+- there is no `--policy` (or, for `aval run`, no `--registry`, or `--no-reuse`)
+- the test is `non-deterministic`, or `external-dependencies` and not in the
+  policy's `allowedCacheability`
+- the inputs hold a [mutable reference](../pinning.md) you did not pin or list
+  in `scope.allowMutable`
+- the only results are signed below `minTrustLevel`
 
 ## A verification failure is a security event
 
-Someone pushed a result under your fingerprint that does not verify. The
-signature is bad, or the signer is not in your policy, or the result claims
-other inputs. The cause can be a wrong policy or an attacker.
+A result under your fingerprint does not verify: a bad signature, a signer not
+in your policy, or a claim of other inputs. The cause is a wrong policy or an
+attacker. Aval runs the test, prints `aval: SECURITY: ...` and exits 5. Fail
+the job and investigate; never hide or retry it.
 
-Aval runs the test, prints `aval: SECURITY: ...` and exits 5. Do not hide
-it and do not retry it away: fail the job and look.
+## In a script
 
-## An example
-
-```console
-$ aval verify --registry $REG --policy policy.yaml
-miss orders-integration sha256:b40e9fac…
-reason: registry.Lookup …: no attestation found for fingerprint
-$ echo $?
-4
-```
-
-In a script, branch on the exit code:
+Branch on the exit code of `aval verify`:
 
 ```sh
 aval verify --registry "$REG" --policy policy.yaml
@@ -68,7 +59,5 @@ case $? in
 esac
 ```
 
-!!! info "The full spec"
-    The JSON report is in the
-    [artifact format](../artifact-format.md#verify-report), the commands in
-    the [CLI reference](../cli-reference.md).
+Details: the JSON report in
+[the artifact format](../artifact-format.md#verify-report).

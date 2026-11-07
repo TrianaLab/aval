@@ -51,27 +51,20 @@ func newRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Reuse a verified result for the current inputs, or run the test",
-		Long: `run computes the execution fingerprint of the contract, looks for a signed
-attestation in the registry, and reuses it if it verifies against the trust
-policy. Otherwise it runs runner.command, records the result (--result) and,
-with --push, signs and publishes it.
+		Long: `run computes the fingerprint, looks up a signed result and reuses it if the
+trust policy accepts it. Otherwise it runs runner.command, records the result
+(--result) and, with --push, signs and publishes it.
 
-Anything that cannot be proven runs the test: a fingerprint error, a registry
-or policy error, a miss. A verification failure also runs the test, and then
-exits 5: it is a security event. A reused failing result exits 3, like a
-failing run. --shadow verifies and still runs the test; if the verified
-result disagrees with the run, that is a false hit and run exits 1.
+Anything Aval cannot prove runs the test. A verification failure runs the
+test and exits 5: a security event. --shadow runs the test even after a
+verified result and exits 1 if they disagree (a false hit).
 
---record publishes a run record (outcome, reuse, durations) for statistics
-to the test's stats anchor in the registry, for every outcome. It is
-best-effort: a failure, such as missing write credentials, is a warning and
-never changes the exit code. Records are unsigned and never read by run or
-verify. --record-file writes the same record to a file for 'aval record'.
+--record publishes a run record for statistics; a failure is only a warning.
+--record-file writes it to a file for 'aval record'.
 
-Exit codes: 0 passed or reused a pass, 3 failed or reused a failure,
-5 verification failed (after running the test), 1 error or false hit,
-2 usage. Keyless signing reads the OIDC token from $` + idTokenEnv + `;
-runner.command never sees it.`,
+Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
+2 usage. Keyless signing reads $` + idTokenEnv + `; runner.command never sees
+it.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runTest(cmd, o) },
 	}
@@ -91,7 +84,7 @@ runner.command never sees it.`,
 	f.StringVar(&o.recordFile, "record-file", "", "also write the run record to this file, for 'aval record'")
 	f.StringVar(&o.ciRunURL, "ci-run-url", "", "link to the CI run, stored in the run record")
 	f.StringVar(&o.repository, "repository", "", "source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'")
-	registryTimeoutFlag(cmd, &o.registryTimeout)
+	registryTimeoutFlag(cmd, &o.registryTimeout, "(lookup and fetch share one; push has its own)")
 	return cmd
 }
 
@@ -558,11 +551,11 @@ func newRecordCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "record",
 		Short: "Publish a run record written by 'aval run --record-file'",
-		Long: `record publishes a run record that 'aval run --record-file' wrote to the
-test's stats anchor in the registry, as 'aval run --record' would have. Use it
-to publish, from a job with write credentials that runs no tests, the record
-of a run made without them. Run records are unsigned statistics: run and
-verify never read them. --repository sets the record's source repository.`,
+		Long: `record publishes a run record that 'aval run --record-file' wrote, as 'aval
+run --record' would have. Use it to publish, from a job with write credentials
+that runs no tests, the record of a run made without them. Run records are
+unsigned statistics: run and verify never read them. --repository sets the
+record's source repository.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if repo == "" || file == "" {
