@@ -37,13 +37,9 @@ func yamlDocs(data []byte) ([]*yaml.Node, error) {
 // scalar returns the decoded value of a scalar node, or of the scalar an
 // alias points to; "" for anything else.
 func scalar(n *yaml.Node) string {
-	if n.Kind == yaml.AliasNode && n.Alias != nil {
-		n = n.Alias
-	}
-	if n.Kind != yaml.ScalarNode {
-		return ""
-	}
-	return n.Value
+	var s string
+	_ = n.Decode(&s) // a collection does not decode into a string: ""
+	return s
 }
 
 // decodedImages checks every image: key under n by its decoded value, so
@@ -57,11 +53,17 @@ func decodedImages(in Input, n *yaml.Node) []Finding {
 	var out []Finding
 	for i := 0; n.Kind == yaml.MappingNode && i+1 < len(n.Content); i += 2 {
 		k, v := n.Content[i], n.Content[i+1]
-		switch scalar(k) {
+		key, fs := decodedKey(in.Path, k)
+		out = append(out, fs...)
+		switch key {
+		case "kind":
+			if scalar(v) == "ImageTagTransformer" {
+				out = append(out, Finding{File: in.Path, Line: v.Line, Ecosystem: "container", Ref: "ImageTagTransformer", Fix: transformerFix})
+			}
 		case "image":
 			out = append(out, decodedImage(in, v)...)
 		case "dockerfile_inline":
-			for _, f := range (dockerfile{}).Detect(Input{Path: in.Path, Data: []byte(scalar(v)), Has: in.Has}) {
+			for _, f := range detectDockerfile(Input{Path: in.Path, Data: []byte(scalar(v)), Has: in.Has}, true) {
 				f.Line = v.Line // ponytail: the line of the value, not of the instruction in it
 				out = append(out, f)
 			}
@@ -79,18 +81,35 @@ func decodedImages(in Input, n *yaml.Node) []Finding {
 	return out
 }
 
+// decodedKey decodes a mapping key as Compose does (!!binary included). A
+// key that does not decode, or has a tag other than !!str, !!merge or
+// !!binary, may still be image to its reader, so it is a finding.
+func decodedKey(file string, k *yaml.Node) (string, []Finding) {
+	var key string
+	if k.Kind != yaml.ScalarNode && k.Kind != yaml.AliasNode { // a collection key is never image
+		return "", nil
+	}
+	tagged := k.Style&yaml.TaggedStyle != 0 && !slices.Contains([]string{"!!str", "!!merge", "!!binary"}, k.Tag)
+	if err := k.Decode(&key); err != nil || tagged {
+		return key, []Finding{{File: file, Line: k.Line, Ecosystem: "container", Ref: strings.TrimSpace(k.Tag + " " + k.Value),
+			Fix: "a tagged YAML key Aval does not decode, so Aval cannot tell whether it is image: write the key plainly"}}
+	}
+	return key, nil
+}
+
 // templatedKeyRe is a line with a template action ({{ }}) before the colon
 // of its key, outside a comment.
 var templatedKeyRe = regexp.MustCompile(`^[^:#]*\{\{.*\}\}[^:]*:(\s|$)`)
 
 // templatedKeys reports keys a Helm template writes (ima{{ "ge" }}:,
-// {{ $k }}:): rendered, any of them may be image, so fail closed.
+// {{ $k }}:): rendered, any of them may be image, so fail closed. The ref
+// is the key, so scope.allowMutable can acknowledge one (a label loop).
 func templatedKeys(in Input) []Finding {
 	var out []Finding
 	for i, l := range strings.Split(string(in.Data), "\n") {
-		if l = strings.TrimSpace(l); templatedKeyRe.MatchString(l) {
-			out = append(out, Finding{File: in.Path, Line: i + 1, Ecosystem: "scan", Ref: l,
-				Fix: "a template writes this key, so Aval cannot tell whether it is image: write the key plainly or render the chart into the scope"})
+		if m := templatedKeyRe.FindString(strings.TrimSpace(l)); m != "" {
+			out = append(out, Finding{File: in.Path, Line: i + 1, Ecosystem: "container", Ref: strings.TrimSuffix(strings.TrimSpace(m), ":"),
+				Fix: "a template writes this key, so Aval cannot tell whether it is image: write the key plainly, render the chart into the scope, or acknowledge the key in scope.allowMutable"})
 		}
 	}
 	return out
@@ -192,14 +211,14 @@ var escapedKeyRe = regexp.MustCompile(`(\?\s*)?"((?:[^"\\]|\\.)*\\.(?:[^"\\]|\\.
 
 // escapedKeys is the fallback for a file the YAML parser rejects: a quoted
 // key with an escape is decoded on its own. One that decodes to image has
-// its value checked when it is on the same line. Fail closed with a scan
+// its value checked when it is on the same line. Fail closed with a finding
 // finding when the key does not decode, when its value is elsewhere (an
 // explicit key, the next line) or when a quoted scalar continues on the
 // next line (it may join into image).
 func escapedKeys(in Input) []Finding {
 	var out []Finding
 	scan := func(n int, ref, fix string) {
-		out = append(out, Finding{File: in.Path, Line: n, Ecosystem: "scan", Ref: ref, Fix: fix})
+		out = append(out, Finding{File: in.Path, Line: n, Ecosystem: "container", Ref: ref, Fix: fix})
 	}
 	for i, l := range strings.Split(string(in.Data), "\n") {
 		l = strings.TrimSuffix(l, "\r")
@@ -242,7 +261,8 @@ func openQuote(l string) bool {
 
 // kustomize checks the images: (and legacy imageTags:) of a kustomization,
 // which retarget an image by name (newName) or tag (newTag); only a digest
-// pins it. A patch or replacement that mentions an image is a scan finding.
+// pins it. A patch, replacement, transformer, generator or Helm chart that
+// sets an image is a finding (see entries).
 type kustomize struct{}
 
 func (kustomize) Applies(p string) bool {
@@ -254,24 +274,97 @@ func (kustomize) Applies(p string) bool {
 type kustomization struct {
 	Images, ImageTags []struct{ Name, NewName, NewTag, TagSuffix, Digest string }
 
-	Patches, PatchesStrategicMerge, PatchesJson6902, Replacements []json.RawMessage
+	Patches, PatchesStrategicMerge, PatchesJson6902, Replacements, Transformers, Generators, HelmCharts []any
 }
 
-// patches reports each patch or replacement that mentions an image.
-// ponytail: any mention, inline or in a file name; a patch file that sets an
-// image under another name is a known limit.
-func (k kustomization) patches(file string) []Finding {
+// transformerFix is the fix for a kustomize entry that may set an image.
+const transformerFix = "kustomize may set an image here that Aval does not apply: pin the image in the base, retarget it in images: with a digest, or acknowledge this ref in scope.allowMutable"
+
+// entries reports each patch, replacement, transformer, generator or Helm
+// chart entry that sets an image, by name and index (patches[0]). A
+// transformer or generator given by a path out of the scope (a directory,
+// a remote base) cannot be read, so it is reported too; one in the scope is
+// a YAML file composeImages checks.
+func (k kustomization) entries(in Input) []Finding {
 	var out []Finding
 	for _, f := range []struct {
 		name    string
-		entries []json.RawMessage
-	}{{"patches", k.Patches}, {"patchesStrategicMerge", k.PatchesStrategicMerge}, {"patchesJson6902", k.PatchesJson6902}, {"replacements", k.Replacements}} {
+		entries []any
+	}{{"patches", k.Patches}, {"patchesStrategicMerge", k.PatchesStrategicMerge}, {"patchesJson6902", k.PatchesJson6902},
+		{"replacements", k.Replacements}, {"transformers", k.Transformers}, {"generators", k.Generators}, {"helmCharts", k.HelmCharts}} {
 		for i, e := range f.entries {
-			if bytes.Contains(bytes.ToLower(e), []byte("image")) {
-				out = append(out, Finding{File: file, Ecosystem: "scan", Ref: fmt.Sprintf("%s[%d]", f.name, i),
-					Fix: "kustomize patch or replacement sets an image Aval cannot read: pin the image in the base, or retarget it in images: with a digest"})
+			s, isPath := e.(string)
+			isPath = isPath && !strings.Contains(s, "\n") && !strings.Contains(s, ": ") && (f.name == "transformers" || f.name == "generators")
+			if isPath && !in.Has(path.Join(path.Dir(in.Path), s)) || !isPath && setsImage(e, true) {
+				out = append(out, Finding{File: in.Path, Ecosystem: "container", Ref: fmt.Sprintf("%s[%d]", f.name, i), Fix: transformerFix})
 			}
 		}
+	}
+	return out
+}
+
+// setsImage reports whether a kustomize entry sets an image: an image:,
+// images: or imageTag: key, an ImageTagTransformer, a JSON6902 path or from
+// ending in /image, a replacement fieldPath ending in .image, or Helm
+// valuesInline. With decode, a string is read as the YAML it holds (an
+// inline patch or transformer), as is a patch: value.
+// ponytail: imagePullPolicy, imagePullSecrets and file names do not match.
+func setsImage(v any, decode bool) bool {
+	switch v := v.(type) {
+	case string:
+		dec := yaml.NewDecoder(strings.NewReader(v))
+		for decode {
+			var d any
+			if dec.Decode(&d) != nil {
+				return false
+			}
+			if setsImage(d, false) {
+				return true
+			}
+		}
+	case []any:
+		return slices.ContainsFunc(v, func(e any) bool { return setsImage(e, false) })
+	case map[string]any:
+		for k, e := range v {
+			if imageField(strings.ToLower(k), e) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// imageField reports whether one field (k lowercased) of a kustomize
+// entry sets an image, as setsImage describes.
+func imageField(k string, e any) bool {
+	s, _ := e.(string)
+	switch k {
+	case "image", "images", "imagetag", "valuesinline":
+		return true
+	case "kind":
+		return s == "ImageTagTransformer"
+	case "path", "from":
+		return strings.HasSuffix(s, "/image")
+	case "fieldpath":
+		return fieldImage(s)
+	case "fieldpaths":
+		return slices.ContainsFunc(toList(e), fieldImage)
+	case "patch":
+		return setsImage(e, true)
+	}
+	return setsImage(e, false)
+}
+
+// fieldImage reports whether a replacement fieldPath ends in an image field.
+func fieldImage(s string) bool { return s == "image" || strings.HasSuffix(s, ".image") }
+
+// toList returns the strings of a list.
+func toList(v any) []string {
+	l, _ := v.([]any)
+	var out []string
+	for _, e := range l {
+		s, _ := e.(string)
+		out = append(out, s)
 	}
 	return out
 }
@@ -280,7 +373,7 @@ func (kustomize) Detect(in Input) []Finding {
 	// Decode like kustomize does: YAML to JSON (merge keys resolved), then
 	// encoding/json, which matches field names case-insensitively.
 	scanErr := func(err error) []Finding {
-		return []Finding{{File: in.Path, Ecosystem: "scan", Ref: in.Path, Fix: "images cannot be read as kustomize reads them: " + err.Error()}}
+		return []Finding{{File: in.Path, Ecosystem: "container", Ref: in.Path, Fix: "images cannot be read as kustomize reads them: " + err.Error()}}
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(in.Data))
 	var out []Finding
@@ -299,7 +392,7 @@ func (kustomize) Detect(in Input) []Finding {
 		if err := json.Unmarshal(j, &k); err != nil {
 			return scanErr(err)
 		}
-		out = append(out, k.patches(in.Path)...)
+		out = append(out, k.entries(in)...)
 		for _, e := range slices.Concat(k.Images, k.ImageTags) { // imageTags: the legacy name kustomize still applies
 			if e.NewName == "" && e.NewTag == "" && e.TagSuffix == "" && e.Digest == "" {
 				continue // the image is left as the manifests write it

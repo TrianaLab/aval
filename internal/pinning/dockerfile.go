@@ -32,7 +32,7 @@ var continuationRe = map[string]*regexp.Regexp{
 // joined with nothing, and comment or blank lines inside a continuation are
 // dropped; the bodies of RUN, COPY and ADD heredocs are kept raw. What
 // BuildKit refuses (an invalid escape, a repeated directive, an unterminated
-// heredoc) is a scan finding, and heredocs after it are read as
+// heredoc) is a finding, and heredocs after it are read as
 // instructions, which reports more, never less.
 func dockerLines(file, data string) ([]dockerLine, []Finding) {
 	phys := strings.Split(strings.TrimPrefix(data, "\ufeff"), "\n")
@@ -66,7 +66,7 @@ func dockerLines(file, data string) ([]dockerLine, []Finding) {
 		if bad == nil {
 			var ok bool
 			if l.body, i, ok = heredocBodies(l.text, phys, i); !ok {
-				bad = []Finding{{File: file, Line: l.n, Ecosystem: "scan", Ref: t,
+				bad = []Finding{{File: file, Line: l.n, Ecosystem: "container", Ref: t,
 					Fix: "an unterminated heredoc or a heredoc name Aval cannot decode: Aval cannot check its references; end the heredoc and write its name plainly"}}
 			}
 		}
@@ -98,7 +98,7 @@ func escape(file string, phys []string) (*regexp.Regexp, []Finding) {
 			fix = "the escape character must be \\ or `, so BuildKit refuses the file"
 		}
 		if fix != "" {
-			return cont, []Finding{{File: file, Line: i + 1, Ecosystem: "scan", Ref: p, Fix: fix + ": Aval cannot check its references; fix the directive"}}
+			return cont, []Finding{{File: file, Line: i + 1, Ecosystem: "container", Ref: p, Fix: fix + ": Aval cannot check its references; fix the directive"}}
 		}
 		seen[k] = true
 		if k == "escape" {
@@ -208,7 +208,7 @@ func redefinedFrom(file string, l line, defs map[string]int) []Finding {
 	}
 	for _, m := range varRe.FindAllStringSubmatch(l.text, -1) {
 		if defs[m[1]+m[2]+m[3]] > 1 {
-			return []Finding{{File: file, Line: l.n, Ecosystem: "scan", Ref: l.text,
+			return []Finding{{File: file, Line: l.n, Ecosystem: "container", Ref: l.text,
 				Fix: "FROM uses an ARG that is given a value more than once, so Aval cannot tell which one BuildKit uses: give it one value"}}
 		}
 	}

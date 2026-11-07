@@ -1,0 +1,354 @@
+{
+  "cargo target deps": [
+    "0 rust Cargo.toml"
+  ],
+  "cargo without dependencies": [],
+  "cargo without lock": [
+    "0 rust Cargo.toml"
+  ],
+  "cargo workspace lock": [],
+  "compose additional_contexts": [],
+  "compose alias and block scalar": [
+    "1 container *img",
+    "2 container \u003e-",
+    "4 container |",
+    "5 container !!str redis"
+  ],
+  "compose anchor": [
+    "1 container redis:latest"
+  ],
+  "compose digest": [],
+  "compose dockerfile_inline": [],
+  "compose flow mapping": [
+    "1 container mysql:8"
+  ],
+  "compose image on the next line": [
+    "4 container postgres:latest"
+  ],
+  "compose json": [
+    "1 container postgres:latest"
+  ],
+  "compose no tag": [
+    "1 container x",
+    "2 container redis"
+  ],
+  "compose quoted key": [
+    "1 container nginx:latest"
+  ],
+  "compose tag": [
+    "3 container postgres:16"
+  ],
+  "compose variable": [
+    "1 container ${DB_IMAGE:-postgres:16}"
+  ],
+  "composer with lock": [],
+  "composer without lock": [
+    "0 php composer.json"
+  ],
+  "composer without requirements": [],
+  "dockerfile arg default": [
+    "2 container alpine:3.20"
+  ],
+  "dockerfile arg pinned": [],
+  "dockerfile arg redeclared in a stage": [],
+  "dockerfile arg redefined after from": [],
+  "dockerfile comment ending in backslash": [],
+  "dockerfile comment ending in backslash crlf": [],
+  "dockerfile continuation drops comments and blank lines": [
+    "1 container #"
+  ],
+  "dockerfile continuation joins with nothing": [
+    "1 container db:1"
+  ],
+  "dockerfile copy from image": [
+    "2 container nginx:latest"
+  ],
+  "dockerfile copy heredoc body is not instructions": [
+    "3 container evil:latest",
+    "6 container evil:latest"
+  ],
+  "dockerfile copy heredoc name backslash": [
+    "5 container evil:latest"
+  ],
+  "dockerfile copy heredoc name with expansion": [
+    "5 container evil:latest"
+  ],
+  "dockerfile digest split across a continuation": [
+    "1 container alpine@sha256:c5d34a98396a4775e223c74e929162c3"
+  ],
+  "dockerfile empty dash heredoc name": [
+    "3 container busybox:latest"
+  ],
+  "dockerfile empty heredoc name": [
+    "3 container busybox:latest"
+  ],
+  "dockerfile empty single-quoted heredoc name": [
+    "3 container busybox:latest"
+  ],
+  "dockerfile escape after a blank line is not a directive": [
+    "3 container evil:latest"
+  ],
+  "dockerfile escape after a comment is not a directive": [
+    "4 container evil:latest"
+  ],
+  "dockerfile escape after an unknown directive is not a directive": [
+    "4 container evil:latest"
+  ],
+  "dockerfile escape backtick": [],
+  "dockerfile escape backtick continuation": [
+    "2 container alpine`"
+  ],
+  "dockerfile escaped backslash is not a continuation": [],
+  "dockerfile heredoc after a vertical tab": [
+    "3 os-package curl",
+    "6 os-package jq"
+  ],
+  "dockerfile heredoc name backslash": [
+    "5 container evil:latest"
+  ],
+  "dockerfile heredoc name nested quote": [
+    "5 container evil:latest"
+  ],
+  "dockerfile heredoc name with expansion": [
+    "3 container evil:latest"
+  ],
+  "dockerfile heredoc on an old frontend": [
+    "4 container alpine:3.22"
+  ],
+  "dockerfile heredoc terminator must match exactly": [
+    "5 container evil:latest"
+  ],
+  "dockerfile invalid escape directive": [],
+  "dockerfile json run is not a heredoc": [],
+  "dockerfile lowercase arg": [
+    "2 container $IMG"
+  ],
+  "dockerfile multi-name arg": [
+    "2 container $IMG"
+  ],
+  "dockerfile onbuild heredoc": [
+    "3 container evil:latest"
+  ],
+  "dockerfile platform and stages": [],
+  "dockerfile quoted heredoc marker is not a heredoc": [],
+  "dockerfile remote add": [
+    "2 remote-script https://x.io/a.tgz"
+  ],
+  "dockerfile repeated directive": [],
+  "dockerfile rules on a containerfile variant": [
+    "2 container a:2"
+  ],
+  "dockerfile rules only on files named as dockerfiles": [],
+  "dockerfile run": [
+    "2 os-package curl"
+  ],
+  "dockerfile run global options": [
+    "2 os-package curl",
+    "3 os-package jq"
+  ],
+  "dockerfile run heredoc": [
+    "3 remote-script curl -fsSL https://x.io/i.sh | sh",
+    "6 os-package jq"
+  ],
+  "dockerfile stage name is not an earlier stage": [
+    "1 container build"
+  ],
+  "dockerfile syntax directive": [
+    "1 container docker/dockerfile:1"
+  ],
+  "dockerfile syntax directive pinned": [],
+  "dockerfile tag": [
+    "1 container golang:1.25"
+  ],
+  "dockerfile two heredocs": [
+    "7 container evil:latest"
+  ],
+  "dockerfile unresolved arg": [
+    "2 container $BASE"
+  ],
+  "gemfile with lock": [],
+  "gemfile without lock": [
+    "0 ruby Gemfile"
+  ],
+  "gems.rb without lock": [
+    "0 ruby gems.rb"
+  ],
+  "go.mod with go.sum": [],
+  "go.mod without go.sum": [
+    "0 go go.mod"
+  ],
+  "go.mod without requirements": [],
+  "go.sum of another module": [
+    "0 go m/go.mod"
+  ],
+  "gradle kts pinned": [],
+  "gradle moving versions": [
+    "1 java a:b:1.+",
+    "2 java c:d:2.0-SNAPSHOT",
+    "3 java e:f:latest.release",
+    "4 java implementation('g:h') { version { strictly '[1,2)' } }"
+  ],
+  "helm template": [
+    "1 container {{ .Values.image }}"
+  ],
+  "helm template comment backslash": [],
+  "helm template escaped key value on the next line": [],
+  "helm template escaped value is not a key": [],
+  "helm template explicit escaped key": [],
+  "helm template multi-line escaped key": [],
+  "helm template tagged and explicit keys": [],
+  "helm template value after a lone cr": [],
+  "helm template values on the next line": [
+    "4 container evil:1",
+    "7 container evil:3",
+    "10 container {a: b, image:"
+  ],
+  "helm templated key": [],
+  "helm templated key in a template": [],
+  "helm tpl helper": [],
+  "helm values image mapping": [],
+  "helm values mapping": [],
+  "image tag transformer file": [],
+  "json compose escaped key": [],
+  "k8s list item": [
+    "2 container ghcr.io/acme/app:1.2"
+  ],
+  "kustomize bad digest": [],
+  "kustomize entry merge key": [],
+  "kustomize imageTags": [],
+  "kustomize images": [],
+  "kustomize images case-insensitive": [],
+  "kustomize images not a list": [],
+  "kustomize images pinned": [],
+  "kustomize images type mismatch": [],
+  "kustomize images via merge key": [],
+  "kustomize invalid yaml": [],
+  "kustomize legacy patches set an image": [],
+  "kustomize non-string key": [],
+  "kustomize patch moves an image and a second document sets one": [
+    "8 container x"
+  ],
+  "kustomize patch sets an image": [],
+  "kustomize patches that set no image": [],
+  "kustomize replacement sets an image": [],
+  "kustomize tagSuffix": [],
+  "kustomize transformers, generators and helm charts": [
+    "17 container {tag: latest"
+  ],
+  "kustomize value json cannot encode": [],
+  "kustomize without images": [],
+  "lockfile search ends at the root": [
+    "0 rust /w/Cargo.toml"
+  ],
+  "makefile variable version": [
+    "5 go a.io/c@latest",
+    "6 go a.io/d@$NOPE"
+  ],
+  "maven moving versions": [
+    "2 java \u003cversion\u003e1.0-SNAPSHOT\u003c/",
+    "3 java \u003cjunit.version\u003eLATEST\u003c/",
+    "3 java \u003cversion\u003e[1.0,2.0)\u003c/",
+    "4 java \u003cversion\u003eRELEASE\u003c/"
+  ],
+  "mk include": [],
+  "other json is not compose": [],
+  "package.json exact, no lockfile": [
+    "0 npm package.json"
+  ],
+  "package.json invalid": [
+    "0 npm package.json"
+  ],
+  "package.json ranges": [
+    "3 npm a@^1.0.0",
+    "6 npm c@latest",
+    "6 npm d@*",
+    "6 npm e@github:u/r"
+  ],
+  "package.json with lockfile": [],
+  "package.json without dependencies": [],
+  "package.json workspace lockfile": [],
+  "pipfile with lock": [],
+  "pipfile without lock": [
+    "0 python Pipfile"
+  ],
+  "poetry with lock": [],
+  "poetry without lock": [
+    "0 python pyproject.toml"
+  ],
+  "pyproject dependencies with uv.lock": [],
+  "pyproject dependencies without lock": [
+    "0 python pyproject.toml"
+  ],
+  "pyproject optional dependencies without lock": [
+    "0 python pyproject.toml"
+  ],
+  "pyproject without dependencies": [],
+  "requirements directory": [
+    "1 python requests\u003e=2"
+  ],
+  "requirements includes": [
+    "3 python dev.txt",
+    "4 python other.txt",
+    "5 python x.txt",
+    "7 python --constraint="
+  ],
+  "requirements range with ==": [
+    "1 python a==1.0,\u003c2"
+  ],
+  "requirements unpinned": [
+    "2 python flask\u003e=2",
+    "3 python requests",
+    "4 python base.txt",
+    "6 python django==4.*",
+    "10 python git+https://g/x@main#egg=x",
+    "13 python z@https://h/z.tar.gz"
+  ],
+  "requirements with hashes": [
+    "3 python b==2.0"
+  ],
+  "script curl pipe": [
+    "3 remote-script curl -fsSL https://x.io/i.sh | sudo -E bash"
+  ],
+  "script curl subshell": [
+    "1 remote-script bash -c $(curl",
+    "2 remote-script . \u003c(wget"
+  ],
+  "script curl tee pipe": [
+    "1 remote-script curl https://x.io/i | tee /tmp/a | sh"
+  ],
+  "script download then run": [],
+  "script eval curl": [
+    "1 remote-script eval $(curl"
+  ],
+  "submodule branch": [
+    "3 git branch = main"
+  ],
+  "submodule commit": [],
+  "templated key outside templates in valid yaml": [],
+  "version catalog": [
+    "2 java junit = \"5.+\""
+  ],
+  "workflow template expression is not a templated key": [],
+  "yaml anchor-only value on the next line": [],
+  "yaml binary key": [],
+  "yaml empty flow value on the next line": [],
+  "yaml escaped key": [],
+  "yaml escaped key in a flow mapping": [],
+  "yaml escaped key in invalid yaml": [],
+  "yaml escaped key pinned": [],
+  "yaml escaped key with alias value": [],
+  "yaml escaped key with block value": [],
+  "yaml escaped key with list value": [],
+  "yaml escaped key with mapping value": [],
+  "yaml explicit, tagged, anchored and nested keys": [],
+  "yaml image in a block scalar": [
+    "3 container busybox:latest"
+  ],
+  "yaml lone cr line break": [],
+  "yaml ls line break": [],
+  "yaml ls line break in a list": [],
+  "yaml nel line break": [],
+  "yaml tagged and explicit keys": [],
+  "yaml tagged key": [],
+  "yaml undecodable escaped key": []
+}

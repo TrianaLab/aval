@@ -38,34 +38,46 @@ var (
 	yamlKeyRe = regexp.MustCompile(`^\s*(-(\s|$)|["']?[\w.-]+["']?\s*:(\s|$))`)
 )
 
-// Detect reads a file the YAML parser accepts with the parser alone; the
-// regexes only read a file it rejects (a Helm template). Templated keys are
-// a text property, so they are checked either way.
+// Detect is the union of two passes, so the parser only adds findings: the
+// line-by-line regexes (the scanner's original pass, kept on every file, so
+// an image: inside a block scalar a template renders is still read) and,
+// for what the parser decodes, every image: key by its decoded value. The
+// escaped-key, prefixed-key and templated-key fallbacks read what the
+// parser cannot: a file it rejects, and Helm templates.
 func (composeImages) Detect(in Input) []Finding {
-	var out []Finding
-	if docs, err := yamlDocs(in.Data); err == nil {
-		for _, d := range docs {
-			out = append(out, decodedImages(in, d)...)
-		}
-		phys := physLines(in.Data)
-		for i := range out {
-			out[i].Line = phys[min(out[i].Line, len(phys))-1] // clamped: see valueText
-		}
-	} else {
-		out = textImages(in)
+	s := string(in.Data)
+	out := textImages(in, logicalLines(s)) // the original pass, as it read lines
+	var phys []line                        // YAML has no line continuation
+	for i, l := range strings.Split(s, "\n") {
+		phys = append(phys, line{i + 1, strings.TrimSuffix(l, "\r")})
 	}
-	out = append(out, templatedKeys(in)...)
+	out = append(out, textImages(in, phys)...)
+	docs, err := yamlDocs(in.Data)
+	var dec []Finding
+	for _, d := range docs {
+		dec = append(dec, decodedImages(in, d)...)
+	}
+	lines := physLines(in.Data)
+	for i := range dec {
+		dec[i].Line = lines[min(dec[i].Line, len(lines))-1] // clamped: see valueText
+	}
+	out = append(out, dec...)
+	if err != nil {
+		out = append(out, escapedKeys(in)...)
+		out = append(out, prefixedKeys(in)...)
+	}
+	if err != nil || path.Ext(in.Path) == ".tpl" || strings.Contains("/"+in.Path, "/templates/") {
+		out = append(out, templatedKeys(in)...)
+	}
 	slices.SortStableFunc(out, func(a, b Finding) int { return cmp.Or(a.Line-b.Line, strings.Compare(a.Ref, b.Ref)) })
 	return slices.Compact(out)
 }
 
-// textImages finds image: keys line by line, for a file the YAML parser
-// rejects.
-func textImages(in Input) []Finding {
+// textImages finds image: keys line by line.
+func textImages(in Input, lines []line) []Finding {
 	var out []Finding
-	pending := -1                                            // indent of an image: key whose value may be on the next line
-	for i, s := range strings.Split(string(in.Data), "\n") { // YAML has no line continuation
-		l := line{i + 1, strings.TrimSuffix(s, "\r")}
+	pending := -1 // indent of an image: key whose value may be on the next line
+	for _, l := range lines {
 		t := strings.TrimSpace(l.text)
 		if t == "" || isComment(t) {
 			continue
@@ -88,8 +100,7 @@ func textImages(in Input) []Finding {
 			out = append(out, yamlImage(in.Path, l.n, l.text[m[4]:m[5]])...)
 		}
 	}
-	out = append(out, escapedKeys(in)...)
-	return append(out, prefixedKeys(in)...)
+	return out
 }
 
 // yamlImage checks one image: value. An empty value is a nested mapping
@@ -125,7 +136,85 @@ func (dockerfile) Applies(p string) bool {
 		strings.HasSuffix(b, ".dockerfile") || strings.HasSuffix(b, ".containerfile")
 }
 
+// buildkitFile reports whether a file Applies matches is named as a
+// Dockerfile (Dockerfile, Dockerfile.ci, app.dockerfile), not a source file
+// that merely starts with the word (dockerfile_test.go): only those get the
+// BuildKit pass.
+func buildkitFile(p string) bool {
+	b := strings.ToLower(path.Base(p))
+	for _, n := range []string{"dockerfile", "containerfile"} {
+		if b == n || strings.HasPrefix(b, n+".") || strings.HasSuffix(b, "."+n) {
+			return true
+		}
+	}
+	return false
+}
+
+// Detect is the union of two passes, so the BuildKit rules only add
+// findings: the scanner's original line pass, kept on every file Applies
+// matches (it also reads a heredoc an old frontend ignores), and the
+// BuildKit pass (dockerLines) on files named as Dockerfiles.
 func (dockerfile) Detect(in Input) []Finding {
+	return detectDockerfile(in, buildkitFile(in.Path))
+}
+
+func detectDockerfile(in Input, buildkit bool) []Finding {
+	out := textDockerfile(in)
+	if buildkit {
+		out = append(out, buildkitDockerfile(in)...)
+	}
+	slices.SortStableFunc(out, func(a, b Finding) int { return cmp.Or(a.Line-b.Line, strings.Compare(a.Ref, b.Ref)) })
+	return slices.Compact(out)
+}
+
+// textDockerfile is the scanner's original Dockerfile pass, unchanged.
+func textDockerfile(in Input) []Finding {
+	lines := logicalLines(string(in.Data))
+	vars := assignments(lines)
+	stages := map[string]bool{}
+	var out []Finding
+	var heredoc string // the delimiter of an open RUN <<EOF body
+	var body []line
+	start := 0
+	directives := true // parser directives (# syntax=) come before anything else
+	for _, l := range lines {
+		if directives {
+			if m := syntaxRe.FindStringSubmatch(l.text); m != nil {
+				out = append(out, image(in.Path, l.n, m[1], nil)...)
+				continue
+			}
+			directives = strings.TrimSpace(l.text) == "" || isComment(strings.TrimSpace(l.text))
+		}
+		if heredoc != "" {
+			if strings.TrimSpace(l.text) == heredoc {
+				out = append(out, heredocFindings(in, body)...)
+				heredoc, body = "", nil
+			} else {
+				body = append(body, line{start + len(body) + 1, l.text})
+			}
+			continue
+		}
+		f := strings.Fields(vars.expand(l.text))
+		if len(f) < 2 || isComment(f[0]) {
+			continue
+		}
+		out = append(out, instruction(in, l.n, f, stages)...)
+		if m := textHeredocRe.FindStringSubmatch(l.text); m != nil && strings.EqualFold(f[0], "RUN") {
+			heredoc, start = m[1], l.n
+		}
+	}
+	if heredoc != "" { // an unterminated body is still checked (fail closed)
+		out = append(out, heredocFindings(in, body)...)
+	}
+	return out
+}
+
+// textHeredocRe finds a RUN heredoc (RUN <<EOF, <<-"EOF") and its delimiter
+// for textDockerfile.
+var textHeredocRe = regexp.MustCompile(`<<-?\s*["']?([A-Za-z_][A-Za-z0-9_]*)["']?`)
+
+// buildkitDockerfile reads a Dockerfile as BuildKit splits it.
+func buildkitDockerfile(in Input) []Finding {
 	lines, out := dockerLines(in.Path, string(in.Data))
 	plain := make([]line, len(lines))
 	for i, l := range lines {
@@ -153,7 +242,6 @@ func (dockerfile) Detect(in Input) []Finding {
 			out = append(out, heredocFindings(in, l.body)...)
 		}
 	}
-	slices.SortStableFunc(out, func(a, b Finding) int { return a.Line - b.Line })
 	return out
 }
 

@@ -1,6 +1,7 @@
 package pinning
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -70,16 +71,24 @@ var fileCases = []fileCase{
 	{name: "compose quoted key", path: "compose.yaml", data: "    \"image\": \"nginx:latest\"\n    'image': nginx" + dg + "\n", want: []string{"nginx:latest"}},
 	// Valid YAML is read by the parser alone, so a key the regexes misplace
 	// cannot hide a decoded value (#116).
-	{name: "yaml anchor-only value on the next line", path: "compose.yaml", data: "services:\n  web:\n    image: &a\n      alpine:latest\n", want: []string{"alpine:latest"}},
-	{name: "yaml empty flow value on the next line", path: "compose.yaml", data: "services: {web: {image:\n  alpine:latest}}\n", want: []string{"alpine:latest"}},
+	{name: "yaml anchor-only value on the next line", path: "compose.yaml", data: "services:\n  web:\n    image: &a\n      alpine:latest\n", want: []string{"alpine:latest", "alpine:latest"}},
+	{name: "yaml empty flow value on the next line", path: "compose.yaml", data: "services: {web: {image:\n  alpine:latest}}\n", want: []string{"alpine:latest", "alpine:latest}}"}},
 	{name: "yaml lone cr line break", path: "compose.yaml", data: "services:\n  x:\r    image: busybox:latest\r  y:\n    image: alpine" + dg + "\n", want: []string{"busybox:latest"}},
 	{name: "yaml nel line break", path: "compose.yaml", data: "services:\n  x:\u0085    image: busybox:latest\u0085  y:\n    image: alpine" + dg + "\n", want: []string{"busybox:latest"}},
 	{name: "yaml ls line break", path: "compose.yaml", data: "services:\n  x:\u2028    image: busybox:latest\u2028  y:\n    image: alpine" + dg + "\n", want: []string{"busybox:latest"}},
 	{name: "yaml ls line break in a list", path: "k8s/pod.yaml", data: "l:\n- a: b\u2028  image: evil:latest\n- image: a" + dg + "\n", want: []string{"evil:latest"}},
 	{name: "compose dockerfile_inline", path: "compose.yaml", data: "services:\n  w:\n    build:\n      context: .\n      dockerfile_inline: |\n        FROM alpine:latest\n", want: []string{"alpine:latest"}},
 	{name: "compose additional_contexts", path: "compose.yaml", data: "services:\n  w:\n    build:\n      additional_contexts:\n        base: docker-image://alpine:latest\n        p: docker-image://alpine" + dg + "\n        src: ../src\n  v:\n    build:\n      additional_contexts:\n      - base=docker-image://redis:7\n", want: []string{"alpine:latest", "redis:7"}},
-	{name: "helm templated key", path: "templates/pod.yaml", data: "spec:\n  containers:\n  - name: x\n    ima{{ \"ge\" }}: alpine:latest\n", want: []string{`ima{{ "ge" }}: alpine:latest`}},
-	{name: "helm templated key in a template", path: "templates/pod.yaml", data: "{{- range $k, $v := .Values.c }}\n  {{ $k }}: {{ $v }}\n{{- end }}\n  name: {{ .x }}\n# {{ a }}: b\n", want: []string{"{{ $k }}: {{ $v }}"}},
+	// The line pass runs on valid YAML too: Helm renders a block scalar with
+	// tpl (extraContainers), and a KRM function config holds its image.
+	{name: "yaml image in a block scalar", path: "values.yaml", data: "extraContainers: |\n  - name: sidecar\n    image: busybox:latest\n", want: []string{"busybox:latest"}},
+	{name: "yaml binary key", path: "compose.yaml", data: "services: {app: {!!binary aW1hZ2U=: alpine:3.22}}\n", want: []string{"alpine:3.22"}},
+	{name: "yaml tagged key", path: "compose.yaml", data: "services:\n  app:\n    !custom image: alpine:3.22\n    !!str name: x\n    !!binary bad: x\n", want: []string{"!custom image", "alpine:3.22", "!!binary bad"}},
+	{name: "image tag transformer file", path: "k8s/retag.yaml", data: "apiVersion: builtin\nkind: ImageTagTransformer\nmetadata: {name: t}\nimageTag: {name: alpine, newTag: \"3.22\"}\n", want: []string{"ImageTagTransformer"}},
+	{name: "workflow template expression is not a templated key", path: ".github/workflows/ci.yml", data: "jobs:\n  a:\n    steps:\n    - run: |\n        echo \"ref ${{ github.ref }}: ok\"\n", want: nil},
+	{name: "templated key outside templates in valid yaml", path: "k8s/labels.yaml", data: "labels:\n  a: \"{{ $k }}: x\"\n", want: nil},
+	{name: "helm templated key", path: "templates/pod.yaml", data: "spec:\n  containers:\n  - name: x\n    ima{{ \"ge\" }}: alpine:latest\n", want: []string{`ima{{ "ge" }}`}},
+	{name: "helm templated key in a template", path: "templates/pod.yaml", data: "{{- range $k, $v := .Values.c }}\n  {{ $k }}: {{ $v }}\n{{- end }}\n  name: {{ .x }}\n# {{ a }}: b\n", want: []string{"{{ $k }}"}},
 	{name: "helm template values on the next line", path: "templates/pod.yaml", data: "{{- if .x }}\n  - name: a\n    image: # c\n      evil:1\n    image: &a\n      evil:2\n    image: &b evil:3\n    image: &c\n      tag: x\n    image: {a: b, image:\n      evil:4}\n{{- end }}\n", want: []string{"evil:1", "evil:2", "evil:3", "{a: b, image:", "evil:4}"}},
 	{name: "helm template value after a lone cr", path: "templates/pod.yaml", data: "x:\r  y:\r    image: {{ .v }}\n", want: []string{"{{ .v }}"}},
 	{name: "helm tpl helper", path: "templates/_helpers.tpl", data: "{{- define \"demo.container\" }}\nimage: busybox:latest\n{{- end }}\n", want: []string{"busybox:latest"}},
@@ -111,7 +120,10 @@ var fileCases = []fileCase{
 	{name: "kustomize imageTags", path: "kustomization.yaml", data: "imageTags:\n- name: alpine\n  newTag: latest\n", want: []string{"alpine:latest"}},
 	{name: "kustomize patch sets an image", path: "kustomization.yaml", data: "patches:\n- path: replicas.yaml\n- target: {kind: Deployment}\n  patch: |-\n    - op: replace\n      path: /spec/template/spec/containers/0/image\n      value: alpine:latest\n", want: []string{"patches[1]"}},
 	{name: "kustomize replacement sets an image", path: "kustomization.yaml", data: "replacements:\n- source: {kind: ConfigMap, name: c, fieldPath: data.img}\n  targets:\n  - select: {kind: Deployment}\n    fieldPaths: [spec.template.spec.containers.0.image]\n", want: []string{"replacements[0]"}},
-	{name: "kustomize legacy patches set an image", path: "kustomization.yaml", data: "patchesStrategicMerge:\n- |-\n  kind: Deployment\n  spec: {template: {spec: {containers: [{name: a, IMAGE: x}]}}}\npatchesJson6902:\n- target: {kind: Deployment, name: a}\n  path: image-patch.yaml\n", want: []string{"patchesStrategicMerge[0]", "patchesJson6902[0]"}},
+	{name: "kustomize patches that set no image", path: "kustomization.yaml", data: "patches:\n- path: image-patch.yaml\n- patch: |-\n    - op: add\n      path: /spec/template/spec/containers/0/imagePullPolicy\n      value: Always\n- patch: |-\n    kind: Deployment\n    spec: {template: {spec: {imagePullSecrets: [{name: r}]}}}\n- patch: \"[\"\nreplacements:\n- targets: [{fieldPaths: [spec.template.spec.containers.0.imagePullPolicy]}]\n", want: nil},
+	{name: "kustomize patch moves an image and a second document sets one", path: "kustomization.yaml", data: "patchesJson6902:\n- patch: '[{op: move, from: /spec/x/image, path: /spec/y}]'\npatches:\n- patch: |-\n    kind: A\n    ---\n    kind: Deployment\n    spec: {template: {spec: {containers: [{name: a, image: x}]}}}\nreplacements:\n- targets: [{fieldPath: image}]\n", want: []string{"x", "patches[0]", "patchesJson6902[0]", "replacements[0]"}},
+	{name: "kustomize transformers, generators and helm charts", path: "k8s/kustomization.yaml", scope: []string{"k8s/labels.yaml"}, data: "transformers:\n- labels.yaml\n- |-\n  apiVersion: builtin\n  kind: ImageTagTransformer\n  metadata: {name: t}\n  imageTag: {name: alpine, newTag: \"3.22\"}\n- ../xform\ngenerators:\n- |-\n  kind: X\n  images: [{name: a, newTag: b}]\n- |-\n  kind: ConfigMapGenerator\nhelmCharts:\n- {name: c, valuesFile: v.yaml}\n- {name: c, valuesInline: {image: {tag: latest}}}\n", want: []string{"{tag: latest", "transformers[1]", "transformers[2]", "generators[0]", "helmCharts[1]"}},
+	{name: "kustomize legacy patches set an image", path: "kustomization.yaml", data: "patchesStrategicMerge:\n- |-\n  kind: Deployment\n  spec: {template: {spec: {containers: [{name: a, IMAGE: x}]}}}\npatchesJson6902:\n- target: {kind: Deployment, name: a}\n  path: image-patch.yaml\n", want: []string{"patchesStrategicMerge[0]"}},
 	{name: "dockerfile tag", path: "Dockerfile", data: "FROM golang:1.25\n", want: []string{"golang:1.25"}},
 	{name: "dockerfile platform and stages", path: "build/Containerfile", data: "# c\nFROM --platform=$BUILDPLATFORM golang:1.25" + dg + " AS build\nFROM build AS test\nFROM scratch\nCOPY --from=build /a /b\nCOPY --from=0 /a /b\n", want: nil},
 	{name: "dockerfile stage name is not an earlier stage", path: "Dockerfile", data: "FROM build AS build\n", want: []string{"build"}},
@@ -127,23 +139,29 @@ var fileCases = []fileCase{
 	// BuildKit line rules (#116): a comment line stands alone, continuations
 	// join with nothing, comments and blank lines inside one are dropped,
 	// and # escape= is honoured only among the leading parser directives.
+	// These rules only add findings: the original line pass still runs, so
+	// what it reads (a heredoc body as instructions, a continuation joined
+	// with a space) is still reported.
+	{name: "dockerfile heredoc on an old frontend", path: "Dockerfile", data: "# syntax=docker/dockerfile:1.2" + dg + "\nFROM alpine" + dg + "\nRUN true <<#x\nFROM alpine:3.22\n#x\nRUN echo final\n", want: []string{"alpine:3.22"}},
+	{name: "dockerfile rules only on files named as dockerfiles", path: "frontend/dockerfile/dockerfile_args_test.go", data: "ARG IMG=alpine" + dg + "\nFROM $IMG\nARG IMG=alpine" + dg + "\nCOPY <<EOF /x\nFROM alpine" + dg + "\nEOF\n", want: nil},
+	{name: "dockerfile rules on a containerfile variant", path: "Containerfile.dev", data: "ARG IMG=a:1\nFROM $IMG\nARG IMG=a:2\n", want: []string{"FROM $IMG", "a:2"}},
 	{name: "dockerfile comment ending in backslash", path: "Dockerfile", data: "FROM alpine" + dg + "\n# note \\\nFROM evil:latest\n", want: []string{"evil:latest"}},
 	{name: "dockerfile comment ending in backslash crlf", path: "Dockerfile", data: "FROM alpine" + dg + "\r\n  # note \\\r\nFROM evil:latest\r\n", want: []string{"evil:latest"}},
-	{name: "dockerfile continuation joins with nothing", path: "Dockerfile", data: "FROM db:1\\\n6\n", want: []string{"db:16"}},
-	{name: "dockerfile continuation drops comments and blank lines", path: "Dockerfile", data: "FROM \\\n# c \\\n  \n  db:1\\\n  # d\n6\n", want: []string{"db:16"}},
-	{name: "dockerfile digest split across a continuation", path: "Dockerfile", data: "FROM alpine@sha256:" + dg[8:40] + "\\\n# c\n" + dg[40:] + "\n", want: nil},
+	{name: "dockerfile continuation joins with nothing", path: "Dockerfile", data: "FROM db:1\\\n6\n", want: []string{"db:1", "db:16"}},
+	{name: "dockerfile continuation drops comments and blank lines", path: "Dockerfile", data: "FROM \\\n# c \\\n  \n  db:1\\\n  # d\n6\n", want: []string{"#", "db:16"}},
+	{name: "dockerfile digest split across a continuation", path: "Dockerfile", data: "FROM alpine@sha256:" + dg[8:40] + "\\\n# c\n" + dg[40:] + "\n", want: []string{"alpine@sha256:" + dg[8:40]}},
 	{name: "dockerfile escaped backslash is not a continuation", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN echo \\\\\nFROM evil:latest\n", want: []string{"evil:latest"}},
 	{name: "dockerfile escape backtick", path: "Dockerfile", data: "# escape=`\nFROM alpine" + dg + " \\\nFROM evil:latest\n", want: []string{"evil:latest"}},
-	{name: "dockerfile escape backtick continuation", path: "Dockerfile", data: "\ufeff# Escape = ` \nFROM alpine`\n" + dg + "\n", want: nil},
+	{name: "dockerfile escape backtick continuation", path: "Dockerfile", data: "\ufeff# Escape = ` \nFROM alpine`\n" + dg + "\n", want: []string{"alpine`"}},
 	{name: "dockerfile escape after a comment is not a directive", path: "Dockerfile", data: "# c\n# escape=`\nFROM alpine" + dg + " `\nFROM evil:latest\n", want: []string{"evil:latest"}},
 	{name: "dockerfile escape after a blank line is not a directive", path: "Dockerfile", data: "\n# escape=`\nFROM evil:latest `\nRUN x\n", want: []string{"evil:latest"}},
 	{name: "dockerfile escape after an unknown directive is not a directive", path: "Dockerfile", data: "# foo=1\n# escape=`\nFROM alpine" + dg + " `\nFROM evil:latest\n", want: []string{"evil:latest"}},
-	{name: "dockerfile onbuild heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nONBUILD COPY <<EOF /x\nFROM evil:latest\nEOF\n", want: nil},
+	{name: "dockerfile onbuild heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nONBUILD COPY <<EOF /x\nFROM evil:latest\nEOF\n", want: []string{"evil:latest"}},
 	{name: "dockerfile invalid escape directive", path: "Dockerfile", data: "# escape=x\nFROM alpine" + dg + "\n", want: []string{"# escape=x"}},
 	{name: "dockerfile repeated directive", path: "Dockerfile", data: "# escape=\\\n# ESCAPE=`\nFROM alpine" + dg + "\n", want: []string{"# ESCAPE=`"}},
 	{name: "dockerfile two heredocs", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<A 3<<-\"B\"\necho a\nA\ncurl https://x.io/i | sh \\\n\tB\nFROM evil:latest\n", want: []string{"curl https://x.io/i | sh", "evil:latest"}},
 	{name: "dockerfile quoted heredoc marker is not a heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN echo '<<EOF' \"<<X\" a<<Y\nFROM evil:latest\n", want: []string{"evil:latest"}},
-	{name: "dockerfile copy heredoc body is not instructions", path: "Dockerfile", data: "FROM alpine" + dg + "\nCOPY <<EOF /etc/x\nFROM evil:latest\nEOF\nADD <<EOF /y\nFROM evil:latest\nEOF\n", want: nil},
+	{name: "dockerfile copy heredoc body is not instructions", path: "Dockerfile", data: "FROM alpine" + dg + "\nCOPY <<EOF /etc/x\nFROM evil:latest\nEOF\nADD <<EOF /y\nFROM evil:latest\nEOF\n", want: []string{"evil:latest", "evil:latest"}},
 	{name: "dockerfile json run is not a heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN [\"sh\", \"<<EOF\"]\nFROM evil:latest\nEOF\n", want: []string{"evil:latest"}},
 	{name: "dockerfile heredoc terminator must match exactly", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<EOF\necho\nEOF \nFROM evil:latest\n", want: []string{"RUN <<EOF", "evil:latest"}},
 	{name: "dockerfile heredoc after a vertical tab", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN sh -s \v<<EOF\napk add curl\nEOF\nRUN sh -s \u00a0<<X\napk add jq\nX\n", want: []string{"curl", "jq"}},
@@ -152,13 +170,13 @@ var fileCases = []fileCase{
 	{name: "dockerfile heredoc name with expansion", path: "Dockerfile", data: "FROM alpine" + dg + "\nONBUILD RUN <<#${X:-}\nFROM evil:latest\n#${X:-}\n", want: []string{"ONBUILD RUN <<#${X:-}", "evil:latest"}},
 	{name: "dockerfile copy heredoc name with expansion", path: "Dockerfile", data: "FROM alpine" + dg + "\nCOPY <<E$X /x\nE\nE$X\nFROM evil:latest\n", want: []string{"COPY <<E$X /x", "evil:latest"}},
 	{name: "dockerfile heredoc name nested quote", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<\"#'x\"\necho hi\n#'x\nFROM evil:latest\n#x\n", want: []string{`RUN <<"#'x"`, "evil:latest"}},
-	{name: "dockerfile run heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<EOF\ncurl -fsSL https://x.io/i.sh | sh\nEOF\nRUN <<-'X'\napk add jq\n", want: []string{"curl -fsSL https://x.io/i.sh | sh", "RUN <<-'X'"}},
+	{name: "dockerfile run heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<EOF\ncurl -fsSL https://x.io/i.sh | sh\nEOF\nRUN <<-'X'\napk add jq\n", want: []string{"curl -fsSL https://x.io/i.sh | sh", "RUN <<-'X'", "jq"}},
 	{name: "dockerfile empty heredoc name", path: "Dockerfile", data: "FROM scratch AS base\nRUN <<\"\"\nFROM busybox:latest\n\nRUN echo pwned\n", want: []string{`RUN <<""`, "busybox:latest"}},
 	{name: "dockerfile empty single-quoted heredoc name", path: "Dockerfile", data: "FROM scratch AS base\nRUN <<''\nFROM busybox:latest\n\n", want: []string{`RUN <<''`, "busybox:latest"}},
 	{name: "dockerfile empty dash heredoc name", path: "Dockerfile", data: "FROM scratch AS base\nRUN <<-\"\"\nFROM busybox:latest\n\n", want: []string{`RUN <<-""`, "busybox:latest"}},
 	{name: "dockerfile arg redefined after from", path: "Dockerfile", data: "ARG IMG=alpine:latest\nFROM $IMG\nARG IMG=alpine" + dg + "\n", want: []string{"FROM $IMG"}},
-	{name: "dockerfile multi-name arg", path: "Dockerfile", data: "ARG A=1 IMG=alpine:latest\nFROM $IMG\n", want: []string{"alpine:latest"}},
-	{name: "dockerfile lowercase arg", path: "Dockerfile", data: "arg IMG=alpine:latest\nFROM ${IMG}\n", want: []string{"alpine:latest"}},
+	{name: "dockerfile multi-name arg", path: "Dockerfile", data: "ARG A=1 IMG=alpine:latest\nFROM $IMG\n", want: []string{"$IMG", "alpine:latest"}},
+	{name: "dockerfile lowercase arg", path: "Dockerfile", data: "arg IMG=alpine:latest\nFROM ${IMG}\n", want: []string{"$IMG", "alpine:latest"}},
 	{name: "dockerfile arg redeclared in a stage", path: "Dockerfile", data: "ARG IMG=alpine" + dg + "\nFROM $IMG\nARG IMG\nRUN echo $IMG\n", want: nil},
 
 	// Go.
@@ -241,6 +259,45 @@ func TestDetectorsFileCases(t *testing.T) {
 				t.Fatalf("refs = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestNoRegressionAgainstMain: testdata/main-findings.json holds what the
+// scanner at cb81760 (before the parser-based detection, #116) found for
+// each fileCases input, as "line ecosystem ref". The scanner now must find
+// all of it: parser findings only add. A case added later has no entry and
+// is skipped. No detector finding is in the scan ecosystem, which
+// scope.allowMutable cannot acknowledge: that is only for an unreadable file.
+func TestNoRegressionAgainstMain(t *testing.T) {
+	data, err := os.ReadFile("testdata/main-findings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var frozen map[string][]string
+	if err := json.Unmarshal(data, &frozen); err != nil {
+		t.Fatal(err)
+	}
+	if len(frozen) < 100 {
+		t.Fatalf("only %d frozen cases", len(frozen))
+	}
+	for _, tc := range fileCases {
+		has := func(p string) bool { return p == tc.path || slices.Contains(tc.scope, p) }
+		var got []string
+		for _, d := range Detectors {
+			if d.Applies(tc.path) {
+				for _, f := range d.Detect(Input{Path: tc.path, Data: []byte(tc.data), Has: has}) {
+					got = append(got, fmt.Sprintf("%d %s %s", f.Line, f.Ecosystem, f.Ref))
+					if f.Ecosystem == "scan" {
+						t.Errorf("%s: scan finding %+v", tc.name, f)
+					}
+				}
+			}
+		}
+		for _, w := range frozen[tc.name] {
+			if !slices.Contains(got, w) {
+				t.Errorf("%s: main found %q, now %q", tc.name, w, got)
+			}
+		}
 	}
 }
 

@@ -56,27 +56,39 @@ ADD --checksum=sha256:<sum> https://example.com/tool.tgz /tool.tgz
 A `# syntax=` parser directive names the BuildKit frontend image: pin it too
 (`# syntax=docker/dockerfile:1@sha256:<digest>`).
 
-Aval splits a Dockerfile into instructions the way BuildKit does: a comment
-line stands on its own, even when it ends in `\`; a continued line joins the
-next one with nothing in between (`FROM db:1\` then `6` is `db:16`); comment
-and blank lines inside a continuation are dropped; and a leading
-`# escape=` directive sets the continuation character. The bodies of
-`COPY` and `ADD` heredocs are file content, not instructions. A Dockerfile
-BuildKit refuses (an invalid `# escape=`, a repeated directive, an
-unterminated heredoc) is reported in the `scan` ecosystem, and so is a
-heredoc name with a quote, backslash or `$` inside it (`<<#\\x`,
-`<<E$X`), or an empty one (`<<""`), which Aval does not decode. Every
-`NAME=value` of an `ARG` counts (`ARG A=1 IMG=x`, also lowercase `arg`); a
-`FROM` that uses an `ARG` given a value more than once is a `scan`
-finding: give it one value.
+Aval reads a Dockerfile twice and reports what either pass finds. A line
+pass reads each line (a continuation joined with a space, a `RUN` heredoc
+body as a script, anything else as instructions). For a file named
+`Dockerfile`, `Containerfile`, `Dockerfile.*`, `Containerfile.*`,
+`*.dockerfile` or `*.containerfile`, a second pass splits it the way
+BuildKit does: a comment line stands on its own, even when it ends in `\`;
+a continued line joins the next one with nothing in between (`FROM db:1\`
+then `6` is `db:16`); comment and blank lines inside a continuation are
+dropped; a leading `# escape=` directive sets the continuation character;
+and the bodies of `RUN`, `COPY` and `ADD` heredocs are kept apart. Since the
+line pass still runs, a heredoc body or continuation it misreads can be
+reported too: a needless miss, never a false hit (an old frontend reads no
+heredocs at all). The BuildKit pass also reports a Dockerfile BuildKit
+refuses (an invalid `# escape=`, a repeated directive, an unterminated
+heredoc), a heredoc name with a quote, backslash or `$` inside it
+(`<<#\\x`, `<<E$X`) or an empty one (`<<""`), which Aval does not decode,
+and a `FROM` that uses an `ARG` given a value more than once (every
+`NAME=value` of an `ARG` counts, also lowercase `arg`): give it one value.
 
 A `kustomization.yaml` that retargets an image in `images:` (or the legacy
 `imageTags:`) with `newName` or `newTag` needs a `digest:` too. A
 `tagSuffix` is always reported: kustomize drops the digest when it appends
-the suffix. A `patches`, `patchesStrategicMerge`, `patchesJson6902` or
-`replacements` entry that mentions `image` is a `scan` finding, since Aval
-does not apply patches: pin the image in the base, or retarget it in
-`images:` with a digest.
+the suffix. Aval does not apply patches or run transformers, so these
+entries are reported by name and index (`patches[0]`, `transformers[1]`):
+a `patches`, `patchesStrategicMerge`, `patchesJson6902` or `replacements`
+entry with an `image:` key, a JSON6902 `path` or `from` ending in `/image`,
+or a `fieldPath` ending in `.image`; a `transformers` or `generators` entry
+that holds an image transformer (`ImageTagTransformer`, `images:`,
+`imageTag:`) or names a path outside the scope (a directory, a remote
+base); and a `helmCharts` entry with `valuesInline`. A transformer file in
+the scope is a YAML file: its `kind: ImageTagTransformer` is reported
+there. Pin the image in the base, or retarget it in `images:` with a
+digest.
 
 ```yaml
 images:
@@ -88,7 +100,7 @@ images:
 Aval reads `images:` as kustomize does: field names match case-insensitively
 (`IMAGES:`, `NewTag:`) and merge keys (`<<:`) are resolved. A kustomization
 that is not valid YAML, or whose `images:` kustomize could not decode, is
-reported in the `scan` ecosystem.
+reported by its path.
 
 Find the digest with `docker buildx imagetools inspect <image:tag>` or
 `crane digest <image:tag>`. Images in `docker run`, `podman run` and
@@ -100,19 +112,22 @@ that comes from a variable Aval cannot resolve (`${DB_IMAGE}`) or from a
 Helm template (`{{ .Values.image }}`) is reported: write the digest into a
 file in the scope, or render the chart into the scope. A YAML alias
 (`image: *img`), a block scalar (`image: >-`) or a tag (`image: !!str ...`)
-is reported too: write the reference inline. A file that is valid YAML is
-read by the YAML parser alone: every `image:` key is matched by its decoded
-value (`"ima\x67e":`, `? image`, `!!str image:`, anchored keys), wherever
-its value is written. A Compose `build.dockerfile_inline` is checked as a
-Dockerfile and `build.additional_contexts` values with `docker-image://` as
-images. Helm helpers (`*.tpl`) are checked like templates. A key a template
-writes (`ima{{ "ge" }}:`, `{{ $k }}:`) is reported in the `scan` ecosystem.
-A file that is not valid YAML (a Helm template) is read line by line: only
-an escaped key with its value on the same line is matched by its decoded
-value; a quoted key with an escape YAML cannot decode, an escaped `image`
-key whose value is elsewhere (`? "\x69mage"`, a value on the next line)
-and a quoted key that continues on the next line are reported in the
-`scan` ecosystem.
+is reported too: write the reference inline.
+
+YAML is also read twice, and what either pass finds is reported. The line
+pass matches `image:` keys in every line, also inside a block scalar a
+template renders (`extraContainers: |`). The YAML parser matches every
+`image:` key by its decoded value (`"ima\x67e":`, `? image`, `!!str image:`,
+`!!binary aW1hZ2U=:`, anchored keys), wherever its value is written; a key
+with another tag (`!custom image:`) is reported by its text. A Compose
+`build.dockerfile_inline` is checked as a Dockerfile and
+`build.additional_contexts` values with `docker-image://` as images. In a
+file the parser rejects (a Helm template), a quoted key with an escape YAML
+cannot decode, an escaped `image` key whose value is elsewhere
+(`? "\x69mage"`, a value on the next line) and a quoted key that continues
+on the next line are reported. In Helm helpers (`*.tpl`), files under a
+`templates/` directory and files the parser rejects, a key a template
+writes (`ima{{ "ge" }}:`, `{{ $k }}:`) is reported by its key text.
 
 ### Go
 
@@ -237,8 +252,11 @@ contract, so adding or removing one changes the fingerprint, and reviewers
 see it in the diff. `aval run` still prints the finding, marked
 `(allowed: <reason>)`. A file Aval cannot read (larger than 1 MiB, or
 unreadable) is reported in the `scan` ecosystem and cannot be accepted:
-shrink or split it. The same holds for the other `scan` findings above (a
-Dockerfile BuildKit refuses, an undecodable YAML key): fix the file.
+shrink or split it. Every other finding above, including those Aval
+reports because it cannot tell (a templated key, a kustomize entry such as
+`patches[0]`, an undecodable heredoc name or YAML key, a `FROM` with a
+redefined `ARG`), is in the `container` ecosystem and can be acknowledged
+by the `ref` Aval prints.
 
 ## Limits
 
@@ -259,8 +277,8 @@ not reported. Keep the scope honest, pin in place, and use
   YAML a template prints (`{{ include ... }}`, `{{ toYaml ... }}`), are not
   read. In a template the YAML parser rejects, keys written as block
   scalars or aliases are not decoded.
-- Kustomize: a patch file referenced by `path:` that sets an image without
-  `image` in the entry is not read.
+- Kustomize: a JSON6902 patch file referenced by `path:` that sets an
+  image (`path: /spec/.../image`) is not read.
 - Dockerfile variables: the last value of a name wins, with no stage
   scoping, except in `FROM` (above).
 
