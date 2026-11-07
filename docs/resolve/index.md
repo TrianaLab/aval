@@ -142,9 +142,10 @@ Nothing is looked up, the test runs, and the reason names the reference:
 it) point to other files. Only a
 `machine` entry of `~/.netrc` is used, never `default`, and credentials are
 sent only over `https` or to a loopback host (also after a redirect).
-Credentials go in headers, never in the manifest, a URL or an error. A user or password
-in a registry variable (`GOPROXY=https://user:token@host`) is masked in
-errors, and refused over plain `http` to a host that is not loopback. Credentials written in a reference (a password, a user name
+Credentials go in headers, never in the manifest, a URL or an error. A user, a password or a path
+in a registry variable (`GOPROXY=https://user:token@host`,
+`https://npm-proxy.fury.io/<token>/user/`) is masked in errors (every URL
+in an error shows only its host), and refused over plain `http` to a host that is not loopback. Credentials written in a reference (a password, a user name
 in an `http(s)` or scheme-less `//user@host` URL, or a query parameter
 such as `token`, `private_token`, `sig`, `client_secret` or
 `X-Amz-Signature`, in any case and with `-` or `_`) are
@@ -156,11 +157,13 @@ The resolved id vouches for the registry in the table, not for the one the
 tool installs from. Where the tool's own setting is known to point
 elsewhere, resolution fails: an npm `@scope:registry` or `registry` line in
 `~/.npmrc`, an `npm_config_@scope:registry` variable,
-two spellings of an `npm_config_*` variable (npm reads any letter case) that differ, `$GOPRIVATE`, `$GONOPROXY` or a `$GOPROXY` that starts with
+two spellings of an `npm_config_*` variable (npm reads any letter case, with `_` equal to `-` after the first character) that differ, `$GOPRIVATE`, `$GONOPROXY` or a `$GOPROXY` that starts with
 `direct` or `off`, a Go module the checksum database would not verify
 (`GOSUMDB=off`, `$GONOSUMDB`, `$GOINSECURE`, `-insecure` in `$GOFLAGS`),
-and `$PIP_INDEX_URL`, `$PIP_EXTRA_INDEX_URL`, `$PIP_FIND_LINKS` or
-`$PIP_NO_INDEX`. Other tool configuration files are not read:
+`$PIP_INDEX_URL`, `$PIP_PYPI_URL` (pip's alias of `--index-url`), `$PIP_EXTRA_INDEX_URL`, `$PIP_FIND_LINKS` or
+`$PIP_NO_INDEX` (in any spelling pip reads, such as `PIP_index-url`), and a
+Maven `<latest>` or `<release>` that is a SNAPSHOT or not listed. A
+`~/.npmrc` line Aval cannot read fails too. Other tool configuration files are not read:
 `pip.conf`, a project `.npmrc`, `go env -w` settings, Cargo's
 `config.toml`, Maven's `settings.xml`, `.gemrc`. If one of them points the
 tool to another registry, set the Aval variable to the same registry.

@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -76,13 +77,47 @@ func entry(fields ...string) string {
 var semverRe = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`)
 
 // npmEnv returns npm_config_<key> and the spelling that set it, in any
-// letter case as npm reads it (@npmcli/config: /^npm_config_/i). Empty
-// values are ignored; two spellings with different values fail.
+// letter case as npm reads it (@npmcli/config: /^npm_config_/i), with a
+// non-leading _ read as - (npm_config_@my_org:registry is @my-org:registry).
 func npmEnv(key string) (name, val string, err error) {
+	return env(func(k string) bool {
+		if len(k) < 11 || !strings.EqualFold(k[:11], "npm_config_") {
+			return false
+		}
+		rest := k[11:]
+		if len(rest) > 1 && !strings.HasPrefix(rest, "//") { // @npmcli/config loadEnv
+			rest = rest[:1] + strings.ReplaceAll(rest[1:], "_", "-")
+		}
+		return strings.EqualFold(rest, key)
+	})
+}
+
+var goos = runtime.GOOS // a variable so tests cover the Windows case
+
+// pipEnv returns pip's option opt (index-url) from the environment and the
+// spelling that set it, as pip reads it: PIP_, then the option in any
+// letter case with - or _ and one optional leading -- (PIP___INDEX_URL).
+func pipEnv(opt string) (name, val string, err error) {
+	return env(func(k string) bool {
+		rest, ok := strings.CutPrefix(k, "PIP_")
+		if !ok && goos == "windows" && len(k) > 4 && strings.EqualFold(k[:4], "PIP_") { // Python uppercases os.environ keys on Windows
+			rest, ok = k[4:], true
+		}
+		return ok && strings.TrimPrefix(strings.ReplaceAll(strings.ToLower(rest), "_", "-"), "--") == opt // pip _normalize_name: one leading -- is dropped
+	})
+}
+
+// env returns the environment variable whose name matches, without a
+// trailing slash ("/" stays "/"). Empty values are ignored; two spellings
+// with different values fail.
+func env(match func(string) bool) (name, val string, err error) {
 	for _, kv := range os.Environ() {
 		k, v, _ := strings.Cut(kv, "=")
-		if v = strings.TrimSuffix(v, "/"); v == "" || !strings.EqualFold(k, "npm_config_"+key) {
+		if v == "" || !match(k) {
 			continue
+		}
+		if t := strings.TrimSuffix(v, "/"); t != "" {
+			v = t
 		}
 		if name != "" && v != val {
 			return "", "", fmt.Errorf("%s is %s and %s is %s: set one", name, redact(val), k, redact(v))
@@ -98,15 +133,9 @@ func npmEnv(key string) (name, val string, err error) {
 // registry), or a registry line when no environment variable sets one. The
 // environment beats .npmrc and the last line wins, as in npm.
 func npmRegistry(pkg, base string) error {
-	_, userconfig, err := npmEnv("userconfig")
+	vals, err := npmrc()
 	if err != nil {
 		return err
-	}
-	vals := map[string]string{}
-	for _, l := range strings.Split(configFile(userconfig, ".npmrc"), "\n") {
-		if k, v, ok := strings.Cut(l, "="); ok {
-			vals[strings.TrimSpace(k)] = strings.TrimSuffix(os.ExpandEnv(strings.TrimSpace(v)), "/")
-		}
 	}
 	key := "registry"
 	_, env, err := npmEnv("registry")
@@ -128,7 +157,7 @@ func npmRegistry(pkg, base string) error {
 			key = scope + ":registry"
 		}
 	}
-	if v, ok := vals[key]; ok && v != base {
+	if v, ok := vals[key]; ok && strings.TrimSuffix(v, "/") != base {
 		return fmt.Errorf(".npmrc sets %s to %s, not %s: npm would install from there; set npm_config_registry to match", key, redact(v), redact(base))
 	}
 	return nil
@@ -232,16 +261,21 @@ func pypi(ctx context.Context, ref string) (string, string, error) {
 // pipIndex fails when the environment points pip to another index than
 // base.
 func pipIndex(base string) error {
-	if v := os.Getenv("PIP_FIND_LINKS"); v != "" {
-		return errors.New("PIP_FIND_LINKS is set: pip would install from there")
-	}
-	if v := strings.ToLower(os.Getenv("PIP_NO_INDEX")); v != "" && !slices.Contains([]string{"0", "false", "no", "off", "n", "f"}, v) {
-		return errors.New("PIP_NO_INDEX is set: pip would not read the index")
-	}
-	for _, e := range []string{"PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL"} {
+	for _, opt := range []string{"find-links", "no-index", "index-url", "pypi-url", "extra-index-url"} { // pypi-url: pip's alias of --index-url
+		k, v, err := pipEnv(opt)
+		switch {
+		case err != nil:
+			return err
+		case v == "":
+		case opt == "find-links":
+			return fmt.Errorf("%s is set: pip would install from there", k)
+		case opt == "no-index":
+			if !slices.Contains([]string{"0", "false", "no", "off", "n", "f"}, strings.ToLower(v)) {
+				return fmt.Errorf("%s is set: pip would not read the index", k)
+			}
 		// pip reads the simple index at <base>/simple: the same registry.
-		if v := strings.TrimSuffix(os.Getenv(e), "/"); v != "" && (e == "PIP_EXTRA_INDEX_URL" || v != base && v != base+"/simple") {
-			return fmt.Errorf("%s is %s, not %s: pip would install from there; set AVAL_PYPI_URL to match", e, redact(v), redact(base))
+		case opt == "extra-index-url" || v != base && v != base+"/simple":
+			return fmt.Errorf("%s is %s, not %s: pip would install from there; set AVAL_PYPI_URL to match", k, redact(v), redact(base))
 		}
 	}
 	return nil
@@ -485,6 +519,16 @@ func maven(ctx context.Context, ref string) (string, string, error) {
 	}
 	if slices.ContainsFunc(doc.Versions, isSnapshot) {
 		return "", "", errSnapshot
+	}
+	// Maven installs <latest> for LATEST and <release> for RELEASE: their
+	// content is bound only when they are listed.
+	for _, x := range []string{doc.Latest, doc.Release} {
+		if isSnapshot(x) {
+			return "", "", errSnapshot
+		}
+		if x != "" && !slices.Contains(doc.Versions, x) {
+			return "", "", fmt.Errorf("maven-metadata.xml names %s, which is not in <versions>", x)
+		}
 	}
 	if len(doc.Versions) > maxMavenVersions {
 		return "", "", fmt.Errorf("%d versions: too many versions to bind: use an exact version", len(doc.Versions))
