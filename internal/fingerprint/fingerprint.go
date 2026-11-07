@@ -239,10 +239,11 @@ type file struct {
 // left out, and so is every directory no include glob can match a file in:
 // an unreadable or deep directory outside the scope is never opened.
 //
-// The walk does not follow symlinks. A symlink an include glob matches is
-// rejected when hashed (unless excluded). One no glob matches, but under
-// which a glob could match files, may point to a directory whose files
-// cannot be hashed, so it is an error here (fail closed).
+// The walk does not follow symlinks. A symlink under which an include glob
+// could match files may point to a directory whose files cannot be hashed,
+// so it is an error here (fail closed), whether or not a glob matches its
+// own name and whatever exclude says. A symlink only an exact glob reaches
+// is rejected when hashed (unless excluded).
 func listFiles(fsys fs.FS, skip map[string]bool, include []contract.Glob) ([]file, error) {
 	var out []file
 	err := fs.WalkDir(fsys, ".", func(rel string, d fs.DirEntry, err error) error {
@@ -262,11 +263,11 @@ func listFiles(fsys fs.FS, skip map[string]bool, include []contract.Glob) ([]fil
 			}
 			return nil
 		}
+		if d.Type()&fs.ModeSymlink != 0 && mayContain {
+			return fmt.Errorf("%q is a symlink a glob could match files under: only regular files are supported in scope (symlinks are not followed)", rel)
+		}
 		if skip[rel] {
 			return nil
-		}
-		if d.Type()&fs.ModeSymlink != 0 && mayContain && !matchesAny(include, f) {
-			return fmt.Errorf("%q is a symlink a glob could match files under: only regular files are supported in scope (symlinks are not followed)", rel)
 		}
 		out = append(out, f)
 		return nil

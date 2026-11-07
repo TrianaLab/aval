@@ -303,6 +303,15 @@ var corpus = []corpusCase{
 		f.do(os.WriteFile(filepath.Join(out, "b.go"), []byte("package b\n"), 0o644))
 		f.symlink(out, "pkg/sub")
 	}, want: failClosed},
+	{name: "symlinked directory excluded by name", change: func(f *fixture) {
+		// exclude matches names only and does not prune the walk, so
+		// excluding sub would drop sub/b.go unhashed.
+		f.c.Scope.Source = []string{"**"}
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "sub")
+		out := f.t.TempDir()
+		f.do(os.WriteFile(filepath.Join(out, "b.go"), []byte("package b\n"), 0o644))
+		f.symlink(out, "sub")
+	}, want: failClosed},
 	{name: "source replaced by symlink", change: func(f *fixture) {
 		f.rename("main.go", "real.txt")
 		f.symlink("real.txt", "main.go")
