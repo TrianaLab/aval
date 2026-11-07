@@ -12,7 +12,7 @@ import (
 // The task guides (#75): short, visual pages whose code cannot drift.
 var guides = []string{
 	"github-actions", "signing", "write-a-contract", "trust-policy",
-	"go-consumer", "measure-reuse", "troubleshooting",
+	"go-consumer", "measure-reuse", "troubleshooting", "depend-on-a-contract",
 }
 
 // guideMaxLines is the maintainer's "under ~100 lines", with room for the

@@ -245,6 +245,7 @@ func printFingerprint(out, warn io.Writer, fp fingerprint.Fingerprint, fpErr err
 	}
 	if o.explain {
 		fmt.Fprint(out, fp.Manifest)
+		printContracts(out, fp.Contracts, "")
 		printResolveCost(warn, fp)
 	}
 	if o.fingerprintOnly {
@@ -252,6 +253,16 @@ func printFingerprint(out, warn io.Writer, fp fingerprint.Fingerprint, fpErr err
 		fmt.Fprintln(out, fp.Digest)
 	}
 	return nil
+}
+
+// printContracts prints the scope.contracts tree, one indented line per
+// reference: path (relative to the contract that names it), name and
+// fingerprint.
+func printContracts(w io.Writer, deps []fingerprint.Dependency, indent string) {
+	for _, d := range deps {
+		fmt.Fprintf(w, "%sdepends on %s (%s) %s\n", indent, d.Path, d.Name, d.Digest)
+		printContracts(w, d.Contracts, indent+"  ")
+	}
 }
 
 // printResolveCost reports what scope.resolve cost: the network time of

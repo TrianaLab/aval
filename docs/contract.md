@@ -78,6 +78,7 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 | `scope.dependencies` | list of globs | no | Lockfiles and manifests. Each glob must match at least one file at fingerprint time. |
 | `scope.allowMutable` | list of `{ref, reason}` | no | Acknowledges a mutable reference that would otherwise block reuse (see [Pin your dependencies](pinning.md)). `ref` is the reference exactly as Aval reports it; `reason` says why it is acceptable. Both must be non-blank. An entry accepts every occurrence of that reference in the scope and in `runner.command`. Part of the contract hash. |
 | `scope.resolve` | list of `kind: reference` | no | External artifacts resolved to an immutable id at fingerprint time (see [Resolve references](resolve/index.md)). Each entry has exactly one key, one of `image`, `npm`, `pypi`, `go`, `maven`, `crate`, `gem`, `git`, `url`; the reference is non-empty, without spaces or control characters, and without credentials. Rejected: a password in any URL; any user name in an `http(s)` URL or a scheme-less `//user@host` one (an `ssh://git@host` user is allowed); an `@` in the authority of a URL that does not parse; a query parameter named (in any case, `-` read as `_`, a trailing `[]` ignored) `token`, `private_token`, `access_token`, `key`, `apikey`, `api_key`, `sig`, `signature`, `X-Amz-Signature`, `X-Goog-Signature`, `auth`, `password`, `secret`, `credential`, `security_token`, `x_amz_security_token`, `client_secret`, `session` or `sessionid`. The error never echoes the reference. Part of the contract hash; order and duplicates do not matter. Never clears a scanner finding: pin the reference in place or accept it with `scope.allowMutable`. Binds the named artifact, not its dependencies. |
+| `scope.contracts` | list of paths | no | Other contracts this test depends on (see [Depend on another part of the repo](guides/depend-on-a-contract.md)). Each path is relative to this contract's directory: clean (`..` only at the start), slash-separated, without spaces, ending in `.yaml` or `.yml`, listed once. At fingerprint time the file must exist, be a valid contract and lie inside the git working tree of this contract (the nearest directory at or above it with a `.git` entry). No component of the path may be a symlink. No cycles, at most 8 levels and 64 distinct contracts. A referenced contract's mutable references block reuse here too, unless its own `scope.allowMutable` accepts them. Part of the contract hash; order does not matter. |
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
 | `environment.env` | list of strings | no | Environment variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
@@ -158,19 +159,20 @@ dependency <sha256> <mode> <path>
 toolchain <key>=<value>
 env <NAME> <sha256 of value | unset>
 resolve <kind> <reference> <version> <immutable id>
+contract <path> <name> <fingerprint>
 ```
 
 - **Header**: `aval-fingerprint/v1`. Bumped whenever the manifest of an existing contract would change, so
   fingerprints from different formats never collide.
 - **contract**: SHA-256 of the contract serialized as JSON after parsing.
   Comments, formatting and YAML key order do not matter. Set-like lists
-  (`source`, `exclude`, `dependencies`, `env`, `allowMutable`, `resolve`) are sorted
+  (`source`, `exclude`, `dependencies`, `env`, `allowMutable`, `resolve`, `contracts`) are sorted
   and deduplicated first, so their order does not matter. `runner.command` is not sorted:
   argv order is semantic. Map keys (`toolchain`) are sorted by the JSON
   encoder. Every field is included, so changing `metadata.name`,
   `runner.command` or `cacheability` changes the fingerprint. An explicitly
   empty list or map (`exclude: []`) hashes the same as an omitted field.
-  `allowMutable` and `resolve` are left out of the JSON when empty, so
+  `allowMutable`, `resolve` and `contracts` are left out of the JSON when empty, so
   contracts without them hash as they did before the fields existed.
 - **source**: one line per file that matches any `source` glob and no
   `exclude` glob.
@@ -193,6 +195,13 @@ resolve <kind> <reference> <version> <immutable id>
   lines, and only they need the network to fingerprint (see
   [Resolve references](resolve/index.md)). The registry address is not
   hashed.
+- **contract** with a path: one line per `scope.contracts` entry: the path
+  as written, the referenced contract's `metadata.name` and its
+  fingerprint, computed from its own directory, scope, environment,
+  `scope.resolve` and `scope.contracts` (so references are transitive).
+  Only contracts with `scope.contracts` have these lines. `--explain` also
+  prints the tree, one `depends on <path> (<name>) <fingerprint>` line per
+  reference, indented by level.
 
 Lines are sorted within each section. The result does not depend on checkout
 path, directory iteration order or glob order. The `x` mode is taken from the
@@ -298,6 +307,15 @@ does not, and an unresolvable reference fails closed; `internal/resolve`
 has the per-ecosystem tables. `TestResolveManifestGolden` pins the
 `resolve` lines in `testdata/golden/resolve-aval-fingerprint-vN.manifest`.
 
+`TestContractsFalseHits` and `TestContractsFailClosed` cover
+`scope.contracts`: a change inside a referenced contract's scope (also two
+levels down) changes the dependent's fingerprint, a change outside it does
+not, and a missing, invalid, escaping, symlinked, cyclic or too deep
+reference fails closed. `TestContractsFindings` checks that a referenced
+contract's mutable references block the dependent. `TestContractsManifestGolden`
+pins the `contract <path>` lines in
+`testdata/golden/contracts-aval-fingerprint-vN.manifest`.
+
 `TestManifestGolden` pins, per manifest version, the manifests of three
 contracts over a fixed tree (`internal/fingerprint/testdata/golden/tree`),
 concatenated in `testdata/golden/aval-fingerprint-vN.manifest`. One
@@ -385,6 +403,12 @@ test without recording it; `aval run --fingerprint-only`, `--explain`,
 - A `scope.resolve` reference that cannot be resolved: `resolve <kind>
   <reference>: <reason>` (network, credentials, an exact version that is not published, a
   download over 256 MiB, the 2-minute deadline).
+- A `scope.contracts` reference that cannot be proven: `scope.contracts
+  <path>: <reason>`. The reason is any error above in the referenced
+  contract, or: the file is missing or not a valid contract; `leads outside
+  the repository root`; `no git working tree (.git) at or above <dir>`; `<path> is a
+  symlink`; `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`; `more than
+  8 levels or 64 contracts`.
 - Any I/O error while walking or reading the root. The walk only enters
   directories that a `source` or `dependencies` glob can match a file in, so
   an unreadable directory outside the scope (a root-owned volume, a cache)

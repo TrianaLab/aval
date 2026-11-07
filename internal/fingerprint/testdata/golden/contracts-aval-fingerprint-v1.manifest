@@ -1,0 +1,5 @@
+aval-fingerprint/v1
+contract 41de925d9e119872ac32e899103ec698abbd9bced887295052e35924b04caf29
+source 8a8f60ecb09b7e64c6d5214a8043865e608507db8c3f61f995eae6d078875901 - src/app.js
+contract ../backend/aval.yaml backend sha256:8441dfa3e11c8bccc1a61b5823a2bec95a873850348f5621e602de5ea37279be
+contract ../shared/aval.yaml shared sha256:6eb9ac39ebcd65dad5ffb21c87f2686e2b74820a545a3ac1293580924408fea4

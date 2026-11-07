@@ -10,9 +10,12 @@
 //	toolchain <key>=<value>
 //	env <NAME> <sha256 of value | unset>
 //	resolve <kind> <reference> <version> <immutable id>
+//	contract <path> <name> <fingerprint>
 //
 // resolve lines appear only for contracts with scope.resolve, the one part
-// of the manifest that reads the network (internal/resolve).
+// of the manifest that reads the network (internal/resolve); contract
+// <path> lines only for contracts with scope.contracts, one per referenced
+// contract with its own fingerprint (so references are transitive).
 //
 // Lines are sorted within each section, paths are slash-separated and
 // relative to the contract root, so the result does not depend on the
@@ -34,6 +37,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -61,7 +65,29 @@ type Fingerprint struct {
 	// Resolved are the scope.resolve references with the ids hashed in
 	// the manifest and the time each took.
 	Resolved []resolve.Result
+	// Contracts are the scope.contracts references, sorted by path, each
+	// with its own fingerprint (and so its own references): the tree
+	// --explain shows.
+	Contracts []Dependency
 }
+
+// Dependency is one scope.contracts reference and its fingerprint. Its
+// findings are also in the referencing Fingerprint's Findings.
+type Dependency struct {
+	// Path is the reference as written, relative to the referencing
+	// contract's directory.
+	Path string
+	// Name is the referenced contract's metadata.name.
+	Name string
+	Fingerprint
+}
+
+// Bounds on scope.contracts: how deep references may nest, and how many
+// distinct contracts one fingerprint may read.
+const (
+	maxContractDepth = 8
+	maxContracts     = 64
+)
 
 // resolveAll is a seam for the golden test, which must not need a network.
 var resolveAll = resolve.All
@@ -90,27 +116,95 @@ const OutputDir = ".aval"
 // Compute fingerprints the contract c rooted at dir. outputs are files Aval
 // itself writes (the --result and --report paths); the ones inside dir are
 // not inputs and are skipped. Empty entries are ignored.
+//
+// A contract with scope.contracts is resolved inside the git working tree
+// that holds dir (see repoRoot): no reference may lead outside it.
 func Compute(ctx context.Context, dir string, c *contract.Contract, env LookupEnv, outputs ...string) (Fingerprint, error) {
-	return compute(ctx, os.DirFS(dir), c, env, outputsUnder(dir, outputs))
+	root, rel := dir, "."
+	if len(c.Scope.Contracts) > 0 {
+		var err error
+		if root, rel, err = repoRoot(dir); err != nil {
+			return Fingerprint{}, err
+		}
+	}
+	return newTree(ctx, os.DirFS(root), env, outputsUnder(root, outputs)).compute(rel, c)
+}
+
+// repoRoot returns the nearest directory at or above dir with a .git entry
+// (a directory, or the file of a worktree or submodule), and dir relative
+// to it, slash-separated. Without one, scope.contracts has no boundary, so
+// it fails closed.
+func repoRoot(dir string) (string, string, error) {
+	abs, err := filepath.Abs(dir)
+	for root := abs; err == nil; {
+		if _, serr := os.Lstat(filepath.Join(root, ".git")); serr == nil {
+			rel, _ := filepath.Rel(root, abs) // both absolute, root a prefix of abs
+			return root, filepath.ToSlash(rel), nil
+		}
+		parent := filepath.Dir(root)
+		if parent == root {
+			break
+		}
+		root = parent
+	}
+	return "", "", fmt.Errorf("scope.contracts: no git working tree (.git) at or above %s: referenced contracts must lie inside one", dir)
 }
 
 // ComputeFS fingerprints the contract c rooted at fsys, such as the
 // in-memory project of the browser demo (cmd/aval-wasm). Its manifest is the
 // one Compute writes for the same tree. skip lists slash-separated paths,
 // relative to the root, that are Aval outputs and not inputs.
+// scope.contracts references must lie inside fsys.
 func ComputeFS(fsys fs.FS, c *contract.Contract, env LookupEnv, skip ...string) (Fingerprint, error) {
 	m := map[string]bool{}
 	for _, s := range skip {
 		m[s] = true
 	}
 	// ponytail: no ctx; the browser demo's contracts declare no scope.resolve.
-	return compute(context.Background(), fsys, c, env, m)
+	return newTree(context.Background(), fsys, env, m).compute(".", c)
 }
 
-func compute(ctx context.Context, fsys fs.FS, c *contract.Contract, env LookupEnv, skip map[string]bool) (Fingerprint, error) {
+// tree fingerprints a contract and the contracts it references, all
+// inside one root.
+type tree struct {
+	ctx  context.Context
+	root fs.FS
+	env  LookupEnv
+	skip map[string]bool // Aval outputs, relative to root
+	// done holds each referenced contract already fingerprinted, by its
+	// path relative to root, so a shared one is computed once; stack is
+	// the chain being computed, to name a cycle.
+	done  map[string]Dependency
+	stack []string
+}
+
+func newTree(ctx context.Context, root fs.FS, env LookupEnv, skip map[string]bool) *tree {
 	if env == nil {
 		env = os.LookupEnv
 	}
+	return &tree{ctx: ctx, root: root, env: env, skip: skip, done: map[string]Dependency{}}
+}
+
+// sub returns the directory dir of the root and the outputs under it,
+// relative to dir.
+func (t *tree) sub(dir string) (fs.FS, map[string]bool) {
+	if dir == "." {
+		return t.root, t.skip
+	}
+	fsys, _ := fs.Sub(t.root, dir) // dir is a valid path: Sub cannot fail
+	skip := map[string]bool{}
+	for p := range t.skip {
+		if rel, ok := strings.CutPrefix(p, dir+"/"); ok {
+			skip[rel] = true
+		}
+	}
+	return fsys, skip
+}
+
+// compute fingerprints c, whose directory is dir (relative to the root).
+func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
+	fsys, skip := t.sub(dir)
+	ctx, env := t.ctx, t.env
 	canon := canonicalContract(c)
 	source, exclude, deps := splitGlobs(c.Scope.Source), splitGlobs(c.Scope.Exclude), splitGlobs(c.Scope.Dependencies)
 	files, err := listFiles(fsys, skip, slices.Concat(source, deps))
@@ -166,8 +260,83 @@ func compute(ctx context.Context, fsys fs.FS, c *contract.Contract, env LookupEn
 		lines = append(lines, fmt.Sprintf("resolve %s %s %s %s", r.Kind, r.Ref, r.Version, r.ID))
 	}
 
+	refs, err := t.contracts(dir, c)
+	if err != nil {
+		return Fingerprint{}, err
+	}
+	found := findings(fsys, c, slices.Concat(src, dep))
+	for _, d := range refs {
+		lines = append(lines, fmt.Sprintf("contract %s %s %s", d.Path, d.Name, d.Digest))
+		// A referenced contract's findings block this one too; its own
+		// scope.allowMutable already marked them, this one's never applies.
+		for _, f := range d.Findings {
+			f.File = path.Join(path.Dir(d.Path), f.File)
+			found = append(found, f)
+		}
+	}
+
 	manifest := strings.Join(lines, "\n") + "\n"
-	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: findings(fsys, c, slices.Concat(src, dep)), Resolved: resolved}, nil
+	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: found, Resolved: resolved, Contracts: refs}, nil
+}
+
+// contracts fingerprints the scope.contracts of c, whose directory is dir,
+// sorted by path. Any reference that cannot be proven fails the whole
+// fingerprint (fail closed).
+func (t *tree) contracts(dir string, c *contract.Contract) ([]Dependency, error) {
+	var out []Dependency
+	for _, ref := range slices.Sorted(slices.Values(c.Scope.Contracts)) {
+		d, err := t.load(path.Join(dir, ref))
+		if err != nil {
+			return nil, fmt.Errorf("scope.contracts %s: %w", ref, err)
+		}
+		d.Path = ref
+		out = append(out, d)
+	}
+	return out, nil
+}
+
+// load parses and fingerprints the contract at file, relative to the root.
+func (t *tree) load(file string) (Dependency, error) {
+	if !fs.ValidPath(file) {
+		return Dependency{}, errors.New("leads outside the repository root (the git working tree, or the project in the browser demo)")
+	}
+	if i := slices.Index(t.stack, file); i >= 0 {
+		return Dependency{}, fmt.Errorf("cycle: %s", strings.Join(append(slices.Clone(t.stack[i:]), file), " -> "))
+	}
+	if d, ok := t.done[file]; ok {
+		return d, nil
+	}
+	if len(t.stack) >= maxContractDepth || len(t.done) >= maxContracts {
+		return Dependency{}, fmt.Errorf("more than %d levels or %d contracts", maxContractDepth, maxContracts)
+	}
+	// Like a symlink in scope, a symlink on the way to a contract may lead
+	// anywhere (#118).
+	for p := file; p != "."; p = path.Dir(p) {
+		fi, err := fs.Lstat(t.root, p)
+		if err != nil {
+			return Dependency{}, err
+		}
+		if fi.Mode()&fs.ModeSymlink != 0 {
+			return Dependency{}, fmt.Errorf("%s is a symlink: symlinks are not followed", p)
+		}
+	}
+	data, err := fs.ReadFile(t.root, file)
+	if err != nil {
+		return Dependency{}, err
+	}
+	c, err := contract.Parse(data)
+	if err != nil {
+		return Dependency{}, err
+	}
+	t.stack = append(t.stack, file)
+	fp, err := t.compute(path.Dir(file), c)
+	t.stack = t.stack[:len(t.stack)-1]
+	if err != nil {
+		return Dependency{}, err
+	}
+	d := Dependency{Name: c.Metadata.Name, Fingerprint: fp}
+	t.done[file] = d
+	return d, nil
 }
 
 // canonicalResolve sorts and deduplicates scope.resolve, so its order does
@@ -230,6 +399,7 @@ func canonicalContract(c *contract.Contract) []byte {
 	})
 	cc.Scope.AllowMutable = slices.Compact(cc.Scope.AllowMutable)
 	cc.Scope.Resolve = canonicalResolve(c.Scope.Resolve)
+	cc.Scope.Contracts = sorted(c.Scope.Contracts)
 	// Marshal cannot fail: the contract holds only strings, string slices
 	// and string maps. Map keys are sorted by encoding/json.
 	b, _ := json.Marshal(cc)

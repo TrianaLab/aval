@@ -88,6 +88,15 @@ func TestParseInvalid(t *testing.T) {
   resolve: [{git: "https://ghp_tok@[::1/o/r@main"}]`, "credentials in the reference are not allowed"},
 		"resolve password in a URL that does not parse": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   resolve: [{url: "ssh://u:s3cret@exa%zz.com/x"}]`, "credentials in the reference are not allowed"},
+		"contracts empty path":   {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [\"\"]", "scope.contracts[0]: \"\": must be a clean relative path"},
+		"contracts absolute":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [/repo/aval.yaml]", "clean relative path"},
+		"contracts inner ..":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [a/../b/aval.yaml]", "clean relative path"},
+		"contracts dot segment":  {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [./b/aval.yaml]", "clean relative path"},
+		"contracts backslash":    {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: ['..\\b\\aval.yaml']", "slash-separated"},
+		"contracts space":        {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [\"b c/aval.yaml\"]", "without spaces"},
+		"contracts not yaml":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../backend]", "must name a contract file"},
+		"contracts listed twice": {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../b/aval.yaml, ../b/aval.yaml]", "scope.contracts[1]: \"../b/aval.yaml\" is listed twice"},
+		"contracts not a list":   {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: ../b/aval.yaml", "cannot unmarshal"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -115,6 +124,22 @@ func TestParseAllowMutable(t *testing.T) {
 	}
 	if c, _ := Parse([]byte(valid)); c.Scope.AllowMutable != nil {
 		t.Fatalf("omitted allowMutable = %+v, want nil", c.Scope.AllowMutable)
+	}
+}
+
+// TestParseContracts: scope.contracts is optional and keeps each path as
+// written, ".." and .yml included.
+func TestParseContracts(t *testing.T) {
+	c, err := Parse([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  contracts: [../backend/aval.yaml, ../../shared/aval.int.yml, lib/aval.yaml]`, 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "[../backend/aval.yaml ../../shared/aval.int.yml lib/aval.yaml]"; fmt.Sprint(c.Scope.Contracts) != want {
+		t.Fatalf("contracts = %v, want %s", c.Scope.Contracts, want)
+	}
+	if c, _ := Parse([]byte(valid)); c.Scope.Contracts != nil {
+		t.Fatalf("omitted contracts = %v, want nil", c.Scope.Contracts)
 	}
 }
 

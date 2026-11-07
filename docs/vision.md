@@ -203,3 +203,13 @@ These formats are frozen; within a version they change additively only (see
    and verify report version are frozen, with compatibility rules in
    [artifact-format.md](artifact-format.md#versioning-and-compatibility)
    and golden files guarding the JSON shape (#17).
+6. **Contract composition for monorepos (Epic 10).** Exit criterion: a test
+   in a monorepo reruns when, and only when, the declared inputs of the
+   parts it depends on change.
+   *In progress:* `scope.contracts` binds the fingerprints of other local
+   contracts, transitively (#124; see
+   [Depend on another part of the repo](guides/depend-on-a-contract.md)).
+   Follow-up idea, not built: a remote dependency (another repository, by
+   OCI reference). Its files are not available to fingerprint, so it would
+   bind a published, verified result instead, which raises its own trust
+   questions (whose signature, which policy, what a revoked result means).
