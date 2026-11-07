@@ -264,9 +264,11 @@ func npmToken(hostPath string) string {
 // ($npm_config_userconfig, else ~/.npmrc), read as npm's ini parser reads
 // them: comments, quotes and escapes, the last line wins, ${VAR} expanded
 // in keys and values as npm expands it (an undefined variable stays
-// literal). A line with U+2028 or U+2029, which npm drops, fails. Keys under a [section] are not npm settings and are skipped.
-// A line npm reads as a flag (no =) or a list (key[]=), or a section named
-// like a setting, fails: Aval cannot tell what npm would use.
+// literal). A line with U+2028 or U+2029, which npm drops, fails.
+// Keys under a [section] are not npm settings and are skipped. A line npm
+// reads as a flag (no =) or a list (key[]=), a quoted key or value that is
+// JSON other than a string, or a section named like a setting, fails: Aval
+// cannot tell what npm would use.
 func npmrc() (map[string]string, error) {
 	_, userconfig, err := npmEnv("userconfig")
 	if err != nil {
@@ -297,10 +299,13 @@ func npmrc() (map[string]string, error) {
 			continue
 		}
 		k, v, ok := strings.Cut(l, "=")
-		if k = npmEnvReplace(iniValue(k)); !ok || k == "" || strings.HasSuffix(k, "[]") {
+		if k = npmEnvReplace(iniValue(k)); !ok || k == "" || strings.HasSuffix(k, "[]") || strings.Contains(k, "\n") {
 			return nil, bad
 		}
-		vals[k] = npmEnvReplace(iniValue(v))
+		if v = npmEnvReplace(iniValue(v)); strings.Contains(v, "\n") {
+			return nil, bad
+		}
+		vals[k] = v
 	}
 	return vals, nil
 }
@@ -336,9 +341,12 @@ func iniValue(s string) string {
 		if s[0] == '\'' {
 			s = s[1 : len(s)-1]
 		}
-		var u string
+		var u any
 		if json.Unmarshal([]byte(s), &u) == nil {
-			return u
+			if str, ok := u.(string); ok {
+				return str
+			}
+			return "\n" // npm reads a JSON array, number, bool or null here (['registry'] is the key registry): npmrc fails the line
 		}
 		return s
 	}

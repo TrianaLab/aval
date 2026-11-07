@@ -43,7 +43,8 @@ scope:
   at all, or `$PIP_NO_INDEX` is true, resolution fails: pip would install
   from another source than the one Aval read. As in pip, the rest of the
   name after `PIP_` is read in any letter case, with `-` equal to `_`
-  (`PIP_index-url`); two spellings set to different values fail.
+  and one optional leading `--` (`PIP_index-url`, `PIP___INDEX_URL`);
+  two spellings set to different values fail.
   `pip.conf` and `uv` settings are not read.
 
 **Pin instead** for your requirements: `pip-compile --generate-hashes` or

@@ -83,11 +83,11 @@ func npmEnv(key string) (name, val string, err error) {
 
 // pipEnv returns pip's option opt (index-url) from the environment and the
 // spelling that set it, as pip reads it: PIP_, then the option in any
-// letter case with - or _.
+// letter case with - or _ and one optional leading -- (PIP___INDEX_URL).
 func pipEnv(opt string) (name, val string, err error) {
 	return env(func(k string) bool {
 		rest, ok := strings.CutPrefix(k, "PIP_")
-		return ok && strings.ReplaceAll(strings.ToLower(rest), "_", "-") == opt
+		return ok && strings.TrimPrefix(strings.ReplaceAll(strings.ToLower(rest), "_", "-"), "--") == opt // pip _normalize_name: one leading -- is dropped
 	})
 }
 

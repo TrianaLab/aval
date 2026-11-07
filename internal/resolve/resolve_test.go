@@ -1137,6 +1137,7 @@ func TestPipEnvSpellings(t *testing.T) {
 		"PIP_index_url": "https://evil.example/simple", "PIP_INDEX-URL": "https://evil.example/simple",
 		"PIP_Extra-Index_URL": "https://evil.example/simple", "PIP_find-links": "./wheels", "PIP_no_index": "1",
 		"PIP_FIND_LINKS": "/", "PIP_EXTRA_INDEX_URL": "/",
+		"PIP___INDEX_URL": "https://evil.example/simple", "PIP_--find-links": "./wheels",
 	} {
 		t.Setenv(k, v)
 		mustFail(t, "pypi", "x==1.0", k)
@@ -1190,6 +1191,9 @@ func TestNpmrcIni(t *testing.T) {
 		"${K}=http://evil/":                                      "registry",
 		"registry=${UNSET_AVAL_X?}" + base:                       "",
 		`registry=\${K}`:                                         "registry",
+		`'["registry"]'=http://evil/`:                            "cannot read",
+		`'["@acme:registry"]'=http://evil/`:                      "cannot read",
+		`registry='["http://evil/"]'`:                            "cannot read",
 	} {
 		if err := os.WriteFile(npmrc, []byte(rc), 0o600); err != nil {
 			t.Fatal(err)
