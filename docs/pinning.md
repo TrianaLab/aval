@@ -64,8 +64,8 @@ and blank lines inside a continuation are dropped; and a leading
 `COPY` and `ADD` heredocs are file content, not instructions. A Dockerfile
 BuildKit refuses (an invalid `# escape=`, a repeated directive, an
 unterminated heredoc) is reported in the `scan` ecosystem, and so is a
-heredoc name with a quote or backslash inside it (`<<#\\x`), which Aval does
-not decode.
+heredoc name with a quote, backslash or `$` inside it (`<<#\\x`,
+`<<E$X`), which Aval does not decode.
 
 A `kustomization.yaml` that retargets an image in `images:` with `newName`
 or `newTag` needs a `digest:` too. A `tagSuffix` is always reported:
@@ -96,8 +96,11 @@ file in the scope, or render the chart into the scope. A YAML alias
 is reported too: write the reference inline. A plain value on the line
 after `image:` is checked like an inline one. Keys are matched by their
 decoded value, so `"ima\x67e":`, `? image` and `!!str image:` are checked
-too. In a file that is not valid YAML, a quoted key with an escape YAML
-cannot decode is reported in the `scan` ecosystem.
+too. In a file that is not valid YAML (a Helm template), only an escaped
+key with its value on the same line is matched by its decoded value; a
+quoted key with an escape YAML cannot decode, an escaped `image` key whose
+value is elsewhere (`? "\x69mage"`, a value on the next line) and a quoted
+key that continues on the next line are reported in the `scan` ecosystem.
 
 ### Go
 

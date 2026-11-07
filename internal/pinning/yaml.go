@@ -128,28 +128,58 @@ func decodedImage(file string, n int, v *yaml.Node) []Finding {
 	return []Finding{{File: file, Line: n, Ecosystem: "container", Ref: ref, Fix: unresolvedFix}}
 }
 
-// escapedKeyRe is a double-quoted key with at least one escape.
-var escapedKeyRe = regexp.MustCompile(`"((?:[^"\\]|\\.)*\\.(?:[^"\\]|\\.)*)"\s*:`)
+// escapedKeyRe is a double-quoted scalar with at least one escape, behind
+// a ? (an explicit key) or before a colon (a key).
+var escapedKeyRe = regexp.MustCompile(`(\?\s*)?"((?:[^"\\]|\\.)*\\.(?:[^"\\]|\\.)*)"(\s*:)?`)
 
 // escapedKeys is the fallback for a file the YAML parser rejects: a quoted
 // key with an escape is decoded on its own. One that decodes to image has
-// its value checked; one that does not decode is a scan finding (fail
-// closed).
+// its value checked when it is on the same line. Fail closed with a scan
+// finding when the key does not decode, when its value is elsewhere (an
+// explicit key, the next line) or when a quoted scalar continues on the
+// next line (it may join into image).
 func escapedKeys(in Input) []Finding {
 	var out []Finding
+	scan := func(n int, ref, fix string) {
+		out = append(out, Finding{File: in.Path, Line: n, Ecosystem: "scan", Ref: ref, Fix: fix})
+	}
 	for i, l := range strings.Split(string(in.Data), "\n") {
+		l = strings.TrimSuffix(l, "\r")
+		if strings.HasSuffix(l, `\`) && openQuote(l) {
+			scan(i+1, strings.TrimSpace(l), "a quoted key that continues on the next line, so Aval cannot tell whether it is image: write the key plainly")
+		}
 		for _, m := range escapedKeyRe.FindAllStringSubmatchIndex(l, -1) {
+			if m[2] < 0 && m[6] < 0 {
+				continue // a quoted value, not a key
+			}
+			ref, rest := l[m[0]:m[5]+1], strings.TrimSpace(l[m[1]:])
 			var k string
-			switch err := yaml.Unmarshal([]byte(`"`+l[m[2]:m[3]]+`"`), &k); {
+			switch err := yaml.Unmarshal([]byte(`"`+l[m[4]:m[5]]+`"`), &k); {
 			case err != nil:
-				out = append(out, Finding{File: in.Path, Line: i + 1, Ecosystem: "scan", Ref: l[m[0] : m[3]+1],
-					Fix: "a quoted key with an escape YAML cannot decode, so Aval cannot tell whether it is image: write the key plainly"})
-			case k == "image":
+				scan(i+1, ref, "a quoted key with an escape YAML cannot decode, so Aval cannot tell whether it is image: write the key plainly")
+			case k != "image":
+			case m[6] < 0 || rest == "" || rest[0] == '#':
+				scan(i+1, ref, "an escaped image key whose value Aval cannot place: write the key plainly")
+			default:
 				out = append(out, yamlImage(in.Path, i+1, l[m[1]:])...)
 			}
 		}
 	}
 	return out
+}
+
+// openQuote reports whether l ends inside a double-quoted scalar.
+func openQuote(l string) bool {
+	in := false
+	for i := 0; i < len(l); i++ {
+		switch {
+		case in && l[i] == '\\':
+			i++
+		case l[i] == '"':
+			in = !in
+		}
+	}
+	return in
 }
 
 // kustomize checks the images: of a kustomization, which retarget an

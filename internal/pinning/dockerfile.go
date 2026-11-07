@@ -67,7 +67,7 @@ func dockerLines(file, data string) ([]dockerLine, []Finding) {
 			var ok bool
 			if l.body, i, ok = heredocBodies(l.text, phys, i); !ok {
 				bad = []Finding{{File: file, Line: l.n, Ecosystem: "scan", Ref: t,
-					Fix: "an unterminated heredoc, so BuildKit refuses the file: Aval cannot check its references; end the heredoc"}}
+					Fix: "an unterminated heredoc or a heredoc name Aval cannot decode: Aval cannot check its references; end the heredoc and write its name plainly"}}
 			}
 		}
 		out = append(out, l)
@@ -167,14 +167,15 @@ func takesHeredocs(text string) bool {
 }
 
 // heredocName decodes a heredoc name: a leading backslash or one pair of
-// enclosing quotes is dropped. A name with any other quote or backslash is
-// not ok: BuildKit's lexer decodes those, so fail closed instead of guessing.
+// enclosing quotes is dropped. A name with any other quote, backslash or $
+// is not ok: BuildKit's lexer decodes and expands those (and with some
+// expansions reads no heredoc at all), so fail closed instead of guessing.
 func heredocName(w string) (string, bool) {
 	name := strings.TrimPrefix(w, `\`)
 	if len(name) >= 2 && (name[0] == '"' || name[0] == '\'') && name[len(name)-1] == name[0] {
 		name = name[1 : len(name)-1]
 	}
-	return name, !strings.ContainsAny(name, `"'\`)
+	return name, !strings.ContainsAny(name, `"'\$`)
 }
 
 // shellWords splits s at unquoted Unicode spaces and keeps quotes and escapes, as
