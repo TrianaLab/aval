@@ -112,19 +112,20 @@ func bounded(err error, set *RecordSet, listing string) error {
 }
 
 // statsTests lists the test ids of the repository's stats anchors, sorted.
-// Tags list in lexical order (OCI distribution spec), so the listing starts
-// after "stats", which sorts just before every stats-<id>, and stops at the
-// first tag past the prefix: sha256-* tags never use up the page bound. A
-// registry that ignores last still works, with the page bound as the limit.
+// It reads every tag and filters by prefix: registries need not sort tags
+// (GHCR does not) and may answer an unknown last with no tags, so no order
+// is assumed and last is never set.
+// ponytail: full tag scan, bounded at maxReferrerPages pages of the
+// registry's page size (100 on distribution: 6400 tags), past which the set
+// is marked truncated; keep stats in a repository of its own, or page with a
+// larger n, if fingerprint tags outgrow that.
 func statsTests(ctx context.Context, r *remote.Repository, set *RecordSet) ([]string, error) {
 	var ids []string
 	prefix := StatsTag("")
-	err := r.Tags(context.WithValue(ctx, pageCount{}, new(int)), strings.TrimSuffix(prefix, "-"), func(tags []string) error {
+	err := r.Tags(context.WithValue(ctx, pageCount{}, new(int)), "", func(tags []string) error {
 		for _, t := range tags {
 			if id, ok := strings.CutPrefix(t, prefix); ok && id != "" {
 				ids = append(ids, id)
-			} else if !ok && t > prefix {
-				return errBound // past every stats-<id> tag
 			}
 		}
 		return nil
