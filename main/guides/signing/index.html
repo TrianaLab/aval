@@ -6,17 +6,17 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.">
+        <meta name="description" content="Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.">
       
       
       
         <link rel="canonical" href="https://aval.run/main/guides/signing/">
       
       
-        <link rel="prev" href="../../resolve/urls/">
+        <link rel="prev" href="../trust-policy/">
       
       
-        <link rel="next" href="../trust-policy/">
+        <link rel="next" href="../../pinning/">
       
       
         
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#sign-with-a-key-or-keyless" class="md-skip">
+        <a href="#sign-results" class="md-skip">
           Skip to content
         </a>
       
@@ -313,7 +313,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../github-actions/" class="md-tabs__link">
+        <a href="../write-a-contract/" class="md-tabs__link">
           
   
   
@@ -761,8 +761,6 @@
       
         
       
-        
-      
     
     
     
@@ -810,34 +808,6 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../github-actions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    GitHub Actions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -902,6 +872,170 @@
   
   
     <li class="md-nav__item">
+      <a href="../github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trust-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a trust policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#which-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which one
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../pinning/" class="md-nav__link">
         
   
@@ -910,6 +1044,185 @@
     
   
     Pin your dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../measure-reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure reuse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../go-consumer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume from Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
   
 
     
@@ -960,17 +1273,14 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -992,14 +1302,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="">
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_5">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1275,325 +1585,10 @@
                 
   
   
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Sign results
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Sign results
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#the-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The example
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#which-one" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Which one
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#read-next" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Read next
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../trust-policy/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Write a trust policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../go-consumer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Consume from Go
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../measure-reuse/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Measure reuse
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../troubleshooting/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
   
   
     
     
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../cli-reference/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI reference
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
       
         
       
@@ -1616,10 +1611,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
             
   
   
@@ -1637,8 +1632,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1746,7 +1741,7 @@
   <span class="md-ellipsis">
     
   
-    Consuming evidence
+    Consume evidence
   
 
     
@@ -1760,57 +1755,31 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
               
-                
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
   
   
   
   
-    <li class="md-nav__item">
-      <a href="../../vision/" class="md-nav__link">
+    
+    
+      
         
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Vision and roadmap
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
       
         
       
@@ -1882,6 +1851,34 @@
     
   
     Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision and roadmap
   
 
     
@@ -2116,7 +2113,7 @@
     
     
       <li class="md-path__item">
-        <a href="../github-actions/" class="md-path__link">
+        <a href="../write-a-contract/" class="md-path__link">
           
   <span class="md-ellipsis">
     Guides
@@ -2146,7 +2143,7 @@
   
 
 
-<h1 id="sign-with-a-key-or-keyless">Sign with a key or keyless<a class="headerlink" href="#sign-with-a-key-or-keyless" title="Anchor link">&para;</a></h1>
+<h1 id="sign-results">Sign results<a class="headerlink" href="#sign-results" title="Anchor link">&para;</a></h1>
 <p>Goal: sign a test result so that others can check who published it.</p>
 <pre class="aval-mermaid"><code>flowchart LR
   run([aval run]) --&gt; result[.aval/result.json] --&gt; push[aval push]
@@ -2156,7 +2153,7 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Key</label><label for="__tabbed_1_2">Keyless</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<p>Make a P-256 key and a <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> that trusts it:</p>
+<p>Make a P-256 key and a <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> that trusts it:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>openssl<span class="w"> </span>genpkey<span class="w"> </span>-algorithm<span class="w"> </span>EC<span class="w"> </span>-pkeyopt<span class="w"> </span>ec_paramgen_curve:P-256<span class="w"> </span>-out<span class="w"> </span>aval.key
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>openssl<span class="w"> </span>pkey<span class="w"> </span>-in<span class="w"> </span>aval.key<span class="w"> </span>-pubout<span class="w"> </span>-out<span class="w"> </span>aval.pub
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>policy.yaml<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
@@ -2171,8 +2168,6 @@
 <p>Run the test, then sign and push the result:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--push<span class="w"> </span>--key<span class="w"> </span>aval.key<span class="w"> </span>--registry<span class="w"> </span>localhost:5001/demo/hello-aval
 </span></code></pre></div>
-<p>This is the <a href="https://github.com/TrianaLab/aval#try-it-on-your-laptop">quickstart</a>
-path; a test runs it as written.</p>
 </div>
 <div class="tabbed-block">
 <p>Put an OIDC token in <code>$SIGSTORE_ID_TOKEN</code> and leave out <code>--key</code>:</p>
@@ -2180,7 +2175,7 @@ path; a test runs it as written.</p>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>aval<span class="w"> </span>run<span class="w"> </span>--push<span class="w"> </span>--registry<span class="w"> </span>ghcr.io/acme/orders-aval
 </span></code></pre></div>
 <p>On GitHub Actions the job gets the token itself; see
-<a href="../github-actions/">Use Aval in GitHub Actions</a>.</p>
+<a href="../github-actions/">Use GitHub Actions</a>.</p>
 </div>
 </div>
 </div>
@@ -2197,7 +2192,7 @@ path; a test runs it as written.</p>
 <tr>
 <td>Who signs</td>
 <td>whoever holds the key file</td>
-<td>a CI workload or a person, proven by an OIDC token</td>
+<td>a CI job or a person, proven by an OIDC token</td>
 </tr>
 <tr>
 <td>Policy entry</td>
@@ -2212,15 +2207,14 @@ path; a test runs it as written.</p>
 <tr>
 <td>Needs network to verify</td>
 <td>no</td>
-<td>yes, unless the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> pins <code>trustedRoot</code></td>
+<td>yes, unless the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> pins <code>trustedRoot</code></td>
 </tr>
 </tbody>
 </table>
-<p>Use keyless in CI. Use a key on your laptop or in a closed network.</p>
 <details class="info">
 <summary>Which keys work</summary>
-<p>Aval signs with an unencrypted ECDSA P-256 private key in PEM (PKCS#8 or
-SEC1). Cosign keys are encrypted and do not work. Make one with
+<p>An unencrypted ECDSA P-256 key in PEM (PKCS#8 or SEC1). Cosign keys are
+encrypted and do not work. Make one with
 <code>openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out aval.key</code>.</p>
 </details>
 <details class="info">
@@ -2232,15 +2226,10 @@ whose inputs no longer match the <abbr title="aval.yaml: what the test is, how t
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>aval<span class="w"> </span>push<span class="w"> </span>--registry<span class="w"> </span>ghcr.io/acme/orders-aval
 </span></code></pre></div>
 </details>
-<details class="info">
-<summary>What a signature proves</summary>
-<p>A signature proves who published the result, not that the test ran
-honestly. That is why the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> decides how much each <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> is trusted.
-See <a href="../../concepts/trust/">Trust</a>.</p>
-</details>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
 <ul>
-<li><a href="../trust-policy/">Write a trust <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr></a></li>
+<li><a href="../trust-policy/">Write a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></a></li>
+<li><a href="../../concepts/trust/#what-a-signature-proves">Trust</a></li>
 <li><a href="../../trust-model/#signing">Trust model: signing</a></li>
 </ul>
 
@@ -2280,7 +2269,7 @@ See <a href="../../concepts/trust/">Trust</a>.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../../resolve/urls/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Downloaded files">
+          <a href="../trust-policy/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Write a trust policy">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2290,20 +2279,20 @@ See <a href="../../concepts/trust/">Trust</a>.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Downloaded files
+                Write a trust policy
               </div>
             </div>
           </a>
         
         
           
-          <a href="../trust-policy/" class="md-footer__link md-footer__link--next" aria-label="Next: Write a trust policy">
+          <a href="../../pinning/" class="md-footer__link md-footer__link--next" aria-label="Next: Pin your dependencies">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Write a trust policy
+                Pin your dependencies
               </div>
             </div>
             <div class="md-footer__button md-icon">

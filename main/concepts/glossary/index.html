@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.">
+        <meta name="description" content="Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.">
       
       
       
@@ -16,7 +16,7 @@
         <link rel="prev" href="../outcomes/">
       
       
-        <link rel="next" href="../../guides/github-actions/">
+        <link rel="next" href="../../guides/write-a-contract/">
       
       
         
@@ -313,7 +313,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../guides/github-actions/" class="md-tabs__link">
+        <a href="../../guides/write-a-contract/" class="md-tabs__link">
           
   
   
@@ -718,24 +718,6 @@
         
       
       
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Glossary
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -752,124 +734,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#attestation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Attestation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cacheability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cacheability
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#contract" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Contract
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#fingerprint" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fingerprint
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#outcome" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Outcome
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#policy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Policy
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scope
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#signer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Signer
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#trust-level" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Trust level
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
       
     </li>
   
@@ -891,8 +755,6 @@
   
     
     
-      
-        
       
         
       
@@ -964,34 +826,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/github-actions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    GitHub Actions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../guides/write-a-contract/" class="md-nav__link">
         
   
@@ -1048,6 +882,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guides/github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/trust-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a trust policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../pinning/" class="md-nav__link">
         
   
@@ -1056,6 +974,185 @@
     
   
     Pin your dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/measure-reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure reuse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/go-consumer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume from Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
   
 
     
@@ -1113,7 +1210,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1135,14 +1232,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_5">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1420,243 +1517,8 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../guides/signing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Sign results
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../guides/trust-policy/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Write a trust policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../guides/go-consumer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Consume from Go
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../guides/measure-reuse/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Measure reuse
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../guides/troubleshooting/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
     
     
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../cli-reference/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI reference
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
       
         
       
@@ -1679,10 +1541,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
             
   
   
@@ -1700,8 +1562,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1809,7 +1671,7 @@
   <span class="md-ellipsis">
     
   
-    Consuming evidence
+    Consume evidence
   
 
     
@@ -1823,57 +1685,31 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
               
-                
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
   
   
   
   
-    <li class="md-nav__item">
-      <a href="../../vision/" class="md-nav__link">
+    
+    
+      
         
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Vision and roadmap
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
       
         
       
@@ -1945,6 +1781,34 @@
     
   
     Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision and roadmap
   
 
     
@@ -2097,113 +1961,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#attestation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Attestation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cacheability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cacheability
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#contract" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Contract
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#fingerprint" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fingerprint
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#outcome" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Outcome
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#policy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Policy
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scope
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#signer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Signer
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#trust-level" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Trust level
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -2276,41 +2033,68 @@
 
 
 <h1 id="glossary">Glossary<a class="headerlink" href="#glossary" title="Anchor link">&para;</a></h1>
-<p>Each word Aval uses with a special meaning, defined once. Across the docs,
-hover a dotted word to see its short form.</p>
-<h2 id="attestation">Attestation<a class="headerlink" href="#attestation" title="Anchor link">&para;</a></h2>
-<p>A signed statement: "test X, with inputs that hash to <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> F,
-produced result R". Aval stores it in your OCI registry. See
-<a href="../../artifact-format/">the artifact format</a>.</p>
-<h2 id="cacheability">Cacheability<a class="headerlink" href="#cacheability" title="Anchor link">&para;</a></h2>
-<p>How safe a test is to reuse, declared in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>. <code>hermetic</code> and
-<code>controlled-environment</code> are reusable. <code>external-dependencies</code> is reusable
-only if the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> allows it. <code>non-deterministic</code> is never reusable. See
-<a href="../../contract/#cacheability-classes"><abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> classes</a>.</p>
-<h2 id="contract">Contract<a class="headerlink" href="#contract" title="Anchor link">&para;</a></h2>
-<p>The <code>aval.yaml</code> file next to a test. It says what the test is, how to run
-it, and which inputs it reads. See <a href="../../contract/">the test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a>.</p>
-<h2 id="fingerprint">Fingerprint<a class="headerlink" href="#fingerprint" title="Anchor link">&para;</a></h2>
-<p>One <code>sha256</code> hash of every input the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> declares: the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
-itself (the command included), the files in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, and the declared tool
-versions and environment variables. Same inputs, same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. See <a href="../">How Aval works</a>.</p>
-<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Anchor link">&para;</a></h2>
-<p>The decision on a lookup: <code>verified</code>, <code>miss</code>, <code>verification-failed</code> or
-<code>error</code>. Only <code>verified</code> skips the test. See <a href="../outcomes/">Outcomes</a>.</p>
-<h2 id="policy">Policy<a class="headerlink" href="#policy" title="Anchor link">&para;</a></h2>
-<p>A YAML file you write that lists the signers you trust and the <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr>
-each one gets. Without a <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>, nothing is reused. See <a href="../trust/">Trust</a>.</p>
-<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Anchor link">&para;</a></h2>
-<p>The files the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> lists as test inputs: <code>source</code> files and
-<code>dependencies</code> such as <code>go.mod</code>. Aval sees nothing outside it. See
-<a href="../../contract/#what-goes-into-the-fingerprint">what goes into the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr></a>.</p>
-<h2 id="signer">Signer<a class="headerlink" href="#signer" title="Anchor link">&para;</a></h2>
-<p>The identity behind a signature: a CI job's OIDC identity (keyless), or a
-key. See <a href="../trust/#signers">Trust</a>.</p>
-<h2 id="trust-level">Trust level<a class="headerlink" href="#trust-level" title="Anchor link">&para;</a></h2>
-<p>How much the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> trusts a <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr>: 1 developer, 2 runner, 3 isolated. A
-result is reused only if its <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr>'s level is at least the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>'s
-<code>minTrustLevel</code>. See <a href="../trust/#trust-levels">Trust</a>.</p>
+<p>Hover a dotted word anywhere in the docs to see its short form.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+<th>More</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Attestation</td>
+<td>a signed statement: test X, with inputs that hash to <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> F, produced result R, stored in your OCI registry</td>
+<td><a href="../../artifact-format/">artifact format</a></td>
+</tr>
+<tr>
+<td>Cacheability</td>
+<td>how safe a test is to reuse: <code>hermetic</code> and <code>controlled-environment</code> yes, <code>external-dependencies</code> only if the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> allows it, <code>non-deterministic</code> never</td>
+<td><a href="../../contract/#cacheability-classes">classes</a></td>
+</tr>
+<tr>
+<td>Contract</td>
+<td><code>aval.yaml</code>: what the test is, how to run it, which inputs it reads</td>
+<td><a href="../../contract/">the test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a></td>
+</tr>
+<tr>
+<td>Fingerprint</td>
+<td>one <code>sha256</code> of every declared input: the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (command included), files in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, toolchain, env var values, resolved references. Same inputs, same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr></td>
+<td><a href="../../contract/#what-goes-into-the-fingerprint">what goes in</a></td>
+</tr>
+<tr>
+<td>Mutable reference</td>
+<td>a tag or range that can point at other content later, such as <code>postgres:16</code>. In a hermetic or controlled-environment test it blocks reuse until you pin it or list it in <code>scope.allowMutable</code></td>
+<td><a href="../../pinning/">Pin your dependencies</a></td>
+</tr>
+<tr>
+<td>Outcome</td>
+<td>the decision on a lookup: <code>verified</code>, <code>miss</code>, <code>verification-failed</code> or <code>error</code>. Only <code>verified</code> skips the test</td>
+<td><a href="../outcomes/">Outcomes</a></td>
+</tr>
+<tr>
+<td>Policy</td>
+<td>your YAML file listing trusted signers and their levels. No <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, no reuse</td>
+<td><a href="../trust/#the-policy">Trust</a></td>
+</tr>
+<tr>
+<td>Scope</td>
+<td>the inputs the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> lists: <code>source</code>, <code>dependencies</code> (such as <code>go.mod</code>), <code>resolve</code> and <code>contracts</code>. Aval sees nothing else</td>
+<td><a href="../../contract/#fields">the test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a></td>
+</tr>
+<tr>
+<td>Signer</td>
+<td>who signed a result: a CI job (keyless, OIDC) or a key</td>
+<td><a href="../trust/#signers-and-levels">Trust</a></td>
+</tr>
+<tr>
+<td>Trust level</td>
+<td>how much the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> trusts a <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr>: developer, runner, isolated. Reuse needs at least <code>minTrustLevel</code></td>
+<td><a href="../trust/#signers-and-levels">Trust</a></td>
+</tr>
+</tbody>
+</table>
 
 
 
@@ -2365,13 +2149,13 @@ result is reused only if its <abbr title="The identity behind a signature: a CI 
         
         
           
-          <a href="../../guides/github-actions/" class="md-footer__link md-footer__link--next" aria-label="Next: GitHub Actions">
+          <a href="../../guides/write-a-contract/" class="md-footer__link md-footer__link--next" aria-label="Next: Write a contract">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                GitHub Actions
+                Write a contract
               </div>
             </div>
             <div class="md-footer__button md-icon">

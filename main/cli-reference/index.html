@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.">
+        <meta name="description" content="Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.">
       
       
       
@@ -16,7 +16,7 @@
         <link rel="prev" href="../guides/troubleshooting/">
       
       
-        <link rel="next" href="../contract/">
+        <link rel="next" href="../resolve/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>CLI reference - Aval</title>
+        <title>CLI - Aval</title>
       
     
     
@@ -124,7 +124,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CLI reference
+              CLI
             
           </span>
         </div>
@@ -311,7 +311,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../guides/github-actions/" class="md-tabs__link">
+        <a href="../guides/write-a-contract/" class="md-tabs__link">
           
   
   
@@ -759,8 +759,6 @@
       
         
       
-        
-      
     
     
     
@@ -805,34 +803,6 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/github-actions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    GitHub Actions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -897,6 +867,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/trust-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a trust policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../pinning/" class="md-nav__link">
         
   
@@ -913,6 +967,325 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/measure-reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure reuse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/go-consumer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume from Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#exit-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exit codes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aval-completion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval completion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aval-push" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval push
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aval-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval record
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aval-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aval-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval stats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aval-verify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval verify
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -955,14 +1328,17 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -984,14 +1360,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_5">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1269,383 +1645,8 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../guides/signing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Sign results
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/trust-policy/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Write a trust policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/go-consumer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Consume from Go
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/measure-reuse/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Measure reuse
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/troubleshooting/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-    
-  
-  
-  
     
     
-      
-        
-      
-        
-      
-    
-    
-    
-      
-        
-        
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI reference
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI reference
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#exit-codes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Exit codes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#aval" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        aval
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#aval-completion" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        aval completion
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#aval-push" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        aval push
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#aval-record" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        aval record
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#aval-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        aval run
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#aval-stats" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        aval stats
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#aval-verify" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        aval verify
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
       
         
       
@@ -1671,10 +1672,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="">
             
   
   
@@ -1692,8 +1693,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1801,7 +1802,7 @@
   <span class="md-ellipsis">
     
   
-    Consuming evidence
+    Consume evidence
   
 
     
@@ -1815,57 +1816,31 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
               
-                
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
   
   
   
   
-    <li class="md-nav__item">
-      <a href="../vision/" class="md-nav__link">
+    
+    
+      
         
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Vision and roadmap
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
       
         
       
@@ -1937,6 +1912,34 @@
     
   
     Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision and roadmap
   
 
     
@@ -2257,8 +2260,9 @@
 
 
 <h1 id="cli-reference">CLI reference<a class="headerlink" href="#cli-reference" title="Anchor link">&para;</a></h1>
-<p>Generated from the cobra command tree by <code>make docs-cli</code>. Do not edit by hand:
-<code>make ci-docs</code> fails when this file and the CLI disagree.</p>
+<!-- Generated by make docs-cli; do not edit. -->
+
+<p>Every command, flag and exit code.</p>
 <h2 id="exit-codes">Exit codes<a class="headerlink" href="#exit-codes" title="Anchor link">&para;</a></h2>
 <table>
 <thead>
@@ -2279,7 +2283,7 @@
 <tr>
 <td>1</td>
 <td>error (the test still runs when it can), or a false hit in <code>--shadow</code></td>
-<td>error: registry, <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>, trusted root or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr></td>
+<td>error: registry, <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, trusted root or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr></td>
 <td>error: signing, registry or a result that does not match the current inputs</td>
 </tr>
 <tr>
@@ -2297,7 +2301,7 @@
 <tr>
 <td>4</td>
 <td>not used: a miss runs the test</td>
-<td>miss: no result the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> can reuse</td>
+<td>miss: no result the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> can reuse</td>
 <td>not used</td>
 </tr>
 <tr>
@@ -2315,7 +2319,7 @@
 </tbody>
 </table>
 <p>A miss (4) is routine. A verification failure (5) means someone published a
-result the <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> does not trust; never hide it or retry it away.</p>
+result the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> does not trust; never hide it or retry it away.</p>
 <h2 id="aval">aval<a class="headerlink" href="#aval" title="Anchor link">&para;</a></h2>
 <p>Verifiable test execution reuse: signed test results as OCI artifacts</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage:
@@ -2366,15 +2370,15 @@ Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.</p>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  -h, --help                        help for push
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>      --key string                  signing key path (default: keyless OIDC)
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>      --registry string             OCI repository for attestations (required)
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>      --result string               result recorded by 'aval run' (default ".aval/result.json")
 </span></code></pre></div>
 <h2 id="aval-record">aval record<a class="headerlink" href="#aval-record" title="Anchor link">&para;</a></h2>
-<p>record publishes a run record that 'aval run --record-file' wrote to the
-test's stats anchor in the registry, as 'aval run --record' would have. Use it
-to publish, from a job with write credentials that runs no tests, the record
-of a run made without them. Run records are unsigned statistics: run and
-verify never read them. --repository sets the record's source repository.</p>
+<p>record publishes a run record that 'aval run --record-file' wrote, as 'aval
+run --record' would have. Use it to publish, from a job with write credentials
+that runs no tests, the record of a run made without them. Run records are
+unsigned statistics: run and verify never read them. --repository sets the
+record's source repository.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Usage:
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  aval record [flags]
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
@@ -2382,28 +2386,21 @@ verify never read them. --repository sets the record's source repository.</p>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  -h, --help                        help for record
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>      --record-file string          run record written by 'aval run --record-file' (required)
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>      --registry string             OCI repository for run records (required)
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>      --repository string           source repository (e.g. acme/orders); default: the one in the record
 </span></code></pre></div>
 <h2 id="aval-run">aval run<a class="headerlink" href="#aval-run" title="Anchor link">&para;</a></h2>
-<p>run computes the execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, looks for a signed
-<abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> in the registry, and reuses it if it verifies against the trust
-<abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>. Otherwise it runs runner.command, records the result (--result) and,
-with --push, signs and publishes it.</p>
-<p>Anything that cannot be proven runs the test: a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> error, a registry
-or <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> error, a miss. A verification failure also runs the test, and then
-exits 5: it is a security event. A reused failing result exits 3, like a
-failing run. --shadow verifies and still runs the test; if the verified
-result disagrees with the run, that is a false hit and run exits 1.</p>
-<p>--record publishes a run record (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>, reuse, durations) for statistics
-to the test's stats anchor in the registry, for every <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>. It is
-best-effort: a failure, such as missing write credentials, is a warning and
-never changes the exit code. Records are unsigned and never read by run or
-verify. --record-file writes the same record to a file for 'aval record'.</p>
-<p>Exit codes: 0 passed or reused a pass, 3 failed or reused a failure,
-5 verification failed (after running the test), 1 error or false hit,
-2 usage. Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN;
-runner.command never sees it.</p>
+<p>run computes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, looks up a signed result and reuses it if the
+trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> accepts it. Otherwise it runs runner.command, records the result
+(--result) and, with --push, signs and publishes it.</p>
+<p>Anything Aval cannot prove runs the test. A verification failure runs the
+test and exits 5: a security event. --shadow runs the test even after a
+verified result and exits 1 if they disagree (a false hit).</p>
+<p>--record publishes a run record for statistics; a failure is only a warning.
+--record-file writes it to a file for 'aval record'.</p>
+<p>Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
+2 usage. Keyless signing reads $SIGSTORE_ID_TOKEN; runner.command never sees
+it.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Usage:
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  aval run [flags]
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
@@ -2433,11 +2430,10 @@ cause, verification failures, shadow false hits, and total and saved test
 time, per test (or per source repository with --by repository) and in total.
 It reads every test with a stats anchor, or only --test. It writes nothing,
 locally or to the registry.</p>
-<p>Run records are unsigned statistics: they never affect reuse. Records that
-cannot be read, are oversized, malformed or inconsistent are skipped and
-counted. Reading stops after 1000 records or 64 pages per listing, with a
-warning; prune old records to stay below it. Records are read one at a time:
-raise --registry-timeout for many records.</p>
+<p>Run records are unsigned statistics and never affect reuse. Unreadable or
+invalid records are skipped and counted. Reading stops after 1000 records or
+64 pages per listing; prune old records. Raise --registry-timeout for many
+records.</p>
 <p>--since keeps records made at or after a time: a duration back from now
 (168h, 30d) or a date (2026-11-01, or RFC 3339).</p>
 <p>Exit codes: 0 statistics printed, 1 error (registry), 2 usage.</p>
@@ -2449,15 +2445,15 @@ raise --registry-timeout for many records.</p>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  -h, --help                        help for stats
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  -o, --output string               output format: text or json (default "text")
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>      --registry string             OCI repository holding the run records (required)
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 </span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>      --since string                only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>      --test string                 only this test id (metadata.name); default: every test with run records
 </span></code></pre></div>
 <h2 id="aval-verify">aval verify<a class="headerlink" href="#aval-verify" title="Anchor link">&para;</a></h2>
 <p>verify computes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, looks up the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> and verifies its
-signature and the trust <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>, without running anything.</p>
+signature and the trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, without running anything.</p>
 <p>Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
-1 error (registry, <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>), 2 usage or invalid aval.yaml.</p>
+1 error (registry, <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>), 2 usage or invalid aval.yaml.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Usage:
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  aval verify [flags]
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
@@ -2467,7 +2463,7 @@ signature and the trust <abbr title="Your file that lists which signers you trus
 </span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  -o, --output string               output format: text or json (default "text")
 </span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>      --policy string               trust policy file (without it every lookup is a miss)
 </span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>      --registry string             OCI repository for attestations (required)
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 </span></code></pre></div>
 
 
@@ -2523,13 +2519,13 @@ signature and the trust <abbr title="Your file that lists which signers you trus
         
         
           
-          <a href="../contract/" class="md-footer__link md-footer__link--next" aria-label="Next: The test contract">
+          <a href="../resolve/" class="md-footer__link md-footer__link--next" aria-label="Next: Resolve references">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                The test contract
+                Resolve references
               </div>
             </div>
             <div class="md-footer__button md-icon">

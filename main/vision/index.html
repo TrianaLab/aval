@@ -6,17 +6,17 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.">
+        <meta name="description" content="Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.">
       
       
       
         <link rel="canonical" href="https://aval.run/main/vision/">
       
       
-        <link rel="prev" href="../integrations/">
+        <link rel="prev" href="../changelog/">
       
       
-        <link rel="next" href="../changelog/">
+        <link rel="next" href="../stats/">
       
       
         
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#aval-vision" class="md-skip">
+        <a href="#vision-and-roadmap" class="md-skip">
           Skip to content
         </a>
       
@@ -311,7 +311,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../guides/github-actions/" class="md-tabs__link">
+        <a href="../guides/write-a-contract/" class="md-tabs__link">
           
   
   
@@ -329,12 +329,10 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
+      <li class="md-tabs__item">
         <a href="../cli-reference/" class="md-tabs__link">
           
   
@@ -353,10 +351,12 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
+      <li class="md-tabs__item md-tabs__item--active">
         <a href="../changelog/" class="md-tabs__link">
           
   
@@ -759,8 +759,6 @@
       
         
       
-        
-      
     
     
     
@@ -805,34 +803,6 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/github-actions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    GitHub Actions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -897,6 +867,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/trust-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a trust policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../pinning/" class="md-nav__link">
         
   
@@ -905,6 +959,185 @@
     
   
     Pin your dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/measure-reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure reuse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/go-consumer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume from Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
   
 
     
@@ -962,7 +1195,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -984,14 +1217,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_5">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1269,157 +1502,12 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../guides/signing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
     
-  
-    Sign results
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/trust-policy/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Write a trust policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/go-consumer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Consume from Go
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/measure-reuse/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Measure reuse
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/troubleshooting/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
     
       
+        
       
-  
-  
-    
-  
-  
-  
-    
-    
+        
       
         
       
@@ -1429,119 +1517,19 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../cli-reference/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI reference
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-          
-          
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
             
   
   
@@ -1559,8 +1547,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1668,7 +1656,121 @@
   <span class="md-ellipsis">
     
   
-    Consuming evidence
+    Consume evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
   
 
     
@@ -1771,10 +1873,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#goals" class="md-nav__link">
+  <a href="#design-decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goals
+        Design decisions
       
     </span>
   </a>
@@ -1789,34 +1891,6 @@
       
     </span>
   </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#design-decisions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Design decisions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Design decisions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#consumption-contract" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Consumption contract
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1846,113 +1920,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
-        
-          
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Project
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Project
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../changelog/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Changelog
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -2126,10 +2093,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#goals" class="md-nav__link">
+  <a href="#design-decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goals
+        Design decisions
       
     </span>
   </a>
@@ -2144,34 +2111,6 @@
       
     </span>
   </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#design-decisions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Design decisions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Design decisions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#consumption-contract" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Consumption contract
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2240,28 +2179,10 @@
     
     
       <li class="md-path__item">
-        <a href="../cli-reference/" class="md-path__link">
+        <a href="../changelog/" class="md-path__link">
           
   <span class="md-ellipsis">
-    Reference
-  </span>
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-    
-    
-      <li class="md-path__item">
-        <a href="../contract/" class="md-path__link">
-          
-  <span class="md-ellipsis">
-    Specs
+    Project
   </span>
 
         </a>
@@ -2288,213 +2209,160 @@
   
 
 
-<h1 id="aval-vision">Aval: vision<a class="headerlink" href="#aval-vision" title="Anchor link">&para;</a></h1>
-<p>Status: pre-alpha. Milestones 1 (<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> + <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>) and 2 (sign, push
-and verify against a registry, <code>aval run</code> reuse or execute) are implemented.</p>
+<h1 id="vision-and-roadmap">Vision and roadmap<a class="headerlink" href="#vision-and-roadmap" title="Anchor link">&para;</a></h1>
 <h2 id="thesis">Thesis<a class="headerlink" href="#thesis" title="Anchor link">&para;</a></h2>
 <p>Aval turns test results into signed, verifiable OCI artifacts. An expensive
-test runs once, locally or in CI. The result is published to an OCI registry as
-a signed <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> bound to a deterministic <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> of the test's inputs.
-Any other environment computes the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, finds the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>,
-verifies it, and if the trust <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> allows it, reuses the result instead of
-running the test again.</p>
-<p>This is not a test cache. It is a CI primitive: <strong>verifiable test execution
-reuse</strong>. A cache optimizes for hit rate and quietly tolerates a stale entry now
-and then. Aval optimizes for being able to justify every reuse, and when it
-can't, it runs the test.</p>
-<p>A signature alone does not get you there. A signature proves <em>who claims</em> the
-test passed, not that it ran honestly or against the inputs you have now.
-Reuse is only safe when two things hold:</p>
-<ul>
-<li>an explicit <strong>input <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></strong> (<code>aval.yaml</code>) that says what the test depends
-  on, so "same inputs" is something you can check, and</li>
-<li>a <strong>trust <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr></strong> over <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> identities, so "who ran it" is something you
-  can accept or reject.</li>
-</ul>
+test runs once, locally or in CI. The result is published to an OCI registry
+as a signed <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> bound to a deterministic <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> of the test's
+inputs. Any other environment computes the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, finds the
+<abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>, verifies it, and if the trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> allows it, reuses the result
+instead of running the test again.</p>
+<p>This is not a test cache. A cache optimizes for hit rate and quietly tolerates
+a stale entry now and then. Aval optimizes for being able to justify every
+reuse, and when it can't, it runs the test.</p>
+<p>A signature proves <em>who claims</em> the test passed, not that it ran honestly or
+against the inputs you have now. So reuse needs an explicit <strong>input
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></strong> (<code>aval.yaml</code>), so "same inputs" can be checked, and a <strong>trust
+<abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></strong> over <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> identities, so "who ran it" can be accepted or rejected.</p>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Anchor link">&para;</a></h2>
-<p>Heavy tests (integration, end-to-end, hardware, long suites) get re-run on
-every pipeline, branch and environment even when nothing they depend on has
-changed. Teams either pay for it in time and compute, or they skip tests based
-on informal judgment ("that service didn't change"), which nobody can audit.
-Existing build caches solve this for teams that buy into a hermetic build
-system. Most teams have not, and their CI cannot prove that a result from one
-environment is valid in another.</p>
-<h2 id="goals">Goals<a class="headerlink" href="#goals" title="Anchor link">&para;</a></h2>
-<ul>
-<li>A test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (<code>aval.yaml</code>) that declares a test's identity, its runner
-  command, its input <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, the environment conditions that matter, and its
-  <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class.</li>
-<li>A deterministic execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> over the declared inputs, independent
-  of checkout path and file iteration order.</li>
-<li>Signed in-toto attestations of execution results, stored in any OCI 1.1
-  registry and found by <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</li>
-<li>Verification that keeps "no result" (miss) separate from "result exists
-  but can't be trusted" (verification failure), in both code and exit codes.</li>
-<li>A versioned output format and a public Go package (<code>pkg/evidence</code>) that
-  other tools can consume without depending on Aval internals.</li>
-</ul>
+<p>Heavy tests (integration, end-to-end, hardware, long suites) re-run on every
+pipeline, branch and environment even when nothing they depend on changed.
+Teams pay for it in time and compute, or skip tests on informal judgment that
+nobody can audit. Build caches solve this only for teams on a hermetic build
+system.</p>
+<h2 id="design-decisions">Design decisions<a class="headerlink" href="#design-decisions" title="Anchor link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No own infrastructure: ORAS, Sigstore (sigstore-go), in-toto/DSSE, OCI 1.1 referrers. Lookup by the tag <code>sha256-&lt;fingerprint hex&gt;</code>, consumption by digest</td>
+<td>registries, signing and access control already exist and are operated; tags are mutable, digests aren't</td>
+</tr>
+<tr>
+<td>Scope belongs to the test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (<code>aval.yaml</code>); nothing is inferred or traced</td>
+<td>the test author knows what the test depends on, and a declared <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> can be reviewed in a PR</td>
+</tr>
+<tr>
+<td>Fail closed: if input equivalence can't be proven, the test runs. A miss (exit 4) and a verification failure (exit 5) stay separate, and the latter is never downgraded</td>
+<td>a false hit costs more than a re-run, and a forged result is something someone needs to look at</td>
+</tr>
+<tr>
+<td>Trust levels (developer, runner, isolated) granted by the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>; no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, no reuse</td>
+<td>how much a signed claim is worth depends on where it was produced, and that call belongs to the consumer</td>
+</tr>
+<tr>
+<td>Test identity (<code>metadata.name</code>) is not the execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr></td>
+<td>the same check gets many executions, and <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> and reporting need to tell them apart</td>
+</tr>
+<tr>
+<td>Cacheability classes; <code>non-deterministic</code> is never reusable</td>
+<td>a matching <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> only means something if the result depends on the declared inputs</td>
+</tr>
+<tr>
+<td>One generic runner: an argv command, the exit code is the result</td>
+<td>it covers every language, framework and CI vendor</td>
+</tr>
+</tbody>
+</table>
 <h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Anchor link">&para;</a></h2>
 <ul>
-<li><strong>No registry, server or database of our own.</strong> Storage, lookup and linking
-  go through standard OCI registries.</li>
-<li><strong>No runtime tracing or input inference in v0.</strong> Scope is declared, not
-  observed. Recording the files a test actually reads ("observed inputs") is
-  future work, and would be used to check declared <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, not to replace it.</li>
-<li><strong>Not a build system and not a Bazel replacement.</strong> Aval doesn't model
-  build graphs, actions or outputs. Teams already on Bazel's remote cache may
-  not need it.</li>
-<li><strong>Not a test framework.</strong> Aval runs an arbitrary command and records its exit
-  code. It doesn't discover, select or report individual test cases.</li>
-<li><strong>No knowledge of Pacto or any other consumer.</strong> Aval doesn't import Pacto
-  or model its concepts. Consumers integrate through the stable formats below,
-  and their adapters live in their own repositories.</li>
+<li>No registry, server or database of our own.</li>
+<li>No runtime tracing or input inference in v0; "observed inputs" is future
+  work, to check declared <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, not replace it.</li>
+<li>Not a build system or a Bazel replacement.</li>
+<li>Not a test framework: Aval records an exit code, not test cases.</li>
+<li>No knowledge of Pacto or any other consumer; consumers use the
+  <a href="../integrations/">stable formats</a>.</li>
 </ul>
-<h2 id="design-decisions">Design decisions<a class="headerlink" href="#design-decisions" title="Anchor link">&para;</a></h2>
-<ol>
-<li><strong>Standard supply-chain plumbing, no own infrastructure.</strong> Publishing and
-   fetching use ORAS, signatures use Cosign/Sigstore, attestations use
-   in-toto Statements in DSSE envelopes, and evidence is linked through OCI 1.1
-   referrers. Lookup goes only through the registry, via the tag
-   <code>sha256-&lt;fingerprint hex&gt;</code>, and artifacts are always consumed by digest.
-   <em>Rationale:</em> registries, signing and access control already exist and are
-   already operated; tags are mutable, digests aren't.</li>
-<li><strong>Scope belongs to the test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, not the runner.</strong> Every test declares
-   its inputs in <code>aval.yaml</code> (<code>scope.source</code>, <code>scope.exclude</code>,
-   <code>scope.dependencies</code>, <code>environment</code>). Nothing is inferred or traced in v0.
-   <em>Rationale:</em> the test author is the one who knows what the test depends on,
-   and a declared <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> can be reviewed in a PR.</li>
-<li><strong>Fail closed.</strong> If input equivalence can't be proven, the test runs. That
-   covers unknown <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> fields, dependency globs that match nothing,
-   symlinks in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, and an empty <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>. A miss (exit 4, <code>ErrNotFound</code>) and
-   a verification failure (exit 5, <code>ErrVerification</code>) are separate outcomes.
-   A verification failure is a security event and is never downgraded to a
-   miss. <em>Rationale:</em> a false hit costs more than a re-run, and a forged or
-   mis-signed result is something someone needs to look at.</li>
-<li><strong>Trust tiers.</strong> Level 1 is a developer signature, meant as personal
-   acceleration and not full trust. Level 2 is a runner with a verifiable
-   identity. Level 3 is isolated execution with a verifiable <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>. The
-   <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> decides which <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> identities are accepted, at which level, and
-   the minimum level needed for reuse. With no <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>, nothing is accepted.
-   <em>Rationale:</em> how much a signed claim is worth depends on where it was
-   produced, and that call belongs to whoever consumes the result.</li>
-<li><strong>Test identity vs execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</strong> <code>metadata.name</code> / <code>test.id</code> says
-   <em>what</em> is checked. The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> says <em>which concrete inputs and
-   conditions</em> a particular run had. <em>Rationale:</em> the same check gets many
-   executions, and <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> and reporting need to tell the two apart.</li>
-<li><strong>Cacheability classes.</strong> <code>hermetic</code> and <code>controlled-environment</code> are
-   reusable by default. <code>external-dependencies</code> needs an explicit <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>
-   opt-in. <code>non-deterministic</code> is never reusable. <em>Rationale:</em> a
-   matching <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> only means something if the result depends on the
-   declared inputs.</li>
-<li><strong>Language-, framework- and CI-agnostic.</strong> v0 ships only a generic runner:
-   an argv command with no shell interpolation, where the exit code is the
-   result. <em>Rationale:</em> one generic runner covers every stack, and
-   framework-specific runners can come later if there's demand.</li>
-</ol>
-<h3 id="consumption-contract">Consumption <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr><a class="headerlink" href="#consumption-contract" title="Anchor link">&para;</a></h3>
-<p>External tools consume Aval results through:</p>
-<ul>
-<li>versioned artifact and predicate formats with Aval's own media types
-  (frozen: predicate type
-  <code>https://aval.trianalab.io/attestation/execution/v2</code>, media type
-  <code>application/vnd.trianalab.aval.execution.v2+json</code>, artifact type
-  <code>application/vnd.trianalab.aval.execution.v2</code>, <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <code>apiVersion</code>
-  <code>aval.trianalab.io/v1</code>),</li>
-<li>neutral predicate fields: <code>subject</code>, <code>test.id</code>, <code>result</code>,
-  <code>execution.fingerprint</code>, <code>execution.environment</code>, <code>runner</code> identity,
-  <code>startedAt</code>/<code>finishedAt</code>, plus a free <code>annotations</code> map that Aval never
-  reads,</li>
-<li>the public Go package <code>pkg/evidence</code> (<code>Parse</code>, <code>Verify</code>),</li>
-<li><code>aval verify --output json</code>.</li>
-</ul>
-<p>These formats are frozen; within a version they change additively only (see
-<a href="../artifact-format/#versioning-and-compatibility">artifact-format.md</a>).</p>
 <h2 id="risks">Risks<a class="headerlink" href="#risks" title="Anchor link">&para;</a></h2>
-<ul>
-<li><strong>Bazel or a remote cache is already enough for some teams.</strong> Mitigation:
-  don't compete there. Aval targets tests outside a hermetic build graph
-  (integration, e2e, cross-environment). We'll know it isn't working if early
-  users are mostly Bazel shops that also want Aval for build actions.</li>
-<li><strong>Declaring <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> can cost more than it saves.</strong> Mitigation: keep the
-  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> small (globs, lockfiles, a toolchain map) and make it debuggable
-  with <code>aval run --explain</code>. Detection: contracts that drift away from the code
-  they cover, or teams that give up on tests with a wide <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>.</li>
-<li><strong>Real savings are small if inputs always change.</strong> If every commit touches
-  the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> never matches. Detection: the hit rate in the
-  milestone 3 example and in early adopters' pipelines. A test whose <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> is
-  "the whole repo" is a bad fit, and the docs should say so.</li>
-<li><strong>Security policies may reject attestations from developer machines.</strong>
-  Mitigation: this is expected, and it's why trust tiers exist. CI policies
-  should require level 2 or higher, and level 1 stays personal acceleration.
-  Detection: whether the value holds up when only runner and isolated
-  signatures are accepted.</li>
-</ul>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+<th>Signal it isn't working</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bazel or a remote cache is already enough</td>
+<td>target tests outside a hermetic build graph (integration, e2e, cross-environment)</td>
+<td>early users are mostly Bazel shops that want Aval for build actions</td>
+</tr>
+<tr>
+<td>Declaring <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> costs more than it saves</td>
+<td>a small <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (globs, lockfiles, a toolchain map), debuggable with <code>aval run --explain</code></td>
+<td>contracts drift from the code, or teams give up on wide-<abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> tests</td>
+</tr>
+<tr>
+<td>Inputs always change, so savings are small</td>
+<td>the docs say a "whole repo" <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> is a bad fit</td>
+<td>a low hit rate in the example and in early adopters' pipelines</td>
+</tr>
+<tr>
+<td>Security policies reject developer signatures</td>
+<td>expected: CI requires runner or higher; developer stays personal</td>
+<td>the value does not hold with only runner and isolated signatures</td>
+</tr>
+</tbody>
+</table>
 <h2 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Anchor link">&para;</a></h2>
-<ol>
-<li><strong>Fingerprint + <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.</strong> <em>Implemented.</em> Exit criterion: <code>aval.yaml</code> is
-   parsed and validated with unknown fields rejected, and
-   <code>aval run --fingerprint-only</code> / <code>--explain</code> produce a deterministic
-   <code>aval-fingerprint/v1</code> digest and manifest that fail closed on undeclared
-   or unprovable inputs.</li>
-<li><strong>Push/verify against a local registry with Cosign signing.</strong>
-   <em>Implemented</em> (<code>aval run</code> exits with the test's own result after a miss,
-   and reports the miss). Exit criterion: <code>aval run --push</code> signs and publishes an <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> to a local
-   OCI registry. <code>aval verify</code> and <code>aval run</code> against that registry reuse a
-   <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>-accepted result (exit 0), report a miss (exit 4), and report a
-   tampered or untrusted <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> as a verification failure (exit 5). The
-   <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> file format is defined.</li>
-<li><strong>End-to-end example in GitHub Actions.</strong> Exit criterion: a public example
-   repo where one workflow run executes and publishes, a second run with
-   unchanged inputs reuses the result, and a run with changed inputs misses
-   and re-executes, all visible in the workflow logs.
-   <em>In progress:</em> the <code>example-go-compose</code> job in <code>.github/workflows/ci.yaml</code>
-   runs this story for <code>examples/go-compose</code> in this repository on every
-   push to <code>main</code> (see <a href="https://github.com/TrianaLab/aval/blob/main/examples/go-compose/README.md">its README</a>).
-   The release pipeline for signed <code>aval</code> binaries (checksums, SBOMs, SLSA
-   provenance) is in place and dry-runs on every PR. The example and the
-   dogfood shadow and publish jobs install the pinned release, verified
-   before use. While the pin is v0.1.0, which cannot read the frozen
-   <code>aval.trianalab.io/v1</code> contracts, they build <code>aval</code> from the commit
-   instead (#17).
-   Aval also dogfoods itself (#28): <code>ci-e2e</code> runs the heavy suite
-   (<code>aval.e2e.yaml</code>) through <code>aval run</code> and reuses a verified result,
-   <code>dogfood-shadow</code> runs the unit suite (<code>aval.yaml</code>) with <code>--shadow</code>, and on
-   <code>main</code> <code>dogfood-publish</code> signs and pushes both results to
-   <code>ghcr.io/trianalab/aval-attestations</code>. A release requires a verified e2e
-   <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> for its commit. See <a href="https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#ci-quality-gates">CONTRIBUTING.md</a>.</li>
-<li><strong>False-hit suite.</strong> <em>Implemented.</em> Exit criterion: an automated suite
-   that applies every known kind of relevant change (source, dependency,
-   toolchain, env var, exec bit, <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> edit, symlink, file rename) and
-   asserts that none of them can reuse a previous execution.
-   The table-driven corpus in <code>internal/fingerprint/corpus_test.go</code> covers
-   these kinds and pins the known gaps (see
-   <a href="../contract/#known-gaps"><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.md</a>). The <code>ci-false-hit</code> CI job runs it
-   on every PR and push, together with golden manifests of a fixed tree that
-   fail on any change to them without an <code>aval-fingerprint/vN</code> bump (a
-   mutation sweep of the manifest code found no manifest-changing mutant
-   that passes; see <a href="../contract/#false-hit-corpus"><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.md</a>).
-   Committed goldens are append-only, so the golden cannot be rewritten
-   instead.</li>
-<li><strong>Stable consumption <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> for external integrations.</strong> Exit criterion:
-   the predicate type, media types, predicate fields, <code>pkg/evidence</code> API and
-   <code>aval verify --output json</code> report are declared stable and versioned,
-   with only additive changes allowed within v1, and an external consumer
-   can verify results using <code>pkg/evidence</code> alone.
-   <em>In progress:</em> the predicate type, media types, <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <code>apiVersion</code>
-   and verify report version are frozen, with compatibility rules in
-   <a href="../artifact-format/#versioning-and-compatibility">artifact-format.md</a>
-   and golden files guarding the JSON shape (#17).</li>
-<li><strong>Contract composition for monorepos (Epic 10).</strong> Exit criterion: a test
-   in a monorepo reruns when, and only when, the declared inputs of the
-   parts it depends on change.
-   <em>In progress:</em> <code>scope.contracts</code> binds the fingerprints of other local
-   contracts, transitively (#124; see
-   <a href="../guides/depend-on-a-contract/">Depend on another part of the repo</a>).
-   Follow-up idea, not built: a remote dependency (another repository, by
-   OCI reference). Its files are not available to <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so it would
-   bind a published, verified result instead, which raises its own trust
-   questions (whose signature, which <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>, what a revoked result means).</li>
-</ol>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Milestone</th>
+<th>Status</th>
+<th>Done when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Fingerprint and <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></td>
+<td>implemented</td>
+<td><code>aval.yaml</code> is validated with unknown fields rejected, and <code>--fingerprint-only</code> / <code>--explain</code> give a deterministic <code>aval-fingerprint/v1</code> digest that fails closed on unprovable inputs</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Push and verify against a registry, with signing</td>
+<td>implemented</td>
+<td><code>aval run --push</code> signs and publishes; <code>aval verify</code> and <code>aval run</code> reuse a trusted result (exit 0), report a miss (exit 4) and a tampered or untrusted one (exit 5); the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> format is defined</td>
+</tr>
+<tr>
+<td>3</td>
+<td>End-to-end example in GitHub Actions</td>
+<td>in progress (<a href="https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#ci-quality-gates">CI quality gates</a>)</td>
+<td>a public example where one run publishes, an unchanged run reuses, and a changed run misses, all visible in the logs</td>
+</tr>
+<tr>
+<td>4</td>
+<td>False-hit suite</td>
+<td>implemented (<a href="https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#false-hit-suite">false-hit suite</a>, <a href="../contract/#known-gaps">known gaps</a>)</td>
+<td>every known kind of relevant change is shown not to reuse a previous execution</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Stable consumption <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></td>
+<td>in progress</td>
+<td>the formats, <code>pkg/evidence</code> and the verify report are versioned with only additive changes in v1, and an external consumer verifies with <code>pkg/evidence</code> alone</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Contract composition for monorepos (Epic 10)</td>
+<td>in progress: <code>scope.contracts</code> binds other local contracts, transitively (<a href="../guides/depend-on-a-contract/">guide</a>)</td>
+<td>a test in a monorepo reruns when, and only when, the declared inputs of the parts it depends on change</td>
+</tr>
+</tbody>
+</table>
+<p>A remote dependency (another repository, by OCI reference) is an idea, not
+built: its files are not available to <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so it would bind a
+published, verified result instead, which raises its own trust questions.</p>
 
 
 
@@ -2532,7 +2400,7 @@ environment is valid in another.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../integrations/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Consuming evidence">
+          <a href="../changelog/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Changelog">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2542,20 +2410,20 @@ environment is valid in another.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Consuming evidence
+                Changelog
               </div>
             </div>
           </a>
         
         
           
-          <a href="../changelog/" class="md-footer__link md-footer__link--next" aria-label="Next: Changelog">
+          <a href="../stats/" class="md-footer__link md-footer__link--next" aria-label="Next: Stats">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Changelog
+                Stats
               </div>
             </div>
             <div class="md-footer__button md-icon">

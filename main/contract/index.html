@@ -6,14 +6,14 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.">
+        <meta name="description" content="Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.">
       
       
       
         <link rel="canonical" href="https://aval.run/main/contract/">
       
       
-        <link rel="prev" href="../cli-reference/">
+        <link rel="prev" href="../resolve/urls/">
       
       
         <link rel="next" href="../trust-model/">
@@ -311,7 +311,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../guides/github-actions/" class="md-tabs__link">
+        <a href="../guides/write-a-contract/" class="md-tabs__link">
           
   
   
@@ -759,8 +759,6 @@
       
         
       
-        
-      
     
     
     
@@ -805,34 +803,6 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/github-actions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    GitHub Actions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -897,6 +867,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/trust-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a trust policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../pinning/" class="md-nav__link">
         
   
@@ -905,6 +959,190 @@
     
   
     Pin your dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/measure-reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure reuse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/go-consumer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume from Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
   
 
     
@@ -955,14 +1193,17 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -984,14 +1225,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_5">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1267,252 +1508,12 @@
                 
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/signing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Sign results
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/trust-policy/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Write a trust policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/go-consumer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Consume from Go
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/measure-reuse/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Measure reuse
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/troubleshooting/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
     
   
   
   
     
     
-      
-        
-      
-        
-      
-    
-    
-    
-      
-        
-        
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../cli-reference/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI reference
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    
-    
-      
-        
       
         
       
@@ -1538,10 +1539,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="">
             
   
   
@@ -1559,8 +1560,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1726,17 +1727,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#false-hit-corpus" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        False-hit corpus
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#fail-closed-errors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1749,17 +1739,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#debugging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Debugging
-      
-    </span>
-  </a>
   
 </li>
       
@@ -1864,7 +1843,7 @@
   <span class="md-ellipsis">
     
   
-    Consuming evidence
+    Consume evidence
   
 
     
@@ -1878,57 +1857,31 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
               
-                
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
   
   
   
   
-    <li class="md-nav__item">
-      <a href="../vision/" class="md-nav__link">
+    
+    
+      
         
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Vision and roadmap
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
       
         
       
@@ -2000,6 +1953,34 @@
     
   
     Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision and roadmap
   
 
     
@@ -2248,17 +2229,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#false-hit-corpus" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        False-hit corpus
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#fail-closed-errors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2271,17 +2241,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#debugging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Debugging
-      
-    </span>
-  </a>
   
 </li>
       
@@ -2399,15 +2358,10 @@
 
 
 <h1 id="the-test-contract-avalyaml">The test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: <code>aval.yaml</code><a class="headerlink" href="#the-test-contract-avalyaml" title="Anchor link">&para;</a></h1>
-<p>Status: <code>aval.trianalab.io/v1</code>, frozen. Within v1 the schema changes additively
-only (see <a href="#versioning">Versioning</a>).
-Source of truth: <code>internal/contract</code> (schema, validation) and
-<code>internal/fingerprint</code> (what gets hashed). If this document and the code
-disagree, the code wins and this document has a bug.</p>
-<p>The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> declares what a test is, how to run it, and which inputs it
-depends on. Aval reuses a previous result only when it can prove that the
-declared inputs are identical. Nothing is inferred: if an input is not
-declared, Aval cannot see it.</p>
+<p><code>aval.yaml</code> says what a test is, how to run it and which files it reads. Aval
+reuses a result only when those declared inputs are identical. An input you
+do not declare is invisible to Aval. Format: <code>aval.trianalab.io/v1</code>, frozen
+(<a href="#versioning">Versioning</a>).</p>
 <h2 id="example">Example<a class="headerlink" href="#example" title="Anchor link">&para;</a></h2>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span><span class="w">   </span><span class="c1"># required, exact value</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Test</span><span class="w">                      </span><span class="c1"># required, exact value</span>
@@ -2446,12 +2400,15 @@ declared, Aval cannot see it.</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>path/to/aval.yaml<span class="w"> </span>--fingerprint-only<span class="w">   </span><span class="c1"># prints sha256:&lt;hex&gt;</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>path/to/aval.yaml<span class="w"> </span>--explain<span class="w"> </span>--fingerprint-only<span class="w">   </span><span class="c1"># also prints the manifest</span>
 </span></code></pre></div>
+<p>Diff the <code>--explain</code> output of two machines to see which file, toolchain entry
+or variable differs. <code>-f</code> defaults to <code>./aval.yaml</code>; the root is always the
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file's directory.</p>
 <h2 id="fields">Fields<a class="headerlink" href="#fields" title="Anchor link">&para;</a></h2>
-<p>All fields below are the complete v1 schema. Unknown fields at any
-level are rejected (strict YAML decoding), so a typo such as <code>sorce:</code> fails
-instead of silently shrinking the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>. A file with more than one YAML
-document is rejected. Semantic validation reports all errors at once; YAML
-decoding errors (including unknown fields) are reported one at a time. An invalid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> exits with code 2 (usage).</p>
+<ul>
+<li>Unknown fields and files with more than one YAML document are rejected
+  (exit 2), so a typo like <code>sorce:</code> fails instead of shrinking the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.</li>
+<li>Every field is part of the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</li>
+</ul>
 <table>
 <thead>
 <tr>
@@ -2484,43 +2441,43 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 <td><code>runner.command</code></td>
 <td>list of strings</td>
 <td>yes</td>
-<td>Non-empty argv. The first element must not be blank. No shell interpolation. v0 only supports this generic runner.</td>
+<td>Non-empty argv, first element not blank. No shell.</td>
 </tr>
 <tr>
 <td><code>scope.source</code></td>
 <td>list of globs</td>
 <td>yes</td>
-<td>At least one glob. Matched files are hashed. At <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time, each glob must match at least one file (before <code>exclude</code>), and the set left after <code>exclude</code> must not be empty.</td>
+<td>At least one glob. Each glob must match a file, and at least one file must remain after <code>exclude</code>.</td>
 </tr>
 <tr>
 <td><code>scope.exclude</code></td>
 <td>list of globs</td>
 <td>no</td>
-<td>Removes files from the <code>source</code> set. Does not apply to <code>dependencies</code>. A glob may match nothing.</td>
+<td>Removes files from the <code>source</code> set (not from <code>dependencies</code>). May match nothing.</td>
 </tr>
 <tr>
 <td><code>scope.dependencies</code></td>
 <td>list of globs</td>
 <td>no</td>
-<td>Lockfiles and manifests. Each glob must match at least one file at <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time.</td>
+<td>Lockfiles and manifests. Each glob must match a file.</td>
 </tr>
 <tr>
 <td><code>scope.allowMutable</code></td>
 <td>list of <code>{file, ref, reason}</code></td>
 <td>no</td>
-<td>Acknowledges a mutable reference that would otherwise block reuse (see <a href="../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>). <code>ref</code> is the reference exactly as Aval reports it; <code>reason</code> says why it is acceptable. Both must be non-blank. <code>file</code> (optional) is the file Aval reports, relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or <code>runner.command</code>: the entry then accepts the reference in that file only. Without <code>file</code>, the entry accepts every occurrence of the reference only if one file reports it; when several do, nothing is accepted and the finding asks for <code>file</code>. Part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash; <code>file</code> is left out of the JSON when empty.</td>
+<td>Accepts a <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr> on purpose: <code>ref</code> exactly as Aval reports it, plus a non-blank <code>reason</code>. An optional <code>file</code> (relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or <code>runner.command</code>) limits it to that file; without <code>file</code>, a <code>ref</code> that several files report is not accepted. See <a href="../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>.</td>
 </tr>
 <tr>
 <td><code>scope.resolve</code></td>
 <td>list of <code>kind: reference</code></td>
 <td>no</td>
-<td>External artifacts resolved to an immutable id at <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time (see <a href="../resolve/">Resolve references</a>). Each entry has exactly one key, one of <code>image</code>, <code>npm</code>, <code>pypi</code>, <code>go</code>, <code>maven</code>, <code>crate</code>, <code>gem</code>, <code>git</code>, <code>url</code>; the reference is non-empty, without spaces or control characters, and without credentials. Rejected: a password in any URL; any user name in an <code>http(s)</code> URL or a scheme-less <code>//user@host</code> one (an <code>ssh://git@host</code> user is allowed); an <code>@</code> in the authority of a URL that does not parse; a query parameter named (in any case, <code>-</code> read as <code>_</code>, a trailing <code>[]</code> ignored) <code>token</code>, <code>private_token</code>, <code>access_token</code>, <code>key</code>, <code>apikey</code>, <code>api_key</code>, <code>sig</code>, <code>signature</code>, <code>X-Amz-Signature</code>, <code>X-Goog-Signature</code>, <code>auth</code>, <code>password</code>, <code>secret</code>, <code>credential</code>, <code>security_token</code>, <code>x_amz_security_token</code>, <code>client_secret</code>, <code>session</code> or <code>sessionid</code>. The error never echoes the reference. Part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash; order and duplicates do not matter. Never clears a scanner finding: pin the reference in place or accept it with <code>scope.allowMutable</code>. Binds the named artifact, not its dependencies.</td>
+<td>One <code>kind: reference</code> per entry. Kind is one of <code>image</code>, <code>npm</code>, <code>pypi</code>, <code>go</code>, <code>maven</code>, <code>crate</code>, <code>gem</code>, <code>git</code>, <code>url</code>. The reference must not contain credentials. See <a href="../resolve/">Resolve references</a>.</td>
 </tr>
 <tr>
 <td><code>scope.contracts</code></td>
 <td>list of paths</td>
 <td>no</td>
-<td>Other contracts this test depends on (see <a href="../guides/depend-on-a-contract/">Depend on another part of the repo</a>). Each path is relative to this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory: clean (<code>..</code> only at the start), slash-separated, without spaces, ending in <code>.yaml</code> or <code>.yml</code>, listed once. At <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time the file must exist, be a valid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and lie inside the git working tree of this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (the nearest directory at or above it with a <code>.git</code> entry). No component of the path may be a symlink. No cycles, at most 8 levels and 64 distinct contracts. A referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s mutable references block reuse here too, unless its own <code>scope.allowMutable</code> accepts them. Part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash; order does not matter.</td>
+<td>Other contracts this test depends on (<a href="../guides/depend-on-a-contract/">Depend on another part of the repo</a>). Each path is relative to this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory: clean (<code>..</code> only at the start), slash-separated, no spaces, ending in <code>.yaml</code> or <code>.yml</code>, listed once. At <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time the file must be a valid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> inside the git working tree of this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (the nearest directory at or above it with a <code>.git</code> entry), with no symlink on the path; if this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s own directory is a symlink, <code>..</code> is resolved from its real location. No cycles, at most 8 levels and 64 distinct contracts. A referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s mutable references block reuse here too, unless its own <code>scope.allowMutable</code> accepts them.</td>
 </tr>
 <tr>
 <td><code>environment.toolchain</code></td>
@@ -2532,7 +2489,7 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 <td><code>environment.env</code></td>
 <td>list of strings</td>
 <td>no</td>
-<td>Environment variable names matching <code>^[A-Za-z_][A-Za-z0-9_]*$</code>.</td>
+<td>Variable names matching <code>^[A-Za-z_][A-Za-z0-9_]*$</code>.</td>
 </tr>
 <tr>
 <td><code>cacheability</code></td>
@@ -2543,90 +2500,86 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 </tbody>
 </table>
 <h2 id="globs">Globs<a class="headerlink" href="#globs" title="Anchor link">&para;</a></h2>
-<p>All globs in <code>scope.source</code>, <code>scope.exclude</code> and <code>scope.dependencies</code> follow
-the same rules.</p>
+<p><code>scope.source</code>, <code>scope.exclude</code> and <code>scope.dependencies</code> use the same globs:</p>
+<table>
+<thead>
+<tr>
+<th>Glob</th>
+<th>Matches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/**/*.go</code></td>
+<td><code>src/a.go</code> and <code>src/x/y/a.go</code></td>
+</tr>
+<tr>
+<td><code>*.go</code></td>
+<td>top-level files only: <code>*</code> does not cross <code>/</code></td>
+</tr>
+<tr>
+<td><code>dir/**</code></td>
+<td>every file under <code>dir</code>; globs never match directories</td>
+</tr>
+<tr>
+<td><code>**</code></td>
+<td>every file</td>
+</tr>
+<tr>
+<td>Rejected</td>
+<td><code>/a</code>, <code>./a</code>, <code>../a</code>, <code>a//b</code>, <code>a\b</code>, <code>foo**</code>, <code>**.go</code>, <code>[a-</code></td>
+</tr>
+</tbody>
+</table>
 <ul>
-<li>Slash-separated, relative to the directory that contains the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file.
-  That directory is the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> root. Backslashes are rejected.</li>
-<li>No leading <code>/</code>. No empty, <code>.</code> or <code>..</code> segments (<code>a//b</code>, <code>./a</code>, <code>../a</code> are
-  rejected), so a glob cannot escape the root. Likewise, a path with a
-  leading <code>/</code> or such segments never matches any glob, not even <code>**</code>.</li>
-<li>Each segment is matched with Go's <code>path.Match</code> (<code>*</code>, <code>?</code>, <code>[...]</code>). <code>*</code>
-  does not cross <code>/</code>. A malformed pattern (e.g. <code>[a-</code>) is rejected.</li>
-<li><code>**</code> is only allowed as a whole segment and matches zero or more segments.
-  <code>src/**/*.go</code> matches <code>src/a.go</code> and <code>src/x/y/a.go</code>. <code>**</code> alone matches
-  every file. <code>foo**</code> or <code>**.go</code> are rejected. Consecutive <code>**</code> match the
-  same names as one (<code>**/**/x</code> is <code>**/x</code>), and matching takes time
-  proportional to glob segments times path segments, however many <code>**</code>.</li>
-<li>In <code>exclude</code>, a trailing <code>**</code> means the files under a directory: a file
-  named <code>build</code> that only <code>build/**</code> would exclude fails fingerprinting
-  (see "Fail-closed errors"). Exclude such a file by name (<code>build</code>).</li>
-<li>Globs match files only, never directories. To include a directory's
-  contents, write <code>dir/**</code>.</li>
-<li>The order of globs does not matter.</li>
+<li>Relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory; a glob cannot escape it.</li>
+<li>Case-sensitive and byte-exact: <code>Makefile</code> is not <code>makefile</code>, NFC is not NFD.</li>
+<li>Order does not matter.</li>
 </ul>
 <h2 id="test-identity-vs-execution-fingerprint">Test identity vs execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr><a class="headerlink" href="#test-identity-vs-execution-fingerprint" title="Anchor link">&para;</a></h2>
-<ul>
-<li><strong>Test identity</strong> is <code>metadata.name</code>: what is being checked, stable across
-  executions (e.g. <code>orders-integration</code>).</li>
-<li><strong>Execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr></strong> is a SHA-256 over the concrete inputs and
-  conditions of one execution: the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> itself, the content of every
-  file in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, the declared toolchain and the declared environment values.
-  Two executions with the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> are, as far as the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> can
-  tell, the same execution.</li>
-</ul>
-<p>The name is also part of the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> (through the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash), so
-renaming a test produces a new <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</p>
+<p><code>metadata.name</code> says what is checked. The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> says with which inputs.
+Renaming a test changes its <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</p>
 <h2 id="cacheability-classes">Cacheability classes<a class="headerlink" href="#cacheability-classes" title="Anchor link">&para;</a></h2>
 <table>
 <thead>
 <tr>
 <th>Class</th>
-<th>Meaning</th>
-<th>Reusable by default</th>
+<th>Use it when</th>
+<th>Reused</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>hermetic</code></td>
-<td>Result depends only on declared files and toolchain.</td>
+<td>the test reads only the declared files</td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>controlled-environment</code></td>
-<td>Depends on services/images whose versions are pinned inside the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> (e.g. a compose file with image digests).</td>
+<td>it uses services you pin, such as a Compose image by digest</td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>external-dependencies</code></td>
-<td>Talks to things outside the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> (SaaS APIs, shared databases).</td>
-<td>no, only with explicit <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> opt-in</td>
+<td>it calls something you do not control</td>
+<td>only if the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> allows it</td>
 </tr>
 <tr>
 <td><code>non-deterministic</code></td>
-<td>Results vary between runs with identical inputs.</td>
+<td>the same inputs can give a different result</td>
 <td>never</td>
 </tr>
 </tbody>
 </table>
-<p>"Reusable by default" only means the class does not block reuse. A result
-is still reused only if a valid, signed <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> exists and the trust
-<abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> accepts its <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> (see <a href="../trust-model/#policy">trust-model.md</a>).
-Without a <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> nothing is accepted.
-<code>aval run</code> prints <code>cacheability external-dependencies: not reusable by
-default (the policy may allow it)</code> and <code>cacheability non-deterministic: never
-reusable</code>. A <code>non-deterministic</code> test is never looked up: it always runs.</p>
-<p>A <code>hermetic</code> or <code>controlled-environment</code> test whose <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> or
-<code>runner.command</code> holds a mutable reference (a container tag, a manifest
-without a lockfile, a script fetched at run time) that <code>scope.allowMutable</code>
-does not acknowledge is never looked up either: the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is <code>miss</code>, the
-reason lists each reference, the test runs and its result is not published.
-For <code>external-dependencies</code> the references are printed as information. See
-<a href="../pinning/">Pin your dependencies</a>.</p>
+<p>A reusable class still needs a signed result your <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> trusts. A
+<code>non-deterministic</code> test is never looked up. A <code>hermetic</code> or
+<code>controlled-environment</code> test with a <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr> that <code>allowMutable</code>
+does not accept is a miss, and its result is not published
+(<a href="../pinning/">Pin your dependencies</a>).</p>
 <h2 id="what-goes-into-the-fingerprint">What goes into the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr><a class="headerlink" href="#what-goes-into-the-fingerprint" title="Anchor link">&para;</a></h2>
-<p>The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>sha256:&lt;hex&gt;</code> of a canonical, line-oriented manifest
-(format <code>aval-fingerprint/v1</code>). <code>aval run --explain</code> prints the exact text
-that was hashed. Layout, in this order:</p>
+<p>The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>sha256:&lt;hex&gt;</code> of a line-oriented manifest (format
+<code>aval-fingerprint/v1</code>). <code>aval run --explain</code> prints the exact text that was
+hashed, in this order:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aval-fingerprint/v1
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>source &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
@@ -2636,275 +2589,169 @@ that was hashed. Layout, in this order:</p>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
 </span></code></pre></div>
-<ul>
-<li><strong>Header</strong>: <code>aval-fingerprint/v1</code>. Bumped whenever the manifest of an existing <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> would change, so
-  fingerprints from different formats never collide.</li>
-<li><strong><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></strong>: SHA-256 of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> serialized as JSON after parsing.
-  Comments, formatting and YAML key order do not matter. Set-like lists
-  (<code>source</code>, <code>exclude</code>, <code>dependencies</code>, <code>env</code>, <code>allowMutable</code>, <code>resolve</code>, <code>contracts</code>) are sorted
-  and deduplicated first, so their order does not matter. <code>runner.command</code> is not sorted:
-  argv order is semantic. Map keys (<code>toolchain</code>) are sorted by the JSON
-  encoder. Every field is included, so changing <code>metadata.name</code>,
-  <code>runner.command</code> or <code>cacheability</code> changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. An explicitly
-  empty list or map (<code>exclude: []</code>) hashes the same as an omitted field.
-  <code>allowMutable</code>, <code>resolve</code> and <code>contracts</code> are left out of the JSON when empty, so
-  contracts without them hash as they did before the fields existed.</li>
-<li><strong>source</strong>: one line per file that matches any <code>source</code> glob and no
-  <code>exclude</code> glob.</li>
-<li><strong>dependency</strong>: one line per file that matches any <code>dependencies</code> glob.
-  A file matched by both <code>source</code> and <code>dependencies</code> appears in both sections.</li>
-<li>File lines carry the SHA-256 of the file content, a portable mode (<code>x</code> if
-  any execute bit is set, <code>-</code> otherwise) and the slash-separated path
-  relative to the root. Owner, timestamps and other permission bits are not
-  hashed.</li>
-<li><strong>toolchain</strong>: one line per declared entry, <code>key=value</code>, as written. v0
-  trusts the declaration; it does not check the installed toolchain.</li>
-<li><strong>env</strong>: one line per declared variable with the SHA-256 of its value, or
-  <code>unset</code> if the variable is not set. Set-but-empty and unset are different.
-  Values are never written in clear.</li>
-<li><strong>resolve</strong>: one line per <code>scope.resolve</code> entry: its kind, the reference
-  as written, what it resolved to (a version or ref name; <code>floating</code> for a
-  range, a tag or latest; <code>-</code> when there is none) and the immutable id
-  (digest, checksum, commit, or for <code>floating</code> the hash of the whole release
-  list) read from the registry when the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is computed. Only contracts with <code>scope.resolve</code> have these
-  lines, and only they need the network to <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> (see
-  <a href="../resolve/">Resolve references</a>). The registry address is not
-  hashed.</li>
-<li><strong><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></strong> with a path: one line per <code>scope.contracts</code> entry: the path
-  as written, the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <code>metadata.name</code> and its
-  <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, computed from its own directory, <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, environment,
-  <code>scope.resolve</code> and <code>scope.contracts</code> (so references are transitive).
-  Only contracts with <code>scope.contracts</code> have these lines. <code>--explain</code> also
-  prints the tree, one <code>depends on &lt;path&gt; (&lt;name&gt;) &lt;fingerprint&gt;</code> line per
-  reference, indented by level.</li>
-</ul>
-<p>Lines are sorted within each section. The result does not depend on checkout
-path, directory iteration order or glob order. The <code>x</code> mode is taken from the
-filesystem, so Windows (which has no execute bit) and Unix checkouts of the
-same executable file <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> differently.</p>
-<p>Paths are hashed as the bytes the filesystem returns, never normalized. The
-NFC and NFD spellings of the same visible name (<code>café.go</code>) are different
-inputs, and so are <code>A.go</code> and <code>a.go</code>. Globs match those bytes
-case-sensitively and without normalization. A literal glob that differs from
-the on-disk name only by case or Unicode form (<code>Makefile</code> vs <code>makefile</code>)
-matches nothing, so fingerprinting fails (see "Fail-closed errors"). A
-wildcard glob that matches other files (<code>**/Makefile</code>) still leaves such a
-file out of <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, like any undeclared file.</p>
+<table>
+<thead>
+<tr>
+<th>Line</th>
+<th>Holds</th>
+<th>Not affected by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>header</td>
+<td><code>aval-fingerprint/v1</code>, bumped when an existing <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s manifest would change</td>
+<td></td>
+</tr>
+<tr>
+<td><code>contract</code></td>
+<td>sha256 of the parsed <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> as JSON</td>
+<td>comments, formatting, key order, the order and duplicates of set-like lists (argv order counts; an empty list equals an omitted one)</td>
+</tr>
+<tr>
+<td><code>source</code>, <code>dependency</code></td>
+<td>sha256 of the content, <code>x</code> (any exec bit) or <code>-</code>, path. A file in both sets appears twice</td>
+<td>owner, timestamps, other permission bits</td>
+</tr>
+<tr>
+<td><code>toolchain</code></td>
+<td><code>key=value</code> as written; not checked against the installed tools</td>
+<td></td>
+</tr>
+<tr>
+<td><code>env</code></td>
+<td>sha256 of the value, or <code>unset</code> (empty is not unset); values never appear in clear</td>
+<td></td>
+</tr>
+<tr>
+<td><code>resolve</code></td>
+<td>kind, reference, version or <code>floating</code>, immutable id; only with <code>scope.resolve</code>, and needs the network (<a href="../resolve/">Resolve references</a>)</td>
+<td>the registry address</td>
+</tr>
+<tr>
+<td><code>contract &lt;path&gt;</code></td>
+<td>one line per <code>scope.contracts</code> entry: the path as written, the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <code>metadata.name</code> and its <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, computed from its own directory and inputs (so references are transitive). <code>--explain</code> also prints the tree, one <code>depends on &lt;path&gt; (&lt;name&gt;) &lt;fingerprint&gt;</code> line per reference</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Lines are sorted within each section, so checkout path and walk order do not
+matter. Paths are hashed byte for byte. Windows has no exec bit, so an
+executable file fingerprints differently there than on Unix.</p>
 <h3 id="what-does-not-go-in">What does not go in<a class="headerlink" href="#what-does-not-go-in" title="Anchor link">&para;</a></h3>
-<ul>
-<li>Files not matched by <code>source</code> or <code>dependencies</code>. Undeclared inputs are
-  invisible: if the test reads them, Aval cannot detect a change. This is
-  the main risk of declared <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>; keep the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> honest.</li>
-<li><code>.git</code> directories at any depth (skipped entirely). The name match is
-  exact and case-sensitive: a <code>.GIT</code> directory is not skipped. A regular
-  file named <code>.git</code> (a worktree or submodule pointer) is an ordinary file:
-  it is in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> if a glob matches it.</li>
-<li>Aval's own outputs, so a broad <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> such as <code>["**"]</code> keeps its
-  <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> across <code>aval run</code>s and <code>aval push</code> accepts the recorded
-  result:</li>
-<li><code>.aval</code> directories at any depth (skipped entirely, the same exact,
-    case-sensitive name match as <code>.git</code>). <code>.aval/</code> is reserved for Aval: a
-    file the test reads must not live there.</li>
-<li>The <code>--result</code> and <code>--report</code> files the command is given, when they
-    fall inside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root. Each command knows only its own flags:
-    <code>aval push</code> skips its <code>--result</code>, <code>aval verify</code> neither. A custom path
-    outside <code>.aval/</code> is therefore hashed by a command that is not given it
-    (a miss, never a false hit); keep results and reports under <code>.aval/</code>
-    or outside the root. A <code>--result</code> or <code>--report</code> path that the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>
-    includes and that holds anything other than an Aval result or report
-    (a real input) exits 2 before the test runs: skipping it would drop
-    that input from the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. <code>aval run</code> also refuses, with exit 2,
-    to overwrite any existing file at those paths that is not an Aval result
-    or report, wherever it lies. Only this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> skips them: in
-    a <code>scope.contracts</code> reference they stay inputs (a miss, never a false
-    hit).</li>
-<li>The git commit, branch or any VCS metadata. Two commits with identical
-  <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> content produce the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and can reuse the same result.
-  That is intended: a commit that only touches unrelated files should not
-  force a re-run.</li>
-<li>Environment variables not listed in <code>environment.env</code>.</li>
-<li>The real toolchain version, OS and architecture, unless declared.</li>
-</ul>
+<table>
+<thead>
+<tr>
+<th>Not hashed</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>files no <code>source</code> or <code>dependencies</code> glob matches</td>
+<td>the main risk: keep the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> honest</td>
+</tr>
+<tr>
+<td><code>.git</code> directories</td>
+<td>exact name; a regular <code>.git</code> file is hashed</td>
+</tr>
+<tr>
+<td><code>.aval/</code> directories and the command's <code>--result</code>/<code>--report</code> files</td>
+<td>so <code>["**"]</code> stays stable; keep them under <code>.aval/</code>. A path in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> that holds a real input exits 2. In a <code>scope.contracts</code> reference they stay inputs (a miss, never a false hit)</td>
+</tr>
+<tr>
+<td>commit, branch, VCS metadata</td>
+<td>two commits with the same <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> share a result</td>
+</tr>
+<tr>
+<td>environment variables not in <code>environment.env</code></td>
+<td></td>
+</tr>
+<tr>
+<td>the real toolchain, OS and architecture</td>
+<td>unless declared</td>
+</tr>
+</tbody>
+</table>
 <h3 id="known-gaps">Known gaps<a class="headerlink" href="#known-gaps" title="Anchor link">&para;</a></h3>
-<p>Declared <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> means some relevant changes are invisible by design
-(invariant 2 in <code>AGENTS.md</code>). A test that depends on one of these can reuse a
-result it should not. The first two are pinned by <code>gap</code> rows in the
-false-hit corpus (<code>internal/fingerprint/corpus_test.go</code>), which assert the
-<abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> does <em>not</em> change; the others follow from what the manifest
-hashes (see above):</p>
+<p>Declared <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> means some changes are invisible by design. A test that
+depends on one of these can reuse a result it should not:</p>
 <ul>
-<li>A file the test reads but <code>scope</code> does not match (corpus row), including
-  a name that differs from a wildcard glob by case or Unicode form.</li>
-<li>An environment variable the test reads but <code>environment.env</code> does not
-  list (corpus row).</li>
-<li>Content behind a declared name: a container tag such as <code>postgres:16</code>
-  that is repushed, a dependency fetched from the network at run time, a
-  service reached over the network. Only the declared text is hashed,
-  unless the reference is in <code>scope.resolve</code>, which hashes its immutable
-  id (<a href="../resolve/">Resolve references</a>). The
-  references the mutable-reference scanner recognizes block reuse for
-  <code>hermetic</code> and <code>controlled-environment</code> (the <code>refused</code> corpus rows):
-  images without a digest, manifests without a lockfile, unpinned installs,
-  scripts piped from the network, branch-tracking git references. See
-  <a href="../pinning/">Pin your dependencies</a> for the list and the fixes per
-  ecosystem. A reference the scanner does not recognize, and a service
-  reached over the network, remain invisible: use <code>external-dependencies</code>,
-  which is not reusable by default.</li>
-<li>The installed toolchain, OS and architecture: <code>environment.toolchain</code> is
-  trusted as written (see "Future work").</li>
+<li>a file the test reads that <code>scope</code> does not match, including a case or
+  Unicode mismatch under a wildcard glob</li>
+<li>an environment variable the test reads that <code>environment.env</code> does not list</li>
+<li>content behind a name the <a href="../pinning/">scanner</a> does not recognize, or a
+  network service: use <code>scope.resolve</code> or <code>external-dependencies</code></li>
+<li>the installed toolchain, OS and architecture</li>
 </ul>
-<p>Mitigations: <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> review, the <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> classes, <code>aval run --shadow</code>
-(runs the test anyway and fails on a false hit) and, in the future, observed
-inputs.</p>
-<h3 id="false-hit-corpus">False-hit corpus<a class="headerlink" href="#false-hit-corpus" title="Anchor link">&para;</a></h3>
-<p><code>TestFalseHitCorpus</code> applies every known kind of change to one base project
-and asserts its <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>: a relevant change (content, rename, add, delete,
-exec bit, lockfile, toolchain, env value or presence, command, any <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
-field, re-included excludes) changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; an irrelevant one
-(out-of-<abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> or excluded files, <code>.git</code>, Aval's own outputs, checkout path, ordering,
-duplicates, timestamps, non-exec permission bits, YAML formatting) does not;
-an unprovable one (see "Fail-closed errors") fails closed; a repushed
-image tag (in a compose file or in <code>runner.command</code>) keeps the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>
-but is reported as an unacknowledged mutable reference, so it is refused.
-The scanner has its own false-hit table per ecosystem, mutable and pinned
-variants, in <code>internal/pinning</code>, and a fuzz target over every detector. The test fails if
-a manifest section is changed by no differ row, so a new section must come
-with corpus cases; a new attribute in an existing section or a new <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
-field needs its row added by review.</p>
-<p><code>TestResolveFalseHits</code> runs the same outcomes through the real resolvers
-and in-process fakes: a republished download or a repushed image tag in
-<code>scope.resolve</code> changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, reordering or repeating entries
-does not, and an unresolvable reference fails closed; <code>internal/resolve</code>
-has the per-ecosystem tables. <code>TestResolveManifestGolden</code> pins the
-<code>resolve</code> lines in <code>testdata/golden/resolve-aval-fingerprint-vN.manifest</code>.</p>
-<p><code>TestContractsFalseHits</code> and <code>TestContractsFailClosed</code> cover
-<code>scope.contracts</code>: a change inside a referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> (also two
-levels down) changes the dependent's <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, a change outside it does
-not, and a missing, invalid, escaping, symlinked, cyclic or too deep
-reference fails closed. <code>TestContractsFindings</code> checks that a referenced
-<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s mutable references block the dependent. <code>TestContractsManifestGolden</code>
-pins the <code>contract &lt;path&gt;</code> lines in
-<code>testdata/golden/contracts-aval-fingerprint-vN.manifest</code>.</p>
-<p><code>TestManifestGolden</code> pins, per manifest version, the manifests of three
-contracts over a fixed tree (<code>internal/fingerprint/testdata/golden/tree</code>),
-concatenated in <code>testdata/golden/aval-fingerprint-vN.manifest</code>. One
-<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> sets every field: <code>source</code>, <code>exclude</code>, <code>dependencies</code> and <code>env</code>
-each unsorted and with a repeat, a toolchain map with six keys, argv with
-<code>&amp;</code>, <code>&lt;</code>, <code>&gt;</code> and non-ASCII characters, and env vars that are set, set to
-the empty string and unset. One omits every optional field; one sets every
-optional field to an empty list or map and must encode like the one that
-omits them (<code>TestGoldenOmittedEqualsEmpty</code>). The tree has a nested path, a
-path with a space, a file that sorts differently by full path than in walk
-order (<code>pkg.go</code> before <code>pkg/...</code>), an empty file under a dot-directory,
-content with CRLF line endings, an excluded file and a file outside the
-<abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>. The test adds a top-level and a nested <code>.git</code> directory (skipped)
-and a regular file named <code>.git</code> (in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>), and fixes the env values and
-the file modes: one exec bit each for owner (0744), group (0654) and other
-(0645), all three (0755), and a file with setuid, setgid and sticky but no
-exec bit. Any change to how these manifests are built (their lines, the
-hashes in them or the canonical <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> JSON) fails it unless the header
-version is bumped too, so an old <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> can never mean different
-inputs.</p>
-<p>What this covers was measured by mutation: each conditional, constant,
-format string and normalization in <code>Compute</code>, <code>canonicalContract</code>,
-<code>listFiles</code>, <code>hashMatching</code>, <code>hashFile</code>, <code>sum</code> and the glob matcher was
-mutated and <code>make ci-false-hit</code> run; every mutant that changes the manifest
-of some input fails it, through the golden, the corpus, the glob tables or
-the fail-closed tests. The two mutants that pass are equivalent on the
-platforms CI runs: dropping <code>filepath.ToSlash</code> (the separator is already
-<code>/</code> on Unix) and masking with <code>Mode().Perm()&amp;0o111</code> instead of
-<code>Mode()&amp;0o111</code>. A path the tree does not exercise (a new manifest feature)
-is caught only by the corpus, so it must come with a case in the golden
-tree.</p>
-<p><code>TestGoldensAppendOnly</code> stops the golden being rewritten to match: a
-committed <code>*.manifest</code> golden may be added (a new version) but never
-modified, renamed or deleted. It diffs the goldens against the merge base of
-<code>HEAD</code> and <code>AVAL_GOLDEN_BASE</code>; in CI that is the PR base branch or the commit
-before the push, and the test fails if it does not resolve (after a
-force-push to <code>main</code> the old commit may be unreachable, and the job fails
-until the next normal push). Locally <code>make ci-false-hit</code> sets it to
-<code>origin/main</code> when it is unset, and the test fails when that ref is missing,
-so set <code>AVAL_GOLDEN_BASE</code> to the upstream main if your remote is named
-differently. A plain <code>go test</code> without <code>AVAL_GOLDEN_BASE</code> (the <code>ci-engine</code>
-job and the dogfood suite, which check out shallow) skips this one test;
-the <code>ci-false-hit</code> leg never does. <code>TestGoldenEditsCatchesEdits</code> is
-its negative test; by hand, append a line to the golden and run
-<code>AVAL_GOLDEN_BASE=HEAD go test ./internal/fingerprint -run TestGoldensAppendOnly</code>.
-The <code>ci-false-hit</code> CI job (<code>make ci-false-hit</code>, part of <code>make ci</code>) runs these
-tests and the glob tables on every PR and push, with no path filter.
-<code>TestFalseHitGateIsBinding</code> (<code>tests/architecture</code>) fails if that job or leg
-is removed, made conditional, allowed to fail (<code>continue-on-error</code>), checked
-out shallow, or given any other <code>AVAL_GOLDEN_BASE</code>, or if the recipe of
-<code>make ci-false-hit</code> changes in any way (a <code>-skip</code>, a dropped package, a
-dropped <code>-count=1</code>, a dropped <code>AVAL_GOLDEN_BASE</code> default). Edits to the tests themselves are left to review.</p>
+<p>Mitigation: review the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, use <code>aval run --shadow</code>, pick the right
+<abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class.</p>
 <h3 id="fail-closed-errors">Fail-closed errors<a class="headerlink" href="#fail-closed-errors" title="Anchor link">&para;</a></h3>
-<p>If equivalence of inputs cannot be proven, fingerprinting fails and the
-test must run. <code>aval run</code> reports the reason (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>) and runs the
-test without recording it; <code>aval run --fingerprint-only</code>, <code>--explain</code>,
-<code>aval verify</code> and <code>aval push</code> exit with code 1. The cases:</p>
-<ul>
-<li><code>source glob "&lt;glob&gt;" matched no files</code>: every <code>source</code> glob must match
-  at least one file before <code>exclude</code> is applied. A typo or a name that
-  differs by case or Unicode form would otherwise silently drop a declared
-  input.</li>
-<li><code>scope.source matched no files</code> (after applying <code>exclude</code>).</li>
-<li><code>source "&lt;path&gt;" is excluded only by a trailing "**"</code>: an <code>exclude</code> glob
-  such as <code>build/**</code> matches a file named <code>build</code> only because <code>**</code> matches
-  zero segments. Exclude the file by name or narrow the glob.</li>
-<li><code>dependency glob "&lt;glob&gt;" matched no files</code>: every <code>dependencies</code> glob
-  must match at least one file.</li>
-<li>A file in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> is not a regular file (symlink, device, socket, ...):
-  <code>only regular files are supported in scope</code>. A symlink's target may live
-  outside the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, so it cannot be proven unchanged.</li>
-<li>A symlink under which a <code>source</code> or <code>dependencies</code> glob could match files
-  (it may point to a directory):
-  <code>"&lt;path&gt;" is a symlink a glob could match files under</code>. Symlinks are not
-  followed, and <code>exclude</code> does not lift this check. A symlink no glob can
-  reach is ignored. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory itself may be a symlink: it
-  fingerprints like its target.</li>
-<li>A path in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> contains a newline or carriage return: <code>control characters
-  in path are not supported</code>. The manifest is line-oriented, so such a name
-  could forge manifest lines and collide with a different tree.</li>
-<li>A <code>scope.resolve</code> reference that cannot be resolved: <code>resolve &lt;kind&gt;
-  &lt;reference&gt;: &lt;reason&gt;</code> (network, credentials, an exact version that is not published, a
-  download over 256 MiB, the 2-minute deadline).</li>
-<li>A <code>scope.contracts</code> reference that cannot be proven: <code>scope.contracts
-  &lt;path&gt;: &lt;reason&gt;</code>. The reason is any error above in the referenced
-  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or: the file is missing or not a valid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>; <code>leads outside
-  the repository root</code>; <code>no git working tree (.git) at or above &lt;dir&gt;</code>; <code>&lt;path&gt; is a
-  symlink</code>; <code>&lt;path&gt; is not a regular file</code>; <code>cycle: a/aval.yaml -&gt; b/aval.yaml -&gt; a/aval.yaml</code>; <code>more than
-  8 levels or 64 contracts</code>.</li>
-<li>Any I/O error while walking or reading the root. The walk only enters
-  directories that a <code>source</code> or <code>dependencies</code> glob can match a file in, so
-  an unreadable directory outside the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> (a root-owned volume, a cache)
-  is never opened and causes no error. <code>exclude</code> does not prune the walk.</li>
-</ul>
-<h2 id="debugging">Debugging<a class="headerlink" href="#debugging" title="Anchor link">&para;</a></h2>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>aval.yaml<span class="w"> </span>--fingerprint-only<span class="w">            </span><span class="c1"># sha256:&lt;hex&gt;</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>aval.yaml<span class="w"> </span>--explain<span class="w"> </span>--fingerprint-only<span class="w">  </span><span class="c1"># manifest, then digest</span>
-</span></code></pre></div>
-<p>To find out why two environments disagree, diff the <code>--explain</code> output from
-both. The differing line names the file, toolchain entry or variable.</p>
-<p><code>-f</code> defaults to <code>aval.yaml</code> in the current directory. The root is always the
-directory of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file, not the current directory.</p>
+<p>Aval cannot prove the inputs: <code>aval run</code> reports <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>, runs the
+test and records nothing; <code>--fingerprint-only</code>, <code>--explain</code>, <code>aval verify</code> and
+<code>aval push</code> exit 1.</p>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>source glob "&lt;glob&gt;" matched no files</code></td>
+<td>fix the glob; a case or Unicode mismatch also matches nothing</td>
+</tr>
+<tr>
+<td><code>scope.source matched no files</code></td>
+<td><code>exclude</code> removed every source file</td>
+</tr>
+<tr>
+<td><code>source "&lt;path&gt;" is excluded only by a trailing "**"</code></td>
+<td>exclude it by name, or narrow the glob</td>
+</tr>
+<tr>
+<td><code>dependency glob "&lt;glob&gt;" matched no files</code></td>
+<td>fix the glob</td>
+</tr>
+<tr>
+<td><code>only regular files are supported in scope</code></td>
+<td>remove the symlink, device or socket from <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr></td>
+</tr>
+<tr>
+<td><code>"&lt;path&gt;" is a symlink a glob could match files under</code></td>
+<td>symlinks are not followed, and <code>exclude</code> does not lift this; the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory itself may be a symlink</td>
+</tr>
+<tr>
+<td><code>control characters in path are not supported</code></td>
+<td>rename the file (newline or carriage return)</td>
+</tr>
+<tr>
+<td><code>resolve &lt;kind&gt; &lt;reference&gt;: &lt;reason&gt;</code></td>
+<td>see <a href="../resolve/#when-resolution-fails">When resolution fails</a></td>
+</tr>
+<tr>
+<td><code>scope.contracts &lt;path&gt;: &lt;reason&gt;</code></td>
+<td>any error above in the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or: missing or invalid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, <code>leads outside the repository root</code>, <code>no git working tree (.git) at or above &lt;dir&gt;</code>, <code>&lt;path&gt; is a symlink</code>, <code>&lt;path&gt; is not a regular file</code>, <code>cycle: a/aval.yaml -&gt; b/aval.yaml -&gt; a/aval.yaml</code>, <code>more than 8 levels or 64 contracts</code></td>
+</tr>
+<tr>
+<td>any I/O error while walking or reading</td>
+<td>make the file or directory readable; the walk only enters directories a glob can match</td>
+</tr>
+</tbody>
+</table>
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Anchor link">&para;</a></h2>
-<p><code>apiVersion</code> <code>aval.trianalab.io/v1</code> is frozen. Policy files (<code>kind: Policy</code>)
-use the same value. Within v1 the schema only gets new optional fields:
-existing contracts keep parsing and keep their meaning. Because unknown
-fields are rejected, an older <code>aval</code> rejects a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> that uses a field
-it does not know, which fails closed. Renaming or removing a field, changing
-its type or meaning, or tightening its validation needs a new <code>apiVersion</code>.</p>
-<p>The pre-freeze <code>aval.dev/v1alpha1</code> is not accepted: change the line to
-<code>aval.trianalab.io/v1</code>. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash covers <code>apiVersion</code>, so results
-published under the old value become misses and the tests run once. The
-general rules are in
-<a href="../artifact-format/#versioning-and-compatibility">artifact-format.md</a>.</p>
+<p><code>aval.trianalab.io/v1</code> is frozen; <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> files use the same value. Within v1
+the schema only gets new optional fields. An older <code>aval</code> rejects a field it
+does not know, which fails closed.</p>
+<p><code>aval.dev/v1alpha1</code> is rejected: change that line. Rules:
+<a href="../artifact-format/#versioning-and-compatibility">artifact format</a>.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Anchor link">&para;</a></h2>
 <ul>
 <li><strong>Detected toolchain</strong>: verify or record the installed toolchain instead
   of trusting <code>environment.toolchain</code>. Not scheduled in milestones 1-5.</li>
 <li><strong>Observed inputs</strong>: trace which files the test actually reads, to flag
-  undeclared inputs or suggest <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>. v0 never infers <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>.</li>
+  undeclared inputs or suggest <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. v0 never infers <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.</li>
 </ul>
 
 
@@ -2943,7 +2790,7 @@ general rules are in
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../cli-reference/" class="md-footer__link md-footer__link--prev" aria-label="Previous: CLI reference">
+          <a href="../resolve/urls/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Downloaded files">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2953,7 +2800,7 @@ general rules are in
                 Previous
               </span>
               <div class="md-ellipsis">
-                CLI reference
+                Downloaded files
               </div>
             </div>
           </a>

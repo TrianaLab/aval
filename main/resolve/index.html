@@ -6,14 +6,14 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.">
+        <meta name="description" content="Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.">
       
       
       
         <link rel="canonical" href="https://aval.run/main/resolve/">
       
       
-        <link rel="prev" href="../pinning/">
+        <link rel="prev" href="../cli-reference/">
       
       
         <link rel="next" href="images/">
@@ -307,13 +307,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../guides/github-actions/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../guides/write-a-contract/" class="md-tabs__link">
           
   
   
@@ -331,10 +329,12 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
+      <li class="md-tabs__item md-tabs__item--active">
         <a href="../cli-reference/" class="md-tabs__link">
           
   
@@ -736,14 +736,10 @@
       
   
   
-    
   
   
-  
     
     
-      
-        
       
         
       
@@ -767,22 +763,19 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
@@ -800,7 +793,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -810,34 +803,6 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/github-actions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    GitHub Actions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -902,6 +867,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/trust-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a trust policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../pinning/" class="md-nav__link">
         
   
@@ -910,6 +959,190 @@
     
   
     Pin your dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/measure-reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure reuse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/go-consumer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume from Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
   
 
     
@@ -972,7 +1205,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
@@ -994,14 +1227,14 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_4_5" id="__nav_4_5_label" tabindex="">
+              <label class="md-nav__link md-nav__link--active" for="__nav_5_2" id="__nav_5_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_4_5">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1279,155 +1512,12 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../guides/signing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
     
-  
-    Sign results
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/trust-policy/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Write a trust policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/go-consumer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Consume from Go
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/measure-reuse/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Measure reuse
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../guides/troubleshooting/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
     
       
+        
       
-  
-  
-  
-  
-    
-    
+        
       
         
       
@@ -1438,110 +1528,21 @@
     
       
       
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../cli-reference/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI reference
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
+          
         
       
     
     
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="">
             
   
   
@@ -1559,8 +1560,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1668,7 +1669,7 @@
   <span class="md-ellipsis">
     
   
-    Consuming evidence
+    Consume evidence
   
 
     
@@ -1682,57 +1683,31 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
               
-                
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
   
   
   
   
-    <li class="md-nav__item">
-      <a href="../vision/" class="md-nav__link">
+    
+    
+      
         
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Vision and roadmap
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
       
         
       
@@ -1804,6 +1779,34 @@
     
   
     Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision and roadmap
   
 
     
@@ -2082,10 +2085,10 @@
     
     
       <li class="md-path__item">
-        <a href="../guides/github-actions/" class="md-path__link">
+        <a href="../cli-reference/" class="md-path__link">
           
   <span class="md-ellipsis">
-    Guides
+    Reference
   </span>
 
         </a>
@@ -2155,43 +2158,70 @@ fingerprints, and hashes that id.</p>
 or moves <code>main</code>, the id changes, the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> changes, and Aval runs the
 test instead of reusing an old result.</p>
 <h2 id="exact-or-floating">Exact or floating<a class="headerlink" href="#exact-or-floating" title="Anchor link">&para;</a></h2>
-<p>An exact version binds that version. For npm, PyPI, crates, gems and
-Maven, anything else (a range, latest, a tag) binds the whole release
-list, so any new release of the package makes the test run again; use an
-exact version (or a lockfile) for stable reuse. Go differs: a <code>vX.Y.Z</code>
-version is exact, a branch, a commit or another non-semver query is
-resolved through the proxy to a version (usually a pseudo-version) whose
-zip is bound, and only <code>latest</code>, a prefix (<code>v1.2</code>), a comparison or a
-<code>+incompatible</code> version binds the version list
-(<a href="go/">Go modules</a>).</p>
-<p>Aval never picks a version from a range. Each tool reads ranges its own
-way, and a version Aval picked differently from the tool would be a false
-hit. What a floating reference hashes:</p>
-<ul>
-<li>npm: every version with its <code>dist.integrity</code> and deprecation, and every
-  dist-tag.</li>
-<li>PyPI: every file of every release with its sha256 and yanked flag.</li>
-<li>Crates: every index entry with its checksum and yanked flag.</li>
-<li>Gems: every version and platform with its checksum.</li>
-<li>Maven: every version in <code>maven-metadata.xml</code> with its POM and published
-  checksum, plus <code>&lt;latest&gt;</code> and <code>&lt;release&gt;</code>; more than 100 versions fail.</li>
-<li>Go (<code>latest</code>, a prefix, a comparison, <code>+incompatible</code>): the proxy's
-  version list and <code>@latest</code> with the <code>h1:</code> hash of the version it names;
-  other versions by name (the checksum database keeps them fixed; a module
-  the go command would not verify against it fails).</li>
-</ul>
-<p>A publish, a yank or a moved tag changes the id: the test runs more
-often, never on stale inputs. What counts as exact is on each ecosystem
-page; when in doubt, a spec is floating. A spec the tool installs from
-somewhere else than the registry (an npm alias <code>npm:x</code>, <code>github:</code>,
-<code>org/repo</code>, <code>git+https:</code>, <code>file:</code>, <code>./dir</code>) fails: use the <code>git</code> or <code>url</code>
-kind, or pin. A package name must match its ecosystem's naming rules
-(npm's rules for old packages, so uppercase is allowed; PEP 508, crates.io, RubyGems, Maven
-coordinates, Go module paths), checked when the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> is read and
-again before the lookup, so a path, a file or a URL never passes for a
-name (<code>left-pad/</code>, <code>./x</code>, <code>x.tgz</code>): <code>not a valid npm package name</code>. An
-image tag and a git branch are resolved to their current
-digest or commit.</p>
+<p>For npm, PyPI, crates, gems and Maven, an exact version binds that release.
+Anything else (a range, <code>latest</code>, a tag) binds the whole release list, so any
+new release runs the test again. Aval never picks a version from a range.</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Exact</th>
+<th>Floating hashes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>npm</code></td>
+<td><code>x.y.z[-pre]</code></td>
+<td>every version's <code>dist.integrity</code> and deprecation, every dist-tag</td>
+</tr>
+<tr>
+<td><code>pypi</code></td>
+<td>one <code>==</code> without <code>*</code></td>
+<td>every file's sha256 and yanked flag</td>
+</tr>
+<tr>
+<td><code>crate</code></td>
+<td><code>=x.y.z</code></td>
+<td>every index entry's checksum and yanked flag</td>
+</tr>
+<tr>
+<td><code>gem</code></td>
+<td>a plain version</td>
+<td>every version and platform checksum</td>
+</tr>
+<tr>
+<td><code>maven</code></td>
+<td>a plain version</td>
+<td>every listed version's POM and checksums (100 versions at most)</td>
+</tr>
+<tr>
+<td><code>go</code></td>
+<td><code>vX.Y.Z</code> (a branch or commit resolves to a version)</td>
+<td>the version list, plus <code>@latest</code> and its <code>h1:</code> hash, for <code>latest</code>, a prefix, a comparison or <code>+incompatible</code></td>
+</tr>
+<tr>
+<td><code>image</code></td>
+<td></td>
+<td>the tag's manifest digest</td>
+</tr>
+<tr>
+<td><code>git</code></td>
+<td>a full commit</td>
+<td>the commit a branch or tag points to</td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td></td>
+<td>the bytes</td>
+</tr>
+</tbody>
+</table>
+<p>A publish, a yank or a moved tag changes the id: the test runs more often,
+never on stale inputs. When in doubt, a spec is floating. A spec the tool
+installs from elsewhere (<code>npm:x</code>, <code>github:</code>, <code>file:</code>, <code>./dir</code>) or a name
+outside the ecosystem's rules fails: use <code>git</code> or <code>url</code>, or pin. Each page
+lists the rules.</p>
 <h2 id="pin-or-resolve">Pin or resolve?<a class="headerlink" href="#pin-or-resolve" title="Anchor link">&para;</a></h2>
 <table>
 <thead>
@@ -2219,37 +2249,23 @@ digest or commit.</p>
 a nightly base image, a tool at <code>latest</code>, a fixtures branch.</p>
 <h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Anchor link">&para;</a></h2>
 <ul>
-<li>Each entry is <code>kind: reference</code>. The kinds: <a href="images/"><code>image</code></a>,
-  <a href="npm/"><code>npm</code></a>, <a href="pypi/"><code>pypi</code></a>, <a href="go/"><code>go</code></a>, <a href="maven/"><code>maven</code></a>,
-  <a href="crates/"><code>crate</code></a>, <a href="gems/"><code>gem</code></a>, <a href="git/"><code>git</code></a>, <a href="urls/"><code>url</code></a>.</li>
 <li>The manifest gets one line per reference, after the <code>env</code> lines:
   <code>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;id&gt;</code>, where <code>&lt;version&gt;</code> is
   <code>floating</code> for a reference that names no exact version. <code>aval run
   --explain</code> shows them, and prints on stderr how long each lookup took,
   including those of the contracts in <code>scope.contracts</code>.</li>
 <li>The list is part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash; its order and duplicates do not
-  matter. Contracts without <code>scope.resolve</code> never touch the network and keep
-  their <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</li>
+  matter. Contracts without <code>scope.resolve</code> never touch the network.</li>
 <li><code>scope.resolve</code> binds the artifact you name, not its dependencies. npm,
   pip, <code>cargo install</code> without <code>--locked</code> and <code>gem install</code> still pick
   transitive versions when they install. Pin those with a lockfile.</li>
 <li>No cache: every <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> asks the registry again.</li>
 </ul>
-<h2 id="scoperesolve-and-the-scanner"><abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>.resolve and the scanner<a class="headerlink" href="#scoperesolve-and-the-scanner" title="Anchor link">&para;</a></h2>
-<p><code>scope.resolve</code> never clears a finding of the
-<a href="../pinning/">mutable-reference scanner</a>. A resolved reference makes a
-move change the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>: a repushed tag, a moved branch, new bytes at a
-URL or a new release all give a miss. But the scanner still reports the
-reference, and it still blocks reuse.</p>
-<p>To clear the finding, pin it in place: a digest, a commit, a lockfile, a
-vendored file. Or accept it on purpose with
-<a href="../pinning/#accept-a-reference-on-purpose"><code>scope.allowMutable</code></a> and the
-reason. <code>scope.resolve</code> and <code>scope.allowMutable</code> work well together: the
-first catches a move, the second says why the reference may stay mutable.</p>
-<p>The resolved id vouches for the registry, not for the machine that runs
-the test. An engine or a node can run a copy of a tag it pulled earlier:
-Compose without <code>pull_policy: always</code>, Kubernetes with <code>IfNotPresent</code>. Pull
-before the test, or pin by digest.</p>
+<h2 id="scoperesolve-and-the-scanner"><abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.resolve and the scanner<a class="headerlink" href="#scoperesolve-and-the-scanner" title="Anchor link">&para;</a></h2>
+<p><code>scope.resolve</code> never clears a <a href="../pinning/">scanner</a> finding: a move
+changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, but the reference still blocks reuse. Pin it in
+place, or accept it with
+<a href="../pinning/#accept-a-reference-on-purpose"><code>scope.allowMutable</code></a>.</p>
 <h2 id="when-resolution-fails">When resolution fails<a class="headerlink" href="#when-resolution-fails" title="Anchor link">&para;</a></h2>
 <p>A reference that cannot be resolved (network, credentials, an exact
 version that is not published, a listed version without a checksum, a
@@ -2314,32 +2330,56 @@ Nothing is looked up, the test runs, and the reason names the reference:
 </tr>
 </tbody>
 </table>
-<p><code>$NETRC</code> and <code>$npm_config_userconfig</code> (any letter case, as npm reads
-it) point to other files. Only a
-<code>machine</code> entry of <code>~/.netrc</code> is used, never <code>default</code>, and credentials are
-sent only over <code>https</code> or to a loopback host (also after a redirect).
-Credentials go in headers, never in the manifest, a URL or an error. A user, a password or a path
-in a registry variable (<code>GOPROXY=https://user:token@host</code>,
-<code>https://npm-proxy.fury.io/&lt;token&gt;/user/</code>) is masked in errors (every URL
-in an error shows only its host), and refused over plain <code>http</code> to a host that is not loopback. Credentials written in a reference (a password, a user name
-in an <code>http(s)</code> or scheme-less <code>//user@host</code> URL, or a query parameter
-such as <code>token</code>, <code>private_token</code>, <code>sig</code>, <code>client_secret</code> or
-<code>X-Amz-Signature</code>, in any case and with <code>-</code> or <code>_</code>) are
-rejected without echoing them; an <code>ssh://git@host</code> user is allowed. The registry address is not hashed: the same
-content on a mirror resolves to the same id. Requests carry the
-User-Agent <code>aval/&lt;version&gt; (+https://github.com/TrianaLab/aval)</code>.</p>
+<ul>
+<li>Only <code>machine</code> entries of <code>~/.netrc</code> (or <code>$NETRC</code>) are used, never
+  <code>default</code>, and only over <code>https</code> or to a loopback host (also after a
+  redirect). <code>$npm_config_userconfig</code> (any letter case) points npm's file
+  elsewhere. Credentials go in headers, never in the manifest, a URL or an
+  error; a user, password or path in a registry variable is masked in errors
+  and refused over plain <code>http</code> to a host that is not loopback.</li>
+<li>A reference with credentials is rejected without echoing it: a password in
+  any URL, a user in an <code>http(s)</code> or scheme-less <code>//user@host</code> URL (an
+  <code>ssh://git@host</code> user is fine), an <code>@</code> in the authority of a URL that does
+  not parse, or a query parameter named <code>token</code>, <code>private_token</code>,
+  <code>access_token</code>, <code>key</code>, <code>apikey</code>, <code>api_key</code>, <code>sig</code>, <code>signature</code>,
+  <code>X-Amz-Signature</code>, <code>X-Goog-Signature</code>, <code>auth</code>, <code>password</code>, <code>secret</code>,
+  <code>credential</code>, <code>security_token</code>, <code>x_amz_security_token</code>, <code>client_secret</code>,
+  <code>session</code> or <code>sessionid</code> (any case, <code>-</code> read as <code>_</code>, a trailing <code>[]</code>
+  ignored).</li>
+<li>The registry address is not hashed: the same content on a mirror resolves
+  to the same id. Requests carry the User-Agent
+  <code>aval/&lt;version&gt; (+https://github.com/TrianaLab/aval)</code>.</li>
+</ul>
 <p>The resolved id vouches for the registry in the table, not for the one the
-tool installs from. Where the tool's own setting is known to point
-elsewhere, resolution fails: an npm <code>@scope:registry</code> or <code>registry</code> line in
-<code>~/.npmrc</code>, an <code>npm_config_@scope:registry</code> variable,
-two spellings of an <code>npm_config_*</code> variable (npm reads any letter case, with <code>_</code> equal to <code>-</code> after the first character) that differ, <code>$GOPRIVATE</code>, <code>$GONOPROXY</code> or a <code>$GOPROXY</code> that starts with
-<code>direct</code> or <code>off</code>, a Go module the checksum database would not verify
-(<code>GOSUMDB=off</code>, <code>$GONOSUMDB</code>, <code>$GOINSECURE</code>, <code>-insecure</code> in <code>$GOFLAGS</code>),
-<code>$PIP_INDEX_URL</code>, <code>$PIP_PYPI_URL</code> (pip's alias of <code>--index-url</code>), <code>$PIP_EXTRA_INDEX_URL</code>, <code>$PIP_FIND_LINKS</code> or
-<code>$PIP_NO_INDEX</code> (in any spelling pip reads, such as <code>PIP_index-url</code>), and a
-Maven <code>&lt;latest&gt;</code> or <code>&lt;release&gt;</code> that is a SNAPSHOT or not listed. A
-<code>~/.npmrc</code> line Aval cannot read fails too. Other tool configuration files are not read:
-<code>pip.conf</code>, a project <code>.npmrc</code>, <code>go env -w</code> settings, Cargo's
+tool installs from. Where the tool's own setting points elsewhere, resolution
+fails:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Fails when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>npm</code></td>
+<td><code>~/.npmrc</code> has a <code>@scope:registry</code> or <code>registry</code> line, or an <code>npm_config_@scope:registry</code> variable is set, that differs from Aval's registry; two spellings of an <code>npm_config_*</code> variable differ; a <code>~/.npmrc</code> line cannot be read</td>
+</tr>
+<tr>
+<td><code>go</code></td>
+<td><code>$GOPROXY</code> starts with <code>direct</code> or <code>off</code>; <code>$GOPRIVATE</code> or <code>$GONOPROXY</code> matches; <code>GOSUMDB=off</code>, <code>$GONOSUMDB</code>, <code>$GOINSECURE</code> or <code>-insecure</code> in <code>$GOFLAGS</code></td>
+</tr>
+<tr>
+<td><code>pypi</code></td>
+<td><code>$PIP_INDEX_URL</code> or <code>$PIP_PYPI_URL</code> names another index; <code>$PIP_EXTRA_INDEX_URL</code> or <code>$PIP_FIND_LINKS</code> is set; <code>$PIP_NO_INDEX</code> is true (any spelling pip reads); two spellings of one <code>PIP_*</code> variable (the option in any case, <code>-</code> equal to <code>_</code>, an optional leading <code>--</code>; on Windows <code>PIP_</code> in any case) differ</td>
+</tr>
+<tr>
+<td><code>maven</code></td>
+<td><code>&lt;latest&gt;</code> or <code>&lt;release&gt;</code> is a SNAPSHOT or not listed</td>
+</tr>
+</tbody>
+</table>
+<p>Not read: <code>pip.conf</code>, a project <code>.npmrc</code>, <code>go env -w</code> settings, Cargo's
 <code>config.toml</code>, Maven's <code>settings.xml</code>, <code>.gemrc</code>. If one of them points the
 tool to another registry, set the Aval variable to the same registry.</p>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
@@ -2384,7 +2424,7 @@ tool to another registry, set the Aval variable to the same registry.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../pinning/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Pin your dependencies">
+          <a href="../cli-reference/" class="md-footer__link md-footer__link--prev" aria-label="Previous: CLI">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2394,7 +2434,7 @@ tool to another registry, set the Aval variable to the same registry.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Pin your dependencies
+                CLI
               </div>
             </div>
           </a>

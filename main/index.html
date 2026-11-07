@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Test results as signed, verifiable OCI artifacts, reused only after signature and policy verification.">
+        <meta name="description" content="Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.">
       
       
       
@@ -311,7 +311,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="guides/github-actions/" class="md-tabs__link">
+        <a href="guides/write-a-contract/" class="md-tabs__link">
           
   
   
@@ -387,15 +387,15 @@
       <span class="aval-kicker"><i></i>signed test results for CI</span>
       
       <h1 class="aval-hero__title" id="aval-hero-title">Run a heavy test once.<br><em>Reuse</em> the result safely everywhere.</h1>
-      <p class="aval-hero__lead">Aval signs a passing test result and ties it to the exact inputs it used. When another job has the same inputs and trusts the signer, it skips the test.</p>
+      <p class="aval-hero__lead">Aval signs a test result and ties it to the exact inputs it used. A job with the same inputs and a trusted signer skips the test.</p>
       <div class="aval-hero__cta">
         <a class="aval-btn aval-btn--primary" href="quickstart/">Get started</a>
-        <a class="aval-btn" href="concepts/trust/">How trust works</a>
+        <a class="aval-btn" href="concepts/">How it works</a>
         <a class="aval-btn aval-btn--gh" href="https://github.com/TrianaLab/aval"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/></svg>GitHub</a>
       </div>
       
       <div class="aval-install"><b aria-hidden="true">$</b><code>curl -fsSL https://aval.run/install.sh | bash</code></div>
-      <p class="aval-install__alt">Windows: a PowerShell installer is in <a href="install/">Install</a>.</p>
+      <p class="aval-install__alt">Windows and other options: <a href="install/">Install</a>.</p>
     </div>
     <div class="aval-hero__art">
       
@@ -442,17 +442,12 @@ ran integration: <span class="g">passed</span> (exit 0)
 <span class="d">signer: key cZ9tHqSn…, trust level runner</span>
 <span class="d">reference: localhost:5055/acme/orders@sha256:0a4a3ac9…</span>
 <span class="w">reused passed result</span></span><span class="pr">$</span> <span class="cur"></span><span class="aval-term__cta" hidden></span></pre>
-      <figcaption class="aval-try">Try it runs Aval compiled to WebAssembly entirely in your browser, with a simulated test, an in-memory registry and a throwaway key generated in this tab. Keyless signing is not available here. <span class="aval-try__status" role="status"></span></figcaption>
+      <figcaption class="aval-try">Runs in your browser: a simulated test, an in-memory registry, a throwaway key. No keyless signing. <span class="aval-try__status" role="status"></span></figcaption>
     </figure>
     <div class="aval-run__explain">
       <p class="aval-eyebrow">// see it run</p>
       <h2 id="aval-run-title">A miss runs the test. A match skips it.</h2>
-      <ol>
-        <li><b>Fingerprint.</b> Aval hashes the inputs you list in <code>aval.yaml</code>.</li>
-        <li><b>Miss.</b> No signed result for that fingerprint, so the test runs and <code>--push</code> signs the pass.</li>
-        <li><b>Verified.</b> Same fingerprint, valid signature, a signer your policy trusts: the run is skipped and exits 0.</li>
-      </ol>
-      <p class="aval-run__try"><b>Try it:</b> click the terminal. It runs the real Aval in your browser.</p>
+      <p>Same inputs and a signer you trust: the test is skipped. Click the terminal to run the real Aval in your browser.</p>
     </div>
   </div>
 </section>
@@ -462,7 +457,7 @@ ran integration: <span class="g">passed</span> (exit 0)
   <div class="aval-wrap aval-metrics__inner">
     <div class="aval-metric"><div class="aval-metric__n"><span data-stat="runs">–</span><small>runs</small></div><div><p><b>Test runs</b> recorded in the public stats registry.</p></div></div>
     <div class="aval-metric"><div class="aval-metric__n"><span data-stat="hit">–</span><small>%</small></div><div><p><b>Reused</b> after verification: <span data-stat="reused">–</span> runs skipped.</p><div class="aval-metric__bar" data-stat="bar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
-    <div class="aval-metric"><div class="aval-metric__n"><span data-stat="saved">–</span><small data-stat="saved-unit">h</small></div><div><p><b>Test time saved.</b> No result trusted blindly.</p></div></div>
+    <div class="aval-metric"><div class="aval-metric__n"><span data-stat="saved">–</span><small data-stat="saved-unit">h</small></div><div><p><b>Test time saved</b> by reused results.</p></div></div>
   </div>
   <p class="aval-metrics__note"><span data-stat="note">Live statistics are not available right now.</span> <a href="stats/">Stats</a></p>
 </section>
@@ -473,10 +468,10 @@ ran integration: <span class="g">passed</span> (exit 0)
     <h2 id="aval-how-title">Three steps. No server to run.</h2>
     <div class="aval-steps">
       <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/></svg><span>01 · declare</span></div><h3>List the inputs</h3><p>Write the files and tools your test reads in <code>aval.yaml</code>. Aval hashes them into one fingerprint.</p></div>
-      <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m2 15 10 5.5L22 15"/></svg><span>02 · sign</span></div><h3>Run once, sign the result</h3><p>On a miss the test runs. Aval signs the result and pushes it to your own OCI registry.</p></div>
-      <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></svg><span>03 · reuse</span></div><h3>Verify, then skip</h3><p>Same fingerprint and a trusted signer? The run is skipped. Anything unclear, the test runs.</p></div>
+      <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m2 15 10 5.5L22 15"/></svg><span>02 · sign</span></div><h3>Run once, sign the result</h3><p>On a miss the test runs. With <code>--push</code>, Aval signs the result and stores it in your OCI registry.</p></div>
+      <div class="aval-step"><div class="aval-step__k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></svg><span>03 · reuse</span></div><h3>Verify, then skip</h3><p>Same fingerprint, trusted signer: the test is skipped. Anything else: the test runs.</p></div>
     </div>
-    <p class="aval-failclosed">If Aval cannot prove reuse is safe, the test runs. A bad signature fails with exit 5, never a silent miss.</p>
+    <p class="aval-failclosed">A result that fails verification is a security event, never a quiet miss.</p>
   </div>
 </section>
 
@@ -873,8 +868,6 @@ ran integration: <span class="g">passed</span> (exit 0)
       
         
       
-        
-      
     
     
     
@@ -919,34 +912,6 @@ ran integration: <span class="g">passed</span> (exit 0)
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="guides/github-actions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    GitHub Actions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -1011,6 +976,90 @@ ran integration: <span class="g">passed</span> (exit 0)
   
   
     <li class="md-nav__item">
+      <a href="guides/github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guides/trust-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a trust policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guides/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pinning/" class="md-nav__link">
         
   
@@ -1019,6 +1068,185 @@ ran integration: <span class="g">passed</span> (exit 0)
     
   
     Pin your dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guides/measure-reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure reuse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guides/go-consumer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume from Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guides/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
   
 
     
@@ -1076,7 +1304,7 @@ ran integration: <span class="g">passed</span> (exit 0)
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1098,14 +1326,14 @@ ran integration: <span class="g">passed</span> (exit 0)
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_5">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1383,243 +1611,8 @@ ran integration: <span class="g">passed</span> (exit 0)
   
   
   
-    <li class="md-nav__item">
-      <a href="guides/signing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Sign results
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="guides/trust-policy/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Write a trust policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="guides/go-consumer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Consume from Go
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="guides/measure-reuse/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Measure reuse
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="guides/troubleshooting/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
     
     
-      
-        
-      
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="cli-reference/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI reference
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
       
         
       
@@ -1642,10 +1635,10 @@ ran integration: <span class="g">passed</span> (exit 0)
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
             
   
   
@@ -1663,8 +1656,8 @@ ran integration: <span class="g">passed</span> (exit 0)
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1772,7 +1765,7 @@ ran integration: <span class="g">passed</span> (exit 0)
   <span class="md-ellipsis">
     
   
-    Consuming evidence
+    Consume evidence
   
 
     
@@ -1786,57 +1779,31 @@ ran integration: <span class="g">passed</span> (exit 0)
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
               
-                
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
   
   
   
   
-    <li class="md-nav__item">
-      <a href="vision/" class="md-nav__link">
+    
+    
+      
         
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Vision and roadmap
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
       
         
       
@@ -1908,6 +1875,34 @@ ran integration: <span class="g">passed</span> (exit 0)
     
   
     Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision and roadmap
   
 
     
