@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -79,5 +80,15 @@ func TestComputeFSSkipAndSymlink(t *testing.T) {
 	fsys["link.txt"] = &fstest.MapFile{Data: []byte("a.txt"), Mode: fs.ModeSymlink}
 	if _, err := ComputeFS(fsys, c, nil); err == nil {
 		t.Fatal("a symlink in scope must fail closed")
+	}
+}
+
+// A symlink whose name no glob matches, but under which a glob could match
+// files, fails closed in memory too, naming the path.
+func TestComputeFSSymlinkedDirectory(t *testing.T) {
+	c := &contract.Contract{Scope: contract.Scope{Source: []string{"**/*.txt"}}}
+	fsys := fstest.MapFS{"a.txt": {Data: []byte("a")}, "sub": {Data: []byte("/elsewhere"), Mode: fs.ModeSymlink}}
+	if _, err := ComputeFS(fsys, c, nil); err == nil || !strings.Contains(err.Error(), `"sub"`) {
+		t.Fatalf("want an error naming sub, got %v", err)
 	}
 }

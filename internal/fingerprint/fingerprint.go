@@ -238,27 +238,38 @@ type file struct {
 // path. VCS metadata, Aval's output directories and the paths in skip are
 // left out, and so is every directory no include glob can match a file in:
 // an unreadable or deep directory outside the scope is never opened.
+//
+// The walk does not follow symlinks. A symlink under which an include glob
+// could match files may point to a directory whose files cannot be hashed,
+// so it is an error here (fail closed), whether or not a glob matches its
+// own name and whatever exclude says. A symlink only an exact glob reaches
+// is rejected when hashed (unless excluded).
 func listFiles(fsys fs.FS, skip map[string]bool, include []contract.Glob) ([]file, error) {
 	var out []file
 	err := fs.WalkDir(fsys, ".", func(rel string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		f := file{rel, strings.Split(rel, "/")}
+		mayContain := slices.ContainsFunc(include, func(g contract.Glob) bool { return g.MayContain(f.segs) })
 		if d.IsDir() {
 			if d.Name() == ".git" || d.Name() == OutputDir {
 				return fs.SkipDir
 			}
 			// WalkDir calls this before reading the directory, so a pruned
 			// directory is never opened.
-			segs := strings.Split(rel, "/")
-			if rel != "." && !slices.ContainsFunc(include, func(g contract.Glob) bool { return g.MayContain(segs) }) {
+			if rel != "." && !mayContain {
 				return fs.SkipDir
 			}
 			return nil
 		}
-		if !skip[rel] {
-			out = append(out, file{rel, strings.Split(rel, "/")})
+		if d.Type()&fs.ModeSymlink != 0 && mayContain {
+			return fmt.Errorf("%q is a symlink a glob could match files under: only regular files are supported in scope (symlinks are not followed)", rel)
 		}
+		if skip[rel] {
+			return nil
+		}
+		out = append(out, f)
 		return nil
 	})
 	slices.SortFunc(out, func(a, b file) int { return strings.Compare(a.rel, b.rel) })
