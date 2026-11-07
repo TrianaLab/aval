@@ -120,14 +120,53 @@ func taggedKeys(in Input) []Finding {
 // of its key, outside a comment.
 var templatedKeyRe = regexp.MustCompile(`^[^:#]*\{\{.*\}\}[^:]*:(\s|$)`)
 
+// rangeKeyRe is the key variable of a range loop ({{- range $k, $v := x }});
+// rangeVarRe a key that is only a variable, optionally quoted
+// ({{ $k | quote }}); plainKeyRe a plain key with its value on the next
+// lines (labels:).
+var (
+	rangeKeyRe = regexp.MustCompile(`\{\{-?\s*range\s+(\$\w+)\s*,`)
+	rangeVarRe = regexp.MustCompile(`^\{\{-?\s*(\$\w+)\s*(?:\|\s*quote\s*)?-?\}\}$`)
+	plainKeyRe = regexp.MustCompile(`^([\w.-]+):\s*(?:#.*)?$`)
+)
+
 // templatedKeys reports keys a Helm template writes (ima{{ "ge" }}:,
 // {{ $k }}:): rendered, any of them may be image, so fail closed. The ref
-// is the key, so scope.allowMutable can acknowledge one (a label loop).
+// is the key, so scope.allowMutable can acknowledge one. A key that is only
+// the key variable of a range loop ({{ $k | quote }}:) directly under
+// labels: or annotations: is skipped: there it names a label, not a field.
 func templatedKeys(in Input) []Finding {
 	var out []Finding
+	type key struct {
+		indent int
+		name   string
+	}
+	var parents []key              // the plain keys enclosing the current line
+	rangeKeys := map[string]bool{} // ponytail: any range key seen above, not scoped to its {{ end }}
 	for i, l := range strings.Split(string(in.Data), "\n") {
-		if m := templatedKeyRe.FindString(strings.TrimSpace(l)); m != "" {
-			out = append(out, Finding{File: in.Path, Line: i + 1, Ecosystem: "container", Ref: strings.TrimSuffix(strings.TrimSpace(m), ":"),
+		t := strings.TrimSpace(l)
+		for _, m := range rangeKeyRe.FindAllStringSubmatch(l, -1) {
+			rangeKeys[m[1]] = true
+		}
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		indent := len(l) - len(strings.TrimLeft(l, " "))
+		if !strings.HasPrefix(t, "{{") || templatedKeyRe.MatchString(t) { // a line of template actions only does not nest
+			for len(parents) > 0 && parents[len(parents)-1].indent >= indent {
+				parents = parents[:len(parents)-1]
+			}
+		}
+		if m := plainKeyRe.FindStringSubmatch(t); m != nil {
+			parents = append(parents, key{indent, m[1]})
+		}
+		if m := templatedKeyRe.FindString(t); m != "" {
+			ref := strings.TrimSuffix(strings.TrimSpace(m), ":")
+			if v := rangeVarRe.FindStringSubmatch(ref); v != nil && rangeKeys[v[1]] && len(parents) > 0 &&
+				slices.Contains([]string{"labels", "annotations"}, parents[len(parents)-1].name) {
+				continue
+			}
+			out = append(out, Finding{File: in.Path, Line: i + 1, Ecosystem: "container", Ref: ref,
 				Fix: "a template writes this key, so Aval cannot tell whether it is image: write the key plainly, render the chart into the scope, or acknowledge the key in scope.allowMutable"})
 		}
 	}
@@ -296,6 +335,8 @@ type kustomization struct {
 	Resources, Components, Bases []any
 
 	Patches, PatchesStrategicMerge, PatchesJson6902, Replacements, Transformers, Generators, HelmCharts []any
+
+	HelmGlobals struct{ ChartHome string }
 }
 
 // transformerFix is the fix for a kustomize entry that may set an image.
@@ -303,6 +344,51 @@ const transformerFix = "kustomize may set an image here that Aval does not apply
 
 // resourceFix is the fix for a kustomize resource Aval cannot read.
 const resourceFix = "a remote kustomize resource or one outside the scope, so Aval cannot check its images: vendor it into the scope, or acknowledge this ref in scope.allowMutable"
+
+// chartFix is the fix for a kustomize Helm chart Aval cannot check.
+const chartFix = "a Helm chart that kustomize pulls from a repository, reads outside the scope or gives image values inline, so Aval cannot check its images: vendor the chart into the scope (its Chart.yaml under helmGlobals.chartHome) and pin its images, or acknowledge this ref in scope.allowMutable"
+
+// entryPath returns the file a transformers, generators or patches entry
+// names: the entry itself, or the path: field of a patch, matched in any
+// case as kustomize's encoding/json does. Two such fields give "", a path
+// never in scope (fail closed). An entry with a line break or a ": " is
+// inline YAML, not a path.
+func entryPath(name string, e any) (string, bool) {
+	s, ok := e.(string)
+	switch {
+	case strings.HasPrefix(name, "patches"):
+		m, _ := e.(map[string]any)
+		for k, v := range m {
+			if p, isStr := v.(string); isStr && strings.EqualFold(k, "path") {
+				if s = p; ok { // a second path field
+					s = ""
+				}
+				ok = true
+			}
+		}
+	case name != "transformers" && name != "generators":
+		return "", false
+	}
+	return s, ok && !strings.Contains(s, "\n") && !strings.Contains(s, ": ")
+}
+
+// localChart reports whether a helmCharts entry is a local chart (no
+// repo) whose Chart.yaml is in the scope under a chartHome inside the
+// kustomization directory, and sets no image inline.
+func (k kustomization) localChart(in Input, e any) bool {
+	var c struct{ Name, Repo string }
+	j, _ := json.Marshal(e) // e was decoded from JSON: Marshal cannot fail
+	if json.Unmarshal(j, &c) != nil || c.Repo != "" || c.Name == "" || setsImage(e, true) {
+		return false
+	}
+	// kustomize keeps an absolute chartHome as-is; one that is absolute or
+	// leaves the kustomization directory is not local, so it is reported.
+	home := path.Clean(cmp.Or(k.HelmGlobals.ChartHome, "charts"))
+	if path.IsAbs(home) || strings.HasPrefix(home, "\\") || home == ".." || strings.HasPrefix(home, "../") {
+		return false
+	}
+	return in.Has(path.Join(path.Dir(in.Path), home, c.Name, "Chart.yaml"))
+}
 
 // inScope reports whether a kustomization entry names an in-scope file,
 // or a directory with an in-scope kustomization.
@@ -320,7 +406,11 @@ func inScope(in Input, e any) bool {
 // chart entry that sets an image, by name and index (patches[0]). A
 // transformer or generator given by a path out of the scope (a directory,
 // a remote base) cannot be read, so it is reported too; one in the scope is
-// a YAML file composeImages checks.
+// a YAML file composeImages checks. A patch given by a path (a
+// patchesStrategicMerge entry, or path: in patches and patchesJson6902) out
+// of the scope is reported the same way. A Helm chart is reported unless it
+// is local (no repo) with its Chart.yaml in the scope, where its templates
+// are checked, and no valuesInline sets an image.
 func (k kustomization) entries(in Input) []Finding {
 	var out []Finding
 	for _, f := range []struct {
@@ -330,12 +420,15 @@ func (k kustomization) entries(in Input) []Finding {
 		{"replacements", k.Replacements}, {"transformers", k.Transformers}, {"generators", k.Generators}, {"helmCharts", k.HelmCharts}} {
 		for i, e := range f.entries {
 			ref := fmt.Sprintf("%s[%d]", f.name, i)
-			s, isPath := e.(string)
-			isPath = isPath && !strings.Contains(s, "\n") && !strings.Contains(s, ": ") && (f.name == "transformers" || f.name == "generators")
+			s, isPath := entryPath(f.name, e)
 			switch {
 			case f.name == "resources" || f.name == "components" || f.name == "bases":
 				if !inScope(in, e) {
 					out = append(out, Finding{File: in.Path, Ecosystem: "container", Ref: ref, Fix: resourceFix})
+				}
+			case f.name == "helmCharts":
+				if !k.localChart(in, e) {
+					out = append(out, Finding{File: in.Path, Ecosystem: "container", Ref: ref, Fix: chartFix})
 				}
 			case isPath && !in.Has(path.Join(path.Dir(in.Path), s)) || !isPath && setsImage(e, true):
 				out = append(out, Finding{File: in.Path, Ecosystem: "container", Ref: ref, Fix: transformerFix})

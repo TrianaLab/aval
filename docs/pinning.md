@@ -66,11 +66,12 @@ Aval reads a Dockerfile in two passes and reports what either finds:
   `Dockerfile_windows`), and the same with `Containerfile`. A comment line
   stands alone, even when it ends in `\`. A continued line joins the next
   one with nothing between (`FROM db:1\` then `6` is `db:16`). A leading
-  `# escape=` sets the continuation character. `RUN`, `COPY` and `ADD`
-  heredoc bodies are kept apart.
+  `# escape=` sets the escape character, for continuations and for the
+  heredoc words. `RUN`, `COPY` and `ADD` heredoc bodies are kept apart.
 
 Both passes check `COPY --from=` and `RUN --mount=...,from=` like a `FROM`:
-a stage name or index is fine, an image needs a digest. The line pass can
+a stage name or index is fine, an image needs a digest. An instruction
+behind `ONBUILD` is checked like the same instruction without it. The line pass can
 misread a heredoc or a continuation; that costs a needless miss, never a
 false hit.
 
@@ -105,9 +106,15 @@ entries by name and index (`resources[2]`, `patches[0]`):
 - a `patches`, `patchesStrategicMerge`, `patchesJson6902` or
   `replacements` entry that sets an image (an `image:` key, a JSON6902
   `path` or `from` ending in `/image`, a `fieldPath` ending in `.image`);
+- a `patches`, `patchesStrategicMerge` or `patchesJson6902` entry given
+  by a path not in the scope;
 - a `transformers` or `generators` entry with an image transformer, or a
   path not in the scope;
-- a `helmCharts` entry with `valuesInline`.
+- a `helmCharts` entry, unless the chart is local (no `repo`), its
+  `Chart.yaml` is in the scope under `helmGlobals.chartHome` (default
+  `charts`; an absolute one, or one that leaves the kustomization
+  directory, is not local), and it has no `valuesInline` that sets an image. Its
+  templates are checked like any other file, if the scope includes them.
 
 A `tagSuffix` is always reported: kustomize drops the digest when it adds
 the suffix. A kustomization that is not valid YAML, or that kustomize could
@@ -138,7 +145,9 @@ cannot decode: a tagged key, a quoted key with an escape YAML cannot
 decode, an escaped `image` key whose value is elsewhere, and a quoted key
 that continues on the next line. In `*.tpl` files, files under
 `templates/` and files the parser rejects, a key a template writes
-(`ima{{ "ge" }}:`, `{{ $k }}:`) is reported by its text.
+(`ima{{ "ge" }}:`, `{{ $k }}:`) is reported by its text. The exception is
+the key variable of a `range` loop alone (`{{ $key | quote }}:`) directly
+under `labels:` or `annotations:`: it names a label, not a field.
 
 JSON is read the same way, but only in Compose files (`compose.json`),
 files under `templates/` and files a kustomization in scope lists in
@@ -257,7 +266,19 @@ scope:
   allowMutable:
     - ref: postgres:16          # exactly as Aval prints it
       reason: rebuilt and scanned nightly; the tag is ours
+    - file: deploy/kustomization.yaml   # only the finding in this file
+      ref: resources[0]
+      reason: vendored upstream base, reviewed on update
 ```
+
+`file` is the path Aval prints before the line number, relative to the
+contract (`runner.command` for the command). With it, the entry accepts the
+finding in that file only. Without it, the entry accepts the `ref` only
+when one file reports it: generic refs such as `resources[0]`,
+`patches[0]` or a templated key repeat across files, so a `ref` that two
+files report is not accepted, and the finding asks for `file`. With
+[`scope.contracts`](guides/depend-on-a-contract.md), each contract's
+entries apply to its own findings, with `file` relative to that contract.
 
 `ref` must match the reference text Aval prints (for a missing lockfile, the
 manifest path, such as `go.mod`). Aval drops quotes from references it finds
@@ -291,8 +312,8 @@ not reported. Keep the scope honest, pin in place, and use
   template prints (`{{ include ... }}`, `{{ toYaml ... }}`), are not read.
   In a template the parser rejects, a key written as a block scalar or an
   alias is not decoded.
-- Kustomize: the overlay is not built. A JSON6902 patch file named by
-  `path:` that sets an image is not read.
+- Kustomize: the overlay is not built. A JSON6902 patch file in the scope
+  named by `path:` that sets an image is not read.
 - JSON outside Compose files, `templates/` and kustomize `resources` is not
   read.
 - Dockerfile variables: outside `FROM`, the last value of a name wins, with
