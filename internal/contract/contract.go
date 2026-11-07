@@ -346,18 +346,19 @@ var nameRules = map[string]func(string) bool{
 	},
 }
 
-// Package names, per ecosystem: npm's rules for new packages
-// (validate-npm-package-name), PEP 508 with extras, crates.io, RubyGems and
-// Maven coordinates. npm and pip read a name ending in an archive
-// extension as a local file, gem a name ending in .gem.
+// Package names, per ecosystem: npm's rules for old packages
+// (validate-npm-package-name validForOldPackages, so JSONStream passes),
+// PEP 508 with extras, crates.io, RubyGems and Maven coordinates. npm and
+// pip read a name ending in an archive extension (pip's ARCHIVE_EXTENSIONS)
+// as a local file, gem a name ending in .gem.
 const pypiName = `[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?`
 
 var (
-	npmNameRe   = regexp.MustCompile(`^(@[a-z0-9-~][a-z0-9-._~]*/)?[a-z0-9-~][a-z0-9-._~]*$`)
+	npmNameRe   = regexp.MustCompile(`^(@[a-z0-9-~][a-z0-9-._~]*/)?[A-Za-z0-9-~][A-Za-z0-9-._~]*$`)
 	npmFileRe   = regexp.MustCompile(`(?i)\.(tgz|tar\.gz|tar)$`)
 	pypiNameRe  = regexp.MustCompile(`^` + pypiName + `$`)
 	pypiReqRe   = regexp.MustCompile(`^(` + pypiName + `)(?:\[` + pypiName + `(?:,` + pypiName + `)*\])?$`)
-	pyFileRe    = regexp.MustCompile(`(?i)\.(whl|tar\.gz|tgz|zip|tar|egg)$`)
+	pyFileRe    = regexp.MustCompile(`(?i)\.(whl|tar\.gz|tgz|zip|tar|egg|tar\.bz2|tbz|tar\.xz|txz|tlz|tar\.lz|tar\.lzma)$`)
 	crateNameRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,63}$`)
 	gemNameRe   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 	mavenIDRe   = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
@@ -371,7 +372,8 @@ var (
 
 // credentialQuery reports whether ref's query string (read as text, so a
 // URL that does not parse is covered) has a parameter named like a
-// credential, in any case: a presigned URL, a GitLab private_token.
+// credential: a presigned URL, a GitLab private_token. Keys compare in
+// any case, without a trailing [] and with - read as _.
 func credentialQuery(ref string) bool {
 	_, q, _ := strings.Cut(ref, "?")
 	q, _, _ = strings.Cut(q, "#")
@@ -380,15 +382,16 @@ func credentialQuery(ref string) bool {
 		if u, err := url.QueryUnescape(k); err == nil {
 			k = u
 		}
-		if slices.Contains(credentialKeys, strings.ToLower(k)) {
+		k = strings.ReplaceAll(strings.TrimSuffix(strings.ToLower(k), "[]"), "-", "_")
+		if slices.Contains(credentialKeys, k) {
 			return true
 		}
 	}
 	return false
 }
 
-var credentialKeys = []string{"token", "private_token", "access_token", "key", "apikey", "api_key", "sig", "signature",
-	"x-amz-signature", "x-goog-signature", "auth", "password", "secret", "credential"}
+var credentialKeys = []string{"token", "private_token", "access_token", "security_token", "x_amz_security_token", "key", "apikey", "api_key",
+	"sig", "signature", "x_amz_signature", "x_goog_signature", "auth", "password", "secret", "client_secret", "credential", "session", "sessionid"}
 
 func (e Environment) validate(add func(string, ...any)) {
 	for k := range e.Toolchain {

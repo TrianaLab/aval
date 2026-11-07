@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 		_ = os.Setenv(k, v)
 	}
 	for _, k := range []string{"npm_config_registry", "NPM_CONFIG_REGISTRY", "AVAL_PYPI_URL", "GOPROXY", "AVAL_MAVEN_URL", "AVAL_CRATES_INDEX", "AVAL_RUBYGEMS_URL",
-		"PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL", "GOPRIVATE", "GONOPROXY", "GONOSUMDB", "GOSUMDB", "GOINSECURE", "GOFLAGS"} {
+		"PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL", "PIP_FIND_LINKS", "PIP_NO_INDEX", "GOPRIVATE", "GONOPROXY", "GONOSUMDB", "GOSUMDB", "GOINSECURE", "GOFLAGS"} {
 		_ = os.Unsetenv(k)
 	}
 	code := m.Run()
@@ -211,14 +211,14 @@ func TestNPM(t *testing.T) {
 	}
 	mirror := newFake(t)
 	mirror.set("/left", base)
-	t.Setenv("npm_config_registry", mirror.url)
+	t.Setenv("NPM_CONFIG_REGISTRY", mirror.url)
 	if r := mustResolve(t, "npm", "left@1.1.0"); r.ID != "sha512-b" {
 		t.Fatalf("the same version on a mirror must keep its id, got %s", r.ID)
 	}
 	f.set("/nosum", `{"versions":{"1.0.0":{"dist":{}}}}`)
 	f.set("/empty", `{"versions":{}}`)
 	f.set("/bad", `{`)
-	t.Setenv("npm_config_registry", f.url)
+	t.Setenv("NPM_CONFIG_REGISTRY", f.url)
 	mustFail(t, "npm", "left@9.9.9", "version 9.9.9 is not published")
 	mustFail(t, "npm", "nosum@1.0.0", "no checksum")
 	mustFail(t, "npm", "nosum@^1", "no checksum")
@@ -886,7 +886,7 @@ func TestLocalFileSpecsRejected(t *testing.T) {
 	for _, ref := range []string{"lib@x.tgz", "lib@x.TAR.GZ", "lib@x.tar", `lib@a\b`} {
 		mustFail(t, "npm", ref, "is not a registry version, range or tag")
 	}
-	for _, ref := range []string{"x.whl", "x-1.0.tar.gz", "x.zip", "x.tar", "x.egg", "X.WHL==1.0"} {
+	for _, ref := range []string{"x.whl", "x-1.0.tar.gz", "x.zip", "x.tar", "x.egg", "X.WHL==1.0", "demo.tar.xz", "demo.tar.xz[x]", "x.tar.lzma"} {
 		mustFail(t, "pypi", ref, "not a valid pypi package name")
 	}
 }
@@ -896,7 +896,7 @@ func TestLocalFileSpecsRejected(t *testing.T) {
 // a registry that would answer for its escaped form.
 func TestPackageNamesRejected(t *testing.T) {
 	for kind, refs := range map[string][]string{
-		"npm":   {"left-pad/", "@types/node/", "./x", "../x", "/x", "C:x", "x.tgz", "UPPER"},
+		"npm":   {"left-pad/", "@types/node/", "./x", "../x", "/x", "C:x", "x.tgz", "@UP/x"},
 		"pypi":  {"./x", "../x", "/x", "dir/x", `dir\x`, "C:x"},
 		"go":    {"./x", "../x", "/x", "C:x", "Example..com/m@latest"},
 		"crate": {"./x", "../x", "/x", "C:x", "x.tgz"},
@@ -982,6 +982,51 @@ func TestRegistryConfigDivergence(t *testing.T) {
 	t.Setenv("PIP_INDEX_URL", "")
 	t.Setenv("PIP_EXTRA_INDEX_URL", "https://corp.example/simple")
 	mustFail(t, "pypi", "x==1.0", "PIP_EXTRA_INDEX_URL")
+	t.Setenv("PIP_EXTRA_INDEX_URL", "")
+	t.Setenv("PIP_FIND_LINKS", "./wheels")
+	mustFail(t, "pypi", "x==1.0", "PIP_FIND_LINKS")
+	t.Setenv("PIP_FIND_LINKS", "")
+	for _, off := range []string{"0", "false", "No", "off"} {
+		t.Setenv("PIP_NO_INDEX", off)
+		mustResolve(t, "pypi", "x==1.0")
+	}
+	for _, on := range []string{"1", "true", "YES", "on", "x"} {
+		t.Setenv("PIP_NO_INDEX", on)
+		mustFail(t, "pypi", "x==1.0", "PIP_NO_INDEX")
+	}
+}
+
+// TestNpmRegistryFromEnvironment: npm reads a registry per scope and the
+// registry itself from the environment; one that differs fails.
+func TestNpmRegistryFromEnvironment(t *testing.T) {
+	f := newFake(t)
+	f.set("/left", `{"versions":{"1.0.0":{"dist":{"integrity":"sha512-a"}}}}`)
+	f.set("/@acme%2fleft", `{"versions":{"1.0.0":{"dist":{"integrity":"sha512-a"}}}}`)
+	t.Setenv("npm_config_registry", f.url)
+	for _, k := range []string{"npm_config_@acme:registry", "NPM_CONFIG_@ACME:REGISTRY"} {
+		t.Setenv(k, f.url+"/")
+		mustResolve(t, "npm", "@acme/left@1.0.0")
+		t.Setenv(k, "https://evil.example/")
+		mustFail(t, "npm", "@acme/left@1.0.0", k+" is https://evil.example")
+		mustResolve(t, "npm", "left@1.0.0") // another scope
+		_ = os.Unsetenv(k)
+	}
+	t.Setenv("NPM_CONFIG_REGISTRY", f.url+"/")
+	mustResolve(t, "npm", "left@1.0.0")
+	t.Setenv("NPM_CONFIG_REGISTRY", "https://evil.example")
+	mustFail(t, "npm", "left@1.0.0", "NPM_CONFIG_REGISTRY")
+}
+
+// TestUserAgent: Maven Central throttles Go's default User-Agent.
+func TestUserAgent(t *testing.T) {
+	var ua string
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { ua = r.UserAgent() }))
+	t.Cleanup(srv.Close)
+	Version = "1.2.3"
+	t.Cleanup(func() { Version = "dev" })
+	if err := get(context.Background(), srv.URL, "", 1, io.Discard); err != nil || ua != "aval/1.2.3 (+https://github.com/TrianaLab/aval)" {
+		t.Fatalf("User-Agent %q, %v", ua, err)
+	}
 }
 
 func TestRedirectToAnotherHostDropsCredentials(t *testing.T) {

@@ -45,6 +45,10 @@ const (
 	maxMetadata = 64 << 20
 )
 
+// Version is the Aval version sent in the User-Agent of every resolver
+// request: Maven Central throttles Go's default one. cmd/aval sets it.
+var Version = "dev"
+
 // Resolver resolves one reference of its ecosystem. It returns the version
 // the name resolved to and the immutable id of its content.
 type Resolver func(ctx context.Context, ref string) (version, id string, err error)
@@ -116,6 +120,7 @@ func get(ctx context.Context, url, accept string, limit int64, w io.Writer) erro
 	if accept != "" {
 		req.Header.Set("Accept", accept)
 	}
+	req.Header.Set("User-Agent", "aval/"+Version+" (+https://github.com/TrianaLab/aval)")
 	authorize(req)
 	resp, err := client.Do(req)
 	if err != nil {

@@ -31,14 +31,17 @@ scope:
 - The name must be a PEP 508 name (`[A-Za-z0-9]`, then letters, digits,
   `.`, `_` or `-`, ending in a letter or digit), with optional
   `[extra,...]`; the specifier holds only version characters. A path, a
-  URL, a marker or a name ending in `.whl`, `.tar.gz`, `.tgz`, `.zip`,
-  `.tar` or `.egg` fails: pip installs it from disk or elsewhere. Use the
+  URL, a marker or a name ending in an archive extension pip reads as a
+  local file fails (`.whl`, `.tar.gz`, `.tgz`, `.zip`, `.tar`, `.egg`,
+  `.tar.bz2`, `.tbz`, `.tar.xz`, `.txz`, `.tlz`, `.tar.lz`, `.tar.lzma`,
+  with or without extras): pip installs it from disk or elsewhere. Use the
   `url` kind.
 - Registry: `$AVAL_PYPI_URL` (an index with the PyPI JSON API at
   `/pypi/<name>/json`). Credentials: `~/.netrc`.
 - If `$PIP_INDEX_URL` is set to anything but that registry (or its
-  `/simple` index), or `$PIP_EXTRA_INDEX_URL` is set at all, resolution
-  fails: pip would install from another index than the one Aval read.
+  `/simple` index), or `$PIP_EXTRA_INDEX_URL` or `$PIP_FIND_LINKS` is set
+  at all, or `$PIP_NO_INDEX` is true, resolution fails: pip would install
+  from another source than the one Aval read.
   `pip.conf` and `uv` settings are not read.
 
 **Pin instead** for your requirements: `pip-compile --generate-hashes` or

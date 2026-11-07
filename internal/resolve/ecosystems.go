@@ -86,10 +86,22 @@ func npmRegistry(pkg, base string) error {
 		}
 	}
 	key := "registry"
-	if os.Getenv("NPM_CONFIG_REGISTRY") != "" || os.Getenv("npm_config_registry") != "" {
+	upper, lower := strings.TrimSuffix(os.Getenv("NPM_CONFIG_REGISTRY"), "/"), strings.TrimSuffix(os.Getenv("npm_config_registry"), "/")
+	if upper != "" && lower != "" && upper != lower {
+		return fmt.Errorf("NPM_CONFIG_REGISTRY is %s and npm_config_registry is %s: set one", redact(upper), redact(lower))
+	}
+	if upper != "" || lower != "" {
 		key = ""
 	}
 	if scope, _, _ := strings.Cut(pkg, "/"); strings.HasPrefix(pkg, "@") {
+		// npm reads npm_config_* variables in any case; the environment
+		// beats .npmrc.
+		for _, kv := range os.Environ() {
+			k, v, _ := strings.Cut(kv, "=")
+			if v = strings.TrimSuffix(v, "/"); strings.EqualFold(k, "npm_config_"+scope+":registry") && v != base {
+				return fmt.Errorf("%s is %s, not %s: npm would install from there; set npm_config_registry to match", k, redact(v), redact(base))
+			}
+		}
 		if _, ok := vals[scope+":registry"]; ok {
 			key = scope + ":registry"
 		}
@@ -197,6 +209,12 @@ func pypi(ctx context.Context, ref string) (string, string, error) {
 // pipIndex fails when the environment points pip to another index than
 // base.
 func pipIndex(base string) error {
+	if v := os.Getenv("PIP_FIND_LINKS"); v != "" {
+		return errors.New("PIP_FIND_LINKS is set: pip would install from there")
+	}
+	if v := strings.ToLower(os.Getenv("PIP_NO_INDEX")); v != "" && !slices.Contains([]string{"0", "false", "no", "off", "n", "f"}, v) {
+		return errors.New("PIP_NO_INDEX is set: pip would not read the index")
+	}
 	for _, e := range []string{"PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL"} {
 		// pip reads the simple index at <base>/simple: the same registry.
 		if v := strings.TrimSuffix(os.Getenv(e), "/"); v != "" && (e == "PIP_EXTRA_INDEX_URL" || v != base && v != base+"/simple") {

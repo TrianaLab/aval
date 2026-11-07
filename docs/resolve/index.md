@@ -145,18 +145,21 @@ Credentials go in headers, never in the manifest, a URL or an error. A user or p
 in a registry variable (`GOPROXY=https://user:token@host`) is masked in
 errors, and refused over plain `http` to a host that is not loopback. Credentials written in a reference (a password, a user name
 in an `http(s)` or scheme-less `//user@host` URL, or a query parameter
-such as `token`, `private_token`, `sig` or `X-Amz-Signature`) are
+such as `token`, `private_token`, `sig`, `client_secret` or
+`X-Amz-Signature`, in any case and with `-` or `_`) are
 rejected without echoing them; an `ssh://git@host` user is allowed. The registry address is not hashed: the same
-content on a mirror resolves to the same id.
+content on a mirror resolves to the same id. Requests carry the
+User-Agent `aval/<version> (+https://github.com/TrianaLab/aval)`.
 
 The resolved id vouches for the registry in the table, not for the one the
 tool installs from. Where the tool's own setting is known to point
 elsewhere, resolution fails: an npm `@scope:registry` or `registry` line in
-`~/.npmrc`, `$GOPRIVATE`, `$GONOPROXY` or a `$GOPROXY` that starts with
+`~/.npmrc`, an `npm_config_@scope:registry` variable,
+`$NPM_CONFIG_REGISTRY` and `$npm_config_registry` that differ, `$GOPRIVATE`, `$GONOPROXY` or a `$GOPROXY` that starts with
 `direct` or `off`, a Go module the checksum database would not verify
 (`GOSUMDB=off`, `$GONOSUMDB`, `$GOINSECURE`, `-insecure` in `$GOFLAGS`),
-and `$PIP_INDEX_URL` or
-`$PIP_EXTRA_INDEX_URL`. Other tool configuration files are not read:
+and `$PIP_INDEX_URL`, `$PIP_EXTRA_INDEX_URL`, `$PIP_FIND_LINKS` or
+`$PIP_NO_INDEX`. Other tool configuration files are not read:
 `pip.conf`, a project `.npmrc`, `go env -w` settings, Cargo's
 `config.toml`, Maven's `settings.xml`, `.gemrc`. If one of them points the
 tool to another registry, set the Aval variable to the same registry.

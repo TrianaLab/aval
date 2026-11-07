@@ -149,6 +149,8 @@ func TestParseResolve(t *testing.T) {
 		"https://h/f?access_token=s3cret", "https://h/f?KEY=s3cret", "https://h/f?apikey=s3cret", "https://h/f?api_key=s3cret",
 		"https://h/f?auth=s3cret", "https://h/f?password=s3cret", "https://h/f?secret=s3cret", "https://h/f?credential=s3cret",
 		"https://h/f?token", "https://h/r?private_token=s3cret@main",
+		"https://h/f?X-Amz-Security-Token=s3cret", "https://h/f?api-key=s3cret", "https://h/f?client_secret=s3cret", "https://h/f?token[]=s3cret",
+		"https://h/f?security_token=s3cret", "https://h/f?Session=s3cret", "https://h/f?sessionid=s3cret", "https://h/f?Client-Secret=s3cret",
 	} {
 		_, err := Parse([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   resolve: [{url: "`+ref+`"}]`, 1)))
@@ -393,7 +395,7 @@ func TestLoad(t *testing.T) {
 // never passes for a registry name.
 func TestPackageNames(t *testing.T) {
 	ok := map[string][]string{
-		"npm":   {"left-pad", "left-pad@1.3.0", "@types/node", "@types/node@^20", "@a-b/c.d_e~f@latest", "lodash@>=4", strings.Repeat("a", 214)},
+		"npm":   {"left-pad", "left-pad@1.3.0", "@types/node", "@types/node@^20", "@a-b/c.d_e~f@latest", "lodash@>=4", strings.Repeat("a", 214), "JSONStream@1.3.5", "Base64", "@types/Node~x"},
 		"pypi":  {"requests", "requests==2.32.3", "Requests[security,socks]>=2", "zope.interface~=6.0", "a"},
 		"go":    {"example.com/m@v1.0.0", "github.com/Acme/m/v2@main", "golang.org/x/mod"},
 		"crate": {"serde@=1.0.0", "serde_json", "a-b@^1"},
@@ -401,9 +403,10 @@ func TestPackageNames(t *testing.T) {
 		"maven": {"org.junit:junit-bom:5.9.3", "com.example_x:a-b.c:[1,2)"},
 	}
 	bad := map[string][]string{
-		"npm": {"left-pad/", "@types/node/", "@types/node/@1.0.0", "./x", "../x", "/x", "C:x", "x.tgz", "x.TAR.GZ", "UPPER", "@Types/node",
+		"npm": {"left-pad/", "@types/node/", "@types/node/@1.0.0", "./x", "../x", "/x", "C:x", "x.tgz", "x.TAR.GZ", "@Types/node",
 			".x", "_x", "a/b", "@scope", `a\b`, strings.Repeat("a", 215), "lib@./x", "lib@x.tgz", "lib@github:o/r", "lib@file:../x", "lib@npm:evil", "lib@~/x"},
-		"pypi":  {"./x", "../x", "/x", "dir/x", `dir\x`, "C:x", "x.whl", "x-1.0.tar.gz", "X.WHL==1.0", "x.tgz", "-x", "x-", "x[", "x[a]b", "x@https://h/x", "x==1.0/../y"},
+		"pypi": {"./x", "../x", "/x", "dir/x", `dir\x`, "C:x", "x.whl", "x-1.0.tar.gz", "X.WHL==1.0", "x.tgz", "-x", "x-", "x[", "x[a]b", "x@https://h/x", "x==1.0/../y",
+			"demo.tar.xz", "demo.tar.xz[x]", "d.tar.bz2", "d.TBZ", "d.txz", "d.tlz", "d.tar.lz", "d.tar.lzma==1", "d.tar[x]"},
 		"go":    {"./x", "../x", "/x", "C:x", "UPPER.com/m", "Example..com/m@latest", "noperiod/m"},
 		"crate": {"./x", "../x", "/x", "C:x", "x.tgz", "1abc", "_x", strings.Repeat("a", 65), "x@./y", "x@git:y"},
 		"gem":   {"./x", "../x", "/x", "C:x", "x.gem", "-x", ".x", "x@/y", "x@1#y"},

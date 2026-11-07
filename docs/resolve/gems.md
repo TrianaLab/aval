@@ -23,7 +23,9 @@ scope:
   registry requirement and fails: use the `git` or `url` kind, or pin.
 - The name must be a RubyGems name: a letter or digit, then letters,
   digits, `.`, `_` or `-`. Anything else fails, and so does a name ending
-  in `.gem`: gem installs it from disk.
+  in `.gem`: gem installs it from disk. `gem install` also reads a
+  matching `<name>-<version>.gem` file in the current directory, which
+  Aval does not see: run it where no such file lies.
 - For anything else the id is a hash of every version, platform and
   checksum. A new version or a yank changes the id. The manifest line says
   `floating`.

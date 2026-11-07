@@ -26,6 +26,7 @@ import (
 	"github.com/TrianaLab/aval/internal/fingerprint"
 	"github.com/TrianaLab/aval/internal/policy"
 	"github.com/TrianaLab/aval/internal/registry"
+	"github.com/TrianaLab/aval/internal/resolve"
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
@@ -44,6 +45,8 @@ const (
 
 // version is set at release build time (-ldflags "-X main.version=...").
 var version = "dev"
+
+func init() { resolve.Version = version }
 
 type usageError struct{ error }
 

@@ -27,7 +27,9 @@ scope:
   version. A new version, a moved `<release>` or a redeployed release
   changes the id. The manifest line says `floating`. A
   `maven-metadata.xml` without versions, or with more than 100 (two
-  requests each), fails: use an exact version.
+  requests each), fails: use an exact version. Floating specs are
+  impractical for popular artifacts (guava, jackson-databind list more
+  than 200 versions).
 - A `-SNAPSHOT` version fails, in any letter case, and so does a floating
   version whose list holds one: a snapshot is redeployed under the same
   name. Resolve a release, or pin.
@@ -40,7 +42,10 @@ scope:
   published checksum. A jar overwritten under the same version on a
   private repository changes the id only if its checksum file is
   redeployed with it. Classifier
-  artifacts (`-sources`, `-linux-x86_64`) are not hashed.
+  artifacts (`-sources`, `-linux-x86_64`) are not hashed, nor is the
+  Gradle module metadata (`.module`), from which Gradle can pick another
+  file: on a private repository, a redeployed `.module` does not change
+  the id.
 - When the repository publishes only a `.sha1`, the id rests on SHA-1.
 - Repository: `$AVAL_MAVEN_URL`. Credentials: `~/.netrc`.
 
