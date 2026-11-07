@@ -112,8 +112,9 @@ entries by name and index (`resources[2]`, `patches[0]`):
   path not in the scope;
 - a `helmCharts` entry, unless the chart is local (no `repo`), its
   `Chart.yaml` is in the scope under `helmGlobals.chartHome` (default
-  `charts`), and it has no `valuesInline` that sets an image. A chart in
-  the scope has its templates checked like any other.
+  `charts`; an absolute one, or one that leaves the kustomization
+  directory, is not local), and it has no `valuesInline` that sets an image. Its
+  templates are checked like any other file, if the scope includes them.
 
 A `tagSuffix` is always reported: kustomize drops the digest when it adds
 the suffix. A kustomization that is not valid YAML, or that kustomize could

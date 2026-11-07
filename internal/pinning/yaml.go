@@ -373,14 +373,21 @@ func entryPath(name string, e any) (string, bool) {
 }
 
 // localChart reports whether a helmCharts entry is a local chart (no
-// repo) whose Chart.yaml is in the scope, and sets no image inline.
+// repo) whose Chart.yaml is in the scope under a chartHome inside the
+// kustomization directory, and sets no image inline.
 func (k kustomization) localChart(in Input, e any) bool {
 	var c struct{ Name, Repo string }
 	j, _ := json.Marshal(e) // e was decoded from JSON: Marshal cannot fail
 	if json.Unmarshal(j, &c) != nil || c.Repo != "" || c.Name == "" || setsImage(e, true) {
 		return false
 	}
-	return in.Has(path.Join(path.Dir(in.Path), cmp.Or(k.HelmGlobals.ChartHome, "charts"), c.Name, "Chart.yaml"))
+	// kustomize keeps an absolute chartHome as-is; one that is absolute or
+	// leaves the kustomization directory is not local, so it is reported.
+	home := path.Clean(cmp.Or(k.HelmGlobals.ChartHome, "charts"))
+	if path.IsAbs(home) || strings.HasPrefix(home, "\\") || home == ".." || strings.HasPrefix(home, "../") {
+		return false
+	}
+	return in.Has(path.Join(path.Dir(in.Path), home, c.Name, "Chart.yaml"))
 }
 
 // inScope reports whether a kustomization entry names an in-scope file,
