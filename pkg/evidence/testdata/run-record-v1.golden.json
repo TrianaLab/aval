@@ -5,9 +5,11 @@
   "outcome": "verified",
   "reused": true,
   "result": "passed",
+  "verifiedResult": "passed",
   "testDurationMs": 0,
   "savedDurationMs": 1184000,
   "avalVersion": "0.3.0",
   "recordedAt": "2026-11-06T09:00:00Z",
-  "ciRunUrl": "https://ci.example.com/acme/orders/runs/42"
+  "ciRunUrl": "https://ci.example.com/acme/orders/runs/42",
+  "repository": "acme/orders"
 }

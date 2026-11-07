@@ -1,0 +1,76 @@
+{
+  "version": "aval.trianalab.io/stats-report/v1",
+  "registry": "ghcr.io/acme/orders-aval",
+  "since": "2026-10-30T00:00:00Z",
+  "total": {
+    "runs": 10,
+    "reused": 4,
+    "hitRate": 0.4,
+    "misses": {
+      "noTrustedResult": 3,
+      "error": 1,
+      "verifiedNotReused": 1
+    },
+    "verificationFailures": 1,
+    "shadowFalseHits": 1,
+    "testDurationMs": 7104000,
+    "savedDurationMs": 4736000
+  },
+  "tests": [
+    {
+      "testId": "orders-integration",
+      "stats": {
+        "runs": 10,
+        "reused": 4,
+        "hitRate": 0.4,
+        "misses": {
+          "noTrustedResult": 3,
+          "error": 1,
+          "verifiedNotReused": 1
+        },
+        "verificationFailures": 1,
+        "shadowFalseHits": 1,
+        "testDurationMs": 7104000,
+        "savedDurationMs": 4736000
+      }
+    }
+  ],
+  "repositories": [
+    {
+      "repository": "acme/orders",
+      "stats": {
+        "runs": 9,
+        "reused": 4,
+        "hitRate": 0.4444444444444444,
+        "misses": {
+          "noTrustedResult": 3,
+          "error": 1,
+          "verifiedNotReused": 1
+        },
+        "verificationFailures": 0,
+        "shadowFalseHits": 1,
+        "testDurationMs": 5920000,
+        "savedDurationMs": 4736000
+      }
+    },
+    {
+      "repository": "unknown",
+      "stats": {
+        "runs": 1,
+        "reused": 0,
+        "hitRate": 0,
+        "misses": {
+          "noTrustedResult": 0,
+          "error": 0,
+          "verifiedNotReused": 0
+        },
+        "verificationFailures": 1,
+        "shadowFalseHits": 0,
+        "testDurationMs": 1184000,
+        "savedDurationMs": 0
+      }
+    }
+  ],
+  "skipped": 2,
+  "truncated": "more than 1000 run records"
+}

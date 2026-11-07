@@ -137,6 +137,7 @@ jobs:
       # Main accepts only this workflow on main; PRs also developer signatures.
       AVAL_POLICY: ${{ github.event_name == 'push' && '.github/aval/main.yaml' || '.github/aval/pr.yaml' }}
       AVAL_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      AVAL_REPOSITORY: ${{ github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -453,6 +454,7 @@ jobs:
       AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
       AVAL_POLICY: ${{ github.event_name == 'push' && '.github/aval/main.yaml' || '.github/aval/pr.yaml' }}
       AVAL_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      AVAL_REPOSITORY: ${{ github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -468,10 +470,22 @@ jobs:
         run: |
           aval run --shadow -f aval.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
             --result .aval/engine-result.json --report .aval/engine-report.json \
-            --record-file .aval/engine-record.json --ci-run-url "$AVAL_CI_RUN_URL"
+            --record-file .aval/engine-record.json --ci-run-url "$AVAL_CI_RUN_URL" --repository "$AVAL_REPOSITORY"
       - name: Summary
         if: always()
         run: .github/aval/summary.sh aval-engine .aval/engine-report.json
+      # Run statistics (#88): `aval stats` over the dogfood suites' run
+      # records, read anonymously. Informational: it never fails the job.
+      - name: Run statistics
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            echo "### aval stats, last 30 days"
+            echo '```'
+            aval stats --registry "$AVAL_REGISTRY" --since 30d --registry-timeout 10m 2>&1 || echo "aval stats failed"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
