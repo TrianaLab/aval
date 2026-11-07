@@ -193,7 +193,7 @@ test and records nothing; `--fingerprint-only`, `--explain`, `aval verify` and
 | `control characters in path are not supported` | rename the file (newline or carriage return) |
 | `resolve <kind> <reference>: <reason>` | see [When resolution fails](resolve/index.md#when-resolution-fails) |
 | `scope.contracts <path>: <reason>` | any error above in the referenced contract, or: missing or invalid contract, `leads outside the repository root`, `no git working tree (.git) at or above <dir>`, `<path> is a symlink`, `<path> is not a regular file`, `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`, `more than 8 levels or 64 contracts` |
-| any I/O error while walking or reading | the walk only enters directories a glob can match |
+| any I/O error while walking or reading | make the file or directory readable; the walk only enters directories a glob can match |
 
 ## Versioning
 

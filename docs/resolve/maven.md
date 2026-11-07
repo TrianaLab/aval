@@ -29,7 +29,7 @@ scope:
 |---|---|
 | `jar` (default), `bundle`, `maven-plugin`, `ejb` | POM and `.jar` checksum (required) |
 | `war`, `ear`, `rar`, `aar` | POM, that file's checksum, and the `.jar` checksum if present |
-| `pom` and others | POM, and the `.jar` checksum if present |
+| `pom` (a BOM or parent) | POM, and the `.jar` checksum if present |
 
 A missing checksum, a checksum file that holds none (a proxy's error page) or
 another packaging fails. Aval never downloads the jar. Not covered:

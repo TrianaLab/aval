@@ -138,7 +138,8 @@ Find the digest with `crane digest <image:tag>` or
 
 `curl … | sh` (also through `tee`), `bash -c "$(curl …)"`,
 `python -c "$(curl …)"`, `eval "$(curl …)"`, `source <(wget …)` and
-`releases/latest` URLs run or fetch whatever the server sends, also in Dockerfile `RUN` lines and heredocs. Vendor the script into the
+`releases/latest` URLs run or fetch whatever the server sends, also in
+Dockerfile `RUN` lines and heredocs. Vendor the script into the
 scope, or download a fixed version and check its sha256 before running it.
 
 ??? info "Which files are scanned as scripts"

@@ -141,7 +141,7 @@ fails:
 |---|---|
 | `npm` | `~/.npmrc` has a `@scope:registry` or `registry` line, or an `npm_config_@scope:registry` variable is set, that differs from Aval's registry; two spellings of an `npm_config_*` variable differ; a `~/.npmrc` line cannot be read |
 | `go` | `$GOPROXY` starts with `direct` or `off`; `$GOPRIVATE` or `$GONOPROXY` matches; `GOSUMDB=off`, `$GONOSUMDB`, `$GOINSECURE` or `-insecure` in `$GOFLAGS` |
-| `pypi` | `$PIP_INDEX_URL` or `$PIP_PYPI_URL` names another index; `$PIP_EXTRA_INDEX_URL` or `$PIP_FIND_LINKS` is set; `$PIP_NO_INDEX` is true (any spelling pip reads) |
+| `pypi` | `$PIP_INDEX_URL` or `$PIP_PYPI_URL` names another index; `$PIP_EXTRA_INDEX_URL` or `$PIP_FIND_LINKS` is set; `$PIP_NO_INDEX` is true (any spelling pip reads); two spellings of one `PIP_*` variable (the option in any case, `-` equal to `_`, an optional leading `--`; on Windows `PIP_` in any case) differ |
 | `maven` | `<latest>` or `<release>` is a SNAPSHOT or not listed |
 
 Not read: `pip.conf`, a project `.npmrc`, `go env -w` settings, Cargo's

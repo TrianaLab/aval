@@ -553,8 +553,9 @@ func newRecordCmd() *cobra.Command {
 		Short: "Publish a run record written by 'aval run --record-file'",
 		Long: `record publishes a run record that 'aval run --record-file' wrote, as 'aval
 run --record' would have. Use it to publish, from a job with write credentials
-that runs no tests, the record of a run made without them. Run records are unsigned statistics: run and
-verify never read them. --repository sets the record's source repository.`,
+that runs no tests, the record of a run made without them. Run records are
+unsigned statistics: run and verify never read them. --repository sets the
+record's source repository.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if repo == "" || file == "" {
