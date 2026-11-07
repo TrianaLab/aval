@@ -240,6 +240,33 @@ func TestContractsSymlink(t *testing.T) {
 			}
 		})
 	}
+	// The contract's own directory may be a symlink: ../ is resolved from
+	// its real location, as the OS does for the test, not from the link's
+	// path text, where a decoy contract sits.
+	t.Run("own directory", func(t *testing.T) {
+		root := writeTree(t, map[string]string{
+			".git/HEAD":              "ref: refs/heads/main\n",
+			"packages/web/aval.yaml": avalYAML("web", "aval.yaml", []string{"../api/aval.yaml"}),
+			"packages/api/aval.yaml": avalYAML("api", "src/**", nil),
+			"packages/api/src/x":     "real\n",
+			"apps/api/aval.yaml":     avalYAML("api", "src/**", nil),
+			"apps/api/src/x":         "decoy\n",
+		})
+		if err := os.Symlink(filepath.Join("..", "packages", "web"), filepath.Join(root, "apps", "web")); err != nil {
+			t.Fatal(err)
+		}
+		fp, err := computeFile(root, "apps/web/aval.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		real, err := computeFile(root, "packages/api/aval.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fp.Contracts[0].Digest != real.Digest {
+			t.Fatalf("bound the decoy at the link's path text:\n%s", fp.Manifest)
+		}
+	})
 }
 
 // TestContractsUnreadable: a referenced contract that exists but cannot be
@@ -254,6 +281,11 @@ func TestContractsUnreadable(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := ComputeFS(fsys, c, noEnv); err == nil || !strings.Contains(err.Error(), "scope.contracts b.yaml: ") {
+		t.Fatalf("got %v", err)
+	}
+	// A FIFO would block the read; it fails instead.
+	fsys = fstest.MapFS{"aval.yaml": fsys["aval.yaml"], "b.yaml": {Mode: fs.ModeNamedPipe}}
+	if _, err := ComputeFS(fsys, c, noEnv); err == nil || !strings.Contains(err.Error(), "b.yaml is not a regular file") {
 		t.Fatalf("got %v", err)
 	}
 }
@@ -294,10 +326,10 @@ func TestContractsFindings(t *testing.T) {
 	}
 }
 
-// TestContractsSkipOutputs: an Aval output inside a referenced contract's
-// scope is skipped there too, so writing it does not change the
-// dependent's fingerprint.
-func TestContractsSkipOutputs(t *testing.T) {
+// TestContractsOutputsInReferencedScopeAreInputs: an Aval output inside a
+// referenced contract's scope stays an input there (the #63 guard checks
+// only the top scope), so writing it changes the dependent's fingerprint.
+func TestContractsOutputsInReferencedScopeAreInputs(t *testing.T) {
 	root := writeTree(t, monorepoFiles())
 	out := filepath.Join(root, "backend", "api", "result.json")
 	before, err := computeFile(root, "frontend/aval.yaml", out)
@@ -311,8 +343,8 @@ func TestContractsSkipOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if before.Digest != after.Digest {
-		t.Fatalf("output changed the fingerprint:\n%s\n%s", before.Manifest, after.Manifest)
+	if before.Digest == after.Digest {
+		t.Fatalf("an input of a referenced contract was skipped:\n%s", after.Manifest)
 	}
 }
 

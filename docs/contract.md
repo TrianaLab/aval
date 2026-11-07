@@ -242,7 +242,9 @@ file out of scope, like any undeclared file.
     (a real input) exits 2 before the test runs: skipping it would drop
     that input from the fingerprint. `aval run` also refuses, with exit 2,
     to overwrite any existing file at those paths that is not an Aval result
-    or report, wherever it lies.
+    or report, wherever it lies. Only this contract's scope skips them: in
+    a `scope.contracts` reference they stay inputs (a miss, never a false
+    hit).
 - The git commit, branch or any VCS metadata. Two commits with identical
   scope content produce the same fingerprint and can reuse the same result.
   That is intended: a commit that only touches unrelated files should not
@@ -407,7 +409,7 @@ test without recording it; `aval run --fingerprint-only`, `--explain`,
   <path>: <reason>`. The reason is any error above in the referenced
   contract, or: the file is missing or not a valid contract; `leads outside
   the repository root`; `no git working tree (.git) at or above <dir>`; `<path> is a
-  symlink`; `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`; `more than
+  symlink`; `<path> is not a regular file`; `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`; `more than
   8 levels or 64 contracts`.
 - Any I/O error while walking or reading the root. The walk only enters
   directories that a `source` or `dependencies` glob can match a file in, so

@@ -115,7 +115,8 @@ const OutputDir = ".aval"
 
 // Compute fingerprints the contract c rooted at dir. outputs are files Aval
 // itself writes (the --result and --report paths); the ones inside dir are
-// not inputs and are skipped. Empty entries are ignored.
+// not inputs and are skipped, in c's own scope only. Empty entries are
+// ignored.
 //
 // A contract with scope.contracts is resolved inside the git working tree
 // that holds dir (see repoRoot): no reference may lead outside it.
@@ -136,6 +137,9 @@ func Compute(ctx context.Context, dir string, c *contract.Contract, env LookupEn
 // it fails closed.
 func repoRoot(dir string) (string, string, error) {
 	abs, err := filepath.Abs(dir)
+	if err == nil {
+		abs, err = filepath.EvalSymlinks(abs) // resolve ../ as the OS does from the test's working directory
+	}
 	for root := abs; err == nil; {
 		if _, serr := os.Lstat(filepath.Join(root, ".git")); serr == nil {
 			rel, _ := filepath.Rel(root, abs) // both absolute, root a prefix of abs
@@ -170,7 +174,10 @@ type tree struct {
 	ctx  context.Context
 	root fs.FS
 	env  LookupEnv
-	skip map[string]bool // Aval outputs, relative to root
+	// skip holds Aval outputs, relative to root. It applies to the top
+	// contract only: the #63 guard checks only that contract's scope, so
+	// in a referenced contract an output stays an input (fail closed).
+	skip map[string]bool
 	// done holds each referenced contract already fingerprinted, by its
 	// path relative to root, so a shared one is computed once; stack is
 	// the chain being computed, to name a cycle.
@@ -185,13 +192,19 @@ func newTree(ctx context.Context, root fs.FS, env LookupEnv, skip map[string]boo
 	return &tree{ctx: ctx, root: root, env: env, skip: skip, done: map[string]Dependency{}}
 }
 
-// sub returns the directory dir of the root and the outputs under it,
-// relative to dir.
+// sub returns the directory dir of the root and, for the top contract,
+// the outputs under it, relative to dir.
 func (t *tree) sub(dir string) (fs.FS, map[string]bool) {
-	if dir == "." {
-		return t.root, t.skip
+	fsys := t.root
+	if dir != "." {
+		fsys, _ = fs.Sub(t.root, dir) // dir is a valid path: Sub cannot fail
 	}
-	fsys, _ := fs.Sub(t.root, dir) // dir is a valid path: Sub cannot fail
+	if len(t.stack) > 0 { // a referenced contract: outputs stay inputs (fail closed)
+		return fsys, nil
+	}
+	if dir == "." {
+		return fsys, t.skip
+	}
 	skip := map[string]bool{}
 	for p := range t.skip {
 		if rel, ok := strings.CutPrefix(p, dir+"/"); ok {
@@ -318,6 +331,9 @@ func (t *tree) load(file string) (Dependency, error) {
 		}
 		if fi.Mode()&fs.ModeSymlink != 0 {
 			return Dependency{}, fmt.Errorf("%s is a symlink: symlinks are not followed", p)
+		}
+		if p == file && !fi.Mode().IsRegular() {
+			return Dependency{}, fmt.Errorf("%s is not a regular file", p)
 		}
 	}
 	data, err := fs.ReadFile(t.root, file)

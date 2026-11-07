@@ -40,7 +40,9 @@ depends on ../backend/aval.yaml (backend) sha256:8441...
 
 - Paths are relative to the contract that names them and must stay inside
   the git working tree (the nearest directory with a `.git` entry). No
-  symlinks on the way, no cycles, at most 8 levels and 64 contracts.
+  symlinks on the way, no cycles, at most 8 levels and 64 contracts. If
+  the contract's own directory is a symlink, `../` is resolved from its
+  real location, as the test sees it.
 - Anything Aval cannot prove fails closed: a missing or invalid contract, a
   scope that matches nothing, an unresolvable `scope.resolve`. The test runs.
 - A mutable reference the backend's scanner finds blocks the frontend's reuse
