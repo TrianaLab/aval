@@ -2432,6 +2432,12 @@ test without recording it; <code>aval run --fingerprint-only</code>, <code>--exp
 <li>A file in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> is not a regular file (symlink, device, socket, ...):
   <code>only regular files are supported in scope</code>. A symlink's target may live
   outside the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, so it cannot be proven unchanged.</li>
+<li>A symlink under which a <code>source</code> or <code>dependencies</code> glob could match files
+  (it may point to a directory):
+  <code>"&lt;path&gt;" is a symlink a glob could match files under</code>. Symlinks are not
+  followed, and <code>exclude</code> does not lift this check. A symlink no glob can
+  reach is ignored. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory itself may be a symlink: it
+  fingerprints like its target.</li>
 <li>A path in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> contains a newline or carriage return: <code>control characters
   in path are not supported</code>. The manifest is line-oriented, so such a name
   could forge manifest lines and collide with a different tree.</li>
