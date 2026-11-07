@@ -29,6 +29,7 @@ import (
 	neturl "net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -158,8 +159,12 @@ func getJSON(ctx context.Context, url, accept string, v any) error {
 	return nil
 }
 
-// redact returns s with its userinfo masked: a token may sit in the user
-// name as well as in the password.
+// redact returns s with its userinfo, path and query masked: a token may
+// sit in the user name, the password, or the path of a registry URL
+// (Gemfury: https://npm-proxy.fury.io/<TOKEN>/user/). The error names the
+// reference, which tells the path.
+// ponytail: masks every path, also a public one; mask only the path from a
+// registry variable if the host alone proves too little.
 func redact(s string) string {
 	u, err := neturl.Parse(s)
 	if err != nil {
@@ -168,6 +173,10 @@ func redact(s string) string {
 	if u.User != nil {
 		u.User = neturl.User("xxxxx")
 	}
+	if strings.Trim(u.Path, "/") != "" || u.RawQuery != "" {
+		u.Path, u.RawPath, u.RawQuery = "/xxxxx", "", ""
+	}
+	u.Fragment = ""
 	return u.String()
 }
 
@@ -235,20 +244,102 @@ func configFile(p, name string) string {
 // ponytail: only per-registry tokens; _auth, username and password lines
 // are ignored.
 func npmToken(hostPath string) string {
-	_, userconfig, err := npmEnv("userconfig")
+	vals, err := npmrc()
 	if err != nil {
-		return "" // which .npmrc npm reads is unclear: send no token
+		return "" // which .npmrc npm reads, or what it says, is unclear: send no token
 	}
 	tok, best := "", 0
-	for _, l := range strings.Split(configFile(userconfig, ".npmrc"), "\n") {
-		k, v, ok := strings.Cut(strings.TrimSpace(l), ":_authToken=")
+	for k, v := range vals {
+		k, ok := strings.CutSuffix(k, ":_authToken")
 		k = strings.TrimPrefix(k, "//")
 		match := k == hostPath || strings.HasSuffix(k, "/") && strings.HasPrefix(hostPath, k) || strings.HasPrefix(hostPath, k+"/")
 		if ok && match && len(k) > best {
-			tok, best = os.ExpandEnv(v), len(k)
+			tok, best = v, len(k)
 		}
 	}
 	return tok
+}
+
+// npmrc returns the settings of the .npmrc npm reads
+// ($npm_config_userconfig, else ~/.npmrc), read as npm's ini parser reads
+// them: comments, quotes and escapes, the last line wins, ${VAR} expanded
+// in values. Keys under a [section] are not npm settings and are skipped.
+// A line npm reads as a flag (no =) or a list (key[]=), or a section named
+// like a setting, fails: Aval cannot tell what npm would use.
+func npmrc() (map[string]string, error) {
+	_, userconfig, err := npmEnv("userconfig")
+	if err != nil {
+		return nil, err
+	}
+	vals := map[string]string{}
+	inSection := false
+	lines := strings.Split(strings.NewReplacer("\r\n", "\n", "\r", "\n").Replace(configFile(userconfig, ".npmrc")), "\n")
+	for i, l := range lines {
+		bad := fmt.Errorf(".npmrc line %d: Aval cannot read it as a key=value setting: fix it", i+1)
+		if t := strings.TrimSpace(l); t == "" || t[0] == ';' || t[0] == '#' {
+			continue
+		}
+		if m := iniSectionRe.FindStringSubmatch(l); m != nil {
+			// ini nests [a.b] under a, replacing a setting a (npm then errors).
+			name, _, _ := strings.Cut(iniValue(m[1]), ".")
+			if _, ok := vals[name]; ok {
+				return nil, bad
+			}
+			inSection = true
+			continue
+		}
+		if inSection {
+			continue
+		}
+		k, v, ok := strings.Cut(l, "=")
+		if k = iniValue(k); !ok || k == "" || strings.HasSuffix(k, "[]") {
+			return nil, bad
+		}
+		vals[k] = os.ExpandEnv(iniValue(v))
+	}
+	return vals, nil
+}
+
+var iniSectionRe = regexp.MustCompile(`^\[([^\]]*)\]\s*$`)
+
+// iniValue is a key or value as the ini package (npm) reads it: a quoted
+// string unquoted, else cut at the first unescaped ; or #, with \; \# \\
+// unescaped, and trimmed.
+func iniValue(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 && (s[0] == '"' || s[0] == '\'') && s[len(s)-1] == s[0] {
+		if s[0] == '\'' {
+			s = s[1 : len(s)-1]
+		}
+		var u string
+		if json.Unmarshal([]byte(s), &u) == nil {
+			return u
+		}
+		return s
+	}
+	var b strings.Builder
+	esc := false
+loop:
+	for _, c := range s {
+		switch {
+		case esc:
+			if !strings.ContainsRune(`\;#`, c) {
+				b.WriteByte('\\')
+			}
+			b.WriteRune(c)
+			esc = false
+		case c == ';' || c == '#':
+			break loop
+		case c == '\\':
+			esc = true
+		default:
+			b.WriteRune(c)
+		}
+	}
+	if esc {
+		b.WriteByte('\\')
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // netrc returns the login and password of the machine entry for host in

@@ -27,7 +27,10 @@ scope:
   version. A new version, a moved `<release>` or a redeployed release
   changes the id. The manifest line says `floating`. A
   `maven-metadata.xml` without versions, or with more than 100 (up to six
-  requests each), fails: use an exact version. Floating specs are
+  requests each), fails: use an exact version. So does a `<latest>` or
+  `<release>` that is a SNAPSHOT or is not in `<versions>`: Maven
+  installs it for `LATEST` or `RELEASE`, and its content would not be
+  bound. Floating specs are
   impractical for popular artifacts (guava, jackson-databind list more
   than 200 versions).
 - A version ending in `SNAPSHOT` (`1.0-SNAPSHOT`, `1.0.SNAPSHOT`), in any

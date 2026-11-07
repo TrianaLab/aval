@@ -1125,3 +1125,126 @@ func TestRedirectToAnotherHostDropsCredentials(t *testing.T) {
 func TestAllUnknownKind(t *testing.T) {
 	mustFail(t, "nope", "x", `unknown kind "nope"`)
 }
+
+// TestPipEnvSpellings: pip reads any PIP_ variable with the rest of the
+// name in any case and - equal to _ (pip 25: PIP_index_url and
+// PIP_INDEX-URL both set the index); pip_ in lower case is not read.
+func TestPipEnvSpellings(t *testing.T) {
+	f := newFake(t)
+	t.Setenv("AVAL_PYPI_URL", f.url)
+	f.set("/pypi/x/json", `{"releases":{"1.0":[{"filename":"x-1.0.tar.gz","digests":{"sha256":"aa"}}]}}`)
+	for k, v := range map[string]string{
+		"PIP_index_url": "https://evil.example/simple", "PIP_INDEX-URL": "https://evil.example/simple",
+		"PIP_Extra-Index_URL": "https://evil.example/simple", "PIP_find-links": "./wheels", "PIP_no_index": "1",
+	} {
+		t.Setenv(k, v)
+		mustFail(t, "pypi", "x==1.0", k)
+		_ = os.Unsetenv(k)
+	}
+	t.Setenv("PIP_index_url", f.url)
+	mustResolve(t, "pypi", "x==1.0")
+	t.Setenv("PIP_INDEX_URL", "https://evil.example/simple")
+	mustFail(t, "pypi", "x==1.0", "set one")
+	_ = os.Unsetenv("PIP_INDEX_URL")
+	_ = os.Unsetenv("PIP_index_url")
+	t.Setenv("pip_INDEX_URL", "https://ignored.example/simple")
+	mustResolve(t, "pypi", "x==1.0")
+}
+
+// TestNpmrcIni: ~/.npmrc is read as npm reads it (the ini package): quotes
+// stripped from keys and values, ; and # comments, keys under a [section]
+// ignored. A line Aval cannot read fails closed.
+func TestNpmrcIni(t *testing.T) {
+	npmrc := filepath.Join(t.TempDir(), "npmrc")
+	t.Setenv("NPM_CONFIG_USERCONFIG", npmrc)
+	const base = "https://registry.npmjs.org"
+	for rc, wantErr := range map[string]string{
+		`"registry"=http://evil/`:                            "registry",
+		"registry=http://evil/\n[x]\n":                       "registry",
+		"registry='http://evil/'":                            "registry",
+		"[x]\nregistry=http://evil/":                         "",
+		"registry=" + base + "/\n[x]\nregistry=http://evil/": "",
+		`registry="` + base + `/"`:                           "",
+		"registry=" + base + "/ ; comment":                   "",
+		"registry=" + base + "/ # comment":                   "",
+		"# c\r\n  ; c\r\n\r\nregistry=" + base:               "",
+		"registry=http://evil/ ; " + base:                    "registry",
+		"registry\n":                                         "cannot read",
+		"garbage line\n":                                     "cannot read",
+		"=x\n":                                               "cannot read",
+		"registry[]=" + base:                                 "cannot read",
+		`"@acme:registry"="http://evil/"`:                    "@acme:registry",
+		"[x]\n@acme:registry=http://evil/":                   "",
+		"[x]\njunk line":                                     "",
+		"registry=http://evil/\n[x]\nregistry=" + base:       "registry",
+		"registry=" + base + "/\n[x]\n[registry.a]\nx=1":     "cannot read",
+		"registry=" + base + `/\;x`:                          "registry",
+		"registry=" + base + `/\#x`:                          "registry",
+		`registry=` + base + `/\x`:                           "registry",
+	} {
+		if err := os.WriteFile(npmrc, []byte(rc), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		err := npmRegistry("@acme/left", base)
+		if wantErr == "" && err != nil || wantErr != "" && (err == nil || !strings.Contains(err.Error(), wantErr)) {
+			t.Errorf(".npmrc %q: %v, want %q", rc, err, wantErr)
+		}
+	}
+	for rc, want := range map[string]string{
+		`"//h.example/:_authToken"="t"`:          "t",
+		"//h.example/:_authToken='t' ; c":        "'t'", // not quoted as a whole: npm keeps the quotes
+		"[x]\n//h.example/:_authToken=t":         "",
+		`//h.example/:_authToken=a\;b\#c\\d\xe\`: `a;b#c\d\xe\`,
+		"junk\n//h.example/:_authToken=t":        "",
+	} {
+		if err := os.WriteFile(npmrc, []byte(rc), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := npmToken("h.example/pkg"); got != want {
+			t.Errorf(".npmrc %q: token %q, want %q", rc, got, want)
+		}
+	}
+}
+
+// TestMavenLatestReleaseListed: <latest> and <release> name what Maven
+// installs for LATEST and RELEASE: a SNAPSHOT or a version outside
+// <versions> (whose content is not bound) fails.
+func TestMavenLatestReleaseListed(t *testing.T) {
+	f := newFake(t)
+	t.Setenv("AVAL_MAVEN_URL", f.url)
+	f.set("/x/a/1.0/a-1.0.pom", "<project><packaging>pom</packaging></project>")
+	for meta, why := range map[string]string{
+		"<latest>2.0-SNAPSHOT</latest><release>1.0</release>": "SNAPSHOT",
+		"<latest>1.0</latest><release>1.1-snapshot</release>": "SNAPSHOT",
+		"<latest>2.0</latest><release>1.0</release>":          "not in <versions>",
+		"<latest>1.0</latest><release>2.0</release>":          "not in <versions>",
+		"<latest>1.0</latest><release>1.0</release>":          "",
+		"<release>1.0</release>":                              "",
+	} {
+		f.set("/x/a/maven-metadata.xml", "<metadata><versioning>"+meta+"<versions><version>1.0</version></versions></versioning></metadata>")
+		if why == "" {
+			mustResolve(t, "maven", "x:a:LATEST")
+			continue
+		}
+		mustFail(t, "maven", "x:a:LATEST", why)
+	}
+}
+
+// TestTokenInRegistryPathMasked: a registry URL may carry its token in the
+// path (Gemfury: https://npm-proxy.fury.io/<TOKEN>/user/); errors never
+// show it.
+func TestTokenInRegistryPathMasked(t *testing.T) {
+	f := newFake(t)
+	t.Setenv("npm_config_registry", f.url+"/T0KEN/user/")
+	t.Setenv("AVAL_PYPI_URL", f.url+"/T0KEN/user")
+	t.Setenv("AVAL_MAVEN_URL", f.url+"/T0KEN/user")
+	for kind, ref := range map[string]string{"npm": "left-pad@1.0.0", "pypi": "x==1.0", "maven": "x:a:1.0"} {
+		if _, err := resolveOne(t, kind, ref); err == nil || strings.Contains(err.Error(), "T0KEN") {
+			t.Errorf("%s error must not show the token: %v", kind, err)
+		}
+	}
+	t.Setenv("PIP_INDEX_URL", "https://npm-proxy.fury.io/T0KEN/user/")
+	if _, err := resolveOne(t, "pypi", "x==1.0"); err == nil || strings.Contains(err.Error(), "T0KEN") || !strings.Contains(err.Error(), "npm-proxy.fury.io") {
+		t.Errorf("PIP_INDEX_URL error must name the host, not the token: %v", err)
+	}
+}
