@@ -5,9 +5,11 @@ import (
 	"cmp"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -44,37 +46,52 @@ func scalar(n *yaml.Node) string {
 	return n.Value
 }
 
-// lastLine bounds a line number from the YAML parser, which also breaks
-// lines at a lone CR, to the lines Aval counts.
-func lastLine(data []byte) int { return bytes.Count(data, []byte("\n")) + 1 }
-
-// decodedImages checks the image: keys the regexes did not read (seen holds
-// the line and column of those they did): keys written with an escape
-// ("ima\x67e"), a tag, an anchor or an alias, explicit keys (? image) and
-// keys in nested flow or block sequences. A file that is not valid YAML (a
-// Helm template, say) falls back to escapedKeys.
-func decodedImages(in Input, seen map[[2]int]bool) []Finding {
-	docs, err := yamlDocs(in.Data)
-	last := lastLine(in.Data)
+// decodedImages checks every image: key under n by its decoded value, so
+// keys written with an escape ("ima\x67e"), a tag, an anchor or an alias,
+// explicit keys (? image) and keys in nested flow or block sequences are
+// read as Compose and Kubernetes read them. It also checks a Compose
+// build.dockerfile_inline as a Dockerfile and the docker-image:// values of
+// build.additional_contexts. Lines are the parser's, which also breaks lines
+// at a lone CR, NEL or LS.
+func decodedImages(in Input, n *yaml.Node) []Finding {
 	var out []Finding
-	var walk func(n *yaml.Node)
-	walk = func(n *yaml.Node) {
-		for i := 0; n.Kind == yaml.MappingNode && i+1 < len(n.Content); i += 2 {
-			k, v := n.Content[i], n.Content[i+1]
-			if scalar(k) == "image" && !seen[[2]int{k.Line, k.Column}] {
-				out = append(out, decodedImage(in.Path, min(v.Line, last), v)...)
+	for i := 0; n.Kind == yaml.MappingNode && i+1 < len(n.Content); i += 2 {
+		k, v := n.Content[i], n.Content[i+1]
+		switch scalar(k) {
+		case "image":
+			out = append(out, decodedImage(in, v)...)
+		case "dockerfile_inline":
+			for _, f := range (dockerfile{}).Detect(Input{Path: in.Path, Data: []byte(scalar(v)), Has: in.Has}) {
+				f.Line = v.Line // ponytail: the line of the value, not of the instruction in it
+				out = append(out, f)
+			}
+		case "additional_contexts": // a mapping (name: value) or a list (name=value)
+			for _, c := range v.Content {
+				if _, ref, ok := strings.Cut(scalar(c), "docker-image://"); ok {
+					out = append(out, image(in.Path, c.Line, ref, nil)...)
+				}
 			}
 		}
-		for _, c := range n.Content {
-			walk(c)
+	}
+	for _, c := range n.Content {
+		out = append(out, decodedImages(in, c)...)
+	}
+	return out
+}
+
+// templatedKeyRe is a line with a template action ({{ }}) before the colon
+// of its key, outside a comment.
+var templatedKeyRe = regexp.MustCompile(`^[^:#]*\{\{.*\}\}[^:]*:(\s|$)`)
+
+// templatedKeys reports keys a Helm template writes (ima{{ "ge" }}:,
+// {{ $k }}:): rendered, any of them may be image, so fail closed.
+func templatedKeys(in Input) []Finding {
+	var out []Finding
+	for i, l := range strings.Split(string(in.Data), "\n") {
+		if l = strings.TrimSpace(l); templatedKeyRe.MatchString(l) {
+			out = append(out, Finding{File: in.Path, Line: i + 1, Ecosystem: "scan", Ref: l,
+				Fix: "a template writes this key, so Aval cannot tell whether it is image: write the key plainly or render the chart into the scope"})
 		}
-	}
-	for _, d := range docs {
-		walk(d)
-	}
-	if err != nil {
-		out = append(out, escapedKeys(in)...)
-		out = append(out, prefixedKeys(in)...)
 	}
 	return out
 }
@@ -88,7 +105,7 @@ var (
 )
 
 // prefixedKeys is the fallback for those keys in a file the YAML parser
-// rejects (a Helm template), where decodedImages cannot read them.
+// rejects (a Helm template), where yamlImageRe does not read them.
 func prefixedKeys(in Input) []Finding {
 	var out []Finding
 	explicit := false
@@ -107,11 +124,14 @@ func prefixedKeys(in Input) []Finding {
 
 // decodedImage checks one decoded image: value, as yamlImage does a
 // written one.
-func decodedImage(file string, n int, v *yaml.Node) []Finding {
+func decodedImage(in Input, v *yaml.Node) []Finding {
+	file, n := in.Path, v.Line
 	var ref string
 	switch {
-	case v.Kind == yaml.MappingNode: // Helm values
+	case v.Kind == yaml.MappingNode && scalarKeys(v): // Helm values
 		return nil
+	case v.Kind == yaml.MappingNode: // a template action ({{ x }}) reads as a mapping with a mapping key
+		return image(file, n, valueText(in.Data, v), nil)
 	case v.Kind == yaml.AliasNode:
 		ref = "*" + v.Value
 	case v.Kind != yaml.ScalarNode:
@@ -126,6 +146,44 @@ func decodedImage(file string, n int, v *yaml.Node) []Finding {
 		return image(file, n, v.Value, nil)
 	}
 	return []Finding{{File: file, Line: n, Ecosystem: "container", Ref: ref, Fix: unresolvedFix}}
+}
+
+// scalarKeys reports whether every key of a mapping is a scalar.
+func scalarKeys(m *yaml.Node) bool {
+	for i := 0; i < len(m.Content); i += 2 {
+		if m.Content[i].Kind != yaml.ScalarNode {
+			return false
+		}
+	}
+	return true
+}
+
+// yamlBreakRe is a line break as the YAML parser counts one.
+var yamlBreakRe = regexp.MustCompile("\r\n|[\n\r\u0085\u2028\u2029]")
+
+// physLines maps the parser's line numbers (index line-1) to the file's
+// \n-separated lines.
+func physLines(data []byte) []int {
+	out := []int{1}
+	for _, m := range yamlBreakRe.FindAllIndex(data, -1) {
+		n := out[len(out)-1]
+		if data[m[1]-1] == '\n' {
+			n++
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
+// valueText is the source text of a node to the end of its line, without a
+// comment, or "image" when there is none.
+// ponytail: line and column are clamped, since the parser also decodes
+// UTF-16, whose line breaks yamlBreakRe does not see.
+func valueText(data []byte, v *yaml.Node) string {
+	lines := yamlBreakRe.Split(string(data), -1)
+	l := []rune(lines[min(v.Line, len(lines))-1])
+	t, _, _ := strings.Cut(string(l[min(v.Column-1, len(l)):]), " #")
+	return cmp.Or(strings.TrimSpace(t), "image")
 }
 
 // escapedKeyRe is a double-quoted scalar with at least one escape, behind
@@ -182,13 +240,40 @@ func openQuote(l string) bool {
 	return in
 }
 
-// kustomize checks the images: of a kustomization, which retarget an
-// image by name (newName) or tag (newTag); only a digest pins it.
+// kustomize checks the images: (and legacy imageTags:) of a kustomization,
+// which retarget an image by name (newName) or tag (newTag); only a digest
+// pins it. A patch or replacement that mentions an image is a scan finding.
 type kustomize struct{}
 
 func (kustomize) Applies(p string) bool {
 	b := path.Base(p)
 	return b == "kustomization.yaml" || b == "kustomization.yml" || b == "Kustomization"
+}
+
+// kustomization is what Aval reads of a kustomization file.
+type kustomization struct {
+	Images, ImageTags []struct{ Name, NewName, NewTag, TagSuffix, Digest string }
+
+	Patches, PatchesStrategicMerge, PatchesJson6902, Replacements []json.RawMessage
+}
+
+// patches reports each patch or replacement that mentions an image.
+// ponytail: any mention, inline or in a file name; a patch file that sets an
+// image under another name is a known limit.
+func (k kustomization) patches(file string) []Finding {
+	var out []Finding
+	for _, f := range []struct {
+		name    string
+		entries []json.RawMessage
+	}{{"patches", k.Patches}, {"patchesStrategicMerge", k.PatchesStrategicMerge}, {"patchesJson6902", k.PatchesJson6902}, {"replacements", k.Replacements}} {
+		for i, e := range f.entries {
+			if bytes.Contains(bytes.ToLower(e), []byte("image")) {
+				out = append(out, Finding{File: file, Ecosystem: "scan", Ref: fmt.Sprintf("%s[%d]", f.name, i),
+					Fix: "kustomize patch or replacement sets an image Aval cannot read: pin the image in the base, or retarget it in images: with a digest"})
+			}
+		}
+	}
+	return out
 }
 
 func (kustomize) Detect(in Input) []Finding {
@@ -210,13 +295,12 @@ func (kustomize) Detect(in Input) []Finding {
 		if err != nil {
 			return scanErr(err)
 		}
-		var k struct {
-			Images []struct{ Name, NewName, NewTag, TagSuffix, Digest string }
-		}
+		var k kustomization
 		if err := json.Unmarshal(j, &k); err != nil {
 			return scanErr(err)
 		}
-		for _, e := range k.Images {
+		out = append(out, k.patches(in.Path)...)
+		for _, e := range slices.Concat(k.Images, k.ImageTags) { // imageTags: the legacy name kustomize still applies
 			if e.NewName == "" && e.NewTag == "" && e.TagSuffix == "" && e.Digest == "" {
 				continue // the image is left as the manifests write it
 			}

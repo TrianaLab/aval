@@ -65,11 +65,18 @@ and blank lines inside a continuation are dropped; and a leading
 BuildKit refuses (an invalid `# escape=`, a repeated directive, an
 unterminated heredoc) is reported in the `scan` ecosystem, and so is a
 heredoc name with a quote, backslash or `$` inside it (`<<#\\x`,
-`<<E$X`), which Aval does not decode.
+`<<E$X`), or an empty one (`<<""`), which Aval does not decode. Every
+`NAME=value` of an `ARG` counts (`ARG A=1 IMG=x`, also lowercase `arg`); a
+`FROM` that uses an `ARG` given a value more than once is a `scan`
+finding: give it one value.
 
-A `kustomization.yaml` that retargets an image in `images:` with `newName`
-or `newTag` needs a `digest:` too. A `tagSuffix` is always reported:
-kustomize drops the digest when it appends the suffix.
+A `kustomization.yaml` that retargets an image in `images:` (or the legacy
+`imageTags:`) with `newName` or `newTag` needs a `digest:` too. A
+`tagSuffix` is always reported: kustomize drops the digest when it appends
+the suffix. A `patches`, `patchesStrategicMerge`, `patchesJson6902` or
+`replacements` entry that mentions `image` is a `scan` finding, since Aval
+does not apply patches: pin the image in the base, or retarget it in
+`images:` with a digest.
 
 ```yaml
 images:
@@ -93,14 +100,19 @@ that comes from a variable Aval cannot resolve (`${DB_IMAGE}`) or from a
 Helm template (`{{ .Values.image }}`) is reported: write the digest into a
 file in the scope, or render the chart into the scope. A YAML alias
 (`image: *img`), a block scalar (`image: >-`) or a tag (`image: !!str ...`)
-is reported too: write the reference inline. A plain value on the line
-after `image:` is checked like an inline one. Keys are matched by their
-decoded value, so `"ima\x67e":`, `? image` and `!!str image:` are checked
-too. In a file that is not valid YAML (a Helm template), only an escaped
-key with its value on the same line is matched by its decoded value; a
-quoted key with an escape YAML cannot decode, an escaped `image` key whose
-value is elsewhere (`? "\x69mage"`, a value on the next line) and a quoted
-key that continues on the next line are reported in the `scan` ecosystem.
+is reported too: write the reference inline. A file that is valid YAML is
+read by the YAML parser alone: every `image:` key is matched by its decoded
+value (`"ima\x67e":`, `? image`, `!!str image:`, anchored keys), wherever
+its value is written. A Compose `build.dockerfile_inline` is checked as a
+Dockerfile and `build.additional_contexts` values with `docker-image://` as
+images. Helm helpers (`*.tpl`) are checked like templates. A key a template
+writes (`ima{{ "ge" }}:`, `{{ $k }}:`) is reported in the `scan` ecosystem.
+A file that is not valid YAML (a Helm template) is read line by line: only
+an escaped key with its value on the same line is matched by its decoded
+value; a quoted key with an escape YAML cannot decode, an escaped `image`
+key whose value is elsewhere (`? "\x69mage"`, a value on the next line)
+and a quoted key that continues on the next line are reported in the
+`scan` ecosystem.
 
 ### Go
 
@@ -230,17 +242,28 @@ Dockerfile BuildKit refuses, an undecodable YAML key): fix the file.
 
 ## Limits
 
-The detectors read text; they do not run your build. A reference they do not
-recognize is not reported, so the scanner narrows the gap but does not close
-it: keep the scope honest, prefer lockfiles and digests, and use
-`aval run --shadow` to catch false hits. Shell commands are split without a
-full shell parser: a quoted `;` or `>` also splits, and a token misread as a
-package is reported as unpinned (a needless miss). Options before a
-subcommand (`apk --no-cache add`, `git -C dir clone`) are skipped, but an
-option Aval does not know to take a value (`tool --opt value install x`)
-hides the subcommand: like any reference the detectors do not recognize,
-it is not reported. Not detected: a download from an unversioned URL
-other than `releases/latest` (`curl -o tool URL`, `curl URL | tar x`), and
-Helm values that split an image into `repository` and `tag` before
-rendering. Declare those in `scope.resolve` (a [`url`](resolve/urls.md),
-an [`image`](resolve/images.md)), so their content is hashed.
+The scanner is a best-effort safety net, not a guarantee. The guarantee is
+the declared scope and the pins you write in place: a digest, a lockfile,
+a commit id. The detectors read text; they do not run your build, render
+your chart or apply your overlays, and a reference they do not recognize is
+not reported. Keep the scope honest, pin in place, and use
+`aval run --shadow` to catch false hits. Known limits:
+
+- Shell commands are split without a full shell parser: a quoted `;` or
+  `>` also splits, and a token misread as a package is reported as
+  unpinned (a needless miss). An option Aval does not know to take a value
+  (`tool --opt value install x`) hides the subcommand.
+- A download from an unversioned URL other than `releases/latest`
+  (`curl -o tool URL`, `curl URL | tar x`) is not detected.
+- Helm: values that split an image into `repository` and `tag`, and any
+  YAML a template prints (`{{ include ... }}`, `{{ toYaml ... }}`), are not
+  read. In a template the YAML parser rejects, keys written as block
+  scalars or aliases are not decoded.
+- Kustomize: a patch file referenced by `path:` that sets an image without
+  `image` in the entry is not read.
+- Dockerfile variables: the last value of a name wins, with no stage
+  scoping, except in `FROM` (above).
+
+Declare what the scanner cannot see in `scope.resolve` (a
+[`url`](resolve/urls.md), an [`image`](resolve/images.md)), so its content
+is hashed.

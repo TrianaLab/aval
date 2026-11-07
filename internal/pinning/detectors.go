@@ -11,7 +11,8 @@ import (
 )
 
 // composeImages checks image: keys in YAML: Compose files, Kubernetes and
-// rendered Helm manifests, CI service definitions.
+// rendered Helm manifests, Helm templates and helpers (*.tpl), CI service
+// definitions.
 type composeImages struct{}
 
 // lockfiles are hashed but not scanned: they hold no image: keys, and a
@@ -23,7 +24,7 @@ func (composeImages) Applies(p string) bool {
 	if slices.Contains(lockfiles, b) {
 		return false
 	}
-	return e == ".yaml" || e == ".yml" || e == ".json" && strings.Contains(b, "compose")
+	return e == ".yaml" || e == ".yml" || e == ".tpl" || e == ".json" && strings.Contains(b, "compose")
 }
 
 // yamlImageRe finds a block-style image: key (quoted or not); its value is
@@ -37,9 +38,31 @@ var (
 	yamlKeyRe = regexp.MustCompile(`^\s*(-(\s|$)|["']?[\w.-]+["']?\s*:(\s|$))`)
 )
 
+// Detect reads a file the YAML parser accepts with the parser alone; the
+// regexes only read a file it rejects (a Helm template). Templated keys are
+// a text property, so they are checked either way.
 func (composeImages) Detect(in Input) []Finding {
 	var out []Finding
-	seen := map[[2]int]bool{}                                // line and column of the image: keys read here
+	if docs, err := yamlDocs(in.Data); err == nil {
+		for _, d := range docs {
+			out = append(out, decodedImages(in, d)...)
+		}
+		phys := physLines(in.Data)
+		for i := range out {
+			out[i].Line = phys[min(out[i].Line, len(phys))-1] // clamped: see valueText
+		}
+	} else {
+		out = textImages(in)
+	}
+	out = append(out, templatedKeys(in)...)
+	slices.SortStableFunc(out, func(a, b Finding) int { return cmp.Or(a.Line-b.Line, strings.Compare(a.Ref, b.Ref)) })
+	return slices.Compact(out)
+}
+
+// textImages finds image: keys line by line, for a file the YAML parser
+// rejects.
+func textImages(in Input) []Finding {
+	var out []Finding
 	pending := -1                                            // indent of an image: key whose value may be on the next line
 	for i, s := range strings.Split(string(in.Data), "\n") { // YAML has no line continuation
 		l := line{i + 1, strings.TrimSuffix(s, "\r")}
@@ -54,19 +77,19 @@ func (composeImages) Detect(in Input) []Finding {
 		pending = -1
 		ms := flowImageRe.FindAllStringSubmatchIndex(l.text, -1)
 		if m := yamlImageRe.FindStringSubmatchIndex(l.text); m != nil {
-			ms = [][]int{m}
-			if v, _, _ := strings.Cut(" "+l.text[m[4]:m[5]], " #"); strings.TrimSpace(v) == "" {
-				pending = indent
-			}
+			ms = append([][]int{m}, ms...) // and flow keys inside its value
 		}
 		for _, m := range ms {
-			seen[[2]int{l.n, m[2] + 1}] = true
+			// an empty or anchor-only value continues on the next line
+			v, _, _ := strings.Cut(" "+l.text[m[4]:m[5]], " #")
+			if f := strings.Fields(v); len(f) == 0 || len(f) == 1 && f[0][0] == '&' {
+				pending = indent
+			}
 			out = append(out, yamlImage(in.Path, l.n, l.text[m[4]:m[5]])...)
 		}
 	}
-	out = append(out, decodedImages(in, seen)...)
-	slices.SortStableFunc(out, func(a, b Finding) int { return a.Line - b.Line })
-	return out
+	out = append(out, escapedKeys(in)...)
+	return append(out, prefixedKeys(in)...)
 }
 
 // yamlImage checks one image: value. An empty value is a nested mapping
@@ -109,6 +132,7 @@ func (dockerfile) Detect(in Input) []Finding {
 		plain[i] = l.line
 	}
 	vars := assignments(plain)
+	defs := dockerArgs(lines, vars)
 	stages := map[string]bool{}
 	directives := true // parser directives (# syntax=) come before anything else
 	for _, l := range lines {
@@ -119,6 +143,7 @@ func (dockerfile) Detect(in Input) []Finding {
 			}
 			directives = isComment(l.text)
 		}
+		out = append(out, redefinedFrom(in.Path, l.line, defs)...)
 		f := strings.Fields(vars.expand(l.text))
 		if len(f) < 2 || isComment(f[0]) {
 			continue

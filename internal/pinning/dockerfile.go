@@ -170,12 +170,49 @@ func takesHeredocs(text string) bool {
 // enclosing quotes is dropped. A name with any other quote, backslash or $
 // is not ok: BuildKit's lexer decodes and expands those (and with some
 // expansions reads no heredoc at all), so fail closed instead of guessing.
+// Nor is an empty name (<<""): BuildKit reads no heredoc there.
 func heredocName(w string) (string, bool) {
 	name := strings.TrimPrefix(w, `\`)
 	if len(name) >= 2 && (name[0] == '"' || name[0] == '\'') && name[len(name)-1] == name[0] {
 		name = name[1 : len(name)-1]
 	}
-	return name, !strings.ContainsAny(name, `"'\$`)
+	return name, name != "" && !strings.ContainsAny(name, `"'\$`)
+}
+
+// dockerArgs records every NAME=value of every ARG (any case, any number of names)
+// in v, and returns how often each name is given a value.
+func dockerArgs(lines []dockerLine, v *vars) map[string]int {
+	defs := map[string]int{}
+	for _, l := range lines {
+		f := strings.Fields(l.text)
+		if len(f) < 2 || !strings.EqualFold(f[0], "ARG") {
+			continue
+		}
+		for _, a := range f[1:] {
+			if name, val, ok := strings.Cut(a, "="); ok {
+				v.m[name] = strings.Trim(val, `"'`)
+				defs[name]++
+			}
+		}
+	}
+	return defs
+}
+
+// redefinedFrom reports a FROM that uses a variable with more than one ARG
+// value: BuildKit uses the one in effect at that point, which last-wins
+// expansion may not see, so fail closed.
+func redefinedFrom(file string, l line, defs map[string]int) []Finding {
+	f := strings.Fields(l.text)
+	if len(f) < 2 || !strings.EqualFold(f[0], "FROM") {
+		return nil
+	}
+	for _, m := range varRe.FindAllStringSubmatch(l.text, -1) {
+		if defs[m[1]+m[2]+m[3]] > 1 {
+			return []Finding{{File: file, Line: l.n, Ecosystem: "scan", Ref: l.text,
+				Fix: "FROM uses an ARG that is given a value more than once, so Aval cannot tell which one BuildKit uses: give it one value"}}
+		}
+	}
+	return nil
 }
 
 // shellWords splits s at unquoted Unicode spaces and keeps quotes and escapes, as

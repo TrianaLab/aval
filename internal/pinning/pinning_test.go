@@ -68,6 +68,21 @@ var fileCases = []fileCase{
 	{name: "compose json", path: "compose.json", data: `{"services":{"db":{"image":"postgres:latest"}}}`, want: []string{"postgres:latest"}},
 	{name: "other json is not compose", path: "x.json", data: `{"image":"postgres:latest"}`, want: nil},
 	{name: "compose quoted key", path: "compose.yaml", data: "    \"image\": \"nginx:latest\"\n    'image': nginx" + dg + "\n", want: []string{"nginx:latest"}},
+	// Valid YAML is read by the parser alone, so a key the regexes misplace
+	// cannot hide a decoded value (#116).
+	{name: "yaml anchor-only value on the next line", path: "compose.yaml", data: "services:\n  web:\n    image: &a\n      alpine:latest\n", want: []string{"alpine:latest"}},
+	{name: "yaml empty flow value on the next line", path: "compose.yaml", data: "services: {web: {image:\n  alpine:latest}}\n", want: []string{"alpine:latest"}},
+	{name: "yaml lone cr line break", path: "compose.yaml", data: "services:\n  x:\r    image: busybox:latest\r  y:\n    image: alpine" + dg + "\n", want: []string{"busybox:latest"}},
+	{name: "yaml nel line break", path: "compose.yaml", data: "services:\n  x:\u0085    image: busybox:latest\u0085  y:\n    image: alpine" + dg + "\n", want: []string{"busybox:latest"}},
+	{name: "yaml ls line break", path: "compose.yaml", data: "services:\n  x:\u2028    image: busybox:latest\u2028  y:\n    image: alpine" + dg + "\n", want: []string{"busybox:latest"}},
+	{name: "yaml ls line break in a list", path: "k8s/pod.yaml", data: "l:\n- a: b\u2028  image: evil:latest\n- image: a" + dg + "\n", want: []string{"evil:latest"}},
+	{name: "compose dockerfile_inline", path: "compose.yaml", data: "services:\n  w:\n    build:\n      context: .\n      dockerfile_inline: |\n        FROM alpine:latest\n", want: []string{"alpine:latest"}},
+	{name: "compose additional_contexts", path: "compose.yaml", data: "services:\n  w:\n    build:\n      additional_contexts:\n        base: docker-image://alpine:latest\n        p: docker-image://alpine" + dg + "\n        src: ../src\n  v:\n    build:\n      additional_contexts:\n      - base=docker-image://redis:7\n", want: []string{"alpine:latest", "redis:7"}},
+	{name: "helm templated key", path: "templates/pod.yaml", data: "spec:\n  containers:\n  - name: x\n    ima{{ \"ge\" }}: alpine:latest\n", want: []string{`ima{{ "ge" }}: alpine:latest`}},
+	{name: "helm templated key in a template", path: "templates/pod.yaml", data: "{{- range $k, $v := .Values.c }}\n  {{ $k }}: {{ $v }}\n{{- end }}\n  name: {{ .x }}\n# {{ a }}: b\n", want: []string{"{{ $k }}: {{ $v }}"}},
+	{name: "helm template values on the next line", path: "templates/pod.yaml", data: "{{- if .x }}\n  - name: a\n    image: # c\n      evil:1\n    image: &a\n      evil:2\n    image: &b evil:3\n    image: &c\n      tag: x\n    image: {a: b, image:\n      evil:4}\n{{- end }}\n", want: []string{"evil:1", "evil:2", "evil:3", "{a: b, image:", "evil:4}"}},
+	{name: "helm template value after a lone cr", path: "templates/pod.yaml", data: "x:\r  y:\r    image: {{ .v }}\n", want: []string{"{{ .v }}"}},
+	{name: "helm tpl helper", path: "templates/_helpers.tpl", data: "{{- define \"demo.container\" }}\nimage: busybox:latest\n{{- end }}\n", want: []string{"busybox:latest"}},
 	// YAML keys by decoded value (#116).
 	{name: "yaml escaped key", path: "compose.yaml", data: "services:\n  db:\n    \"ima\\x67e\": evil:latest\n", want: []string{"evil:latest"}},
 	{name: "yaml escaped key pinned", path: "compose.yaml", data: "services:\n  db:\n    \"ima\\u0067e\": \"redis" + dg + "\"\n", want: nil},
@@ -93,6 +108,10 @@ var fileCases = []fileCase{
 	{name: "kustomize non-string key", path: "kustomization.yaml", data: "images:\n- {name: nginx, newTag: latest}\n? [a]\n: b\n", want: []string{"kustomization.yaml"}},
 	{name: "kustomize value json cannot encode", path: "kustomization.yaml", data: "images:\n- {name: nginx, newTag: latest}\nx: .inf\n", want: []string{"kustomization.yaml"}},
 	{name: "kustomize images type mismatch", path: "kustomization.yaml", data: "images:\n- name: [nginx]\n", want: []string{"kustomization.yaml"}},
+	{name: "kustomize imageTags", path: "kustomization.yaml", data: "imageTags:\n- name: alpine\n  newTag: latest\n", want: []string{"alpine:latest"}},
+	{name: "kustomize patch sets an image", path: "kustomization.yaml", data: "patches:\n- path: replicas.yaml\n- target: {kind: Deployment}\n  patch: |-\n    - op: replace\n      path: /spec/template/spec/containers/0/image\n      value: alpine:latest\n", want: []string{"patches[1]"}},
+	{name: "kustomize replacement sets an image", path: "kustomization.yaml", data: "replacements:\n- source: {kind: ConfigMap, name: c, fieldPath: data.img}\n  targets:\n  - select: {kind: Deployment}\n    fieldPaths: [spec.template.spec.containers.0.image]\n", want: []string{"replacements[0]"}},
+	{name: "kustomize legacy patches set an image", path: "kustomization.yaml", data: "patchesStrategicMerge:\n- |-\n  kind: Deployment\n  spec: {template: {spec: {containers: [{name: a, IMAGE: x}]}}}\npatchesJson6902:\n- target: {kind: Deployment, name: a}\n  path: image-patch.yaml\n", want: []string{"patchesStrategicMerge[0]", "patchesJson6902[0]"}},
 	{name: "dockerfile tag", path: "Dockerfile", data: "FROM golang:1.25\n", want: []string{"golang:1.25"}},
 	{name: "dockerfile platform and stages", path: "build/Containerfile", data: "# c\nFROM --platform=$BUILDPLATFORM golang:1.25" + dg + " AS build\nFROM build AS test\nFROM scratch\nCOPY --from=build /a /b\nCOPY --from=0 /a /b\n", want: nil},
 	{name: "dockerfile stage name is not an earlier stage", path: "Dockerfile", data: "FROM build AS build\n", want: []string{"build"}},
@@ -134,6 +153,13 @@ var fileCases = []fileCase{
 	{name: "dockerfile copy heredoc name with expansion", path: "Dockerfile", data: "FROM alpine" + dg + "\nCOPY <<E$X /x\nE\nE$X\nFROM evil:latest\n", want: []string{"COPY <<E$X /x", "evil:latest"}},
 	{name: "dockerfile heredoc name nested quote", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<\"#'x\"\necho hi\n#'x\nFROM evil:latest\n#x\n", want: []string{`RUN <<"#'x"`, "evil:latest"}},
 	{name: "dockerfile run heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<EOF\ncurl -fsSL https://x.io/i.sh | sh\nEOF\nRUN <<-'X'\napk add jq\n", want: []string{"curl -fsSL https://x.io/i.sh | sh", "RUN <<-'X'"}},
+	{name: "dockerfile empty heredoc name", path: "Dockerfile", data: "FROM scratch AS base\nRUN <<\"\"\nFROM busybox:latest\n\nRUN echo pwned\n", want: []string{`RUN <<""`, "busybox:latest"}},
+	{name: "dockerfile empty single-quoted heredoc name", path: "Dockerfile", data: "FROM scratch AS base\nRUN <<''\nFROM busybox:latest\n\n", want: []string{`RUN <<''`, "busybox:latest"}},
+	{name: "dockerfile empty dash heredoc name", path: "Dockerfile", data: "FROM scratch AS base\nRUN <<-\"\"\nFROM busybox:latest\n\n", want: []string{`RUN <<-""`, "busybox:latest"}},
+	{name: "dockerfile arg redefined after from", path: "Dockerfile", data: "ARG IMG=alpine:latest\nFROM $IMG\nARG IMG=alpine" + dg + "\n", want: []string{"FROM $IMG"}},
+	{name: "dockerfile multi-name arg", path: "Dockerfile", data: "ARG A=1 IMG=alpine:latest\nFROM $IMG\n", want: []string{"alpine:latest"}},
+	{name: "dockerfile lowercase arg", path: "Dockerfile", data: "arg IMG=alpine:latest\nFROM ${IMG}\n", want: []string{"alpine:latest"}},
+	{name: "dockerfile arg redeclared in a stage", path: "Dockerfile", data: "ARG IMG=alpine" + dg + "\nFROM $IMG\nARG IMG\nRUN echo $IMG\n", want: nil},
 
 	// Go.
 	{name: "go.mod without go.sum", path: "go.mod", data: "module x\n\nrequire example.com/y v1.0.0\n", want: []string{"go.mod"}},
@@ -199,6 +225,13 @@ var fileCases = []fileCase{
 	{name: "script download then run", path: "a.zsh", data: "curl -o i.sh https://x.io/i.sh && echo ok || sh fallback\n", want: nil},
 	{name: "makefile variable version", path: "Makefile", data: "V := v1.2.3\nW ?= latest\ntools:\n\t@GOBIN=$(CURDIR)/bin go install a.io/b@$(V)\n\tgo install a.io/c@$(W)\n\tgo install a.io/d@$(NOPE)\n", want: []string{"a.io/c@latest", "a.io/d@$NOPE"}},
 	{name: "mk include", path: "build/rules.mk", data: "x:\n\tnpx --yes markdownlint-cli2@0.13.0\n", want: nil},
+}
+
+func TestYAMLFindingLinesAreFileLines(t *testing.T) {
+	fs := composeImages{}.Detect(Input{Path: "c.yaml", Data: []byte("a:\r  image: x:1\nb: 1\u2028image: y:1\n")})
+	if len(fs) != 2 || fs[0].Line != 1 || fs[1].Line != 2 {
+		t.Fatalf("%v", fs)
+	}
 }
 
 func TestDetectorsFileCases(t *testing.T) {
