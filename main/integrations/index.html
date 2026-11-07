@@ -1953,7 +1953,11 @@ public Go API. It exposes:</p>
 </tr>
 <tr>
 <td><code>RunRecord</code>, <code>RunRecordVersion</code>, <code>ParseRunRecord(data []byte) (*RunRecord, error)</code></td>
-<td>A run record published by <code>aval run --record</code> (see <a href="../artifact-format/#run-records">artifact-format.md</a>). Unsigned statistics: never a basis for reuse or trust. <code>ParseRunRecord</code> checks the version, <code>testId</code> and the closed sets only.</td>
+<td>A run record published by <code>aval run --record</code> (see <a href="../artifact-format/#run-records">artifact-format.md</a>). Unsigned statistics: never a basis for reuse or trust. <code>ParseRunRecord</code> checks the version, <code>testId</code>, the closed sets and consistency (<code>reused</code> requires <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code> and <code>testDurationMs</code> 0; <code>verifiedResult</code> requires <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>).</td>
+</tr>
+<tr>
+<td><code>StatsReport</code>, <code>TestStats</code>, <code>RepositoryStats</code>, <code>RunStats</code>, <code>MissCauses</code>, <code>StatsReportVersion</code>, <code>StatsUnknownRepository</code></td>
+<td>The document printed by <code>aval stats --output json</code> (see <a href="../artifact-format/#stats-report-json">artifact-format.md</a>). Informational, from unsigned records.</td>
 </tr>
 </tbody>
 </table>

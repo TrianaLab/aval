@@ -1432,6 +1432,45 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#statistics-aval-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statistics: aval stats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Statistics: aval stats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stats-report-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stats report JSON
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pruning-run-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pruning run records
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1996,6 +2035,45 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#statistics-aval-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statistics: aval stats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Statistics: aval stats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stats-report-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stats report JSON
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pruning-run-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pruning run records
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2349,6 +2427,12 @@ see <a href="#versioning-and-compatibility">Versioning and compatibility</a>.</p
 <td><code>artifactType</code> of the per-test stats anchor manifest</td>
 <td>provisional</td>
 </tr>
+<tr>
+<td><code>StatsReportVersion</code></td>
+<td><code>aval.trianalab.io/stats-report/v1</code></td>
+<td><code>version</code> of the <code>aval stats --output json</code> document</td>
+<td>provisional</td>
+</tr>
 </tbody>
 </table>
 <p>Registry identifiers (<code>internal/registry</code>): the bundle layer uses the
@@ -2579,6 +2663,10 @@ existing file at <code>--record-file</code> that is not an Aval result, report o
 run record is never overwritten: the run warns and goes on, and inside the
 <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> that file stays an input of the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. A <code>--record-file</code>
 that is also <code>--result</code> or <code>--report</code> is not written either.</p>
+<p>A run that stops before the lookup publishes no record: bad flags, an
+invalid <code>aval.yaml</code>, an output path that would clobber an input (exit 2),
+and <code>--fingerprint-only</code>. So does <code>--explain</code> when the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> cannot be
+computed.</p>
 <h3 id="layout">Layout<a class="headerlink" href="#layout" title="Anchor link">&para;</a></h3>
 <p>Per test there is one <strong>stats anchor</strong>, separate from every <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>
 anchor. It is deterministic (its digest depends on the test id alone) and
@@ -2596,7 +2684,8 @@ not confirm the referrers listing, so on a registry without the referrers
 API two concurrent records for one test can drop one of them.
 On such registries all records of a test also share one referrers index,
 which grows with every record; once it exceeds the registry's manifest size
-limit, publishing a record fails with a warning. Pruning old records is future work (Epic 9, #88).</p>
+limit, publishing a record fails with a warning; prune old records (see
+<a href="#pruning-run-records">Pruning run records</a>).</p>
 <h3 id="record-json">Record JSON<a class="headerlink" href="#record-json" title="Anchor link">&para;</a></h3>
 <p><code>evidence.RunRecord</code>, parsed by <code>evidence.ParseRunRecord</code>:</p>
 <table>
@@ -2646,6 +2735,12 @@ limit, publishing a record fails with a warning. Pruning old records is future w
 <td>The reused or the real <code>passed</code> / <code>failed</code>; omitted when <code>runner.command</code> could not start.</td>
 </tr>
 <tr>
+<td><code>verifiedResult</code></td>
+<td>string</td>
+<td>when <code>outcome</code> is <code>verified</code></td>
+<td>The result of the verified <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>. With <code>reused</code> <code>false</code> and the test run (<code>--shadow</code>), a <code>verifiedResult</code> that differs from <code>result</code> is a false hit. Records made before it was added (#88) lack it.</td>
+</tr>
+<tr>
 <td><code>testDurationMs</code></td>
 <td>integer</td>
 <td>always</td>
@@ -2675,6 +2770,12 @@ limit, publishing a record fails with a warning. Pruning old records is future w
 <td>when passed</td>
 <td><code>--ci-run-url</code>, a link to the CI run. Aval does not derive it from any CI vendor.</td>
 </tr>
+<tr>
+<td><code>repository</code></td>
+<td>string</td>
+<td>when passed</td>
+<td><code>--repository</code> on <code>aval run</code> (or <code>aval record</code>, which overrides the record's), the source repository, e.g. <code>acme/orders</code>. Aval does not derive it from any CI vendor. <code>aval stats --by repository</code> counts records without it (made before it was added, #88) as <code>unknown</code>.</td>
+</tr>
 </tbody>
 </table>
 <p>Example:</p>
@@ -2685,22 +2786,193 @@ limit, publishing a record fails with a warning. Pruning old records is future w
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">"reused"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">"testDurationMs"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">"savedDurationMs"</span><span class="p">:</span><span class="w"> </span><span class="mi">1184000</span><span class="p">,</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span><span class="nt">"avalVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.3.0"</span><span class="p">,</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">"recordedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-06T09:00:00Z"</span><span class="p">,</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nt">"ciRunUrl"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://ci.example.com/acme/orders/runs/42"</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="p">}</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">"verifiedResult"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">"testDurationMs"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span><span class="nt">"savedDurationMs"</span><span class="p">:</span><span class="w"> </span><span class="mi">1184000</span><span class="p">,</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">"avalVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.3.0"</span><span class="p">,</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nt">"recordedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-06T09:00:00Z"</span><span class="p">,</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">  </span><span class="nt">"ciRunUrl"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://ci.example.com/acme/orders/runs/42"</span><span class="p">,</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">  </span><span class="nt">"repository"</span><span class="p">:</span><span class="w"> </span><span class="s2">"acme/orders"</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="p">}</span>
 </span></code></pre></div>
+<p><code>evidence.ParseRunRecord</code> also rejects an inconsistent record: <code>reused</code>
+<code>true</code> with an <code>outcome</code> other than <code>verified</code> or a <code>testDurationMs</code> other
+than <code>0</code>, and a <code>verifiedResult</code> with an <code>outcome</code> other than <code>verified</code>. A
+hand-edited record cannot claim a reuse that never happened; <code>aval record</code>
+refuses it and <code>aval stats</code> skips it.</p>
+<h3 id="statistics-aval-stats">Statistics: <code>aval stats</code><a class="headerlink" href="#statistics-aval-stats" title="Anchor link">&para;</a></h3>
+<p><code>aval stats --registry &lt;repo&gt; [--test &lt;id&gt;] [--since &lt;duration|date&gt;]
+[--by test|repository] [--output text|json]</code> reads the run records and aggregates them on demand.
+It lists the <code>stats-&lt;test id&gt;</code> tags of the repository (or takes <code>--test</code>),
+lists each stats anchor's referrers with artifact type
+<code>application/vnd.trianalab.aval.run.v1</code>, and fetches each record by digest.
+It writes nothing, locally or to the registry, and needs only read access.
+<code>--since</code> keeps records whose <code>recordedAt</code> is at or after a time: a duration
+back from now (<code>168h</code>, <code>30d</code>) or a date (<code>2026-11-01</code>, or RFC 3339).
+<code>--by</code> groups the records by test (default) or by <code>repository</code>, the source
+repository in each record; records without one count as <code>unknown</code>.</p>
+<p>Statistics are informational: records are unsigned, so anyone with push
+access can skew them, and they never affect reuse.</p>
+<p>Registry data is untrusted, so reading is bounded:</p>
+<ul>
+<li>A record whose manifest is not a run record of that stats anchor, whose
+  layer is over 64 KiB, that cannot be fetched or parsed, that is
+  inconsistent (see above) or that names another test is <strong>skipped and
+  counted</strong> (<code>skipped</code>), never an error.</li>
+<li>Reading stops after 1000 records in total, or 64 pages in one tag or
+  referrers listing. The statistics then cover only what was read before,
+  <code>aval stats</code> prints <code>aval: warning: stopped reading run records: ...</code> on
+  stderr and the JSON report sets <code>truncated</code>. Which records come first is up
+  to the registry; prune old records to stay below the bound.</li>
+<li>A listing that fails for any other reason (registry down, no read
+  access) is exit 1, and so is exceeding <code>--registry-timeout</code> while listing
+  or fetching records: a deadline never shows up as skipped records.</li>
+<li><code>--since</code> filters after reading: the read bound, the timeout and
+  <code>skipped</code> cover every record listed, whatever its <code>recordedAt</code>. Records
+  are fetched one at a time, two requests each (about 0.7 s per record on
+  GHCR), so the default <code>1m</code> timeout covers some 80 records; raise
+  <code>--registry-timeout</code> or prune old records.</li>
+</ul>
+<p>Exit codes: 0 statistics printed, 1 error, 2 usage.</p>
+<h4 id="stats-report-json">Stats report JSON<a class="headerlink" href="#stats-report-json" title="Anchor link">&para;</a></h4>
+<p><code>aval stats --output json</code> prints <code>evidence.StatsReport</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Present</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>version</code></td>
+<td>string</td>
+<td>always</td>
+<td><code>aval.trianalab.io/stats-report/v1</code>.</td>
+</tr>
+<tr>
+<td><code>registry</code></td>
+<td>string</td>
+<td>always</td>
+<td>The repository read.</td>
+</tr>
+<tr>
+<td><code>since</code></td>
+<td>RFC 3339 timestamp</td>
+<td>with <code>--since</code></td>
+<td>Records made before it are left out (not counted, not skipped).</td>
+</tr>
+<tr>
+<td><code>total</code></td>
+<td>object</td>
+<td>always</td>
+<td>Run statistics over every test in <code>tests</code>.</td>
+</tr>
+<tr>
+<td><code>tests</code></td>
+<td>array</td>
+<td>always</td>
+<td>One <code>{"testId", "stats"}</code> per test with records, sorted by test id; <code>[]</code> when there are none.</td>
+</tr>
+<tr>
+<td><code>repositories</code></td>
+<td>array</td>
+<td>with <code>--by repository</code></td>
+<td>One <code>{"repository", "stats"}</code> per source repository, sorted; records without a repository are under <code>unknown</code>. Omitted when there are no records.</td>
+</tr>
+<tr>
+<td><code>skipped</code></td>
+<td>integer</td>
+<td>always</td>
+<td>Records read but not counted (see above).</td>
+</tr>
+<tr>
+<td><code>truncated</code></td>
+<td>string</td>
+<td>when a bound was hit</td>
+<td>Which bound, e.g. <code>more than 1000 run records</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Run statistics (<code>total</code>, <code>tests[].stats</code>, <code>repositories[].stats</code>); <code>runs</code> is
+the sum of <code>reused</code>, the three <code>misses</code> and <code>verificationFailures</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>runs</code></td>
+<td>Records counted.</td>
+</tr>
+<tr>
+<td><code>reused</code></td>
+<td>Records with <code>reused</code> <code>true</code>.</td>
+</tr>
+<tr>
+<td><code>hitRate</code></td>
+<td><code>reused / runs</code>; <code>0</code> when <code>runs</code> is <code>0</code>.</td>
+</tr>
+<tr>
+<td><code>misses.noTrustedResult</code></td>
+<td>Outcome <code>miss</code>.</td>
+</tr>
+<tr>
+<td><code>misses.error</code></td>
+<td>Outcome <code>error</code>: Aval could not decide.</td>
+</tr>
+<tr>
+<td><code>misses.verifiedNotReused</code></td>
+<td>Outcome <code>verified</code> with <code>reused</code> <code>false</code>: <code>--shadow</code>, or the <code>--report</code> file could not be written.</td>
+</tr>
+<tr>
+<td><code>verificationFailures</code></td>
+<td>Outcome <code>verification-failed</code>: security events, not misses.</td>
+</tr>
+<tr>
+<td><code>shadowFalseHits</code></td>
+<td>Of <code>verifiedNotReused</code>, the runs whose <code>result</code> differs from <code>verifiedResult</code>. Records without both are not counted.</td>
+</tr>
+<tr>
+<td><code>testDurationMs</code></td>
+<td>Sum of <code>testDurationMs</code>: time spent running tests.</td>
+</tr>
+<tr>
+<td><code>savedDurationMs</code></td>
+<td>Sum of <code>savedDurationMs</code>: test time reuse saved.</td>
+</tr>
+</tbody>
+</table>
+<p>A negative duration in a record (a clock jump, or an edit) counts as <code>0</code>,
+and duration sums stop at the largest int64 instead of wrapping.
+The golden file is <code>pkg/evidence/testdata/stats-report-v1.golden.json</code>.</p>
+<h3 id="pruning-run-records">Pruning run records<a class="headerlink" href="#pruning-run-records" title="Anchor link">&para;</a></h3>
+<p>Records accumulate: one per recorded run. Aval never deletes one. To keep
+<code>aval stats</code> below its read bound, and the referrers index of registries
+without the referrers API below their manifest size limit, delete old
+records, for example with <a href="https://oras.land">ORAS</a>:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>oras<span class="w"> </span>discover<span class="w"> </span>--artifact-type<span class="w"> </span>application/vnd.trianalab.aval.run.v1<span class="w"> </span>&lt;repo&gt;:stats-&lt;<span class="nb">test</span><span class="w"> </span>id&gt;
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>oras<span class="w"> </span>manifest<span class="w"> </span>delete<span class="w"> </span>&lt;repo&gt;@sha256:&lt;record<span class="w"> </span>digest&gt;
+</span></code></pre></div>
+<p><code>oras discover --format json</code> shows each record's digest; fetch one with
+<code>oras manifest fetch</code> and <code>oras blob fetch</code> to read its <code>recordedAt</code>.
+Deleting records only changes statistics: run records never affect reuse.
+The registry must allow deletes (see
+<a href="#the-64-candidate-cap-and-cleanup">the 64-candidate cap and cleanup</a>).</p>
 <h2 id="dsse-envelope">DSSE envelope<a class="headerlink" href="#dsse-envelope" title="Anchor link">&para;</a></h2>
 <p>The layer is a DSSE envelope (<code>evidence.Envelope</code>):</p>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">"payloadType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.in-toto+json"</span><span class="p">,</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">"payload"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;base64 of the in-toto Statement JSON&gt;"</span><span class="p">,</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">"signatures"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">"keyid"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w"> </span><span class="nt">"sig"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;base64 signature&gt;"</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="p">]</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">}</span>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"payloadType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"application/vnd.in-toto+json"</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">"payload"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;base64 of the in-toto Statement JSON&gt;"</span><span class="p">,</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">"signatures"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">"keyid"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w"> </span><span class="nt">"sig"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;base64 signature&gt;"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="p">]</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>Signing uses sigstore-go (<code>attest.Sign</code>, keyless with a Fulcio certificate
 and Rekor entry, or key-based; see <a href="../trust-model/#signing">trust-model.md</a>).
@@ -2713,17 +2985,17 @@ so an <abbr title="A signed statement of a test result and the fingerprint of th
 <p>The envelope payload is an in-toto Statement v1 (<code>evidence.Statement</code>). Its
 <code>subject</code> is the tested revision or artifact, the same one recorded in
 <code>predicate.subject</code>.</p>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://in-toto.io/Statement/v1"</span><span class="p">,</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="p">{</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"git+https://github.com/acme/orders"</span><span class="p">,</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"gitCommit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d"</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="p">],</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">"predicateType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://aval.trianalab.io/attestation/execution/v2"</span><span class="p">,</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="nt">"predicate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"see below"</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="p">}</span>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://in-toto.io/Statement/v1"</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="p">{</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"git+https://github.com/acme/orders"</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">      </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"gitCommit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">  </span><span class="p">],</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span><span class="nt">"predicateType"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://aval.trianalab.io/attestation/execution/v2"</span><span class="p">,</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="nt">"predicate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"see below"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>For an image, use <code>"digest": {"sha256": "&lt;hex&gt;"}</code> with the image reference as
 <code>name</code>.</p>
@@ -2882,38 +3154,38 @@ evidence; use <code>evidence.Verify</code> to get something you can rely on.</p>
 <code>com.acme.ticket</code>. Aval does not define, validate or interpret any key. Do not
 put secrets there: the predicate is published to the registry.</p>
 <h3 id="example">Example<a class="headerlink" href="#example" title="Anchor link">&para;</a></h3>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"schemaVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"v2"</span><span class="p">,</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"git+https://github.com/acme/orders"</span><span class="p">,</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"gitCommit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d"</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nt">"test"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-integration"</span><span class="p">,</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">    </span><span class="nt">"cacheability"</span><span class="p">:</span><span class="w"> </span><span class="s2">"controlled-environment"</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">  </span><span class="nt">"execution"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">    </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
-</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">    </span><span class="nt">"fingerprintVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval-fingerprint/v1"</span><span class="p">,</span>
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="w">    </span><span class="nt">"environment"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="w">      </span><span class="nt">"go"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.23.4"</span><span class="p">,</span>
-</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="w">      </span><span class="nt">"os"</span><span class="p">:</span><span class="w"> </span><span class="s2">"linux"</span><span class="p">,</span>
-</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="w">      </span><span class="nt">"arch"</span><span class="p">:</span><span class="w"> </span><span class="s2">"amd64"</span>
-</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="w">    </span><span class="p">},</span>
-</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="w">    </span><span class="nt">"exitCode"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
-</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="w">  </span><span class="nt">"runner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="w">    </span><span class="nt">"identity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"</span><span class="p">,</span>
-</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="w">    </span><span class="nt">"issuer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="p">,</span>
-</span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a><span class="w">    </span><span class="nt">"trustLevel"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span>
-</span><span id="__span-6-26"><a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-6-27"><a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a><span class="w">  </span><span class="nt">"startedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-05T10:12:03Z"</span><span class="p">,</span>
-</span><span id="__span-6-28"><a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a><span class="w">  </span><span class="nt">"finishedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-05T10:31:47Z"</span><span class="p">,</span>
-</span><span id="__span-6-29"><a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a><span class="w">  </span><span class="nt">"annotations"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-30"><a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a><span class="w">    </span><span class="nt">"com.acme.team"</span><span class="p">:</span><span class="w"> </span><span class="s2">"payments"</span>
-</span><span id="__span-6-31"><a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-6-32"><a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a><span class="p">}</span>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"schemaVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"v2"</span><span class="p">,</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"git+https://github.com/acme/orders"</span><span class="p">,</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"gitCommit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9b2c1e0f4a7d3b5c6e8f9a0b1c2d3e4f5a6b7c8d"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">"test"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-integration"</span><span class="p">,</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">"cacheability"</span><span class="p">:</span><span class="w"> </span><span class="s2">"controlled-environment"</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">  </span><span class="nt">"execution"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">    </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">    </span><span class="nt">"fingerprintVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval-fingerprint/v1"</span><span class="p">,</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">    </span><span class="nt">"environment"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="w">      </span><span class="nt">"go"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.23.4"</span><span class="p">,</span>
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="w">      </span><span class="nt">"os"</span><span class="p">:</span><span class="w"> </span><span class="s2">"linux"</span><span class="p">,</span>
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="w">      </span><span class="nt">"arch"</span><span class="p">:</span><span class="w"> </span><span class="s2">"amd64"</span>
+</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a><span class="w">    </span><span class="nt">"exitCode"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+</span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="w">  </span><span class="nt">"runner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-23"><a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a><span class="w">    </span><span class="nt">"identity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"</span><span class="p">,</span>
+</span><span id="__span-7-24"><a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a><span class="w">    </span><span class="nt">"issuer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="p">,</span>
+</span><span id="__span-7-25"><a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a><span class="w">    </span><span class="nt">"trustLevel"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span>
+</span><span id="__span-7-26"><a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-7-27"><a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a><span class="w">  </span><span class="nt">"startedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-05T10:12:03Z"</span><span class="p">,</span>
+</span><span id="__span-7-28"><a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a><span class="w">  </span><span class="nt">"finishedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-05T10:31:47Z"</span><span class="p">,</span>
+</span><span id="__span-7-29"><a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a><span class="w">  </span><span class="nt">"annotations"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-30"><a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a><span class="w">    </span><span class="nt">"com.acme.team"</span><span class="p">:</span><span class="w"> </span><span class="s2">"payments"</span>
+</span><span id="__span-7-31"><a id="__codelineno-7-31" name="__codelineno-7-31" href="#__codelineno-7-31"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-7-32"><a id="__codelineno-7-32" name="__codelineno-7-32" href="#__codelineno-7-32"></a><span class="p">}</span>
 </span></code></pre></div>
 <h2 id="verify-report">Verify report<a class="headerlink" href="#verify-report" title="Anchor link">&para;</a></h2>
 <p><code>aval verify --output json</code> prints one <code>evidence.Report</code> to stdout, and
@@ -3094,30 +3366,30 @@ reason, and an empty <code>fingerprint</code>, and then runs the test.</p>
 cannot be loaded is <code>outcome: "error"</code> (exit 1) once a candidate with a
 certificate needs it.</p>
 <p>Example (<code>verified</code>):</p>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval.trianalab.io/verify-report/v1"</span><span class="p">,</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">"testId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-integration"</span><span class="p">,</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">"reference"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ghcr.io/acme/orders-aval@sha256:8c1d4e5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7a8b9c0"</span><span class="p">,</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="nt">"signer"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">"issuer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="p">,</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="nt">"subjectRegexp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"^https://github.com/acme/orders/\\.github/workflows/ci\\.yaml@refs/heads/main$"</span><span class="p">,</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="nt">"trustLevel"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"</span>
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">  </span><span class="nt">"predicate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"as in the predicate example"</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="p">}</span>
-</span></code></pre></div>
-<p>Example (<code>miss</code>):</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval.trianalab.io/verify-report/v1"</span><span class="p">,</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"miss"</span><span class="p">,</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">"testId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-integration"</span><span class="p">,</span>
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">"reason"</span><span class="p">:</span><span class="w"> </span><span class="s2">"no attestation found for fingerprint"</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">}</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">"reference"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ghcr.io/acme/orders-aval@sha256:8c1d4e5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7a8b9c0"</span><span class="p">,</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nt">"signer"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">"issuer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="p">,</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="nt">"subjectRegexp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"^https://github.com/acme/orders/\\.github/workflows/ci\\.yaml@refs/heads/main$"</span><span class="p">,</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">    </span><span class="nt">"trustLevel"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">    </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">  </span><span class="nt">"predicate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"as in the predicate example"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Example (<code>miss</code>):</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval.trianalab.io/verify-report/v1"</span><span class="p">,</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"miss"</span><span class="p">,</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">"testId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-integration"</span><span class="p">,</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nt">"reason"</span><span class="p">:</span><span class="w"> </span><span class="s2">"no attestation found for fingerprint"</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="p">}</span>
 </span></code></pre></div>
 <h2 id="versioning-and-compatibility">Versioning and compatibility<a class="headerlink" href="#versioning-and-compatibility" title="Anchor link">&para;</a></h2>
 <p>These rules apply to every frozen format:</p>
@@ -3149,6 +3421,11 @@ certificate needs it.</p>
 <td>Run record and stats anchor</td>
 <td><code>RunRecordVersion</code>, <code>ArtifactTypeRun</code>, <code>MediaTypeRun</code>, <code>ArtifactTypeStats</code></td>
 <td><code>run-record/v1</code>, <code>run.v1</code>, <code>stats.v1</code> (provisional)</td>
+</tr>
+<tr>
+<td>Stats report</td>
+<td><code>StatsReportVersion</code></td>
+<td><code>aval.trianalab.io/stats-report/v1</code> (provisional)</td>
 </tr>
 <tr>
 <td>Contract and <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> file</td>
@@ -3215,9 +3492,10 @@ new ones; any identifier Aval does not know fails closed. Ending a transition
 is announced in the release notes of the release that removes it.</p>
 <h3 id="golden-files">Golden files<a class="headerlink" href="#golden-files" title="Anchor link">&para;</a></h3>
 <p><code>pkg/evidence/testdata/statement-execution-v2.golden.json</code>,
-<code>pkg/evidence/testdata/verify-report-v1.golden.json</code> and
-<code>pkg/evidence/testdata/run-record-v1.golden.json</code> set every field of the
-statement, predicate, verify report and run record. A test decodes each strictly into the
+<code>pkg/evidence/testdata/verify-report-v1.golden.json</code>,
+<code>pkg/evidence/testdata/run-record-v1.golden.json</code> and
+<code>pkg/evidence/testdata/stats-report-v1.golden.json</code> set every field of the
+statement, predicate, verify report, run record and stats report. A test decodes each strictly into the
 current types and requires the same JSON back, so dropping, renaming or
 retyping a field, or adding a required one, fails. Another test requires
 every JSON field of those types to be set in its golden file, so a new field
@@ -3240,6 +3518,13 @@ the old ones.</p>
   <code>minTrustLevel</code> became <code>miss</code> instead of <code>verification-failed</code>, and
   <code>rejected[].outcome</code> may now also be <code>miss</code>. No new value, field or exit
   code; the maintainers confirmed this as additive, so the version stays.</li>
+<li>Within the provisional <code>run-record/v1</code> (#88), records gained the optional
+  <code>verifiedResult</code> and <code>repository</code>, and <code>evidence.ParseRunRecord</code> started rejecting
+  inconsistent records (a reuse with an <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> other than <code>verified</code> or
+  with test time, a <code>verifiedResult</code> without <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>). Tightening
+  validation is breaking for a frozen format; the identifier stays because
+  it is provisional and no record <code>aval</code> writes is affected; the maintainers
+  confirmed keeping <code>run-record/v1</code> (#88).</li>
 </ul>
 
 

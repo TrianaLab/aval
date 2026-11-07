@@ -2460,7 +2460,7 @@ declared class.</p>
 </tr>
 <tr>
 <td>Forged or tampered run records (anyone with push access)</td>
-<td>Records are statistics, never evidence: unsigned, hung off a per-test stats anchor, and never fetched by <code>aval run</code> or <code>aval verify</code>, so they cannot cause reuse or count toward the candidate cap. A record crafted with a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> anchor as its subject is filtered out by artifact type. They can skew statistics; treat them as informational.</td>
+<td>Records are statistics, never evidence: unsigned, hung off a per-test stats anchor, and never fetched by <code>aval run</code> or <code>aval verify</code>, so they cannot cause reuse or count toward the candidate cap. A record crafted with a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> anchor as its subject is filtered out by artifact type. They can skew statistics; treat them as informational. <code>aval stats</code> skips and counts records that are malformed, oversized or inconsistent (a reuse with any <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> but <code>verified</code>, or with test time), and bounds how many it reads.</td>
 </tr>
 <tr>
 <td>Dishonest but trusted <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> (ran a modified test and signed "passed")</td>

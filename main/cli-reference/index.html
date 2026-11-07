@@ -1229,6 +1229,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#aval-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval stats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#aval-verify" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1744,6 +1755,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#aval-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval stats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#aval-verify" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1899,13 +1921,14 @@ result the <abbr title="Your file that lists which signers you trust, and how mu
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  push        Sign and publish a recorded execution result
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  record      Publish a run record written by 'aval run --record-file'
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  run         Reuse a verified result for the current inputs, or run the test
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  verify      Check whether a trusted result exists for the current inputs
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>Flags:
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  -h, --help      help for aval
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  -v, --version   version for aval
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>Use "aval [command] --help" for more information about a command.
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  stats       Aggregate the run records in the registry: reuse, misses, time saved
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  verify      Check whether a trusted result exists for the current inputs
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>Flags:
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  -h, --help      help for aval
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  -v, --version   version for aval
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>Use "aval [command] --help" for more information about a command.
 </span></code></pre></div>
 <h2 id="aval-completion">aval completion<a class="headerlink" href="#aval-completion" title="Anchor link">&para;</a></h2>
 <p>Generate the autocompletion script for aval for the specified shell.
@@ -1944,7 +1967,7 @@ Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.</p>
 test's stats anchor in the registry, as 'aval run --record' would have. Use it
 to publish, from a job with write credentials that runs no tests, the record
 of a run made without them. Run records are unsigned statistics: run and
-verify never read them.</p>
+verify never read them. --repository sets the record's source repository.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Usage:
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  aval record [flags]
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
@@ -1953,6 +1976,7 @@ verify never read them.</p>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>      --record-file string          run record written by 'aval run --record-file' (required)
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>      --registry string             OCI repository for run records (required)
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>      --repository string           source repository (e.g. acme/orders); default: the one in the record
 </span></code></pre></div>
 <h2 id="aval-run">aval run<a class="headerlink" href="#aval-run" title="Anchor link">&para;</a></h2>
 <p>run computes the execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, looks for a signed
@@ -1991,24 +2015,52 @@ runner.command never sees it.</p>
 </span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>      --registry string             OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
 </span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
 </span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>      --report string               also write the lookup decision as a verify report (JSON) to this file
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>      --result string               where to record the result for 'aval push' (default ".aval/result.json")
-</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>      --shadow                      verify, but run the test anyway and fail on a false hit
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>      --repository string           source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>      --result string               where to record the result for 'aval push' (default ".aval/result.json")
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>      --shadow                      verify, but run the test anyway and fail on a false hit
+</span></code></pre></div>
+<h2 id="aval-stats">aval stats<a class="headerlink" href="#aval-stats" title="Anchor link">&para;</a></h2>
+<p>stats reads the run records that 'aval run --record' and 'aval record'
+published to the registry and aggregates them: runs, hit rate, misses by
+cause, verification failures, shadow false hits, and total and saved test
+time, per test (or per source repository with --by repository) and in total.
+It reads every test with a stats anchor, or only --test. It writes nothing,
+locally or to the registry.</p>
+<p>Run records are unsigned statistics: they never affect reuse. Records that
+cannot be read, are oversized, malformed or inconsistent are skipped and
+counted. Reading stops after 1000 records or 64 pages per listing, with a
+warning; prune old records to stay below it. Records are read one at a time:
+raise --registry-timeout for many records.</p>
+<p>--since keeps records made at or after a time: a duration back from now
+(168h, 30d) or a date (2026-11-01, or RFC 3339).</p>
+<p>Exit codes: 0 statistics printed, 1 error (registry), 2 usage.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Usage:
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  aval stats [flags]
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>Flags:
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>      --by string                   group by test or repository (the run record's source repository) (default "test")
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  -h, --help                        help for stats
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  -o, --output string               output format: text or json (default "text")
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>      --registry string             OCI repository holding the run records (required)
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>      --since string                only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>      --test string                 only this test id (metadata.name); default: every test with run records
 </span></code></pre></div>
 <h2 id="aval-verify">aval verify<a class="headerlink" href="#aval-verify" title="Anchor link">&para;</a></h2>
 <p>verify computes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, looks up the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> and verifies its
 signature and the trust <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>, without running anything.</p>
 <p>Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 1 error (registry, <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr> or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>), 2 usage or invalid aval.yaml.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Usage:
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  aval verify [flags]
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>Flags:
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>  -f, --contract string             path to the test contract (default "aval.yaml")
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  -h, --help                        help for verify
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  -o, --output string               output format: text or json (default "text")
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>      --policy string               trust policy file (without it every lookup is a miss)
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>      --registry string             OCI repository for attestations (required)
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Usage:
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  aval verify [flags]
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>Flags:
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  -f, --contract string             path to the test contract (default "aval.yaml")
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  -h, --help                        help for verify
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  -o, --output string               output format: text or json (default "text")
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>      --policy string               trust policy file (without it every lookup is a miss)
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>      --registry string             OCI repository for attestations (required)
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
 </span></code></pre></div>
 
 
