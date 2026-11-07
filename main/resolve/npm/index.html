@@ -2059,7 +2059,9 @@ reuse.</p>
   moved tag changes the id. The manifest line says <code>floating</code>.</li>
 <li>Registry: <code>$npm_config_registry</code>. Token: the <code>//host/:_authToken=</code> line
   of <code>~/.npmrc</code> (or <code>$npm_config_userconfig</code>), <code>${VAR}</code> expanded. As in
-  npm, <code>npm_config_*</code> variables are read in any letter case; two
+  npm, <code>npm_config_*</code> variables are read in any letter case, with <code>_</code> equal
+  to <code>-</code> after the first character, and the userconfig path is expanded
+  as npm expands it (<code>${VAR}</code>, a leading <code>~/</code>); two
   spellings of one variable set to different values fail.</li>
 <li>If the environment or <code>~/.npmrc</code> points the package elsewhere,
   resolution fails instead of binding the wrong registry: a
@@ -2068,6 +2070,13 @@ reuse.</p>
   <code>registry=</code> line when no registry variable is set, that differs from the
   registry Aval uses. Set <code>$npm_config_registry</code> to the same URL. A
   project <code>.npmrc</code> and the global npmrc are not read.</li>
+<li><code>~/.npmrc</code> is read as npm reads it (ini): quotes around keys and values
+  are removed, <code>;</code> and <code>#</code> start a comment, and keys under a <code>[section]</code>
+  are ignored. <code>${VAR}</code> is expanded in keys and values as npm does (an
+  undefined variable stays literal). A line Aval cannot read as
+  <code>key=value</code> (a bare <code>key</code>, a list <code>key[]=</code>, a quoted key or value that
+  is JSON other than a string, a section named like a setting, a line
+  with U+2028 or U+2029) fails the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, and no token is sent.</li>
 </ul>
 <p><strong>Pin instead</strong> for your project's own dependencies: commit
 <code>package-lock.json</code> (or <code>yarn.lock</code>, <code>pnpm-lock.yaml</code>, <code>bun.lock</code>) and add

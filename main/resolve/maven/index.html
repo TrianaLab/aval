@@ -2050,7 +2050,10 @@ reuse.</p>
   version. A new version, a moved <code>&lt;release&gt;</code> or a redeployed release
   changes the id. The manifest line says <code>floating</code>. A
   <code>maven-metadata.xml</code> without versions, or with more than 100 (up to six
-  requests each), fails: use an exact version. Floating specs are
+  requests each), fails: use an exact version. So does a <code>&lt;latest&gt;</code> or
+  <code>&lt;release&gt;</code> that is a SNAPSHOT or is not in <code>&lt;versions&gt;</code>: Maven
+  installs it for <code>LATEST</code> or <code>RELEASE</code>, and its content would not be
+  bound. Floating specs are
   impractical for popular artifacts (guava, jackson-databind list more
   than 200 versions).</li>
 <li>A version ending in <code>SNAPSHOT</code> (<code>1.0-SNAPSHOT</code>, <code>1.0.SNAPSHOT</code>), in any

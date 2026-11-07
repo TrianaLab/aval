@@ -2061,10 +2061,14 @@ reuse.</p>
   <code>url</code> kind.</li>
 <li>Registry: <code>$AVAL_PYPI_URL</code> (an index with the PyPI JSON API at
   <code>/pypi/&lt;name&gt;/json</code>). Credentials: <code>~/.netrc</code>.</li>
-<li>If <code>$PIP_INDEX_URL</code> is set to anything but that registry (or its
+<li>If <code>$PIP_INDEX_URL</code> or <code>$PIP_PYPI_URL</code> (pip's alias of <code>--index-url</code>) is set to anything but that registry (or its
   <code>/simple</code> index), or <code>$PIP_EXTRA_INDEX_URL</code> or <code>$PIP_FIND_LINKS</code> is set
   at all, or <code>$PIP_NO_INDEX</code> is true, resolution fails: pip would install
-  from another source than the one Aval read.
+  from another source than the one Aval read. As in pip, the rest of the
+  name after <code>PIP_</code> is read in any letter case, with <code>-</code> equal to <code>_</code>
+  and one optional leading <code>--</code> (<code>PIP_index-url</code>, <code>PIP___INDEX_URL</code>);
+  two spellings set to different values fail. On Windows, where Python
+  uppercases variable names, <code>PIP_</code> is read in any letter case too.
   <code>pip.conf</code> and <code>uv</code> settings are not read.</li>
 </ul>
 <p><strong>Pin instead</strong> for your requirements: <code>pip-compile --generate-hashes</code> or
