@@ -78,7 +78,7 @@ type Detector interface {
 
 // Detectors are every ecosystem Scan checks.
 var Detectors = []Detector{
-	composeImages{}, dockerfile{}, shellScripts{}, gomod{}, npm{}, python{},
+	composeImages{}, kustomize{}, dockerfile{}, shellScripts{}, gomod{}, npm{}, python{},
 	cargo{}, java{}, ruby{}, php{}, gitmodules{},
 }
 
@@ -160,6 +160,9 @@ func logicalLines(data string) []line {
 		cur.WriteString(l)
 		out = append(out, line{start, cur.String()})
 		cur.Reset()
+	}
+	if cur.Len() > 0 { // a continuation at the end of the text
+		out = append(out, line{start, cur.String()})
 	}
 	return out
 }
