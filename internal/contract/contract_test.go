@@ -69,7 +69,13 @@ func TestParseInvalid(t *testing.T) {
 		"allowMutable blank ref": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   allowMutable: [{ref: " ", reason: "x"}]`, "scope.allowMutable[0]"},
 		"allowMutable unknown key": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
-  allowMutable: [{ref: a, reason: b, file: c}]`, "file"},
+  allowMutable: [{ref: a, reason: b, path: c}]`, "path"},
+		"allowMutable file outside": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{file: ../x/kustomization.yaml, ref: a, reason: b}]`, "scope.allowMutable[0]: file"},
+		"allowMutable file absolute": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{file: /compose.yaml, ref: a, reason: b}]`, "scope.allowMutable[0]: file"},
+		"allowMutable file dot": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{file: ./compose.yaml, ref: a, reason: b}]`, "scope.allowMutable[0]: file"},
 		"resolve unknown kind": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   resolve: [{docker: postgres:16}]`, `scope.resolve[0]: unknown kind "docker"`},
 		"resolve two keys": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
@@ -114,11 +120,14 @@ func TestParseAllowMutable(t *testing.T) {
 	c, err := Parse([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   allowMutable:
     - ref: postgres:16
-      reason: the image is rebuilt and scanned nightly`, 1)))
+      reason: the image is rebuilt and scanned nightly
+    - file: deploy/kustomization.yaml
+      ref: resources[0]
+      reason: vendored upstream`, 1)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []AllowMutable{{Ref: "postgres:16", Reason: "the image is rebuilt and scanned nightly"}}
+	want := []AllowMutable{{Ref: "postgres:16", Reason: "the image is rebuilt and scanned nightly"}, {File: "deploy/kustomization.yaml", Ref: "resources[0]", Reason: "vendored upstream"}}
 	if fmt.Sprint(c.Scope.AllowMutable) != fmt.Sprint(want) {
 		t.Fatalf("allowMutable = %+v", c.Scope.AllowMutable)
 	}

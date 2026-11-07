@@ -381,14 +381,29 @@ func findings(fsys fs.FS, c *contract.Contract, lines []string) []pinning.Findin
 		paths[i] = strings.SplitN(l, " ", 4)[3] // kind sum mode path
 	}
 	out := pinning.Scan(fsys, paths, c.Runner.Command)
+	files := map[string]map[string]bool{} // ref -> files reporting it
+	for _, f := range out {
+		if files[f.Ref] == nil {
+			files[f.Ref] = map[string]bool{}
+		}
+		files[f.Ref][f.File] = true
+	}
 	for i := range out {
 		if out[i].Ecosystem == "scan" { // a file Aval cannot read is never accepted
 			continue
 		}
+		ambiguous := false
 		for _, a := range c.Scope.AllowMutable {
-			if a.Ref == out[i].Ref {
+			switch {
+			case a.Ref != out[i].Ref || a.File != "" && a.File != out[i].File:
+			case a.File == "" && len(files[a.Ref]) > 1: // which file it means is unprovable: fail closed
+				ambiguous = true
+			default:
 				out[i].Allowed = a.Reason
 			}
+		}
+		if ambiguous && out[i].Allowed == "" {
+			out[i].Fix += fmt.Sprintf("; scope.allowMutable lists this ref without file:, and %d files report it: add file: %s to the entry", len(files[out[i].Ref]), out[i].File)
 		}
 	}
 	return out
@@ -417,7 +432,7 @@ func canonicalContract(c *contract.Contract) []byte {
 	cc.Environment.Env = sorted(c.Environment.Env)
 	cc.Scope.AllowMutable = slices.Clone(c.Scope.AllowMutable)
 	slices.SortFunc(cc.Scope.AllowMutable, func(a, b contract.AllowMutable) int {
-		return cmp.Or(strings.Compare(a.Ref, b.Ref), strings.Compare(a.Reason, b.Reason))
+		return cmp.Or(strings.Compare(a.File, b.File), strings.Compare(a.Ref, b.Ref), strings.Compare(a.Reason, b.Reason))
 	})
 	cc.Scope.AllowMutable = slices.Compact(cc.Scope.AllowMutable)
 	cc.Scope.Resolve = canonicalResolve(c.Scope.Resolve)

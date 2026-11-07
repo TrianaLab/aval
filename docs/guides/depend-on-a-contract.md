@@ -47,7 +47,8 @@ depends on ../backend/aval.yaml (backend) sha256:8441...
 - Anything Aval cannot prove fails closed: a missing or invalid contract, a
   scope that matches nothing, an unresolvable `scope.resolve`. The test runs.
 - A mutable reference the backend's scanner finds blocks the frontend's reuse
-  too. Only the backend's own `scope.allowMutable` can accept it.
+  too. Only the backend's own `scope.allowMutable` can accept it, with
+  `file` relative to the backend's contract.
 - Only local files. A contract in another repository cannot be referenced.
 
 ## A contract, or an API file?

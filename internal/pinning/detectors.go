@@ -201,7 +201,7 @@ func textDockerfile(in Input) []Finding {
 			}
 			continue
 		}
-		f := strings.Fields(vars.expand(l.text))
+		f := onbuild(strings.Fields(vars.expand(l.text)))
 		if len(f) < 2 || isComment(f[0]) {
 			continue
 		}
@@ -240,12 +240,12 @@ func buildkitDockerfile(in Input) []Finding {
 			}
 			directives = isComment(l.text)
 		}
-		f := strings.Fields(vars.expand(l.text))
+		f := onbuild(strings.Fields(vars.expand(l.text)))
 		if len(f) < 2 || isComment(f[0]) {
 			continue
 		}
 		if strings.EqualFold(f[0], "FROM") {
-			out = append(out, buildkitFrom(in.Path, l.line, strings.Fields(globals.expand(l.text)), stages)...)
+			out = append(out, buildkitFrom(in.Path, l.line, onbuild(strings.Fields(globals.expand(l.text))), stages)...)
 			continue
 		}
 		out = append(out, instruction(in, l.n, f, stages)...)
@@ -273,6 +273,15 @@ func heredocFindings(in Input, body []line) []Finding {
 		fs[i].Line = body[fs[i].Line-1].n
 	}
 	return fs
+}
+
+// onbuild drops an ONBUILD prefix: the wrapped instruction runs in every
+// build FROM this image, so it is checked like any other.
+func onbuild(f []string) []string {
+	if len(f) > 2 && strings.EqualFold(f[0], "ONBUILD") {
+		return f[1:]
+	}
+	return f
 }
 
 // instruction checks one Dockerfile instruction, split into fields.

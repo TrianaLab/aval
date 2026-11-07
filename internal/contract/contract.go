@@ -153,8 +153,12 @@ func (r *Reference) UnmarshalYAML(n *yaml.Node) error {
 }
 
 // AllowMutable accepts one mutable reference, by the exact text Aval reports
-// for it, with the reason it is acceptable.
+// for it, with the reason it is acceptable. File, when set, limits it to
+// the finding in that file (as findings print it: relative to the contract,
+// or runner.command); without it the ref must be reported in one file only.
+// File is omitted when empty, so contracts without it hash as before.
 type AllowMutable struct {
+	File   string `yaml:"file,omitempty" json:"file,omitempty"`
 	Ref    string `yaml:"ref" json:"ref"`
 	Reason string `yaml:"reason" json:"reason"`
 }
@@ -256,6 +260,9 @@ func (s Scope) validate(add func(string, ...any)) {
 	for i, a := range s.AllowMutable {
 		if strings.TrimSpace(a.Ref) == "" || strings.TrimSpace(a.Reason) == "" {
 			add("scope.allowMutable[%d]: ref and reason are both required", i)
+		}
+		if a.File != "" && !fs.ValidPath(a.File) {
+			add("scope.allowMutable[%d]: file %q must be a slash-separated path relative to the contract, as findings print it", i, a.File)
 		}
 	}
 	for i, r := range s.Resolve {

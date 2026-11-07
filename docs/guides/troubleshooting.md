@@ -47,7 +47,7 @@ Find the message in a section below. Text in `<...>` changes per run.
     | `empty glob`, `must be a relative, slash-separated path`, `empty, '.' or '..' segments are not allowed`, `'**' must be a whole path segment` | write globs like `src/**/*.go` |
     | `cacheability: required`, `cacheability: unknown class` | pick a [class](write-a-contract.md#step-by-step) |
     | `environment.toolchain: invalid key`, `invalid variable name` | lower case tool names, valid variable names |
-    | `scope.allowMutable[<i>]: ref and reason are both required` | give each entry a `ref` and a `reason` ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
+    | `scope.allowMutable[<i>]: ref and reason are both required`, `file <x> must be a slash-separated path relative to the contract` | give each entry a `ref` and a `reason`, and a `file` as the finding prints it ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
     | `scope.resolve[<i>]: <x>`, `unknown kind <x>`, `the reference must be non-empty`, `credentials in the reference are not allowed`, `a scope.resolve entry is one` | one `kind: reference` per entry, a known kind, no spaces, no credentials ([Resolve references](../resolve/index.md)) |
     | `scope.contracts[<i>]: <x>`, `must be slash-separated`, `must be a clean relative path`, `must name a contract file`, `is listed twice` | a relative path to a `.yaml` contract, such as `../backend/aval.yaml`, listed once ([Depend on another part of the repo](depend-on-a-contract.md)) |
     | `not a valid <kind> package name`, `is not a registry version, range or tag`, `want group:artifact:version` | a registry name that follows the ecosystem's naming rules and a version, range or tag, not a path, file or URL ([Resolve references](../resolve/index.md#exact-or-floating)) |
@@ -96,7 +96,7 @@ result cannot be published.
     | `no trust policy configured`, `no registry configured`, `reuse disabled (--no-reuse)` | pass `--policy`, `--registry`, drop `--no-reuse` |
     | `cacheability <x> is never reusable`, `is not in allowedCacheability` | by design, or allow the class in the policy |
     | `not reusable under the trust policy`, `signer <x> has trust level <y>, policy requires at least <z>` | the signer is below `minTrustLevel`; raise its `trustLevel` if you trust it |
-    | `mutable references in the inputs` | pin each reference the line lists, or acknowledge it with `scope.allowMutable` ([Pin your dependencies](../pinning.md)) |
+    | `mutable references in the inputs` | pin each reference the line lists, or acknowledge it with `scope.allowMutable`; for `lists this ref without file:`, add `file:` to the entry ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
     | `every listed attestation is gone`, `is gone, skipping it` | someone deleted results during the lookup: run again |
 
 ## Verification failures (exit 5)
