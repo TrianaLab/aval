@@ -1780,7 +1780,8 @@ registry anonymously:</p>
 <p>It publishes the <a href="../artifact-format/#stats-report-json">stats report</a>, plus
 <code>generatedAt</code>, as <code>stats.json</code> at the root of this site. This page and the
 home page read that file in your browser. If a refresh fails, the previous
-file stays.</p>
+file stays. A maintainer can refresh it at any time from the Actions tab:
+open the <code>docs</code> workflow and choose "Run workflow" on <code>main</code>.</p>
 <h2 id="keep-statistics-of-your-own">Keep statistics of your own<a class="headerlink" href="#keep-statistics-of-your-own" title="Anchor link">&para;</a></h2>
 <p>Run records go to the registry you choose. <code>aval run --record</code> writes them
 next to your attestations; to keep them apart, write the record to a file and
