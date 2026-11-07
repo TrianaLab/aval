@@ -2219,7 +2219,8 @@ inputs count too.</p>
 <li>Anything Aval cannot prove fails closed: a missing or invalid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, a
   <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> that matches nothing, an unresolvable <code>scope.resolve</code>. The test runs.</li>
 <li>A mutable reference the backend's scanner finds blocks the frontend's reuse
-  too. Only the backend's own <code>scope.allowMutable</code> can accept it.</li>
+  too. Only the backend's own <code>scope.allowMutable</code> can accept it, with
+  <code>file</code> relative to the backend's <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.</li>
 <li>Only local files. A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> in another repository cannot be referenced.</li>
 </ul>
 <h2 id="a-contract-or-an-api-file">A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or an API file?<a class="headerlink" href="#a-contract-or-an-api-file" title="Anchor link">&para;</a></h2>

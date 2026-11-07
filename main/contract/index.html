@@ -2506,9 +2506,9 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 </tr>
 <tr>
 <td><code>scope.allowMutable</code></td>
-<td>list of <code>{ref, reason}</code></td>
+<td>list of <code>{file, ref, reason}</code></td>
 <td>no</td>
-<td>Acknowledges a mutable reference that would otherwise block reuse (see <a href="../pinning/">Pin your dependencies</a>). <code>ref</code> is the reference exactly as Aval reports it; <code>reason</code> says why it is acceptable. Both must be non-blank. An entry accepts every occurrence of that reference in the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> and in <code>runner.command</code>. Part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash.</td>
+<td>Acknowledges a mutable reference that would otherwise block reuse (see <a href="../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>). <code>ref</code> is the reference exactly as Aval reports it; <code>reason</code> says why it is acceptable. Both must be non-blank. <code>file</code> (optional) is the file Aval reports, relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or <code>runner.command</code>: the entry then accepts the reference in that file only. Without <code>file</code>, the entry accepts every occurrence of the reference only if one file reports it; when several do, nothing is accepted and the finding asks for <code>file</code>. Part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash; <code>file</code> is left out of the JSON when empty.</td>
 </tr>
 <tr>
 <td><code>scope.resolve</code></td>

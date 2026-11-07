@@ -2370,8 +2370,8 @@ result the <abbr title="Your file that lists which signers you trust, and how mu
 <td>lower case tool names, valid variable names</td>
 </tr>
 <tr>
-<td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code></td>
-<td>give each entry a <code>ref</code> and a <code>reason</code> (<a href="../../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>)</td>
+<td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code>, <code>file &lt;x&gt; must be a slash-separated path relative to the contract</code></td>
+<td>give each entry a <code>ref</code> and a <code>reason</code>, and a <code>file</code> as the finding prints it (<a href="../../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>)</td>
 </tr>
 <tr>
 <td><code>scope.resolve[&lt;i&gt;]: &lt;x&gt;</code>, <code>unknown kind &lt;x&gt;</code>, <code>the reference must be non-empty</code>, <code>credentials in the reference are not allowed</code>, <code>a scope.resolve entry is one</code></td>
@@ -2528,7 +2528,7 @@ result cannot be published.</p>
 </tr>
 <tr>
 <td><code>mutable references in the inputs</code></td>
-<td>pin each reference the line lists, or acknowledge it with <code>scope.allowMutable</code> (<a href="../../pinning/">Pin your dependencies</a>)</td>
+<td>pin each reference the line lists, or acknowledge it with <code>scope.allowMutable</code>; for <code>lists this ref without file:</code>, add <code>file:</code> to the entry (<a href="../../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>)</td>
 </tr>
 <tr>
 <td><code>every listed attestation is gone</code>, <code>is gone, skipping it</code></td>

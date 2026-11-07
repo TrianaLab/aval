@@ -2511,11 +2511,12 @@ check, or one it cannot read, is itself a finding. Lockfiles
   <code>Dockerfile_windows</code>), and the same with <code>Containerfile</code>. A comment line
   stands alone, even when it ends in <code>\</code>. A continued line joins the next
   one with nothing between (<code>FROM db:1\</code> then <code>6</code> is <code>db:16</code>). A leading
-  <code># escape=</code> sets the continuation character. <code>RUN</code>, <code>COPY</code> and <code>ADD</code>
-  heredoc bodies are kept apart.</li>
+  <code># escape=</code> sets the escape character, for continuations and for the
+  heredoc words. <code>RUN</code>, <code>COPY</code> and <code>ADD</code> heredoc bodies are kept apart.</li>
 </ul>
 <p>Both passes check <code>COPY --from=</code> and <code>RUN --mount=...,from=</code> like a <code>FROM</code>:
-a stage name or index is fine, an image needs a digest. The line pass can
+a stage name or index is fine, an image needs a digest. An instruction
+behind <code>ONBUILD</code> is checked like the same instruction without it. The line pass can
 misread a heredoc or a continuation; that costs a needless miss, never a
 false hit.</p>
 <p>The BuildKit pass also reports:</p>
@@ -2546,9 +2547,15 @@ entries by name and index (<code>resources[2]</code>, <code>patches[0]</code>):<
 <li>a <code>patches</code>, <code>patchesStrategicMerge</code>, <code>patchesJson6902</code> or
   <code>replacements</code> entry that sets an image (an <code>image:</code> key, a JSON6902
   <code>path</code> or <code>from</code> ending in <code>/image</code>, a <code>fieldPath</code> ending in <code>.image</code>);</li>
+<li>a <code>patches</code>, <code>patchesStrategicMerge</code> or <code>patchesJson6902</code> entry given
+  by a path not in the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>;</li>
 <li>a <code>transformers</code> or <code>generators</code> entry with an image transformer, or a
   path not in the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>;</li>
-<li>a <code>helmCharts</code> entry with <code>valuesInline</code>.</li>
+<li>a <code>helmCharts</code> entry, unless the chart is local (no <code>repo</code>), its
+  <code>Chart.yaml</code> is in the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> under <code>helmGlobals.chartHome</code> (default
+  <code>charts</code>; an absolute one, or one that leaves the kustomization
+  directory, is not local), and it has no <code>valuesInline</code> that sets an image. Its
+  templates are checked like any other file, if the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> includes them.</li>
 </ul>
 <p>A <code>tagSuffix</code> is always reported: kustomize drops the digest when it adds
 the suffix. A kustomization that is not valid YAML, or that kustomize could
@@ -2576,7 +2583,9 @@ cannot decode: a tagged key, a quoted key with an escape YAML cannot
 decode, an escaped <code>image</code> key whose value is elsewhere, and a quoted key
 that continues on the next line. In <code>*.tpl</code> files, files under
 <code>templates/</code> and files the parser rejects, a key a template writes
-(<code>ima{{ "ge" }}:</code>, <code>{{ $k }}:</code>) is reported by its text.</p>
+(<code>ima{{ "ge" }}:</code>, <code>{{ $k }}:</code>) is reported by its text. The exception is
+the key variable of a <code>range</code> loop alone (<code>{{ $key | quote }}:</code>) directly
+under <code>labels:</code> or <code>annotations:</code>: it names a label, not a field.</p>
 <p>JSON is read the same way, but only in Compose files (<code>compose.json</code>),
 files under <code>templates/</code> and files a kustomization in <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> lists in
 <code>resources</code>, so <code>package.json</code> and other data files stay quiet.</p>
@@ -2660,7 +2669,18 @@ reason:</p>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">allowMutable</span><span class="p">:</span>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:16</span><span class="w">          </span><span class="c1"># exactly as Aval prints it</span>
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rebuilt and scanned nightly; the tag is ours</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy/kustomization.yaml</span><span class="w">   </span><span class="c1"># only the finding in this file</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">      </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">resources[0]</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vendored upstream base, reviewed on update</span>
 </span></code></pre></div>
+<p><code>file</code> is the path Aval prints before the line number, relative to the
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (<code>runner.command</code> for the command). With it, the entry accepts the
+finding in that file only. Without it, the entry accepts the <code>ref</code> only
+when one file reports it: generic refs such as <code>resources[0]</code>,
+<code>patches[0]</code> or a templated key repeat across files, so a <code>ref</code> that two
+files report is not accepted, and the finding asks for <code>file</code>. With
+<a href="../guides/depend-on-a-contract/"><code>scope.contracts</code></a>, each <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s
+entries apply to its own findings, with <code>file</code> relative to that <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.</p>
 <p><code>ref</code> must match the reference text Aval prints (for a missing lockfile, the
 manifest path, such as <code>go.mod</code>). Aval drops quotes from references it finds
 in shell commands, so <code>"curl" -fsSL URL | bash</code> prints as
@@ -2691,8 +2711,8 @@ not reported. Keep the <abbr title="The files and dependencies the contract list
   template prints (<code>{{ include ... }}</code>, <code>{{ toYaml ... }}</code>), are not read.
   In a template the parser rejects, a key written as a block scalar or an
   alias is not decoded.</li>
-<li>Kustomize: the overlay is not built. A JSON6902 patch file named by
-  <code>path:</code> that sets an image is not read.</li>
+<li>Kustomize: the overlay is not built. A JSON6902 patch file in the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>
+  named by <code>path:</code> that sets an image is not read.</li>
 <li>JSON outside Compose files, <code>templates/</code> and kustomize <code>resources</code> is not
   read.</li>
 <li>Dockerfile variables: outside <code>FROM</code>, the last value of a name wins, with
