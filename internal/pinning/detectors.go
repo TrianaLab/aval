@@ -39,9 +39,10 @@ var (
 
 func (composeImages) Detect(in Input) []Finding {
 	var out []Finding
-	seen := map[[2]int]bool{} // line and column of the image: keys read here
-	pending := -1             // indent of an image: key whose value may be on the next line
-	for _, l := range logicalLines(string(in.Data)) {
+	seen := map[[2]int]bool{}                                // line and column of the image: keys read here
+	pending := -1                                            // indent of an image: key whose value may be on the next line
+	for i, s := range strings.Split(string(in.Data), "\n") { // YAML has no line continuation
+		l := line{i + 1, strings.TrimSuffix(s, "\r")}
 		t := strings.TrimSpace(l.text)
 		if t == "" || isComment(t) {
 			continue

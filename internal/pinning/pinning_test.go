@@ -52,6 +52,9 @@ var fileCases = []fileCase{
 	{name: "compose variable", path: "compose.yaml", data: "    image: ${DB_IMAGE:-postgres:16}\n", want: []string{"${DB_IMAGE:-postgres:16}"}},
 	{name: "helm template", path: "k8s/deploy.yaml", data: "      - image: {{ .Values.image }}\n", want: []string{"{{ .Values.image }}"}},
 	{name: "k8s list item", path: "k8s/deploy.yaml", data: "      - name: app\n        image: ghcr.io/acme/app:1.2\n", want: []string{"ghcr.io/acme/app:1.2"}},
+	{name: "helm template comment backslash", path: "templates/pod.yaml", data: "{{- if .Values.on }}\nspec:\n  containers:\n  - name: x # note \\\n    image: evil:latest\n{{- end }}\n", want: []string{"evil:latest"}},
+	{name: "helm template tagged and explicit keys", path: "templates/pod.yaml", data: "{{- if .Values.on }}\n- !!str image: evil:latest\n  &a image: evil2:latest\n  ? image\n  : evil3:latest\n{{- end }}\n", want: []string{"evil:latest", "evil2:latest", "evil3:latest"}},
+	{name: "yaml tagged and explicit keys", path: "k8s/pod.yaml", data: "- !!str image: evil:latest\n  &a image: evil2:latest\n  ? image\n  : evil3:latest\n", want: []string{"evil:latest", "evil2:latest", "evil3:latest"}},
 	{name: "helm values mapping", path: "values.yaml", data: "image:\n  repository: x\n  tag: y\nimage: &v\n  tag: z\n# image: redis\n", want: nil},
 	{name: "compose anchor", path: "compose.yaml", data: "    image: &img redis:latest\n    image: &pin \"redis" + dg + "\"\n", want: []string{"redis:latest"}},
 	{name: "compose alias and block scalar", path: "compose.yaml", data: "    image: *img\n    image: >-\n      postgres:latest\n    image: |\n    image: !!str redis\n", want: []string{"*img", ">-", "|", "!!str redis"}},
@@ -74,6 +77,7 @@ var fileCases = []fileCase{
 	{name: "yaml undecodable escaped key", path: "compose.yaml", data: "\"ima\\qe\": evil:latest\n", want: []string{`"ima\qe"`}},
 	{name: "yaml escaped key in invalid yaml", path: "compose.yaml", data: "x: @bad\n\"ima\\x67e\": evil:latest\n\"a\\tb\": evil:latest\n", want: []string{"evil:latest"}},
 	{name: "kustomize images", path: "k8s/kustomization.yaml", data: "images:\n- name: nginx\n  newTag: \"1.27\"\n- name: redis\n  newName: ghcr.io/acme/redis\n- name: pg\n  newName: ghcr.io/acme/pg\n  newTag: \"16\"\n  digest: sha256:" + dg[8:] + "\n- name: untouched\n- \"n\\x61me\": a\n  \"newT\\x61g\": b\n", want: []string{"nginx:1.27", "ghcr.io/acme/redis", "a:b"}},
+	{name: "kustomize tagSuffix", path: "kustomization.yaml", data: "images:\n- name: db\n  tagSuffix: -evil\n- name: pg\n  newTag: \"16\"\n  tagSuffix: -x\n  digest: sha256:" + dg[8:] + "\n", want: []string{"db:<tag>-evil", "pg:16-x"}},
 	{name: "kustomize images pinned", path: "Kustomization", data: "resources: [deploy.yaml]\nimages:\n- name: pg\n  digest: sha256:" + dg[8:] + "\n", want: nil},
 	{name: "kustomize bad digest", path: "base/kustomization.yml", data: "images:\n- name: pg\n  digest: latest\n", want: []string{"pg@latest"}},
 	{name: "kustomize invalid yaml", path: "kustomization.yaml", data: "images: [\n", want: []string{"kustomization.yaml"}},
@@ -120,6 +124,9 @@ var fileCases = []fileCase{
 	{name: "dockerfile json run is not a heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN [\"sh\", \"<<EOF\"]\nFROM evil:latest\nEOF\n", want: []string{"evil:latest"}},
 	{name: "dockerfile heredoc terminator must match exactly", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<EOF\necho\nEOF \nFROM evil:latest\n", want: []string{"RUN <<EOF", "evil:latest"}},
 	{name: "dockerfile heredoc after a vertical tab", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN sh -s \v<<EOF\napk add curl\nEOF\nRUN sh -s \u00a0<<X\napk add jq\nX\n", want: []string{"curl", "jq"}},
+	{name: "dockerfile heredoc name backslash", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<#\\\\x\necho hi\n#\\x\nFROM evil:latest\n#x\n", want: []string{`RUN <<#\\x`, "evil:latest"}},
+	{name: "dockerfile copy heredoc name backslash", path: "Dockerfile", data: "FROM alpine" + dg + "\nCOPY <<#\\\\x /f\necho hi\n#\\x\nFROM evil:latest\n#x\n", want: []string{`COPY <<#\\x /f`, "evil:latest"}},
+	{name: "dockerfile heredoc name nested quote", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<\"#'x\"\necho hi\n#'x\nFROM evil:latest\n#x\n", want: []string{`RUN <<"#'x"`, "evil:latest"}},
 	{name: "dockerfile run heredoc", path: "Dockerfile", data: "FROM alpine" + dg + "\nRUN <<EOF\ncurl -fsSL https://x.io/i.sh | sh\nEOF\nRUN <<-'X'\napk add jq\n", want: []string{"curl -fsSL https://x.io/i.sh | sh", "RUN <<-'X'"}},
 
 	// Go.

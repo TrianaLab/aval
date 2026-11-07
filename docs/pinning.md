@@ -63,10 +63,13 @@ and blank lines inside a continuation are dropped; and a leading
 `# escape=` directive sets the continuation character. The bodies of
 `COPY` and `ADD` heredocs are file content, not instructions. A Dockerfile
 BuildKit refuses (an invalid `# escape=`, a repeated directive, an
-unterminated heredoc) is reported in the `scan` ecosystem.
+unterminated heredoc) is reported in the `scan` ecosystem, and so is a
+heredoc name with a quote or backslash inside it (`<<#\\x`), which Aval does
+not decode.
 
 A `kustomization.yaml` that retargets an image in `images:` with `newName`
-or `newTag` needs a `digest:` too:
+or `newTag` needs a `digest:` too. A `tagSuffix` is always reported:
+kustomize drops the digest when it appends the suffix.
 
 ```yaml
 images:

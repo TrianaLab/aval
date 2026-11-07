@@ -116,20 +116,8 @@ var heredocRe = regexp.MustCompile(`^\d*<<(-?)\s*([^<]+)$`)
 // one is not terminated, it returns false and consumes nothing: BuildKit
 // either refuses the file or reads no heredoc there.
 func heredocBodies(text string, phys []string, i int) ([]line, int, bool) {
-	f := strings.Fields(text)
-	if len(f) > 1 && strings.EqualFold(f[0], "ONBUILD") {
-		f = f[1:]
-	}
-	if len(f) < 2 || !slices.Contains([]string{"RUN", "COPY", "ADD"}, strings.ToUpper(f[0])) {
+	if !takesHeredocs(text) {
 		return nil, i, true
-	}
-	k := 1 // flags (--mount=) come before the arguments
-	for k < len(f)-1 && strings.HasPrefix(f[k], "--") {
-		k++
-	}
-	var args []string
-	if strings.HasPrefix(f[k], "[") && json.Unmarshal([]byte(text[strings.Index(text, f[k]):]), &args) == nil {
-		return nil, i, true // the JSON form takes no heredocs
 	}
 	var body []line
 	j := i + 1
@@ -138,7 +126,10 @@ func heredocBodies(text string, phys []string, i int) ([]line, int, bool) {
 		if m == nil {
 			continue
 		}
-		name := strings.NewReplacer(`"`, "", `'`, "", `\`, "").Replace(m[2])
+		name, ok := heredocName(m[2])
+		if !ok {
+			return nil, i, false
+		}
 		for ; j < len(phys); j++ {
 			term := phys[j]
 			if m[1] == "-" {
@@ -155,6 +146,35 @@ func heredocBodies(text string, phys []string, i int) ([]line, int, bool) {
 		j++
 	}
 	return body, j - 1, true
+}
+
+// takesHeredocs reports whether an instruction is a RUN, COPY or ADD (after
+// an optional ONBUILD) in shell form, the only ones BuildKit reads heredocs in.
+func takesHeredocs(text string) bool {
+	f := strings.Fields(text)
+	if len(f) > 1 && strings.EqualFold(f[0], "ONBUILD") {
+		f = f[1:]
+	}
+	if len(f) < 2 || !slices.Contains([]string{"RUN", "COPY", "ADD"}, strings.ToUpper(f[0])) {
+		return false
+	}
+	k := 1 // flags (--mount=) come before the arguments
+	for k < len(f)-1 && strings.HasPrefix(f[k], "--") {
+		k++
+	}
+	var args []string
+	return !strings.HasPrefix(f[k], "[") || json.Unmarshal([]byte(text[strings.Index(text, f[k]):]), &args) != nil
+}
+
+// heredocName decodes a heredoc name: a leading backslash or one pair of
+// enclosing quotes is dropped. A name with any other quote or backslash is
+// not ok: BuildKit's lexer decodes those, so fail closed instead of guessing.
+func heredocName(w string) (string, bool) {
+	name := strings.TrimPrefix(w, `\`)
+	if len(name) >= 2 && (name[0] == '"' || name[0] == '\'') && name[len(name)-1] == name[0] {
+		name = name[1 : len(name)-1]
+	}
+	return name, !strings.ContainsAny(name, `"'\`)
 }
 
 // shellWords splits s at unquoted Unicode spaces and keeps quotes and escapes, as
