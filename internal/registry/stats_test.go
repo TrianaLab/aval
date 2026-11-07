@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -121,42 +122,37 @@ func TestReadRecordsCapsRecords(t *testing.T) {
 	}
 }
 
-// stats-* tags sort after the sha256-* tags of every fingerprint: the tag
-// listing starts after them (last=stats) and stops past the prefix, so many
-// sha256-* tags never push the stats tags beyond the page bound.
-func TestReadRecordsSkipsFingerprintTags(t *testing.T) {
+// Registries need not sort tags, and GHCR answers an unknown last with null
+// tags: the listing reads every tag unsorted, follows next links, and never
+// relies on last, so stats tags anywhere in the list are found.
+func TestReadRecordsUnsortedTags(t *testing.T) {
 	ctx := context.Background()
-	tags := []string{StatsTag("unit"), "v1"}
-	for i := range 2 * maxReferrerPages {
-		tags = append(tags, fmt.Sprintf("sha256-%04d", i))
-	}
-	slices.Sort(tags)
-	pages := 0
-	// One tag per page with a next link, honouring last as the spec says.
+	tags := []string{StatsTag("unit"), "sha256-0002", "v1", "sha256-0001", StatsTag("e2e"), "sha256-0000"}
+	// One tag per page; the next link carries an opaque page number, and any
+	// last= request gets null tags.
 	repo := serve(t, true, func(w http.ResponseWriter, r *http.Request) bool {
 		if !strings.HasSuffix(r.URL.Path, "/tags/list") {
 			return false
 		}
-		pages++
-		rest := tags
-		if last := r.URL.Query().Get("last"); last != "" {
-			rest = tags[len(tags):]
-			if i := slices.IndexFunc(tags, func(t string) bool { return t > last }); i >= 0 {
-				rest = tags[i:]
-			}
+		if r.URL.Query().Has("last") {
+			_, _ = w.Write([]byte(`{"tags":null}`))
+			return true
 		}
-		if len(rest) > 1 {
-			w.Header().Set("Link", fmt.Sprintf(`<%s?last=%s>; rel="next"`, r.URL.Path, rest[0]))
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		if page+1 < len(tags) {
+			w.Header().Set("Link", fmt.Sprintf(`<%s?page=%d>; rel="next"`, r.URL.Path, page+1))
 		}
-		_ = json.NewEncoder(w).Encode(map[string][]string{"tags": rest[:min(1, len(rest))]})
+		_ = json.NewEncoder(w).Encode(map[string][]string{"tags": tags[page : page+1]})
 		return true
 	})
-	if _, err := Record(ctx, repo, runRecord("unit")); err != nil {
-		t.Fatal(err)
+	for _, id := range []string{"unit", "e2e"} {
+		if _, err := Record(ctx, repo, runRecord(id)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	set, err := ReadRecords(ctx, repo, nil)
-	if err != nil || set.Truncated != "" || len(set.Records) != 1 || pages != 2 {
-		t.Fatalf("ReadRecords = %+v, %v after %d tag pages", set, err, pages)
+	if err != nil || set.Truncated != "" || len(set.Records) != 2 || set.Records[0].TestID != "e2e" || set.Records[1].TestID != "unit" {
+		t.Fatalf("ReadRecords = %+v, %v", set, err)
 	}
 }
 
