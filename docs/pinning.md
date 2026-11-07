@@ -56,39 +56,38 @@ ADD --checksum=sha256:<sum> https://example.com/tool.tgz /tool.tgz
 A `# syntax=` parser directive names the BuildKit frontend image: pin it too
 (`# syntax=docker/dockerfile:1@sha256:<digest>`).
 
-Aval reads a Dockerfile twice and reports what either pass finds. A line
-pass reads each line (a continuation joined with a space, a `RUN` heredoc
-body as a script, anything else as instructions). For a file named
-`Dockerfile`, `Containerfile`, `Dockerfile.*`, `Containerfile.*`,
-`*.dockerfile` or `*.containerfile`, a second pass splits it the way
-BuildKit does: a comment line stands on its own, even when it ends in `\`;
-a continued line joins the next one with nothing in between (`FROM db:1\`
-then `6` is `db:16`); comment and blank lines inside a continuation are
-dropped; a leading `# escape=` directive sets the continuation character;
-and the bodies of `RUN`, `COPY` and `ADD` heredocs are kept apart. Since the
-line pass still runs, a heredoc body or continuation it misreads can be
-reported too: a needless miss, never a false hit (an old frontend reads no
-heredocs at all). The BuildKit pass also reports a Dockerfile BuildKit
-refuses (an invalid `# escape=`, a repeated directive, an unterminated
-heredoc), a heredoc name with a quote, backslash or `$` inside it
-(`<<#\\x`, `<<E$X`) or an empty one (`<<""`), which Aval does not decode,
-and a `FROM` that uses an `ARG` given a value more than once (every
-`NAME=value` of an `ARG` counts, also lowercase `arg`): give it one value.
+Aval reads a Dockerfile in two passes and reports what either finds:
+
+- The line pass reads each line as an instruction. It joins a continued
+  line with a space and reads a `RUN` heredoc body as a script.
+- The BuildKit pass splits the file the way BuildKit does. It runs on files
+  named `Dockerfile`, `Dockerfile.*`, `*.dockerfile` or any name that
+  starts with `Dockerfile` and has no dot (`Dockerfile-dev`,
+  `Dockerfile_windows`), and the same with `Containerfile`. A comment line
+  stands alone, even when it ends in `\`. A continued line joins the next
+  one with nothing between (`FROM db:1\` then `6` is `db:16`). A leading
+  `# escape=` sets the continuation character. `RUN`, `COPY` and `ADD`
+  heredoc bodies are kept apart.
+
+Both passes check `COPY --from=` and `RUN --mount=...,from=` like a `FROM`:
+a stage name or index is fine, an image needs a digest. The line pass can
+misread a heredoc or a continuation; that costs a needless miss, never a
+false hit.
+
+The BuildKit pass also reports:
+
+- a file BuildKit refuses: an invalid `# escape=`, a repeated directive,
+  an unterminated heredoc;
+- a heredoc name with a quote, `\` or `$` in it (`<<#\\x`, `<<E$X`), or an
+  empty one (`<<""`), which Aval does not decode;
+- a `FROM` image with a variable that is not a global `ARG` with a value.
+  In `FROM`, BuildKit expands only the `ARG`s declared before the first
+  `FROM`. A stage `ARG`, an `ENV` or an `ARG` without a value is reported
+  by its line (`FROM alpine:$V`): give the global `ARG` a default, or
+  write the image.
 
 A `kustomization.yaml` that retargets an image in `images:` (or the legacy
-`imageTags:`) with `newName` or `newTag` needs a `digest:` too. A
-`tagSuffix` is always reported: kustomize drops the digest when it appends
-the suffix. Aval does not apply patches or run transformers, so these
-entries are reported by name and index (`patches[0]`, `transformers[1]`):
-a `patches`, `patchesStrategicMerge`, `patchesJson6902` or `replacements`
-entry with an `image:` key, a JSON6902 `path` or `from` ending in `/image`,
-or a `fieldPath` ending in `.image`; a `transformers` or `generators` entry
-that holds an image transformer (`ImageTagTransformer`, `images:`,
-`imageTag:`) or names a path outside the scope (a directory, a remote
-base); and a `helmCharts` entry with `valuesInline`. A transformer file in
-the scope is a YAML file: its `kind: ImageTagTransformer` is reported
-there. Pin the image in the base, or retarget it in `images:` with a
-digest.
+`imageTags:`) with `newName` or `newTag` needs a `digest:` too.
 
 ```yaml
 images:
@@ -97,10 +96,22 @@ images:
     digest: sha256:<digest>
 ```
 
-Aval reads `images:` as kustomize does: field names match case-insensitively
-(`IMAGES:`, `NewTag:`) and merge keys (`<<:`) are resolved. A kustomization
-that is not valid YAML, or whose `images:` kustomize could not decode, is
-reported by its path.
+Aval reads the kustomization as kustomize does (field names in any case,
+merge keys resolved), but it does not build the overlay. It reports these
+entries by name and index (`resources[2]`, `patches[0]`):
+
+- a `resources`, `components` or `bases` entry that is remote (a URL,
+  `git::`, `github.com/...`) or not in the scope: vendor it into the scope;
+- a `patches`, `patchesStrategicMerge`, `patchesJson6902` or
+  `replacements` entry that sets an image (an `image:` key, a JSON6902
+  `path` or `from` ending in `/image`, a `fieldPath` ending in `.image`);
+- a `transformers` or `generators` entry with an image transformer, or a
+  path not in the scope;
+- a `helmCharts` entry with `valuesInline`.
+
+A `tagSuffix` is always reported: kustomize drops the digest when it adds
+the suffix. A kustomization that is not valid YAML, or that kustomize could
+not decode, is reported by its path.
 
 Find the digest with `docker buildx imagetools inspect <image:tag>` or
 `crane digest <image:tag>`. Images in `docker run`, `podman run` and
@@ -114,20 +125,24 @@ file in the scope, or render the chart into the scope. A YAML alias
 (`image: *img`), a block scalar (`image: >-`) or a tag (`image: !!str ...`)
 is reported too: write the reference inline.
 
-YAML is also read twice, and what either pass finds is reported. The line
-pass matches `image:` keys in every line, also inside a block scalar a
-template renders (`extraContainers: |`). The YAML parser matches every
-`image:` key by its decoded value (`"ima\x67e":`, `? image`, `!!str image:`,
-`!!binary aW1hZ2U=:`, anchored keys), wherever its value is written; a key
-with another tag (`!custom image:`) is reported by its text. A Compose
-`build.dockerfile_inline` is checked as a Dockerfile and
-`build.additional_contexts` values with `docker-image://` as images. In a
-file the parser rejects (a Helm template), a quoted key with an escape YAML
-cannot decode, an escaped `image` key whose value is elsewhere
-(`? "\x69mage"`, a value on the next line) and a quoted key that continues
-on the next line are reported. In Helm helpers (`*.tpl`), files under a
-`templates/` directory and files the parser rejects, a key a template
-writes (`ima{{ "ge" }}:`, `{{ $k }}:`) is reported by its key text.
+YAML is read in two passes too. The line pass matches `image:` in every
+line, also inside a block scalar a template renders
+(`extraContainers: |`). The YAML parser matches every key that decodes to
+`image` (`"ima\x67e":`, `? image`, `!!str image:`, `!!binary aW1hZ2U=:`),
+wherever its value is. A key with another tag (`!custom image:`) is
+reported. A Compose `build.dockerfile_inline` is checked as a Dockerfile,
+and `build.additional_contexts` values with `docker-image://` as images.
+
+When the parser rejects a file (a Helm template), Aval reports what it
+cannot decode: a tagged key, a quoted key with an escape YAML cannot
+decode, an escaped `image` key whose value is elsewhere, and a quoted key
+that continues on the next line. In `*.tpl` files, files under
+`templates/` and files the parser rejects, a key a template writes
+(`ima{{ "ge" }}:`, `{{ $k }}:`) is reported by its text.
+
+JSON is read the same way, but only in Compose files (`compose.json`),
+files under `templates/` and files a kustomization in scope lists in
+`resources`, so `package.json` and other data files stay quiet.
 
 ### Go
 
@@ -252,11 +267,10 @@ contract, so adding or removing one changes the fingerprint, and reviewers
 see it in the diff. `aval run` still prints the finding, marked
 `(allowed: <reason>)`. A file Aval cannot read (larger than 1 MiB, or
 unreadable) is reported in the `scan` ecosystem and cannot be accepted:
-shrink or split it. Every other finding above, including those Aval
-reports because it cannot tell (a templated key, a kustomize entry such as
-`patches[0]`, an undecodable heredoc name or YAML key, a `FROM` with a
-redefined `ARG`), is in the `container` ecosystem and can be acknowledged
-by the `ref` Aval prints.
+shrink or split it. A finding Aval reports because it cannot tell (a
+templated or tagged key, a kustomize entry such as `resources[2]`, a heredoc
+name, a `FROM` line) is in the `container` ecosystem: acknowledge it by the
+`ref` Aval prints.
 
 ## Limits
 
@@ -273,14 +287,19 @@ not reported. Keep the scope honest, pin in place, and use
   (`tool --opt value install x`) hides the subcommand.
 - A download from an unversioned URL other than `releases/latest`
   (`curl -o tool URL`, `curl URL | tar x`) is not detected.
-- Helm: values that split an image into `repository` and `tag`, and any
-  YAML a template prints (`{{ include ... }}`, `{{ toYaml ... }}`), are not
-  read. In a template the YAML parser rejects, keys written as block
-  scalars or aliases are not decoded.
-- Kustomize: a JSON6902 patch file referenced by `path:` that sets an
-  image (`path: /spec/.../image`) is not read.
-- Dockerfile variables: the last value of a name wins, with no stage
-  scoping, except in `FROM` (above).
+- Helm: values that split an image into `repository` and `tag`, and YAML a
+  template prints (`{{ include ... }}`, `{{ toYaml ... }}`), are not read.
+  In a template the parser rejects, a key written as a block scalar or an
+  alias is not decoded.
+- Kustomize: the overlay is not built. A JSON6902 patch file named by
+  `path:` that sets an image is not read.
+- JSON outside Compose files, `templates/` and kustomize `resources` is not
+  read.
+- Dockerfile variables: outside `FROM`, the last value of a name wins, with
+  no stage scoping. Values given at build time (`--build-arg`) are not
+  seen: Aval checks the `ARG` default.
+- A source file whose name starts with `dockerfile` and has a dot
+  (`dockerfile_test.go`) gets only the line pass.
 
 Declare what the scanner cannot see in `scope.resolve` (a
 [`url`](resolve/urls.md), an [`image`](resolve/images.md)), so its content

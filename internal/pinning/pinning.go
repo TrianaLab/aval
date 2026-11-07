@@ -92,6 +92,7 @@ func Scan(fsys fs.FS, files []string, command []string) []Finding {
 		inScope[f] = true
 	}
 	has := func(p string) bool { return inScope[p] }
+	manifests := kustomizeJSON(fsys, files, has)
 	var out []Finding
 	for _, rel := range files {
 		var ds []Detector
@@ -99,6 +100,9 @@ func Scan(fsys fs.FS, files []string, command []string) []Finding {
 			if d.Applies(rel) {
 				ds = append(ds, d)
 			}
+		}
+		if manifests[rel] && !(composeImages{}).Applies(rel) {
+			ds = append(ds, composeImages{})
 		}
 		if len(ds) == 0 && path.Ext(rel) == "" && isShellScript(fsys, rel) {
 			ds = []Detector{shellScripts{}}
@@ -123,6 +127,29 @@ func Scan(fsys fs.FS, files []string, command []string) []Finding {
 		return a.Line - b.Line
 	})
 	return slices.CompactFunc(out, func(a, b Finding) bool { return a == b })
+}
+
+// kustomizeJSON returns the in-scope .json files that an in-scope
+// kustomization lists in resources: manifests composeImages checks. A
+// kustomization it cannot read is reported by the kustomize detector.
+func kustomizeJSON(fsys fs.FS, files []string, has func(string) bool) map[string]bool {
+	out := map[string]bool{}
+	for _, f := range files {
+		if !(kustomize{}).Applies(f) {
+			continue
+		}
+		data, _ := readBounded(fsys, f)
+		ks, _ := kustomizations(data)
+		for _, k := range ks {
+			for _, r := range k.Resources {
+				s, _ := r.(string)
+				if p := path.Join(path.Dir(f), s); path.Ext(p) == ".json" && has(p) {
+					out[p] = true
+				}
+			}
+		}
+	}
+	return out
 }
 
 func readBounded(fsys fs.FS, p string) ([]byte, error) {

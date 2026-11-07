@@ -91,10 +91,29 @@ func decodedKey(file string, k *yaml.Node) (string, []Finding) {
 	}
 	tagged := k.Style&yaml.TaggedStyle != 0 && !slices.Contains([]string{"!!str", "!!merge", "!!binary"}, k.Tag)
 	if err := k.Decode(&key); err != nil || tagged {
-		return key, []Finding{{File: file, Line: k.Line, Ecosystem: "container", Ref: strings.TrimSpace(k.Tag + " " + k.Value),
-			Fix: "a tagged YAML key Aval does not decode, so Aval cannot tell whether it is image: write the key plainly"}}
+		return key, []Finding{{File: file, Line: k.Line, Ecosystem: "container", Ref: strings.TrimSpace(k.Tag + " " + k.Value), Fix: taggedKeyFix}}
 	}
 	return key, nil
+}
+
+const taggedKeyFix = "a tagged YAML key Aval does not decode, so Aval cannot tell whether it is image: write the key plainly"
+
+// taggedKeyRe is a key behind a tag (!!binary aW1hZ2U=:, {!t key: v}).
+var taggedKeyRe = regexp.MustCompile(`(?:^|[\s{,?])(![^\s:,{}\[\]]*)\s+([^\s:,{}\[\]#][^:,{}\[\]#]*?)\s*:(?:\s|$)`)
+
+// taggedKeys is the fallback for a file the YAML parser rejects: a key
+// behind a tag other than !!str or !!merge (prefixedKeys reads those) may
+// decode to image, so it is a finding.
+func taggedKeys(in Input) []Finding {
+	var out []Finding
+	for i, l := range strings.Split(string(in.Data), "\n") {
+		for _, m := range taggedKeyRe.FindAllStringSubmatch(l, -1) {
+			if m[1] != "!!str" && m[1] != "!!merge" {
+				out = append(out, Finding{File: in.Path, Line: i + 1, Ecosystem: "container", Ref: m[1] + " " + m[2], Fix: taggedKeyFix})
+			}
+		}
+	}
+	return out
 }
 
 // templatedKeyRe is a line with a template action ({{ }}) before the colon
@@ -274,13 +293,30 @@ func (kustomize) Applies(p string) bool {
 type kustomization struct {
 	Images, ImageTags []struct{ Name, NewName, NewTag, TagSuffix, Digest string }
 
+	Resources, Components, Bases []any
+
 	Patches, PatchesStrategicMerge, PatchesJson6902, Replacements, Transformers, Generators, HelmCharts []any
 }
 
 // transformerFix is the fix for a kustomize entry that may set an image.
 const transformerFix = "kustomize may set an image here that Aval does not apply: pin the image in the base, retarget it in images: with a digest, or acknowledge this ref in scope.allowMutable"
 
-// entries reports each patch, replacement, transformer, generator or Helm
+// resourceFix is the fix for a kustomize resource Aval cannot read.
+const resourceFix = "a remote kustomize resource or one outside the scope, so Aval cannot check its images: vendor it into the scope, or acknowledge this ref in scope.allowMutable"
+
+// inScope reports whether a kustomization entry names an in-scope file,
+// or a directory with an in-scope kustomization.
+func inScope(in Input, e any) bool {
+	s, ok := e.(string)
+	if !ok || strings.HasPrefix(s, "/") {
+		return false
+	}
+	p := path.Join(path.Dir(in.Path), s)
+	return slices.ContainsFunc([]string{p, p + "/kustomization.yaml", p + "/kustomization.yml", p + "/Kustomization"}, in.Has)
+}
+
+// entries reports each resource, component or base that is remote or out
+// of the scope (a URL, git::, github.com/..., ../other), and each patch, replacement, transformer, generator or Helm
 // chart entry that sets an image, by name and index (patches[0]). A
 // transformer or generator given by a path out of the scope (a directory,
 // a remote base) cannot be read, so it is reported too; one in the scope is
@@ -290,13 +326,19 @@ func (k kustomization) entries(in Input) []Finding {
 	for _, f := range []struct {
 		name    string
 		entries []any
-	}{{"patches", k.Patches}, {"patchesStrategicMerge", k.PatchesStrategicMerge}, {"patchesJson6902", k.PatchesJson6902},
+	}{{"resources", k.Resources}, {"components", k.Components}, {"bases", k.Bases}, {"patches", k.Patches}, {"patchesStrategicMerge", k.PatchesStrategicMerge}, {"patchesJson6902", k.PatchesJson6902},
 		{"replacements", k.Replacements}, {"transformers", k.Transformers}, {"generators", k.Generators}, {"helmCharts", k.HelmCharts}} {
 		for i, e := range f.entries {
+			ref := fmt.Sprintf("%s[%d]", f.name, i)
 			s, isPath := e.(string)
 			isPath = isPath && !strings.Contains(s, "\n") && !strings.Contains(s, ": ") && (f.name == "transformers" || f.name == "generators")
-			if isPath && !in.Has(path.Join(path.Dir(in.Path), s)) || !isPath && setsImage(e, true) {
-				out = append(out, Finding{File: in.Path, Ecosystem: "container", Ref: fmt.Sprintf("%s[%d]", f.name, i), Fix: transformerFix})
+			switch {
+			case f.name == "resources" || f.name == "components" || f.name == "bases":
+				if !inScope(in, e) {
+					out = append(out, Finding{File: in.Path, Ecosystem: "container", Ref: ref, Fix: resourceFix})
+				}
+			case isPath && !in.Has(path.Join(path.Dir(in.Path), s)) || !isPath && setsImage(e, true):
+				out = append(out, Finding{File: in.Path, Ecosystem: "container", Ref: ref, Fix: transformerFix})
 			}
 		}
 	}
@@ -369,29 +411,39 @@ func toList(v any) []string {
 	return out
 }
 
-func (kustomize) Detect(in Input) []Finding {
-	// Decode like kustomize does: YAML to JSON (merge keys resolved), then
-	// encoding/json, which matches field names case-insensitively.
-	scanErr := func(err error) []Finding {
-		return []Finding{{File: in.Path, Ecosystem: "container", Ref: in.Path, Fix: "images cannot be read as kustomize reads them: " + err.Error()}}
-	}
-	dec := yaml.NewDecoder(bytes.NewReader(in.Data))
-	var out []Finding
+// kustomizations decodes every document of a kustomization like kustomize
+// does: YAML to JSON (merge keys resolved), then encoding/json, which
+// matches field names case-insensitively. It returns the documents decoded
+// before the first error.
+func kustomizations(data []byte) ([]kustomization, error) {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	var out []kustomization
 	for {
 		var v any
 		if err := dec.Decode(&v); errors.Is(err, io.EOF) {
-			return out
+			return out, nil
 		} else if err != nil {
-			return scanErr(err)
+			return out, err
 		}
 		j, err := json.Marshal(v)
 		if err != nil {
-			return scanErr(err)
+			return out, err
 		}
 		var k kustomization
 		if err := json.Unmarshal(j, &k); err != nil {
-			return scanErr(err)
+			return out, err
 		}
+		out = append(out, k)
+	}
+}
+
+func (kustomize) Detect(in Input) []Finding {
+	ks, err := kustomizations(in.Data)
+	if err != nil {
+		return []Finding{{File: in.Path, Ecosystem: "container", Ref: in.Path, Fix: "images cannot be read as kustomize reads them: " + err.Error()}}
+	}
+	var out []Finding
+	for _, k := range ks {
 		out = append(out, k.entries(in)...)
 		for _, e := range slices.Concat(k.Images, k.ImageTags) { // imageTags: the legacy name kustomize still applies
 			if e.NewName == "" && e.NewTag == "" && e.TagSuffix == "" && e.Digest == "" {
@@ -412,4 +464,5 @@ func (kustomize) Detect(in Input) []Finding {
 			out = append(out, image(in.Path, 0, ref, nil)...)
 		}
 	}
+	return out
 }

@@ -179,10 +179,9 @@ func heredocName(w string) (string, bool) {
 	return name, name != "" && !strings.ContainsAny(name, `"'\$`)
 }
 
-// dockerArgs records every NAME=value of every ARG (any case, any number of names)
-// in v, and returns how often each name is given a value.
-func dockerArgs(lines []dockerLine, v *vars) map[string]int {
-	defs := map[string]int{}
+// dockerArgs records every NAME=value of every ARG (any case, any number
+// of names) in v.
+func dockerArgs(lines []dockerLine, v *vars) {
 	for _, l := range lines {
 		f := strings.Fields(l.text)
 		if len(f) < 2 || !strings.EqualFold(f[0], "ARG") {
@@ -191,28 +190,56 @@ func dockerArgs(lines []dockerLine, v *vars) map[string]int {
 		for _, a := range f[1:] {
 			if name, val, ok := strings.Cut(a, "="); ok {
 				v.m[name] = strings.Trim(val, `"'`)
-				defs[name]++
 			}
 		}
 	}
-	return defs
 }
 
-// redefinedFrom reports a FROM that uses a variable with more than one ARG
-// value: BuildKit uses the one in effect at that point, which last-wins
-// expansion may not see, so fail closed.
-func redefinedFrom(file string, l line, defs map[string]int) []Finding {
-	f := strings.Fields(l.text)
-	if len(f) < 2 || !strings.EqualFold(f[0], "FROM") {
-		return nil
-	}
-	for _, m := range varRe.FindAllStringSubmatch(l.text, -1) {
-		if defs[m[1]+m[2]+m[3]] > 1 {
-			return []Finding{{File: file, Line: l.n, Ecosystem: "container", Ref: l.text,
-				Fix: "FROM uses an ARG that is given a value more than once, so Aval cannot tell which one BuildKit uses: give it one value"}}
+// globalArgs are the ARGs before the first FROM that have a value, the
+// only variables BuildKit expands in FROM. An ARG NAME without a value
+// drops NAME, so a FROM using it is reported, not guessed.
+func globalArgs(lines []dockerLine) *vars {
+	v := &vars{m: map[string]string{}, budget: maxExpand}
+	for _, l := range lines {
+		f := strings.Fields(l.text)
+		if len(f) > 0 && strings.EqualFold(f[0], "FROM") {
+			break
+		}
+		if len(f) < 2 || !strings.EqualFold(f[0], "ARG") {
+			continue
+		}
+		for _, a := range f[1:] {
+			name, val, ok := strings.Cut(a, "=")
+			if delete(v.m, name); ok {
+				v.m[name] = strings.Trim(val, `"'`)
+			}
 		}
 	}
-	return nil
+	return v
+}
+
+// buildkitFrom checks a FROM expanded with the global ARGs. An image that
+// still has a variable (a stage ARG, an ENV, an unset ARG) is reported by
+// its line instead of guessed.
+func buildkitFrom(file string, l line, f []string, stages map[string]bool) []Finding {
+	i := 1 // flags (--platform=$BUILDPLATFORM) come first
+	for i < len(f) && strings.HasPrefix(f[i], "--") {
+		i++
+	}
+	rest := f[i:]
+	var out []Finding
+	switch {
+	case len(rest) == 0:
+	case strings.Contains(rest[0], "$"):
+		out = []Finding{{File: file, Line: l.n, Ecosystem: "container", Ref: l.text,
+			Fix: "FROM uses a variable that is not a global ARG with a value (an ARG before the first FROM), so Aval cannot tell the image: give it a global ARG default or write the image with its digest"}}
+	default:
+		out = image(file, l.n, rest[0], stages)
+	}
+	if len(rest) >= 3 && strings.EqualFold(rest[1], "AS") {
+		stages[strings.ToLower(rest[2])] = true
+	}
+	return out
 }
 
 // shellWords splits s at unquoted Unicode spaces and keeps quotes and escapes, as

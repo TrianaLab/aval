@@ -12,7 +12,8 @@ import (
 
 // composeImages checks image: keys in YAML: Compose files, Kubernetes and
 // rendered Helm manifests, Helm templates and helpers (*.tpl), CI service
-// definitions.
+// definitions; and in JSON: Compose files, files under templates/ and (see
+// Scan) files a kustomization lists in resources.
 type composeImages struct{}
 
 // lockfiles are hashed but not scanned: they hold no image: keys, and a
@@ -24,7 +25,8 @@ func (composeImages) Applies(p string) bool {
 	if slices.Contains(lockfiles, b) {
 		return false
 	}
-	return e == ".yaml" || e == ".yml" || e == ".tpl" || e == ".json" && strings.Contains(b, "compose")
+	return e == ".yaml" || e == ".yml" || e == ".tpl" ||
+		e == ".json" && (strings.Contains(b, "compose") || strings.Contains("/"+path.Dir(p)+"/", "/templates/"))
 }
 
 // yamlImageRe finds a block-style image: key (quoted or not); its value is
@@ -65,6 +67,7 @@ func (composeImages) Detect(in Input) []Finding {
 	if err != nil {
 		out = append(out, escapedKeys(in)...)
 		out = append(out, prefixedKeys(in)...)
+		out = append(out, taggedKeys(in)...)
 	}
 	if err != nil || path.Ext(in.Path) == ".tpl" || strings.Contains("/"+in.Path, "/templates/") {
 		out = append(out, templatedKeys(in)...)
@@ -111,7 +114,11 @@ func yamlImage(file string, n int, v string) []Finding {
 	if i := strings.Index(" "+v, " #"); i >= 0 { // a comment, also right after the colon
 		v = v[:i]
 	}
-	if v = strings.Trim(strings.TrimSpace(v), `"'`); v == "" {
+	v = strings.TrimSpace(v)
+	if strings.HasSuffix(v, `",`) || strings.HasSuffix(v, `',`) { // a JSON member: "image": "x",
+		v = v[:len(v)-1]
+	}
+	if v = strings.Trim(v, `"'`); v == "" {
 		return nil
 	}
 	if strings.HasPrefix(v, "&") { // an anchor: the value follows it
@@ -137,13 +144,13 @@ func (dockerfile) Applies(p string) bool {
 }
 
 // buildkitFile reports whether a file Applies matches is named as a
-// Dockerfile (Dockerfile, Dockerfile.ci, app.dockerfile), not a source file
-// that merely starts with the word (dockerfile_test.go): only those get the
-// BuildKit pass.
+// Dockerfile (Dockerfile, Dockerfile-dev, Dockerfile.ci, app.dockerfile),
+// not a source file that merely starts with the word (dockerfile_test.go):
+// only those get the BuildKit pass.
 func buildkitFile(p string) bool {
 	b := strings.ToLower(path.Base(p))
 	for _, n := range []string{"dockerfile", "containerfile"} {
-		if b == n || strings.HasPrefix(b, n+".") || strings.HasSuffix(b, "."+n) {
+		if strings.HasPrefix(b, n) && !strings.Contains(b, ".") || strings.HasPrefix(b, n+".") || strings.HasSuffix(b, "."+n) {
 			return true
 		}
 	}
@@ -221,7 +228,8 @@ func buildkitDockerfile(in Input) []Finding {
 		plain[i] = l.line
 	}
 	vars := assignments(plain)
-	defs := dockerArgs(lines, vars)
+	dockerArgs(lines, vars)
+	globals := globalArgs(lines)
 	stages := map[string]bool{}
 	directives := true // parser directives (# syntax=) come before anything else
 	for _, l := range lines {
@@ -232,9 +240,12 @@ func buildkitDockerfile(in Input) []Finding {
 			}
 			directives = isComment(l.text)
 		}
-		out = append(out, redefinedFrom(in.Path, l.line, defs)...)
 		f := strings.Fields(vars.expand(l.text))
 		if len(f) < 2 || isComment(f[0]) {
+			continue
+		}
+		if strings.EqualFold(f[0], "FROM") {
+			out = append(out, buildkitFrom(in.Path, l.line, strings.Fields(globals.expand(l.text)), stages)...)
 			continue
 		}
 		out = append(out, instruction(in, l.n, f, stages)...)
@@ -282,16 +293,39 @@ func instruction(in Input, n int, f []string, stages map[string]bool) []Finding 
 		}
 	case "COPY":
 		for _, fl := range flags {
-			if from, ok := strings.CutPrefix(fl, "--from="); ok && strings.Trim(from, "0123456789") != "" {
-				out = append(out, image(in.Path, n, from, stages)...)
+			if from, ok := strings.CutPrefix(fl, "--from="); ok {
+				out = append(out, fromImage(in.Path, n, from, stages)...)
 			}
 		}
 	case "ADD":
 		out = remoteAdd(in.Path, n, flags, rest)
 	case "RUN":
+		out = mountFrom(in.Path, n, flags, stages)
 		for _, fd := range scanShell(in.Path, strings.Join(rest, " "), in.Has) {
 			fd.Line = n
 			out = append(out, fd)
+		}
+	}
+	return out
+}
+
+// fromImage checks a --from= value: a stage index or name, or an image.
+func fromImage(file string, n int, from string, stages map[string]bool) []Finding {
+	if strings.Trim(from, "0123456789") == "" {
+		return nil
+	}
+	return image(file, n, from, stages)
+}
+
+// mountFrom checks the from= of each RUN --mount=type=bind,from=<ref>.
+func mountFrom(file string, n int, flags []string, stages map[string]bool) []Finding {
+	var out []Finding
+	for _, fl := range flags {
+		opts, _ := strings.CutPrefix(fl, "--mount=")
+		for _, o := range strings.Split(opts, ",") {
+			if k, v, _ := strings.Cut(strings.Trim(o, `"'`), "="); strings.EqualFold(k, "from") {
+				out = append(out, fromImage(file, n, v, stages)...)
+			}
 		}
 	}
 	return out

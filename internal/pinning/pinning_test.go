@@ -106,10 +106,10 @@ var fileCases = []fileCase{
 	{name: "yaml escaped key in invalid yaml", path: "compose.yaml", data: "x: @bad\n\"ima\\x67e\": evil:latest\n\"a\\tb\": evil:latest\n", want: []string{"evil:latest"}},
 	{name: "kustomize images", path: "k8s/kustomization.yaml", data: "images:\n- name: nginx\n  newTag: \"1.27\"\n- name: redis\n  newName: ghcr.io/acme/redis\n- name: pg\n  newName: ghcr.io/acme/pg\n  newTag: \"16\"\n  digest: sha256:" + dg[8:] + "\n- name: untouched\n- \"n\\x61me\": a\n  \"newT\\x61g\": b\n", want: []string{"nginx:1.27", "ghcr.io/acme/redis", "a:b"}},
 	{name: "kustomize tagSuffix", path: "kustomization.yaml", data: "images:\n- name: db\n  tagSuffix: -evil\n- name: pg\n  newTag: \"16\"\n  tagSuffix: -x\n  digest: sha256:" + dg[8:] + "\n", want: []string{"db:<tag>-evil", "pg:16-x"}},
-	{name: "kustomize images pinned", path: "Kustomization", data: "resources: [deploy.yaml]\nimages:\n- name: pg\n  digest: sha256:" + dg[8:] + "\n", want: nil},
+	{name: "kustomize images pinned", path: "Kustomization", scope: []string{"deploy.yaml"}, data: "resources: [deploy.yaml]\nimages:\n- name: pg\n  digest: sha256:" + dg[8:] + "\n", want: nil},
 	{name: "kustomize bad digest", path: "base/kustomization.yml", data: "images:\n- name: pg\n  digest: latest\n", want: []string{"pg@latest"}},
 	{name: "kustomize invalid yaml", path: "kustomization.yaml", data: "images: [\n", want: []string{"kustomization.yaml"}},
-	{name: "kustomize without images", path: "kustomization.yaml", data: "resources: [a.yaml]\n---\n", want: nil},
+	{name: "kustomize without images", path: "kustomization.yaml", scope: []string{"a.yaml"}, data: "resources: [a.yaml]\n---\n", want: nil},
 	{name: "kustomize images not a list", path: "kustomization.yaml", data: "images: x\n", want: []string{"kustomization.yaml"}},
 	{name: "kustomize images case-insensitive", path: "kustomization.yaml", data: "IMAGES:\n- NAME: nginx\n  NewTag: latest\n", want: []string{"nginx:latest"}},
 	{name: "kustomize images via merge key", path: "kustomization.yaml", data: "<<: {images: [{name: nginx, newName: evil, newTag: latest}]}\n", want: []string{"evil:latest"}},
@@ -124,12 +124,29 @@ var fileCases = []fileCase{
 	{name: "kustomize patch moves an image and a second document sets one", path: "kustomization.yaml", data: "patchesJson6902:\n- patch: '[{op: move, from: /spec/x/image, path: /spec/y}]'\npatches:\n- patch: |-\n    kind: A\n    ---\n    kind: Deployment\n    spec: {template: {spec: {containers: [{name: a, image: x}]}}}\nreplacements:\n- targets: [{fieldPath: image}]\n", want: []string{"x", "patches[0]", "patchesJson6902[0]", "replacements[0]"}},
 	{name: "kustomize transformers, generators and helm charts", path: "k8s/kustomization.yaml", scope: []string{"k8s/labels.yaml"}, data: "transformers:\n- labels.yaml\n- |-\n  apiVersion: builtin\n  kind: ImageTagTransformer\n  metadata: {name: t}\n  imageTag: {name: alpine, newTag: \"3.22\"}\n- ../xform\ngenerators:\n- |-\n  kind: X\n  images: [{name: a, newTag: b}]\n- |-\n  kind: ConfigMapGenerator\nhelmCharts:\n- {name: c, valuesFile: v.yaml}\n- {name: c, valuesInline: {image: {tag: latest}}}\n", want: []string{"{tag: latest", "transformers[1]", "transformers[2]", "generators[0]", "helmCharts[1]"}},
 	{name: "kustomize legacy patches set an image", path: "kustomization.yaml", data: "patchesStrategicMerge:\n- |-\n  kind: Deployment\n  spec: {template: {spec: {containers: [{name: a, IMAGE: x}]}}}\npatchesJson6902:\n- target: {kind: Deployment, name: a}\n  path: image-patch.yaml\n", want: []string{"patchesStrategicMerge[0]"}},
+	// #116 follow-up: Dockerfile variants without a dot, RUN --mount from=,
+	// FROM with only global ARGs, JSON manifests, remote kustomize
+	// resources, tagged keys in a template the parser rejects.
+	{name: "dockerfile rules on Dockerfile-dev", path: "Dockerfile-dev", data: "FROM alpine" + dg + "\n# note \\\nFROM evil:latest\n", want: []string{"evil:latest"}},
+	{name: "dockerfile rules on Dockerfile_windows", path: "x/Dockerfile_windows", data: "FROM alpine" + dg + "\n# note \\\nFROM evil:latest\n", want: []string{"evil:latest"}},
+	{name: "dockerfile rules on Containerfile_ci", path: "CONTAINERFILE_ci", data: "FROM alpine" + dg + "\n# note \\\nFROM evil:latest\n", want: []string{"evil:latest"}},
+	{name: "dockerfile run mount from", path: "Dockerfile", data: "FROM alpine" + dg + " AS build\nRUN --mount=type=bind,from=nginx:latest,target=/x true\nRUN --mount=type=cache,FROM=build,target=/c --mount=from=0,target=/y true\nRUN --mount=type=bind,\"from=redis:7\" true\n", want: []string{"nginx:latest", "redis:7"}},
+	{name: "dockerfile from stage arg", path: "Dockerfile", data: "FROM alpine" + dg + "\nARG V=3.22\nFROM alpine:$V\n", want: []string{"FROM alpine:$V", "alpine:3.22"}},
+	{name: "dockerfile from env", path: "Dockerfile", data: "FROM alpine" + dg + "\nENV B=busybox:latest\nFROM $B\n", want: []string{"FROM $B", "busybox:latest"}},
+	{name: "dockerfile from global arg redefined", path: "Dockerfile", data: "ARG I=evil:1\nARG I=alpine" + dg + "\nFROM $I\n", want: nil},
+	{name: "dockerfile from global arg unset", path: "Dockerfile", data: "ARG I=alpine" + dg + "\nARG I\nFROM $I\n", want: []string{"FROM $I"}},
+	{name: "helm json template", path: "chart/templates/cm.json", data: "{\"spec\": {\"containers\": [{\n  \"image\": \"evil:latest\",\n  \"name\": \"x\"}]}}\n", want: []string{"evil:latest"}},
+	{name: "package json is not a manifest", path: "templates.json", data: `{"image":"postgres:latest"}`, want: nil},
+	{name: "kustomize remote and outside resources", path: "k8s/kustomization.yaml", scope: []string{"k8s/deploy.yaml", "base/kustomization.yaml", "k8s/sub/kustomization.yml", "k8s/c/Kustomization"},
+		data: "resources:\n- deploy.yaml\n- ../base\n- sub\n- https://github.com/a/b//c?ref=main\n- github.com/a/b/c\n- git::https://x/y\n- ../other\n- {a: b}\ncomponents: [c, ../comp]\nbases: [../old]\n",
+		want: []string{"resources[3]", "resources[4]", "resources[5]", "resources[6]", "resources[7]", "components[1]", "bases[0]"}},
+	{name: "helm template tagged keys", path: "templates/pod.yaml", data: "{{- if .x }}\n  !!binary aW1hZ2U=: evil:latest\n  c: {!t key: v}\n  !!str name: x\n  d: !!str v\n{{- end }}\n", want: []string{"!!binary aW1hZ2U=", "!t key"}},
 	{name: "dockerfile tag", path: "Dockerfile", data: "FROM golang:1.25\n", want: []string{"golang:1.25"}},
 	{name: "dockerfile platform and stages", path: "build/Containerfile", data: "# c\nFROM --platform=$BUILDPLATFORM golang:1.25" + dg + " AS build\nFROM build AS test\nFROM scratch\nCOPY --from=build /a /b\nCOPY --from=0 /a /b\n", want: nil},
 	{name: "dockerfile stage name is not an earlier stage", path: "Dockerfile", data: "FROM build AS build\n", want: []string{"build"}},
 	{name: "dockerfile arg default", path: "app.Dockerfile", data: "ARG BASE=alpine:3.20\nFROM ${BASE}\n", want: []string{"alpine:3.20"}},
 	{name: "dockerfile arg pinned", path: "Dockerfile.ci", data: "ARG BASE=alpine:3.20" + dg + "\nFROM $BASE\n", want: nil},
-	{name: "dockerfile unresolved arg", path: "Dockerfile", data: "ARG BASE\nFROM ${BASE}\n", want: []string{"$BASE"}},
+	{name: "dockerfile unresolved arg", path: "Dockerfile", data: "ARG BASE\nFROM ${BASE}\n", want: []string{"$BASE", "FROM ${BASE}"}},
 	{name: "dockerfile copy from image", path: "Dockerfile", data: "FROM scratch\nCOPY --from=nginx:latest /a /b\n", want: []string{"nginx:latest"}},
 	{name: "dockerfile remote add", path: "Dockerfile", data: "FROM scratch\nADD https://x.io/a.tgz /a\nADD --checksum=sha256:ab https://x.io/b.tgz /b\nADD a b\n", want: []string{"https://x.io/a.tgz"}},
 	{name: "dockerfile run", path: "Dockerfile", data: "FROM scratch\nRUN --mount=type=cache,target=/r apk add --no-cache curl \\\n  && pip install requests==2.0\n", want: []string{"curl"}},
@@ -144,7 +161,7 @@ var fileCases = []fileCase{
 	// with a space) is still reported.
 	{name: "dockerfile heredoc on an old frontend", path: "Dockerfile", data: "# syntax=docker/dockerfile:1.2" + dg + "\nFROM alpine" + dg + "\nRUN true <<#x\nFROM alpine:3.22\n#x\nRUN echo final\n", want: []string{"alpine:3.22"}},
 	{name: "dockerfile rules only on files named as dockerfiles", path: "frontend/dockerfile/dockerfile_args_test.go", data: "ARG IMG=alpine" + dg + "\nFROM $IMG\nARG IMG=alpine" + dg + "\nCOPY <<EOF /x\nFROM alpine" + dg + "\nEOF\n", want: nil},
-	{name: "dockerfile rules on a containerfile variant", path: "Containerfile.dev", data: "ARG IMG=a:1\nFROM $IMG\nARG IMG=a:2\n", want: []string{"FROM $IMG", "a:2"}},
+	{name: "dockerfile rules on a containerfile variant", path: "Containerfile.dev", data: "ARG IMG=a:1\nFROM $IMG\nARG IMG=a:2\n", want: []string{"a:1", "a:2"}},
 	{name: "dockerfile comment ending in backslash", path: "Dockerfile", data: "FROM alpine" + dg + "\n# note \\\nFROM evil:latest\n", want: []string{"evil:latest"}},
 	{name: "dockerfile comment ending in backslash crlf", path: "Dockerfile", data: "FROM alpine" + dg + "\r\n  # note \\\r\nFROM evil:latest\r\n", want: []string{"evil:latest"}},
 	{name: "dockerfile continuation joins with nothing", path: "Dockerfile", data: "FROM db:1\\\n6\n", want: []string{"db:1", "db:16"}},
@@ -174,7 +191,7 @@ var fileCases = []fileCase{
 	{name: "dockerfile empty heredoc name", path: "Dockerfile", data: "FROM scratch AS base\nRUN <<\"\"\nFROM busybox:latest\n\nRUN echo pwned\n", want: []string{`RUN <<""`, "busybox:latest"}},
 	{name: "dockerfile empty single-quoted heredoc name", path: "Dockerfile", data: "FROM scratch AS base\nRUN <<''\nFROM busybox:latest\n\n", want: []string{`RUN <<''`, "busybox:latest"}},
 	{name: "dockerfile empty dash heredoc name", path: "Dockerfile", data: "FROM scratch AS base\nRUN <<-\"\"\nFROM busybox:latest\n\n", want: []string{`RUN <<-""`, "busybox:latest"}},
-	{name: "dockerfile arg redefined after from", path: "Dockerfile", data: "ARG IMG=alpine:latest\nFROM $IMG\nARG IMG=alpine" + dg + "\n", want: []string{"FROM $IMG"}},
+	{name: "dockerfile arg redefined after from", path: "Dockerfile", data: "ARG IMG=alpine:latest\nFROM $IMG\nARG IMG=alpine" + dg + "\n", want: []string{"alpine:latest"}},
 	{name: "dockerfile multi-name arg", path: "Dockerfile", data: "ARG A=1 IMG=alpine:latest\nFROM $IMG\n", want: []string{"$IMG", "alpine:latest"}},
 	{name: "dockerfile lowercase arg", path: "Dockerfile", data: "arg IMG=alpine:latest\nFROM ${IMG}\n", want: []string{"$IMG", "alpine:latest"}},
 	{name: "dockerfile arg redeclared in a stage", path: "Dockerfile", data: "ARG IMG=alpine" + dg + "\nFROM $IMG\nARG IMG\nRUN echo $IMG\n", want: nil},
@@ -401,6 +418,26 @@ func TestScan(t *testing.T) {
 	allowed := Finding{File: "a", Ecosystem: "go", Ref: "r", Fix: "f", Allowed: "why"}.String()
 	if allowed != "a (go) r: f (allowed: why)" {
 		t.Fatal(allowed)
+	}
+}
+
+// TestScanKustomizeJSON: a .json file a kustomization lists in resources
+// is a manifest and its images are checked; other .json files are not.
+func TestScanKustomizeJSON(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "k8s/kustomization.yaml", "resources: [deploy.json, sub]\n---\nresources: x\n")
+	write(t, dir, "k8s/sub/kustomization.yml", "resources:\n- ../svc.json\n- {a: b}\n")
+	write(t, dir, "k8s/deploy.json", `{"spec": {"image": "evil:1"}}`)
+	write(t, dir, "k8s/svc.json", `{"spec": {"image": "evil:2"}}`)
+	write(t, dir, "k8s/other.json", `{"spec": {"image": "evil:3"}}`)
+	files := []string{"k8s/deploy.json", "k8s/kustomization.yaml", "k8s/other.json", "k8s/sub/kustomization.yml", "k8s/svc.json"}
+	var refs []string
+	for _, f := range Scan(os.DirFS(dir), files, nil) {
+		refs = append(refs, f.File+" "+f.Ref)
+	}
+	want := []string{"k8s/deploy.json evil:1", "k8s/kustomization.yaml k8s/kustomization.yaml", "k8s/sub/kustomization.yml resources[1]", "k8s/svc.json evil:2"}
+	if !slices.Equal(refs, want) {
+		t.Fatalf("refs = %q, want %q", refs, want)
 	}
 }
 
