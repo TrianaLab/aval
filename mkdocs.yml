@@ -161,6 +161,8 @@ extra_javascript:
   # Renders Mermaid diagrams; loads javascripts/vendor/mermaid.min.js only on
   # pages that have one.
   - javascripts/diagrams.js
+  # Fills the home metric strip and the Stats page from /stats.json.
+  - javascripts/stats.js
 
 # A reader's path: user pages first (Get started, Concepts, Guides), then
 # the pages to look things up. The dense design documents live under
@@ -195,6 +197,7 @@ nav:
           - Vision and roadmap: vision.md
   - Project:
       - Changelog: changelog.md
+      - Stats: stats.md
       - Contributing: https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md
       - Security policy: https://github.com/TrianaLab/aval/blob/main/SECURITY.md
       - Code of conduct: https://github.com/TrianaLab/aval/blob/main/CODE_OF_CONDUCT.md

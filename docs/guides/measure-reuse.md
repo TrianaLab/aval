@@ -52,7 +52,8 @@ misses an input: fix the scope before you turn shadow mode off.
     aval record --record-file record.json --registry ghcr.io/acme/orders-aval
     ```
 
-    Aval's own CI does this on `main` for its end-to-end suite.
+    Aval's own CI does this on `main` for its suites, into the public
+    registry behind the site's [Stats](../stats.md) page.
 
 ## Read the numbers
 

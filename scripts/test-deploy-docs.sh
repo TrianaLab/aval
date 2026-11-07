@@ -8,7 +8,9 @@
 # release v0.3.0 and a release v0.3.1 tagged on an older commit, and checks
 # after each step where the site root redirects, which versions carry
 # `latest`, and that install.sh and install.ps1 at the gh-pages root are
-# byte-equal to main's scripts. Set
+# byte-equal to main's scripts. Then it publishes stats.json
+# (scripts/publish-stats.sh) and checks that a docs deploy keeps it and that
+# an invalid report never replaces it. Needs jq. Set
 # AVAL_TEST_KEEP=<dir> to keep the scratch copy (mike serve runs from it).
 set -euo pipefail
 
@@ -73,3 +75,28 @@ git checkout -q main
 aliases=$(pages versions.json | python3 -c 'import json,sys; print(" ".join(v["version"] + ":" + ",".join(v["aliases"]) for v in json.load(sys.stdin)))')
 [ "$aliases" = "main: 0.3.1:latest 0.3.0: 0.2.0:" ] || die "versions.json: got '$aliases'"
 pass "only 0.3.1 carries latest"
+
+# stats.json (#97): a valid stats report is published at the gh-pages root
+# with generatedAt, survives a docs deploy, and anything else leaves it as
+# it was.
+golden=pkg/evidence/testdata/stats-report-v1.golden.json
+publish() { PUSH=true scripts/publish-stats.sh "$1" > "$work/stats.log" 2>&1; }
+publish "$golden" || { cat "$work/stats.log" >&2; die "publish the golden stats report"; }
+pages stats.json | jq -e --slurpfile want "$golden" 'del(.generatedAt) == $want[0] and (.generatedAt | fromdateiso8601) > 0' >/dev/null ||
+  die "stats.json is not the report plus generatedAt"
+pass "stats.json published with generatedAt"
+before=$(pages stats.json)
+
+deploy branch main
+[ "$(pages stats.json)" = "$before" ] || die "a docs deploy changed stats.json"
+pass "a docs deploy keeps stats.json"
+
+echo '{"version":"aval.trianalab.io/stats-report/v2","total":{"runs":1},"tests":[],"repositories":[]}' > "$work/v2.json"
+jq 'del(.repositories)' "$golden" > "$work/by-test.json"
+echo 'not json' > "$work/garbage.json"
+for bad in v2 by-test garbage missing; do
+  ! publish "$work/$bad.json" || die "$bad: published"
+  [ "$(pages stats.json)" = "$before" ] || die "$bad: stats.json changed"
+done
+[ "$(git worktree list | wc -l)" -eq 1 ] || die "publish-stats left a worktree behind"
+pass "an invalid or missing report keeps the previous stats.json"
