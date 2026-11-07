@@ -1136,6 +1136,7 @@ func TestPipEnvSpellings(t *testing.T) {
 	for k, v := range map[string]string{
 		"PIP_index_url": "https://evil.example/simple", "PIP_INDEX-URL": "https://evil.example/simple",
 		"PIP_Extra-Index_URL": "https://evil.example/simple", "PIP_find-links": "./wheels", "PIP_no_index": "1",
+		"PIP_FIND_LINKS": "/", "PIP_EXTRA_INDEX_URL": "/",
 	} {
 		t.Setenv(k, v)
 		mustFail(t, "pypi", "x==1.0", k)
@@ -1157,30 +1158,38 @@ func TestPipEnvSpellings(t *testing.T) {
 func TestNpmrcIni(t *testing.T) {
 	npmrc := filepath.Join(t.TempDir(), "npmrc")
 	t.Setenv("NPM_CONFIG_USERCONFIG", npmrc)
+	t.Setenv("K", "registry")
+	t.Setenv("TOK", "secret")
 	const base = "https://registry.npmjs.org"
 	for rc, wantErr := range map[string]string{
-		`"registry"=http://evil/`:                            "registry",
-		"registry=http://evil/\n[x]\n":                       "registry",
-		"registry='http://evil/'":                            "registry",
-		"[x]\nregistry=http://evil/":                         "",
-		"registry=" + base + "/\n[x]\nregistry=http://evil/": "",
-		`registry="` + base + `/"`:                           "",
-		"registry=" + base + "/ ; comment":                   "",
-		"registry=" + base + "/ # comment":                   "",
-		"# c\r\n  ; c\r\n\r\nregistry=" + base:               "",
-		"registry=http://evil/ ; " + base:                    "registry",
-		"registry\n":                                         "cannot read",
-		"garbage line\n":                                     "cannot read",
-		"=x\n":                                               "cannot read",
-		"registry[]=" + base:                                 "cannot read",
-		`"@acme:registry"="http://evil/"`:                    "@acme:registry",
-		"[x]\n@acme:registry=http://evil/":                   "",
-		"[x]\njunk line":                                     "",
-		"registry=http://evil/\n[x]\nregistry=" + base:       "registry",
-		"registry=" + base + "/\n[x]\n[registry.a]\nx=1":     "cannot read",
-		"registry=" + base + `/\;x`:                          "registry",
-		"registry=" + base + `/\#x`:                          "registry",
-		`registry=` + base + `/\x`:                           "registry",
+		`"registry"=http://evil/`:                                "registry",
+		"registry=http://evil/\n[x]\n":                           "registry",
+		"registry='http://evil/'":                                "registry",
+		"[x]\nregistry=http://evil/":                             "",
+		"registry=" + base + "/\n[x]\nregistry=http://evil/":     "",
+		`registry="` + base + `/"`:                               "",
+		"registry=" + base + "/ ; comment":                       "",
+		"registry=" + base + "/ # comment":                       "",
+		"# c\r\n  ; c\r\n\r\nregistry=" + base:                   "",
+		"registry=http://evil/ ; " + base:                        "registry",
+		"registry\n":                                             "cannot read",
+		"garbage line\n":                                         "cannot read",
+		"=x\n":                                                   "cannot read",
+		"registry[]=" + base:                                     "cannot read",
+		`"@acme:registry"="http://evil/"`:                        "@acme:registry",
+		"[x]\n@acme:registry=http://evil/":                       "",
+		"[x]\njunk line":                                         "",
+		"registry=http://evil/\n[x]\nregistry=" + base:           "registry",
+		"registry=" + base + "/\n[x]\n[registry.a]\nx=1":         "cannot read",
+		"registry=" + base + `/\;x`:                              "registry",
+		"registry=" + base + `/\#x`:                              "registry",
+		`registry=` + base + `/\x`:                               "registry",
+		"registry=http://evil/\nregistry=" + base + "/\u2028":    "cannot read",
+		"registry=http://evil/\nregistry=" + base + "/\u2029":    "cannot read",
+		"registry=https://${x@evil.example/}registry.npmjs.org/": "registry",
+		"${K}=http://evil/":                                      "registry",
+		"registry=${UNSET_AVAL_X?}" + base:                       "",
+		`registry=\${K}`:                                         "registry",
 	} {
 		if err := os.WriteFile(npmrc, []byte(rc), 0o600); err != nil {
 			t.Fatal(err)
@@ -1196,6 +1205,8 @@ func TestNpmrcIni(t *testing.T) {
 		"[x]\n//h.example/:_authToken=t":         "",
 		`//h.example/:_authToken=a\;b\#c\\d\xe\`: `a;b#c\d\xe\`,
 		"junk\n//h.example/:_authToken=t":        "",
+		"//h.example/:_authToken=${TOK}":         "secret",
+		"//h.example/:_authToken=${NOPE_X}":      "${NOPE_X}",
 	} {
 		if err := os.WriteFile(npmrc, []byte(rc), 0o600); err != nil {
 			t.Fatal(err)

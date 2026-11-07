@@ -92,13 +92,16 @@ func pipEnv(opt string) (name, val string, err error) {
 }
 
 // env returns the environment variable whose name matches, without a
-// trailing slash. Empty values are ignored; two spellings with different
-// values fail.
+// trailing slash ("/" stays "/"). Empty values are ignored; two spellings
+// with different values fail.
 func env(match func(string) bool) (name, val string, err error) {
 	for _, kv := range os.Environ() {
 		k, v, _ := strings.Cut(kv, "=")
-		if v = strings.TrimSuffix(v, "/"); v == "" || !match(k) {
+		if v == "" || !match(k) {
 			continue
+		}
+		if t := strings.TrimSuffix(v, "/"); t != "" {
+			v = t
 		}
 		if name != "" && v != val {
 			return "", "", fmt.Errorf("%s is %s and %s is %s: set one", name, redact(val), k, redact(v))

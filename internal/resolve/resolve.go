@@ -263,7 +263,8 @@ func npmToken(hostPath string) string {
 // npmrc returns the settings of the .npmrc npm reads
 // ($npm_config_userconfig, else ~/.npmrc), read as npm's ini parser reads
 // them: comments, quotes and escapes, the last line wins, ${VAR} expanded
-// in values. Keys under a [section] are not npm settings and are skipped.
+// in keys and values as npm expands it (an undefined variable stays
+// literal). A line with U+2028 or U+2029, which npm drops, fails. Keys under a [section] are not npm settings and are skipped.
 // A line npm reads as a flag (no =) or a list (key[]=), or a section named
 // like a setting, fails: Aval cannot tell what npm would use.
 func npmrc() (map[string]string, error) {
@@ -279,6 +280,10 @@ func npmrc() (map[string]string, error) {
 		if t := strings.TrimSpace(l); t == "" || t[0] == ';' || t[0] == '#' {
 			continue
 		}
+		// ini's (.*)$ does not match across U+2028/U+2029: npm drops the line.
+		if strings.ContainsAny(l, "\u2028\u2029") {
+			return nil, bad
+		}
 		if m := iniSectionRe.FindStringSubmatch(l); m != nil {
 			// ini nests [a.b] under a, replacing a setting a (npm then errors).
 			name, _, _ := strings.Cut(iniValue(m[1]), ".")
@@ -292,12 +297,32 @@ func npmrc() (map[string]string, error) {
 			continue
 		}
 		k, v, ok := strings.Cut(l, "=")
-		if k = iniValue(k); !ok || k == "" || strings.HasSuffix(k, "[]") {
+		if k = npmEnvReplace(iniValue(k)); !ok || k == "" || strings.HasSuffix(k, "[]") {
 			return nil, bad
 		}
-		vals[k] = os.ExpandEnv(iniValue(v))
+		vals[k] = npmEnvReplace(iniValue(v))
 	}
 	return vals, nil
+}
+
+var npmEnvRe = regexp.MustCompile(`(\\*)\$\{([^${}?]+)(\?)?\}`)
+
+// npmEnvReplace expands ${VAR} as @npmcli/config does: an undefined
+// variable stays literal unless written ${VAR?}, and an odd run of
+// backslashes escapes the expression.
+func npmEnvReplace(s string) string {
+	return npmEnvRe.ReplaceAllStringFunc(s, func(m string) string {
+		p := npmEnvRe.FindStringSubmatch(m)
+		esc := p[1]
+		if len(esc)%2 == 1 {
+			return m[(len(esc)+1)/2:]
+		}
+		v, ok := os.LookupEnv(p[2])
+		if !ok && p[3] != "?" {
+			v = "${" + p[2] + "}"
+		}
+		return esc[len(esc)/2:] + v
+	})
 }
 
 var iniSectionRe = regexp.MustCompile(`^\[([^\]]*)\]\s*$`)
