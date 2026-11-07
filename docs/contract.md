@@ -354,6 +354,12 @@ test without recording it; `aval run --fingerprint-only`, `--explain`,
 - A file in scope is not a regular file (symlink, device, socket, ...):
   `only regular files are supported in scope`. A symlink's target may live
   outside the scope, so it cannot be proven unchanged.
+- A symlink whose own name no glob matches, but under which a `source` or
+  `dependencies` glob could match files (it may point to a directory):
+  `"<path>" is a symlink a glob could match files under`. Symlinks are not
+  followed, and `exclude` does not lift this check. A symlink no glob can
+  reach is ignored. The contract directory itself may be a symlink: it
+  fingerprints like its target.
 - A path in scope contains a newline or carriage return: `control characters
   in path are not supported`. The manifest is line-oriented, so such a name
   could forge manifest lines and collide with a different tree.

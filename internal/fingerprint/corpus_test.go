@@ -222,6 +222,13 @@ var corpus = []corpusCase{
 		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "build", "build/**")
 		f.write("build", "#!/bin/sh\necho a\n")
 	}, change: func(f *fixture) { f.write("build", "#!/bin/sh\necho b\n") }, want: same},
+	{name: "symlink no glob can reach", setup: func(f *fixture) {
+		f.c.Scope.Source = []string{"main.go", "pkg/**", "compose.yaml"}
+	}, change: func(f *fixture) {
+		out := f.t.TempDir()
+		f.do(os.WriteFile(filepath.Join(out, "b.go"), []byte("package b\n"), 0o644))
+		f.symlink(out, "sub")
+	}, want: same},
 	{name: "file under .git added", change: func(f *fixture) { f.write(".git/objects/x.go", "package x\n") }, want: same},
 	{name: "file under a nested .git added", change: func(f *fixture) { f.write("pkg/a/.git/x.go", "package x\n") }, want: same},
 	// Only the exact name .git is skipped: a case-insensitive match would drop
@@ -290,6 +297,12 @@ var corpus = []corpusCase{
 		f.symlink(out, "link.go")
 	}, want: failClosed},
 	{name: "symlink to directory", change: func(f *fixture) { f.symlink(f.path("pkg"), "dir.go") }, want: failClosed},
+	{name: "symlinked directory outside root", change: func(f *fixture) {
+		// The name sub matches no glob, but **/*.go could match sub/b.go.
+		out := f.t.TempDir()
+		f.do(os.WriteFile(filepath.Join(out, "b.go"), []byte("package b\n"), 0o644))
+		f.symlink(out, "pkg/sub")
+	}, want: failClosed},
 	{name: "source replaced by symlink", change: func(f *fixture) {
 		f.rename("main.go", "real.txt")
 		f.symlink("real.txt", "main.go")

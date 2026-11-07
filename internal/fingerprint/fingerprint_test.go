@@ -116,6 +116,27 @@ func TestWalkSkipsDirectoriesOutsideScope(t *testing.T) {
 	}
 }
 
+// A contract directory that is itself a symlink fingerprints like its
+// target: only symlinks inside the root are rejected (#111).
+func TestSymlinkedRootFingerprintsLikeTarget(t *testing.T) {
+	f := newFixture(t)
+	want, err := f.compute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.symlink(f.dir, "../"+filepath.Base(f.dir)+"-link")
+	link := f.dir + "-link"
+	t.Cleanup(func() { _ = os.Remove(link) })
+	f.dir = link
+	got, err := f.compute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Manifest != want.Manifest {
+		t.Errorf("manifest changed:\n%s\nwant\n%s", got.Manifest, want.Manifest)
+	}
+}
+
 // canonicalContract discards the json.Marshal error; guard against it ever
 // collapsing to empty or identical bytes for distinct contracts.
 func TestCanonicalContractNonEmptyAndDistinct(t *testing.T) {
