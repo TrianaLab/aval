@@ -30,8 +30,8 @@ func (composeImages) Applies(p string) bool {
 // the rest of the line. flowImageRe finds image: keys inside flow mappings
 // ({image: x, ...}), whose value ends at , or }.
 var (
-	yamlImageRe = regexp.MustCompile(`^\s*(?:-\s+)?["']?image["']?\s*:\s*(.*)$`)
-	flowImageRe = regexp.MustCompile(`[{,]\s*["']?image["']?\s*:\s*([^,}]*)`)
+	yamlImageRe = regexp.MustCompile(`^\s*(?:-\s+)?(["']?image["']?)\s*:\s*(.*)$`)
+	flowImageRe = regexp.MustCompile(`[{,]\s*(["']?image["']?)\s*:\s*([^,}]*)`)
 	// yamlKeyRe finds a line that starts a mapping key or a list item, so it
 	// is not the continuation of an image: value on the next line.
 	yamlKeyRe = regexp.MustCompile(`^\s*(-(\s|$)|["']?[\w.-]+["']?\s*:(\s|$))`)
@@ -39,8 +39,10 @@ var (
 
 func (composeImages) Detect(in Input) []Finding {
 	var out []Finding
-	pending := -1 // indent of an image: key whose value may be on the next line
-	for _, l := range logicalLines(string(in.Data)) {
+	seen := map[[2]int]bool{}                                // line and column of the image: keys read here
+	pending := -1                                            // indent of an image: key whose value may be on the next line
+	for i, s := range strings.Split(string(in.Data), "\n") { // YAML has no line continuation
+		l := line{i + 1, strings.TrimSuffix(s, "\r")}
 		t := strings.TrimSpace(l.text)
 		if t == "" || isComment(t) {
 			continue
@@ -50,17 +52,20 @@ func (composeImages) Detect(in Input) []Finding {
 			out = append(out, yamlImage(in.Path, l.n, t)...) // a plain scalar on the next line
 		}
 		pending = -1
-		ms := flowImageRe.FindAllStringSubmatch(l.text, -1)
-		if m := yamlImageRe.FindStringSubmatch(l.text); m != nil {
-			ms = [][]string{m}
-			if v, _, _ := strings.Cut(" "+m[1], " #"); strings.TrimSpace(v) == "" {
+		ms := flowImageRe.FindAllStringSubmatchIndex(l.text, -1)
+		if m := yamlImageRe.FindStringSubmatchIndex(l.text); m != nil {
+			ms = [][]int{m}
+			if v, _, _ := strings.Cut(" "+l.text[m[4]:m[5]], " #"); strings.TrimSpace(v) == "" {
 				pending = indent
 			}
 		}
 		for _, m := range ms {
-			out = append(out, yamlImage(in.Path, l.n, m[1])...)
+			seen[[2]int{l.n, m[2] + 1}] = true
+			out = append(out, yamlImage(in.Path, l.n, l.text[m[4]:m[5]])...)
 		}
 	}
+	out = append(out, decodedImages(in, seen)...)
+	slices.SortStableFunc(out, func(a, b Finding) int { return a.Line - b.Line })
 	return out
 }
 
@@ -82,7 +87,7 @@ func yamlImage(file string, n int, v string) []Finding {
 		}
 	}
 	if strings.ContainsAny(v[:1], "|>*!") {
-		return []Finding{{File: file, Line: n, Ecosystem: "container", Ref: v, Fix: "image is a YAML alias, block scalar or tag Aval cannot resolve: write the reference inline with its digest (name@sha256:...)"}}
+		return []Finding{{File: file, Line: n, Ecosystem: "container", Ref: v, Fix: unresolvedFix}}
 	}
 	return image(file, n, v, nil)
 }
@@ -98,13 +103,13 @@ func (dockerfile) Applies(p string) bool {
 }
 
 func (dockerfile) Detect(in Input) []Finding {
-	lines := logicalLines(string(in.Data))
-	vars := assignments(lines)
+	lines, out := dockerLines(in.Path, string(in.Data))
+	plain := make([]line, len(lines))
+	for i, l := range lines {
+		plain[i] = l.line
+	}
+	vars := assignments(plain)
 	stages := map[string]bool{}
-	var out []Finding
-	var heredoc string // the delimiter of an open RUN <<EOF body
-	var body []string
-	start := 0
 	directives := true // parser directives (# syntax=) come before anything else
 	for _, l := range lines {
 		if directives {
@@ -112,44 +117,36 @@ func (dockerfile) Detect(in Input) []Finding {
 				out = append(out, image(in.Path, l.n, m[1], nil)...)
 				continue
 			}
-			directives = strings.TrimSpace(l.text) == "" || isComment(strings.TrimSpace(l.text))
-		}
-		if heredoc != "" {
-			if strings.TrimSpace(l.text) == heredoc {
-				out = append(out, heredocFindings(in, start, body)...)
-				heredoc, body = "", nil
-			} else {
-				body = append(body, l.text)
-			}
-			continue
+			directives = isComment(l.text)
 		}
 		f := strings.Fields(vars.expand(l.text))
 		if len(f) < 2 || isComment(f[0]) {
 			continue
 		}
 		out = append(out, instruction(in, l.n, f, stages)...)
-		if m := heredocRe.FindStringSubmatch(l.text); m != nil && strings.EqualFold(f[0], "RUN") {
-			heredoc, start = m[1], l.n
+		if strings.EqualFold(f[0], "RUN") {
+			out = append(out, heredocFindings(in, l.body)...)
 		}
 	}
-	if heredoc != "" { // an unterminated body is still checked (fail closed)
-		out = append(out, heredocFindings(in, start, body)...)
-	}
+	slices.SortStableFunc(out, func(a, b Finding) int { return a.Line - b.Line })
 	return out
 }
 
 // syntaxRe finds the BuildKit frontend image of a # syntax= directive.
+// ponytail: looser than BuildKit (also after comments and blank lines), so
+// it reports more, never less.
 var syntaxRe = regexp.MustCompile(`(?i)^\s*#\s*syntax\s*=\s*(\S+)`)
 
-// heredocRe finds a BuildKit heredoc (RUN <<EOF, <<-"EOF") and its delimiter.
-var heredocRe = regexp.MustCompile(`<<-?\s*["']?([A-Za-z_][A-Za-z0-9_]*)["']?`)
-
-// heredocFindings checks the body of a RUN heredoc like a shell script; its
-// lines are numbered from the RUN line.
-func heredocFindings(in Input, start int, body []string) []Finding {
-	fs := scanShell(in.Path, strings.Join(body, "\n"), in.Has)
+// heredocFindings checks the body of a RUN heredoc like a shell script,
+// numbered by its physical lines.
+func heredocFindings(in Input, body []line) []Finding {
+	texts := make([]string, len(body))
+	for i, l := range body {
+		texts[i] = l.text
+	}
+	fs := scanShell(in.Path, strings.Join(texts, "\n"), in.Has)
 	for i := range fs {
-		fs[i].Line += start
+		fs[i].Line = body[fs[i].Line-1].n
 	}
 	return fs
 }
