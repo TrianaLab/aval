@@ -112,7 +112,8 @@ async function screenshots(p, name) {
 
 // A real mouse click in the middle of the element.
 async function click(p, sel) {
-  const { x, y } = await p.js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const { x, y, onTerm } = await p.js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; const t = document.elementFromPoint(x, y); return { x, y, onTerm: !!(t && t.closest(".aval-term pre")) }; })()`);
+  if (!onTerm) throw new Error("click target is not the terminal body");
   for (const type of ["mousePressed", "mouseReleased"]) await p.s("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
 }
 
@@ -121,7 +122,7 @@ const enter = async (p) => {
   await p.s("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
 };
 
-const fetched = `performance.getEntriesByType("resource").some((e) => e.name.endsWith("aval.wasm"))`;
+const fetched = `performance.getEntriesByType("resource").some((e) => /\\/assets\\/demo\\/(aval\\.wasm|wasm_exec\\.js)$/.test(e.name))`;
 const termText = `document.querySelector(".aval-term pre").textContent`;
 
 try {

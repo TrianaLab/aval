@@ -82,8 +82,6 @@
         btn.hidden = true;
         pre.textContent = "";
         pre.removeAttribute("tabindex");
-        pre.removeAttribute("role");
-        pre.removeAttribute("aria-label");
         pre.setAttribute("aria-live", "polite");
         pre.classList.add("aval-term__out");
         print(pre, "Aval is running in your browser. Type help, or start with: aval run", "c");
@@ -157,8 +155,6 @@
     // The whole terminal body is the entry: click it, or focus it and press
     // Enter, Space or any character (which then lands in the prompt).
     pre.tabIndex = 0;
-    pre.setAttribute("role", "button");
-    pre.setAttribute("aria-label", "Terminal transcript of two aval runs. Press Enter to run Aval live in your browser.");
     pre.addEventListener("click", function () {
       if (!fig.dataset.state && !String(window.getSelection())) go();
     });
