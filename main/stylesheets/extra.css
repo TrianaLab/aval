@@ -362,10 +362,12 @@
 }
 
 /* A faint iso grid in the top corner of content pages, fading out: the one
-   place the home page's grid shows up inside the docs. */
+   place the home page's grid shows up inside the docs. No isolation or
+   z-index on .md-main: a stacking context there traps the mobile drawer
+   (.md-sidebar--primary lives inside it) under Material's overlay. The
+   z-index: -1 grid paints in the root context, over the canvas. */
 .md-main {
   position: relative;
-  isolation: isolate;
 }
 .md-main::before {
   content: "";
@@ -607,9 +609,22 @@
    Home (overrides/home.html). Pixel sizes follow the design mockup; widths
    follow Material's grid (61rem).
    =========================================================================== */
-/* The sections replace <main>; the empty one that follows them goes. */
+/* The sections replace <main>. Below 76.25em <main> stays, collapsed, for
+   the primary sidebar that Material slides in as the drawer (the hamburger
+   menu); from 76.25em, where that sidebar is a column, <main> goes. */
 .aval-home ~ .md-main {
+  flex-grow: 0;
+}
+.aval-home ~ .md-main::before {
   display: none;
+}
+.aval-home ~ .md-main > .md-main__inner {
+  margin: 0;
+}
+@media screen and (min-width: 76.25em) {
+  .aval-home ~ .md-main {
+    display: none;
+  }
 }
 .aval-home {
   flex-grow: 1; /* keeps the footer at the bottom, in <main>'s place */
