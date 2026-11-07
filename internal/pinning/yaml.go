@@ -74,6 +74,33 @@ func decodedImages(in Input, seen map[[2]int]bool) []Finding {
 	}
 	if err != nil {
 		out = append(out, escapedKeys(in)...)
+		out = append(out, prefixedKeys(in)...)
+	}
+	return out
+}
+
+// prefixedKeyRe is a block image: key behind a ?, tag or anchor, which
+// yamlImageRe does not read; explicitKeyRe is ? image with its value on the
+// next line (: x).
+var (
+	prefixedKeyRe = regexp.MustCompile(`^\s*(?:-\s+)?(?:(?:\?|![^\s:]*|&[^\s:]+)\s+)+["']?image["']?\s*:\s*(.*)$`)
+	explicitKeyRe = regexp.MustCompile(`^\s*(?:-\s+)?\?\s+(?:(?:![^\s:]*|&[^\s:]+)\s+)*["']?image["']?\s*(?:#.*)?$`)
+)
+
+// prefixedKeys is the fallback for those keys in a file the YAML parser
+// rejects (a Helm template), where decodedImages cannot read them.
+func prefixedKeys(in Input) []Finding {
+	var out []Finding
+	explicit := false
+	for i, l := range strings.Split(string(in.Data), "\n") {
+		l = strings.TrimSuffix(l, "\r")
+		if v, ok := strings.CutPrefix(strings.TrimSpace(l), ":"); explicit && ok {
+			out = append(out, yamlImage(in.Path, i+1, v)...)
+		}
+		if m := prefixedKeyRe.FindStringSubmatch(l); m != nil {
+			out = append(out, yamlImage(in.Path, i+1, m[1])...)
+		}
+		explicit = explicitKeyRe.MatchString(l)
 	}
 	return out
 }
@@ -154,20 +181,24 @@ func (kustomize) Detect(in Input) []Finding {
 			return scanErr(err)
 		}
 		var k struct {
-			Images []struct{ Name, NewName, NewTag, Digest string }
+			Images []struct{ Name, NewName, NewTag, TagSuffix, Digest string }
 		}
 		if err := json.Unmarshal(j, &k); err != nil {
 			return scanErr(err)
 		}
 		for _, e := range k.Images {
-			if e.NewName == "" && e.NewTag == "" && e.Digest == "" {
+			if e.NewName == "" && e.NewTag == "" && e.TagSuffix == "" && e.Digest == "" {
 				continue // the image is left as the manifests write it
 			}
 			ref := cmp.Or(e.NewName, e.Name)
 			if e.NewTag != "" {
 				ref += ":" + e.NewTag
+			} else if e.TagSuffix != "" {
+				ref += ":<tag>"
 			}
-			if e.Digest != "" {
+			if e.TagSuffix != "" {
+				ref += e.TagSuffix // kustomize drops the digest when it appends a suffix
+			} else if e.Digest != "" {
 				ref += "@" + e.Digest
 			}
 			// ponytail: line 0, the decoded value has no position.
