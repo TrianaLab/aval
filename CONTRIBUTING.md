@@ -79,10 +79,13 @@ Both fail on a verification failure (exit 5), read
 `dogfood-publish`, the only job with `id-token: write`, signs keyless and
 pushes the results that were not reused; it runs no tests. Both suites also
 write a run record (`--record-file`), and on `main` `dogfood-record`
-(`packages: write` only, no tests) publishes them with `aval record`, whatever
-the suites' outcome; a record that cannot be published is a warning.
-`dogfood-shadow` adds `aval stats --since 30d` for both suites to its job
-summary (read anonymously, informational).
+(`packages: write` only, no tests) publishes them with `aval record` to the
+public stats registry `ghcr.io/trianalab/aval-stats`, whatever the suites'
+outcome; a record that cannot be published is a warning. `dogfood-shadow`
+adds `aval stats --by repository --since 30d` over that registry to its job
+summary (read anonymously, informational), and `docs.yaml` publishes the same
+numbers as the site's `stats.json` twice an hour
+([Stats](https://aval.run/main/stats/)).
 Trust comes from `.github/aval/main.yaml` (main and releases: only `ci.yaml`
 on `main`, runner level) and `.github/aval/pr.yaml` (pull requests: also
 developer signatures); `tests/architecture/dogfood_test.go` enforces both,

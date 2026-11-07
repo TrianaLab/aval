@@ -136,7 +136,8 @@ docs-site:
 	NO_MKDOCS_2_WARNING=1 mkdocs build --strict
 
 # scripts/deploy-docs.sh (the docs.yaml deploy) against a scratch copy with a
-# local origin: default version, `latest` alias and the root installers.
+# local origin: default version, `latest` alias, the root installers and
+# stats.json (scripts/publish-stats.sh).
 docs-deploy-test:
 	scripts/test-deploy-docs.sh
 

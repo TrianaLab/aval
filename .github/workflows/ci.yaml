@@ -32,6 +32,9 @@ permissions:
 env:
   AVAL_VERSION: 0.1.0
   AVAL_SHA256: 1128344383f48cd7dd8e46b21cbe838dd6e7b075f45a0365f9784c1b71f6e67a
+  # The public stats registry (#97): dogfood-record publishes run records
+  # there and docs.yaml (which names it too) builds the site's stats.json.
+  AVAL_STATS_REGISTRY: ghcr.io/trianalab/aval-stats
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -475,8 +478,8 @@ jobs:
       - name: Summary
         if: always()
         run: .github/aval/summary.sh aval-engine .aval/engine-report.json
-      # Run statistics (#88): `aval stats` over the dogfood suites' run
-      # records, read anonymously. Informational: it never fails the job.
+      # Run statistics (#88): `aval stats` over the run records in the public
+      # stats registry, read anonymously. Informational: it never fails the job.
       - name: Run statistics
         if: always()
         continue-on-error: true
@@ -484,7 +487,7 @@ jobs:
           {
             echo "### aval stats, last 30 days"
             echo '```'
-            aval stats --registry "$AVAL_REGISTRY" --since 30d --registry-timeout 10m 2>&1 || echo "aval stats failed"
+            aval stats --registry "$AVAL_STATS_REGISTRY" --by repository --since 30d --registry-timeout 10m 2>&1 || echo "aval stats failed"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - if: always()
@@ -594,8 +597,11 @@ jobs:
   # dogfood-shadow wrote, whatever their outcome (always(), so failed runs
   # count too). The suites run without credentials and write the record to a
   # file; this job has `packages: write` only, runs no tests, and publishes
-  # with `aval record`. Best-effort: a record that cannot be published is a
-  # warning. Records are unsigned statistics; run and verify never read them.
+  # with `aval record` to the public stats registry (#97), a package of its
+  # own so other repositories can be given write access to it without access
+  # to the attestations; docs.yaml turns it into the site's stats.json.
+  # Best-effort: a record that cannot be published is a warning. Records are
+  # unsigned statistics; run and verify never read them.
   dogfood-record:
     needs: [changes, ci-e2e, dogfood-shadow]
     if: always() && needs.changes.outputs.code == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -603,8 +609,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    env:
-      AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
     # Statistics only (#86): every step is best-effort, so nothing here can
     # fail the job and turn main red.
     steps:
@@ -639,7 +643,7 @@ jobs:
               echo "::warning title=aval run record::$name: no run record to publish"
               continue
             fi
-            aval record --registry "$AVAL_REGISTRY" --record-file "$f" \
+            aval record --registry "$AVAL_STATS_REGISTRY" --record-file "$f" \
               || echo "::warning title=aval run record::$name: run record not published"
           done
 

@@ -85,13 +85,16 @@ ran integration: <span class="g">passed</span> (exit 0)
   </div>
 </section>
 
-<section class="aval-metrics" aria-label="Example numbers">
+{# Live numbers from the root stats.json (#97), filled in by
+   javascripts/stats.js; the dashes and the note are the neutral state when
+   it is missing or stale. #}
+<section class="aval-metrics" aria-label="Live reuse statistics" data-aval-stats="strip">
   <div class="aval-wrap aval-metrics__inner">
-    <div class="aval-metric"><div class="aval-metric__n">1<small>run</small></div><div><p><b>Integration suite</b> ran once on main and was signed.</p><div class="aval-metric__bar" aria-hidden="true"><i class="on"></i></div></div></div>
-    <div class="aval-metric"><div class="aval-metric__n">37<small>×</small></div><div><p><b>Reused</b> by pull requests with the same inputs.</p><div class="aval-metric__bar" aria-hidden="true">{% for _ in range(14) %}<i></i>{% endfor %}</div></div></div>
-    <div class="aval-metric"><div class="aval-metric__n">4<small>h</small></div><div><p><b>CI time saved</b> this week. No result trusted blindly.</p><div class="aval-metric__bar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div></div>
+    <div class="aval-metric"><div class="aval-metric__n"><span data-stat="runs">–</span><small>runs</small></div><div><p><b>Test runs</b> recorded in the public stats registry.</p></div></div>
+    <div class="aval-metric"><div class="aval-metric__n"><span data-stat="hit">–</span><small>%</small></div><div><p><b>Reused</b> after verification: <span data-stat="reused">–</span> runs skipped.</p><div class="aval-metric__bar" data-stat="bar" aria-hidden="true">{% for _ in range(10) %}<i></i>{% endfor %}</div></div></div>
+    <div class="aval-metric"><div class="aval-metric__n"><span data-stat="saved">–</span><small data-stat="saved-unit">h</small></div><div><p><b>Test time saved.</b> No result trusted blindly.</p></div></div>
   </div>
-  <p class="aval-metrics__note">Example numbers.</p>
+  <p class="aval-metrics__note"><span data-stat="note">Live statistics are not available right now.</span> <a href="{{ 'stats/' | url }}">Stats</a></p>
 </section>
 
 <section class="aval-how" id="how-it-works" aria-labelledby="aval-how-title">

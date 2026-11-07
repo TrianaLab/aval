@@ -72,7 +72,7 @@ A change that breaks one of these is wrong, even if tests pass.
 | `make ci-security` | govulncheck (pinned version) on both modules against the go.mod toolchain (`make vuln`); needs network |
 | `make ci-docs` | markdownlint, vale, CLI reference drift (`make docs-lint`; regenerate with `make docs-cli`), strict MkDocs build (`make docs-site`), mobile drawer smoke (`make docs-nav-smoke`), docs deploy logic (`make docs-deploy-test`) |
 | `make docs-nav-smoke` | opens the hamburger menu of the built `site/` at 390x844 on the home page and an inner page, light and dark, and checks the nav panel is on screen with links; needs Chrome (`CHROME` overrides), `SHOTS=<dir>` keeps screenshots |
-| `make docs-deploy-test` | `scripts/deploy-docs.sh` against a scratch copy with a local origin: default version, `latest` alias, root installers; needs mike |
+| `make docs-deploy-test` | `scripts/deploy-docs.sh` and `scripts/publish-stats.sh` against a scratch copy with a local origin: default version, `latest` alias, root installers, `stats.json`; needs mike and jq |
 | `make docs-site` | the MkDocs site into `site/` with `--strict`; needs `pip install --require-hashes -r docs/requirements.txt` |
 | `make coverage` | unit tests plus an HTML report in `coverage.html` |
 | `make build` | `bin/aval` |

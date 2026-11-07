@@ -431,7 +431,7 @@ the sum of `reused`, the three `misses` and `verificationFailures`:
 | `runs` | Records counted. |
 | `reused` | Records with `reused` `true`. |
 | `hitRate` | `reused / runs`; `0` when `runs` is `0`. |
-| `misses.noTrustedResult` | Outcome `miss`. |
+| `misses.noTrustedResult` | Outcome `miss`: no trusted attestation, an unacknowledged mutable reference ([Pin your dependencies](pinning.md)) or `--no-reuse`. |
 | `misses.error` | Outcome `error`: Aval could not decide. |
 | `misses.verifiedNotReused` | Outcome `verified` with `reused` `false`: `--shadow`, or the `--report` file could not be written. |
 | `verificationFailures` | Outcome `verification-failed`: security events, not misses. |

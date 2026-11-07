@@ -10,17 +10,34 @@ name: docs
 #
 # Until a maintainer enables that (Settings > Pages > Source: GitHub Actions),
 # the `pages` job reports a notice and `deploy` is skipped, so the workflow
-# stays green. Write scopes only on push to main or a tag, never on
-# pull_request; the PR-side check is `make docs-site` in ci.yaml (ci-docs).
+# stays green. Write scopes only on push to main, a tag or the schedule,
+# never on pull_request; the PR-side check is `make docs-site` in ci.yaml (ci-docs).
+#
+# Live statistics (#97): twice an hour and on every push, `stats` runs `aval
+# stats` over the public stats registry (anonymous, no write scopes) and
+# `deploy` commits the report to the gh-pages root as stats.json
+# (scripts/publish-stats.sh) and redeploys the gh-pages tree. A scheduled run
+# rebuilds no page. If anything in that path fails, the previous stats.json
+# stays and the run stays green. The schedule runs only on the default
+# branch, so its write scopes are those of a push to main.
 
 on:
   push:
     branches: [main]
     tags: ['v*']
+  schedule:
+    - cron: '7,37 * * * *'
 
 permissions:
   contents: read
 
+env:
+  # Where run records for the public aggregate go; ci.yaml names it too.
+  AVAL_STATS_REGISTRY: ghcr.io/trianalab/aval-stats
+
+# One deploy at a time, docs or stats, so they never race on gh-pages or
+# Pages. Known limit: a run that starts while one runs and one waits cancels
+# the waiting one; re-run a cancelled docs deploy (or push again).
 concurrency:
   group: docs-deploy
   cancel-in-progress: false
@@ -46,9 +63,41 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
+  # Reads untrusted run records, so it holds no write scope. Never blocks
+  # deploy: a missing report only means stats.json is not refreshed. Bounded
+  # so a slow registry cannot hold the docs-deploy concurrency group; a
+  # timeout fails this job, and deploy (if: !cancelled()) still runs.
+  stats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        continue-on-error: true
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        continue-on-error: true
+        with:
+          go-version-file: go.mod
+      # Built from this commit like the dogfood jobs in ci.yaml (#17).
+      - name: Aggregate the public run records
+        continue-on-error: true
+        run: |
+          make build
+          bin/aval stats --registry "$AVAL_STATS_REGISTRY" --by repository --since 30d \
+            --registry-timeout 3m -o json > stats-report.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        continue-on-error: true
+        with:
+          name: stats-report
+          path: stats-report.json
+          if-no-files-found: ignore
+          retention-days: 1
+
   deploy:
-    needs: pages
-    if: needs.pages.outputs.enabled == 'true' && github.event_name == 'push'
+    needs: [pages, stats]
+    # !cancelled(): a failed stats job never blocks a docs deploy.
+    if: ${{ !cancelled() && needs.pages.outputs.enabled == 'true' && (github.event_name == 'push' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # mike pushes the gh-pages branch
@@ -61,25 +110,44 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - if: github.event_name == 'push'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
-      - run: pip install --require-hashes -r docs/requirements.txt
+      - if: github.event_name == 'push'
+        run: pip install --require-hashes -r docs/requirements.txt
       # Same strict gate as ci-docs, so nothing that fails it is published.
-      - run: make docs-site
+      - if: github.event_name == 'push'
+        run: make docs-site
       - name: Deploy the version with mike
+        if: github.event_name == 'push'
         env:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
+        # Also sets the default version and copies the installers to the
+        # gh-pages root; scripts/test-deploy-docs.sh (make ci-docs) tests it.
+        run: PUSH=true scripts/deploy-docs.sh "$REF_TYPE" "$REF_NAME"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        with:
+          name: stats-report
+          path: ${{ runner.temp }}/stats
+      - name: Publish stats.json
+        id: stats
+        continue-on-error: true
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Also sets the default version and copies the installers to the
-          # gh-pages root; scripts/test-deploy-docs.sh (make ci-docs) tests it.
-          PUSH=true scripts/deploy-docs.sh "$REF_TYPE" "$REF_NAME"
-          git worktree add "$RUNNER_TEMP/gh-pages" gh-pages
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+          PUSH=true scripts/publish-stats.sh "$RUNNER_TEMP/stats/stats-report.json"
+          echo "published=true" >> "$GITHUB_OUTPUT"
+      # A scheduled run deploys only when it published a new stats.json.
+      - if: github.event_name == 'push' || steps.stats.outputs.published == 'true'
+        run: git worktree add "$RUNNER_TEMP/gh-pages" gh-pages
+      - if: github.event_name == 'push' || steps.stats.outputs.published == 'true'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: ${{ runner.temp }}/gh-pages
       - id: deploy
+        if: github.event_name == 'push' || steps.stats.outputs.published == 'true'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
