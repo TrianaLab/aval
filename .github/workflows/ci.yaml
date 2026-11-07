@@ -224,7 +224,8 @@ jobs:
       - run: make ci-security
 
   # Docs gates: markdownlint, vale, CLI reference drift, the strict site
-  # build and the deploy logic (scripts/test-deploy-docs.sh). No path filter:
+  # build, the mobile drawer smoke (scripts/docs-nav-smoke.mjs, with the
+  # runner image's Chrome) and the deploy logic (scripts/test-deploy-docs.sh). No path filter:
   # a docs-only PR must run it too. Links, doc examples, page length and the
   # image and recording size budget are checked in ci-gates. On a PR it
   # uploads the built site as the docs-site artifact for preview.
