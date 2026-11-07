@@ -23,7 +23,7 @@ What each outcome means: [Outcomes](outcomes.md).
 | Signer | Signs with | Usual level |
 |---|---|---|
 | CI job (keyless) | a short-lived Sigstore certificate for its OIDC identity | runner |
-| developer | a local ECDSA P-256 key file | developer |
+| key | a local ECDSA P-256 key file | developer |
 
 Your policy sets the level. The level the result claims is ignored.
 

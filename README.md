@@ -2,8 +2,8 @@
 
 Run a heavy test once. Reuse the result anywhere the inputs match.
 
-Aval hashes the inputs you declare in `aval.yaml` into a fingerprint, signs
-the test result and stores it in your own OCI registry. A job with the same
+Aval hashes the inputs you declare in `aval.yaml` into a fingerprint and,
+with `--push`, signs the test result and stores it in your own OCI registry. A job with the same
 fingerprint checks the signature against its trust policy and skips the test.
 If Aval cannot prove reuse is safe, the test runs.
 
@@ -28,7 +28,8 @@ Windows: `irm https://aval.run/install.ps1 | iex`. Other options:
 
 ## Status
 
-Pre-alpha. The formats are frozen at v1
+Pre-alpha. The contract and verify report are frozen at `aval.trianalab.io/v1`
+and the predicate at `execution/v2`
 ([compatibility rules](https://aval.run/main/artifact-format/#versioning-and-compatibility));
 see the [roadmap](https://aval.run/main/vision/#roadmap).
 

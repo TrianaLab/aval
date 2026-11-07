@@ -48,7 +48,7 @@ cause, verification failures, shadow false hits and time saved.
 aval stats --registry ghcr.io/acme/aval-stats --since 7d
 ```
 
-`--by repository` needs `aval run --repository <name>`.
+`--by repository` needs `--repository <name>` on `aval run` or `aval record`.
 
 ```text
 run records in ghcr.io/acme/aval-stats since 2026-10-31T12:30:00Z
