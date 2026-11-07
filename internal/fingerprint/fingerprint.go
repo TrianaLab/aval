@@ -128,7 +128,13 @@ func Compute(ctx context.Context, dir string, c *contract.Contract, env LookupEn
 			return Fingerprint{}, err
 		}
 	}
-	return newTree(ctx, os.DirFS(root), env, outputsUnder(root, outputs)).compute(rel, c)
+	// Outputs are taken relative to dir as given, not to the root repoRoot
+	// resolved through symlinks, then placed under rel.
+	skip := map[string]bool{}
+	for p := range outputsUnder(dir, outputs) {
+		skip[path.Join(rel, p)] = true
+	}
+	return newTree(ctx, os.DirFS(root), env, skip).compute(rel, c)
 }
 
 // repoRoot returns the nearest directory at or above dir with a .git entry

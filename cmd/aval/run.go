@@ -27,6 +27,7 @@ import (
 	"github.com/TrianaLab/aval/internal/contract"
 	"github.com/TrianaLab/aval/internal/fingerprint"
 	"github.com/TrianaLab/aval/internal/registry"
+	"github.com/TrianaLab/aval/internal/resolve"
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
@@ -266,15 +267,29 @@ func printContracts(w io.Writer, deps []fingerprint.Dependency, indent string) {
 }
 
 // printResolveCost reports what scope.resolve cost: the network time of
-// each reference and the total. Not part of the manifest.
+// each reference and the total, across the contract and the contracts it
+// references. Not part of the manifest.
 func printResolveCost(w io.Writer, fp fingerprint.Fingerprint) {
+	var all []resolve.Result
+	seen := map[string]bool{}
+	var walk func(fingerprint.Fingerprint)
+	walk = func(f fingerprint.Fingerprint) {
+		all = append(all, f.Resolved...)
+		for _, d := range f.Contracts {
+			if !seen[d.Digest] { // a shared contract was resolved once
+				seen[d.Digest] = true
+				walk(d.Fingerprint)
+			}
+		}
+	}
+	walk(fp)
 	var total time.Duration
-	for _, r := range fp.Resolved {
+	for _, r := range all {
 		total += r.Took
 		fmt.Fprintf(w, "resolved %s %s to %s in %s\n", r.Kind, r.Ref, r.ID, r.Took.Round(time.Millisecond))
 	}
-	if len(fp.Resolved) > 0 {
-		fmt.Fprintf(w, "resolved %d reference(s) in %s\n", len(fp.Resolved), total.Round(time.Millisecond))
+	if len(all) > 0 {
+		fmt.Fprintf(w, "resolved %d reference(s) in %s\n", len(all), total.Round(time.Millisecond))
 	}
 }
 

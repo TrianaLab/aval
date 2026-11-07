@@ -39,7 +39,8 @@ depends on ../backend/aval.yaml (backend) sha256:8441...
 ## Rules
 
 - Paths are relative to the contract that names them and must stay inside
-  the git working tree (the nearest directory with a `.git` entry). No
+  the git working tree: Aval walks up from the contract's directory to the
+  nearest directory with a `.git` entry. No
   symlinks on the way, no cycles, at most 8 levels and 64 contracts. If
   the contract's own directory is a symlink, `../` is resolved from its
   real location, as the test sees it.

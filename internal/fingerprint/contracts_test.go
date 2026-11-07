@@ -283,6 +283,14 @@ func TestContractsUnreadable(t *testing.T) {
 	if _, err := ComputeFS(fsys, c, noEnv); err == nil || !strings.Contains(err.Error(), "scope.contracts b.yaml: ") {
 		t.Fatalf("got %v", err)
 	}
+	// A regular file that cannot be read.
+	root := writeTree(t, monorepoFiles())
+	if err := os.Chmod(filepath.Join(root, "backend", "aval.yaml"), 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := computeFile(root, "frontend/aval.yaml"); err == nil || !strings.Contains(err.Error(), "scope.contracts ../backend/aval.yaml: ") {
+		t.Fatalf("got %v", err)
+	}
 	// A FIFO would block the read; it fails instead.
 	fsys = fstest.MapFS{"aval.yaml": fsys["aval.yaml"], "b.yaml": {Mode: fs.ModeNamedPipe}}
 	if _, err := ComputeFS(fsys, c, noEnv); err == nil || !strings.Contains(err.Error(), "b.yaml is not a regular file") {
@@ -294,7 +302,12 @@ func TestContractsUnreadable(t *testing.T) {
 // the dependent unless the referenced contract itself accepts them; the
 // dependent's scope.allowMutable never does.
 func TestContractsFindings(t *testing.T) {
-	const compose = "services:\n  db:\n    image: postgres:16\n"
+	// A compose image and a kustomize images entry (a container finding
+	// from the kustomize detector) propagate the same way.
+	sources := []struct{ file, data, ref string }{
+		{"compose.yaml", "services:\n  db:\n    image: postgres:16\n", "postgres:16"},
+		{"kustomization.yaml", "images:\n- name: nginx\n  newTag: \"1.27\"\n", "nginx:1.27"},
+	}
 	cases := []struct {
 		name               string
 		backendAllow, own  bool
@@ -304,25 +317,27 @@ func TestContractsFindings(t *testing.T) {
 		{"acknowledged by the dependent only", false, true, 1, 1},
 		{"acknowledged by the referenced contract", true, false, 0, 1},
 	}
-	allow := `allowMutable: [{ref: "postgres:16", reason: "scanned nightly"}]`
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			files := monorepoFiles()
-			files["backend/api/compose.yaml"] = compose
-			if tc.backendAllow {
-				files["backend/aval.yaml"] = avalYAML("backend", "api/**", []string{"../shared/aval.yaml"}, allow)
-			}
-			if tc.own {
-				files["frontend/aval.yaml"] = avalYAML("frontend", "src/**", []string{"../backend/aval.yaml"}, allow)
-			}
-			fp, err := computeFile(writeTree(t, files), "frontend/aval.yaml")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(fp.Findings) != tc.want || len(fp.Unpinned()) != tc.wantUnpinned || fp.Findings[0].File != "../backend/api/compose.yaml" {
-				t.Fatalf("findings = %+v", fp.Findings)
-			}
-		})
+	for _, src := range sources {
+		allow := `allowMutable: [{ref: "` + src.ref + `", reason: "scanned nightly"}]`
+		for _, tc := range cases {
+			t.Run(src.file+"/"+tc.name, func(t *testing.T) {
+				files := monorepoFiles()
+				files["backend/api/"+src.file] = src.data
+				if tc.backendAllow {
+					files["backend/aval.yaml"] = avalYAML("backend", "api/**", []string{"../shared/aval.yaml"}, allow)
+				}
+				if tc.own {
+					files["frontend/aval.yaml"] = avalYAML("frontend", "src/**", []string{"../backend/aval.yaml"}, allow)
+				}
+				fp, err := computeFile(writeTree(t, files), "frontend/aval.yaml")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(fp.Findings) != tc.want || len(fp.Unpinned()) != tc.wantUnpinned || fp.Findings[0].File != "../backend/api/"+src.file {
+					t.Fatalf("findings = %+v", fp.Findings)
+				}
+			})
+		}
 	}
 }
 
@@ -401,5 +416,26 @@ func TestContractsManifestGolden(t *testing.T) {
 	}
 	if err != nil || string(golden) != fp.Manifest {
 		t.Fatalf("contracts manifest changed without a version bump (%v):\n--- golden\n%s--- got\n%s", err, golden, fp.Manifest)
+	}
+}
+
+// TestContractsTopOutputsSkipped: an Aval output in the top contract's own
+// scope is skipped even when that contract is not at the git root.
+func TestContractsTopOutputsSkipped(t *testing.T) {
+	root := writeTree(t, monorepoFiles())
+	out := filepath.Join(root, "frontend", "src", "result.json")
+	before, err := computeFile(root, "frontend/aval.yaml", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(out, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	after, err := computeFile(root, "frontend/aval.yaml", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Digest != after.Digest {
+		t.Fatalf("output changed the fingerprint:\n%s", after.Manifest)
 	}
 }
