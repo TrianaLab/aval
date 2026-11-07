@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,7 +43,7 @@ func loadAndCompute(t *testing.T, dir string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fp, err := fingerprint.Compute(dir, c, noEnv)
+	fp, err := fingerprint.Compute(context.Background(), dir, c, noEnv)
 	if err != nil {
 		t.Fatal(err)
 	}

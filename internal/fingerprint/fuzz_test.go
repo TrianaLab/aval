@@ -1,6 +1,7 @@
 package fingerprint
 
 import (
+	"context"
 	"maps"
 	"os"
 	"path/filepath"
@@ -62,7 +63,7 @@ func manifestOf(t *testing.T, tree map[string]entry) string {
 	}
 	c := testContract()
 	c.Scope = contract.Scope{Source: []string{"**"}}
-	fp, err := Compute(dir, c, fixedEnv)
+	fp, err := Compute(context.Background(), dir, c, fixedEnv)
 	if err != nil {
 		t.Fatal(err)
 	}

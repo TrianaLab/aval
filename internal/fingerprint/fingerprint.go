@@ -9,6 +9,10 @@
 //	dependency <sha256> <mode> <path>
 //	toolchain <key>=<value>
 //	env <NAME> <sha256 of value | unset>
+//	resolve <kind> <reference> <version> <immutable id>
+//
+// resolve lines appear only for contracts with scope.resolve, the one part
+// of the manifest that reads the network (internal/resolve).
 //
 // Lines are sorted within each section, paths are slash-separated and
 // relative to the contract root, so the result does not depend on the
@@ -21,6 +25,7 @@ package fingerprint
 
 import (
 	"cmp"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -35,6 +40,7 @@ import (
 
 	"github.com/TrianaLab/aval/internal/contract"
 	"github.com/TrianaLab/aval/internal/pinning"
+	"github.com/TrianaLab/aval/internal/resolve"
 )
 
 // Version is the manifest format version. Bump it whenever the manifest
@@ -52,7 +58,13 @@ type Fingerprint struct {
 	// scope.allowMutable on the acknowledged ones. They are not part of the
 	// manifest: they say what the digest cannot vouch for.
 	Findings []pinning.Finding
+	// Resolved are the scope.resolve references with the ids hashed in
+	// the manifest and the time each took.
+	Resolved []resolve.Result
 }
+
+// resolveAll is a seam for the golden test, which must not need a network.
+var resolveAll = resolve.All
 
 // Unpinned returns the findings scope.allowMutable does not acknowledge.
 func (f Fingerprint) Unpinned() []pinning.Finding {
@@ -78,8 +90,8 @@ const OutputDir = ".aval"
 // Compute fingerprints the contract c rooted at dir. outputs are files Aval
 // itself writes (the --result and --report paths); the ones inside dir are
 // not inputs and are skipped. Empty entries are ignored.
-func Compute(dir string, c *contract.Contract, env LookupEnv, outputs ...string) (Fingerprint, error) {
-	return compute(os.DirFS(dir), c, env, outputsUnder(dir, outputs))
+func Compute(ctx context.Context, dir string, c *contract.Contract, env LookupEnv, outputs ...string) (Fingerprint, error) {
+	return compute(ctx, os.DirFS(dir), c, env, outputsUnder(dir, outputs))
 }
 
 // ComputeFS fingerprints the contract c rooted at fsys, such as the
@@ -91,10 +103,11 @@ func ComputeFS(fsys fs.FS, c *contract.Contract, env LookupEnv, skip ...string) 
 	for _, s := range skip {
 		m[s] = true
 	}
-	return compute(fsys, c, env, m)
+	// ponytail: no ctx; the browser demo's contracts declare no scope.resolve.
+	return compute(context.Background(), fsys, c, env, m)
 }
 
-func compute(fsys fs.FS, c *contract.Contract, env LookupEnv, skip map[string]bool) (Fingerprint, error) {
+func compute(ctx context.Context, fsys fs.FS, c *contract.Contract, env LookupEnv, skip map[string]bool) (Fingerprint, error) {
 	if env == nil {
 		env = os.LookupEnv
 	}
@@ -143,12 +156,34 @@ func compute(fsys fs.FS, c *contract.Contract, env LookupEnv, skip map[string]bo
 	slices.Sort(section)
 	lines = append(lines, slices.Compact(section)...)
 
+	// Last, so a contract without scope.resolve never touches the network
+	// and one with a bad scope fails before it does.
+	resolved, err := resolveAll(ctx, canonicalResolve(c.Scope.Resolve))
+	if err != nil {
+		return Fingerprint{}, err
+	}
+	for _, r := range resolved {
+		lines = append(lines, fmt.Sprintf("resolve %s %s %s %s", r.Kind, r.Ref, r.Version, r.ID))
+	}
+
 	manifest := strings.Join(lines, "\n") + "\n"
-	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: findings(fsys, c, slices.Concat(src, dep))}, nil
+	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: findings(fsys, c, slices.Concat(src, dep)), Resolved: resolved}, nil
+}
+
+// canonicalResolve sorts and deduplicates scope.resolve, so its order does
+// not matter; resolve lines come out sorted too.
+func canonicalResolve(refs []contract.Reference) []contract.Reference {
+	refs = slices.Clone(refs)
+	slices.SortFunc(refs, func(a, b contract.Reference) int {
+		return cmp.Or(strings.Compare(a.Kind, b.Kind), strings.Compare(a.Ref, b.Ref))
+	})
+	return slices.Compact(refs)
 }
 
 // findings scans the hashed files (from their manifest lines) and
 // runner.command, and marks the findings scope.allowMutable acknowledges.
+// scope.resolve never clears a finding: it binds an id into the manifest,
+// but cannot prove that id is what runs (invariant 3).
 func findings(fsys fs.FS, c *contract.Contract, lines []string) []pinning.Finding {
 	paths := make([]string, len(lines))
 	for i, l := range lines {
@@ -194,6 +229,7 @@ func canonicalContract(c *contract.Contract) []byte {
 		return cmp.Or(strings.Compare(a.Ref, b.Ref), strings.Compare(a.Reason, b.Reason))
 	})
 	cc.Scope.AllowMutable = slices.Compact(cc.Scope.AllowMutable)
+	cc.Scope.Resolve = canonicalResolve(c.Scope.Resolve)
 	// Marshal cannot fail: the contract holds only strings, string slices
 	// and string maps. Map keys are sorted by encoding/json.
 	b, _ := json.Marshal(cc)

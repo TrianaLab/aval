@@ -2,6 +2,7 @@ package fingerprint
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -57,7 +58,7 @@ func TestNilEnvUsesProcessEnvironment(t *testing.T) {
 	if err := os.Unsetenv("MODE"); err != nil {
 		t.Fatal(err)
 	}
-	got, err := Compute(f.dir, f.c, nil)
+	got, err := Compute(context.Background(), f.dir, f.c, nil)
 	want, err2 := f.compute()
 	if err != nil || err2 != nil {
 		t.Fatal(err, err2)
@@ -68,7 +69,7 @@ func TestNilEnvUsesProcessEnvironment(t *testing.T) {
 }
 
 func TestUnreadableInputsFailClosed(t *testing.T) {
-	if _, err := Compute(filepath.Join(t.TempDir(), "missing"), testContract(), fixedEnv); err == nil {
+	if _, err := Compute(context.Background(), filepath.Join(t.TempDir(), "missing"), testContract(), fixedEnv); err == nil {
 		t.Error("missing contract root must fail")
 	}
 	if _, _, err := (&hasher{buf: make([]byte, 512)}).hashFile(os.DirFS(t.TempDir()), "gone.go"); err == nil {

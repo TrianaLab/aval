@@ -70,6 +70,24 @@ func TestParseInvalid(t *testing.T) {
   allowMutable: [{ref: " ", reason: "x"}]`, "scope.allowMutable[0]"},
 		"allowMutable unknown key": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   allowMutable: [{ref: a, reason: b, file: c}]`, "file"},
+		"resolve unknown kind": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{docker: postgres:16}]`, `scope.resolve[0]: unknown kind "docker"`},
+		"resolve two keys": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{image: a, npm: b}]`, "one `kind: reference` pair"},
+		"resolve not a map": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [postgres:16]`, "cannot unmarshal"},
+		"resolve space": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{npm: "react@>=1 <2"}]`, "scope.resolve[0]: npm: the reference must be non-empty, without spaces"},
+		"resolve empty": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{url: ""}]`, "scope.resolve[0]: url: the reference must be non-empty"},
+		"resolve password": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{url: "https://u:s3cret@example.com/x"}]`, "credentials in the reference are not allowed"},
+		"resolve token user": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{git: "https://ghp_tok@github.com/o/r@main"}]`, "credentials in the reference are not allowed"},
+		"resolve token in a URL that does not parse": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{git: "https://ghp_tok@[::1/o/r@main"}]`, "credentials in the reference are not allowed"},
+		"resolve password in a URL that does not parse": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{url: "ssh://u:s3cret@exa%zz.com/x"}]`, "credentials in the reference are not allowed"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -97,6 +115,52 @@ func TestParseAllowMutable(t *testing.T) {
 	}
 	if c, _ := Parse([]byte(valid)); c.Scope.AllowMutable != nil {
 		t.Fatalf("omitted allowMutable = %+v, want nil", c.Scope.AllowMutable)
+	}
+}
+
+// TestParseResolve: scope.resolve is optional and keeps each `kind: ref`
+// entry; a user in a URL is fine, a password is not echoed.
+func TestParseResolve(t *testing.T) {
+	c, err := Parse([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve:
+    - image: postgres:16
+    - npm: react@^18
+    - git: ssh://git@github.com/org/repo@main`, 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Reference{{"image", "postgres:16"}, {"npm", "react@^18"}, {"git", "ssh://git@github.com/org/repo@main"}}
+	if fmt.Sprint(c.Scope.Resolve) != fmt.Sprint(want) {
+		t.Fatalf("resolve = %+v", c.Scope.Resolve)
+	}
+	if c, _ := Parse([]byte(valid)); c.Scope.Resolve != nil {
+		t.Fatalf("omitted resolve = %+v, want nil", c.Scope.Resolve)
+	}
+	_, err = Parse([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{url: "https://u:s3cret@example.com/x"}]`, 1)))
+	if err == nil || strings.Contains(err.Error(), "s3cret") {
+		t.Fatalf("a password must be rejected without echoing it: %v", err)
+	}
+	// A token in a scheme-less user name or in a query parameter is
+	// published with the manifest: rejected, never echoed.
+	for _, ref := range []string{
+		"//s3cret@example.com/f", "https://h/f?token=s3cret", "https://h/f?a=1&Private_Token=s3cret", "https://h/f?X-Amz-Signature=s3cret",
+		"https://h/f?x-goog-signature=s3cret", "https://h/f?sig=s3cret", "https://h/f?a=1;signature=s3cret", "https://h/f?%74oken=s3cret",
+		"https://h/f?access_token=s3cret", "https://h/f?KEY=s3cret", "https://h/f?apikey=s3cret", "https://h/f?api_key=s3cret",
+		"https://h/f?auth=s3cret", "https://h/f?password=s3cret", "https://h/f?secret=s3cret", "https://h/f?credential=s3cret",
+		"https://h/f?token", "https://h/r?private_token=s3cret@main",
+	} {
+		_, err := Parse([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{url: "`+ref+`"}]`, 1)))
+		if err == nil || !strings.Contains(err.Error(), "credentials in the reference are not allowed") || strings.Contains(err.Error(), "s3cret") {
+			t.Errorf("%s: want a credentials error that does not echo the value, got %v", ref, err)
+		}
+	}
+	for _, ref := range []string{"https://h/f?v=1&format=tar.gz", "https://h/f?%zz=1", "https://h/f?tokens=1"} {
+		if _, err := Parse([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  resolve: [{url: "`+ref+`"}]`, 1))); err != nil {
+			t.Errorf("%s: %v", ref, err)
+		}
 	}
 }
 
@@ -321,5 +385,58 @@ func TestLoad(t *testing.T) {
 	}
 	if _, err := Load(dir); err == nil || strings.Contains(err.Error(), "-f") {
 		t.Fatalf("unreadable contract: got %v", err)
+	}
+}
+
+// TestPackageNames: a package name is accepted only when it matches its
+// ecosystem's naming rules, so a path, a URL, a local file or another source
+// never passes for a registry name.
+func TestPackageNames(t *testing.T) {
+	ok := map[string][]string{
+		"npm":   {"left-pad", "left-pad@1.3.0", "@types/node", "@types/node@^20", "@a-b/c.d_e~f@latest", "lodash@>=4", strings.Repeat("a", 214)},
+		"pypi":  {"requests", "requests==2.32.3", "Requests[security,socks]>=2", "zope.interface~=6.0", "a"},
+		"go":    {"example.com/m@v1.0.0", "github.com/Acme/m/v2@main", "golang.org/x/mod"},
+		"crate": {"serde@=1.0.0", "serde_json", "a-b@^1"},
+		"gem":   {"rails@7.1.3", "net-http", "A.b_c"},
+		"maven": {"org.junit:junit-bom:5.9.3", "com.example_x:a-b.c:[1,2)"},
+	}
+	bad := map[string][]string{
+		"npm": {"left-pad/", "@types/node/", "@types/node/@1.0.0", "./x", "../x", "/x", "C:x", "x.tgz", "x.TAR.GZ", "UPPER", "@Types/node",
+			".x", "_x", "a/b", "@scope", `a\b`, strings.Repeat("a", 215), "lib@./x", "lib@x.tgz", "lib@github:o/r", "lib@file:../x", "lib@npm:evil", "lib@~/x"},
+		"pypi":  {"./x", "../x", "/x", "dir/x", `dir\x`, "C:x", "x.whl", "x-1.0.tar.gz", "X.WHL==1.0", "x.tgz", "-x", "x-", "x[", "x[a]b", "x@https://h/x", "x==1.0/../y"},
+		"go":    {"./x", "../x", "/x", "C:x", "UPPER.com/m", "Example..com/m@latest", "noperiod/m"},
+		"crate": {"./x", "../x", "/x", "C:x", "x.tgz", "1abc", "_x", strings.Repeat("a", 65), "x@./y", "x@git:y"},
+		"gem":   {"./x", "../x", "/x", "C:x", "x.gem", "-x", ".x", "x@/y", "x@1#y"},
+		"maven": {"../x:a:1", "a..b:x:1", "g:./x:1", "g:a/b:1", "/g:a:1", "C\\x:a:1", "g:.a:1"},
+	}
+	for kind, refs := range ok {
+		for _, ref := range refs {
+			if err := (Reference{kind, ref}).validate(); err != nil {
+				t.Errorf("%s %s: %v", kind, ref, err)
+			}
+		}
+	}
+	for kind, refs := range bad {
+		for _, ref := range refs {
+			err := (Reference{kind, ref}).validate()
+			if err == nil || !strings.Contains(err.Error(), "not a valid "+kind+" package name") && !strings.Contains(err.Error(), "is not a registry version, range or tag") {
+				t.Errorf("%s %s: want a package name error, got %v", kind, ref, err)
+			}
+		}
+	}
+	for _, ref := range []string{"g:a", "g::1", "g:a:1:x"} {
+		if err := (Reference{"maven", ref}).validate(); err == nil || !strings.Contains(err.Error(), "want group:artifact:version") {
+			t.Errorf("maven %s: %v", ref, err)
+		}
+	}
+	// A name with spaces fails before the name check.
+	if err := (Reference{"npm", "left pad"}).validate(); err == nil {
+		t.Error("npm: a name with a space must fail")
+	}
+	// Not packages: no name rules.
+	for _, r := range []Reference{{"image", "postgres:16"}, {"git", "https://h/r@main"}, {"url", "https://h/x.tgz"}} {
+		if err := r.validate(); err != nil {
+			t.Errorf("%v: %v", r, err)
+		}
 	}
 }

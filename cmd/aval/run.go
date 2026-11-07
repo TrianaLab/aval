@@ -190,7 +190,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	if err := o.validate(token); err != nil {
 		return err
 	}
-	c, fp, fpErr := loadAndFingerprint(o.file, o.outputs()...)
+	c, fp, fpErr := loadAndFingerprint(cmd.Context(), o.file, o.outputs()...)
 	if c == nil {
 		return fpErr
 	}
@@ -245,12 +245,26 @@ func printFingerprint(out, warn io.Writer, fp fingerprint.Fingerprint, fpErr err
 	}
 	if o.explain {
 		fmt.Fprint(out, fp.Manifest)
+		printResolveCost(warn, fp)
 	}
 	if o.fingerprintOnly {
 		printFindings(warn, fp)
 		fmt.Fprintln(out, fp.Digest)
 	}
 	return nil
+}
+
+// printResolveCost reports what scope.resolve cost: the network time of
+// each reference and the total. Not part of the manifest.
+func printResolveCost(w io.Writer, fp fingerprint.Fingerprint) {
+	var total time.Duration
+	for _, r := range fp.Resolved {
+		total += r.Took
+		fmt.Fprintf(w, "resolved %s %s to %s in %s\n", r.Kind, r.Ref, r.ID, r.Took.Round(time.Millisecond))
+	}
+	if len(fp.Resolved) > 0 {
+		fmt.Fprintf(w, "resolved %d reference(s) in %s\n", len(fp.Resolved), total.Round(time.Millisecond))
+	}
 }
 
 // printFindings lists every mutable reference, acknowledged or not.
@@ -476,7 +490,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout), checkSigner(key, token)); err != nil {
 				return err
 			}
-			c, fp, err := loadAndFingerprint(file, resultFile)
+			c, fp, err := loadAndFingerprint(cmd.Context(), file, resultFile)
 			if err != nil {
 				return err
 			}

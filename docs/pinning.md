@@ -161,6 +161,15 @@ one checkout per clone. A `git pull` is reported for the same reason. A
 submodule with a `branch =` line in `.gitmodules`, or `git submodule update
 --remote`, follows a branch: rely on the commit recorded in the repository.
 
+## Resolve a reference instead
+
+To follow a tag, a range or a branch on purpose, declare the reference in
+`scope.resolve`: Aval resolves it to its digest, checksum or commit every
+time it fingerprints and hashes that id, so a move changes the
+fingerprint. It never clears a finding: the reference still blocks reuse
+until you pin it in place or accept it below. `scope.resolve` binds the artifact you name, not its dependencies:
+use a lockfile for those. See [Resolve references](resolve/index.md).
+
 ## Accept a reference on purpose
 
 Sometimes a mutable reference is acceptable, for example an image your team
@@ -196,7 +205,8 @@ package is reported as unpinned (a needless miss). Options before a
 subcommand (`apk --no-cache add`, `git -C dir clone`) are skipped, but an
 option Aval does not know to take a value (`tool --opt value install x`)
 hides the subcommand: like any reference the detectors do not recognize,
-it is not reported. Not detected yet: a download from an unversioned URL
+it is not reported. Not detected: a download from an unversioned URL
 other than `releases/latest` (`curl -o tool URL`, `curl URL | tar x`), and
 Helm values that split an image into `repository` and `tag` before
-rendering.
+rendering. Declare those in `scope.resolve` (a [`url`](resolve/urls.md),
+an [`image`](resolve/images.md)), so their content is hashed.

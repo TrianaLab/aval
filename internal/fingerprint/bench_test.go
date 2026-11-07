@@ -1,6 +1,7 @@
 package fingerprint
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,7 +54,7 @@ func BenchmarkCompute(b *testing.B) {
 	c.Scope.Dependencies = []string{"go.mod"}
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := Compute(dir, c, fixedEnv); err != nil {
+		if _, err := Compute(context.Background(), dir, c, fixedEnv); err != nil {
 			b.Fatal(err)
 		}
 	}

@@ -11,12 +11,15 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"path"
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 
+	"golang.org/x/mod/module"
 	"gopkg.in/yaml.v3"
 )
 
@@ -112,6 +115,36 @@ type Scope struct {
 	// adding or removing one changes the fingerprint. Omitted when empty,
 	// so contracts without it hash as before.
 	AllowMutable []AllowMutable `yaml:"allowMutable,omitempty" json:"allowMutable,omitempty"`
+	// Resolve declares external artifacts by name (a tag, a version range,
+	// a branch, a URL). At fingerprint time each is resolved to an
+	// immutable id (digest, checksum or commit) that goes into the manifest
+	// (internal/resolve). Omitted when empty, so contracts without it hash
+	// as before.
+	Resolve []Reference `yaml:"resolve,omitempty" json:"resolve,omitempty"`
+}
+
+// ResolveKinds are the ecosystems scope.resolve accepts, one resolver each.
+var ResolveKinds = []string{"image", "npm", "pypi", "go", "maven", "crate", "gem", "git", "url"}
+
+// Reference is one scope.resolve entry, written `kind: reference`.
+type Reference struct {
+	Kind string `json:"kind"`
+	Ref  string `json:"ref"`
+}
+
+// UnmarshalYAML reads the one-key form `npm: react@^18`.
+func (r *Reference) UnmarshalYAML(n *yaml.Node) error {
+	var m map[string]string
+	if err := n.Decode(&m); err != nil {
+		return err
+	}
+	if len(m) != 1 {
+		return fmt.Errorf("line %d: a scope.resolve entry is one `kind: reference` pair", n.Line)
+	}
+	for k, v := range m {
+		r.Kind, r.Ref = k, v
+	}
+	return nil
 }
 
 // AllowMutable accepts one mutable reference, by the exact text Aval reports
@@ -202,11 +235,7 @@ func (c *Contract) Validate() error {
 			}
 		}
 	}
-	for i, a := range c.Scope.AllowMutable {
-		if strings.TrimSpace(a.Ref) == "" || strings.TrimSpace(a.Reason) == "" {
-			add("scope.allowMutable[%d]: ref and reason are both required", i)
-		}
-	}
+	c.Scope.validate(add)
 	c.Environment.validate(add)
 	if c.Cacheability == "" {
 		add("cacheability: required (hermetic, controlled-environment, external-dependencies, non-deterministic)")
@@ -215,6 +244,151 @@ func (c *Contract) Validate() error {
 	}
 	return errors.Join(errs...)
 }
+
+// validate checks scope.allowMutable and scope.resolve; Validate checks
+// the globs.
+func (s Scope) validate(add func(string, ...any)) {
+	for i, a := range s.AllowMutable {
+		if strings.TrimSpace(a.Ref) == "" || strings.TrimSpace(a.Reason) == "" {
+			add("scope.allowMutable[%d]: ref and reason are both required", i)
+		}
+	}
+	for i, r := range s.Resolve {
+		if err := r.validate(); err != nil {
+			add("scope.resolve[%d]: %v", i, err)
+		}
+	}
+}
+
+func (r Reference) validate() error {
+	switch {
+	case !slices.Contains(ResolveKinds, r.Kind):
+		return fmt.Errorf("unknown kind %q (want one of %s)", r.Kind, strings.Join(ResolveKinds, ", "))
+	case r.Ref == "" || strings.IndexFunc(r.Ref, func(c rune) bool { return unicode.IsSpace(c) || unicode.IsControl(c) }) >= 0:
+		return fmt.Errorf("%s: the reference must be non-empty, without spaces or control characters", r.Kind)
+	}
+	// A token in the user name (https://tok@host) is a credential too; an
+	// ssh user name (ssh://git@host) is not; a scheme-less //tok@host may
+	// be https to the tool, so it is.
+	// A URL that does not parse still reaches a tool that may read it: any
+	// @ in its authority counts as credentials.
+	u, err := url.Parse(r.Ref)
+	_, rest, scheme := strings.Cut(r.Ref, "://")
+	authority, _, _ := strings.Cut(rest, "/")
+	creds := err != nil && scheme && strings.Contains(authority, "@")
+	if err == nil && u.User != nil {
+		_, hasPass := u.User.Password()
+		creds = hasPass || u.Scheme == "http" || u.Scheme == "https" || u.Scheme == ""
+	}
+	if creds || credentialQuery(r.Ref) {
+		// The contract is committed: never echo the reference.
+		return fmt.Errorf("%s: credentials in the reference are not allowed: put them in ~/.netrc", r.Kind)
+	}
+	_, _, err = r.Package()
+	return err
+}
+
+// Package splits a package reference (npm, pypi, go, crate, gem, maven) into
+// its name and version spec ("" when there is none; for maven the name is
+// group:artifact) and checks both. The name must match its ecosystem's
+// naming rules, so nothing a tool reads as a path, a file or a URL passes
+// for a registry name; the spec must not name another source. image, git
+// and url are not packages: all empty, no error.
+func (r Reference) Package() (name, spec string, err error) {
+	ref, valid := r.Ref, nameRules[r.Kind]
+	switch r.Kind {
+	case "npm", "go", "crate", "gem":
+		// The last @ after the first byte, so an npm scope stays in the name.
+		name = ref
+		if i := strings.LastIndex(ref, "@"); i > 0 {
+			name, spec = ref[:i], ref[i+1:]
+		}
+		if r.Kind != "go" && registrySpecRe.MatchString(spec) {
+			return "", "", fmt.Errorf("%s: spec %q is not a registry version, range or tag: use the git or url kind, or pin", r.Kind, spec)
+		}
+	case "pypi":
+		i := strings.IndexAny(ref, "=<>!~")
+		if i < 0 {
+			i = len(ref)
+		}
+		name, spec = ref[:i], ref[i:]
+		if m := pypiReqRe.FindStringSubmatch(name); m != nil {
+			name = m[1] // extras do not change the files
+		}
+		if !pypiSpecRe.MatchString(spec) {
+			return "", "", fmt.Errorf("pypi: spec %q is not a registry version, range or tag: use the url kind, or pin", spec)
+		}
+	case "maven":
+		p := strings.Split(ref, ":")
+		if len(p) != 3 || p[0] == "" || p[1] == "" || p[2] == "" {
+			return "", "", errors.New("maven: want group:artifact:version")
+		}
+		name, spec = p[0]+":"+p[1], p[2]
+	default:
+		return "", "", nil
+	}
+	if !valid(name) {
+		return "", "", fmt.Errorf("not a valid %s package name: %q", r.Kind, name)
+	}
+	return name, spec, nil
+}
+
+// nameRules checks a package name, per ecosystem.
+var nameRules = map[string]func(string) bool{
+	"npm":   func(n string) bool { return len(n) <= 214 && npmNameRe.MatchString(n) && !npmFileRe.MatchString(n) },
+	"go":    func(n string) bool { return module.CheckPath(n) == nil },
+	"pypi":  func(n string) bool { return pypiNameRe.MatchString(n) && !pyFileRe.MatchString(n) },
+	"crate": crateNameRe.MatchString,
+	"gem":   func(n string) bool { return gemNameRe.MatchString(n) && !strings.HasSuffix(strings.ToLower(n), ".gem") },
+	"maven": func(n string) bool {
+		g, a, _ := strings.Cut(n, ":")
+		return mavenIDRe.MatchString(g) && mavenIDRe.MatchString(a) && !strings.Contains(n, "..")
+	},
+}
+
+// Package names, per ecosystem: npm's rules for new packages
+// (validate-npm-package-name), PEP 508 with extras, crates.io, RubyGems and
+// Maven coordinates. npm and pip read a name ending in an archive
+// extension as a local file, gem a name ending in .gem.
+const pypiName = `[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?`
+
+var (
+	npmNameRe   = regexp.MustCompile(`^(@[a-z0-9-~][a-z0-9-._~]*/)?[a-z0-9-~][a-z0-9-._~]*$`)
+	npmFileRe   = regexp.MustCompile(`(?i)\.(tgz|tar\.gz|tar)$`)
+	pypiNameRe  = regexp.MustCompile(`^` + pypiName + `$`)
+	pypiReqRe   = regexp.MustCompile(`^(` + pypiName + `)(?:\[` + pypiName + `(?:,` + pypiName + `)*\])?$`)
+	pyFileRe    = regexp.MustCompile(`(?i)\.(whl|tar\.gz|tgz|zip|tar|egg)$`)
+	crateNameRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,63}$`)
+	gemNameRe   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+	mavenIDRe   = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
+	// registrySpecRe is an npm, Cargo or gem spec the tool installs from
+	// somewhere else than the registry entry (npm:alias, github:, org/repo,
+	// git+https:, file:, ./dir, ~/dir, a tarball, a Windows path).
+	registrySpecRe = regexp.MustCompile(`(?i)[:/#\\]|^\.|^~/|\.(tgz|tar\.gz|tar)$`)
+	// pypiSpecRe is a version specifier: no path, URL or marker.
+	pypiSpecRe = regexp.MustCompile(`^[=<>!~0-9A-Za-z.*+,_-]*$`)
+)
+
+// credentialQuery reports whether ref's query string (read as text, so a
+// URL that does not parse is covered) has a parameter named like a
+// credential, in any case: a presigned URL, a GitLab private_token.
+func credentialQuery(ref string) bool {
+	_, q, _ := strings.Cut(ref, "?")
+	q, _, _ = strings.Cut(q, "#")
+	for _, kv := range strings.FieldsFunc(q, func(c rune) bool { return c == '&' || c == ';' }) {
+		k, _, _ := strings.Cut(kv, "=")
+		if u, err := url.QueryUnescape(k); err == nil {
+			k = u
+		}
+		if slices.Contains(credentialKeys, strings.ToLower(k)) {
+			return true
+		}
+	}
+	return false
+}
+
+var credentialKeys = []string{"token", "private_token", "access_token", "key", "apikey", "api_key", "sig", "signature",
+	"x-amz-signature", "x-goog-signature", "auth", "password", "secret", "credential"}
 
 func (e Environment) validate(add func(string, ...any)) {
 	for k := range e.Toolchain {

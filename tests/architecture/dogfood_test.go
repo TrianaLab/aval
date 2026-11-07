@@ -1,6 +1,7 @@
 package architecture
 
 import (
+	"context"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -238,7 +239,7 @@ func literalPaths(t *testing.T, name string, src []byte) []string {
 // the Go files under its run directories name by a relative literal path.
 func undeclaredReads(t *testing.T, c *contract.Contract, dirs suiteDirs) []string {
 	t.Helper()
-	fp, err := fingerprint.Compute(root, c, nil)
+	fp, err := fingerprint.Compute(context.Background(), root, c, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
