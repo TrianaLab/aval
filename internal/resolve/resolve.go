@@ -103,11 +103,14 @@ var client = &http.Client{Timeout: time.Minute, CheckRedirect: func(req *http.Re
 	return nil
 }}
 
+var errNotFound = errors.New("404 Not Found")
+
 // get writes the body of url to w, at most limit bytes. Credentials come
 // from ~/.npmrc or ~/.netrc (see authorize); they are sent as headers, so
 // they never appear in a URL or an error. net/http drops them on a redirect
 // to another host. A base URL taken from an environment variable may carry
 // userinfo, so every error shows the URL redacted.
+// A 404 wraps errNotFound.
 func get(ctx context.Context, url, accept string, limit int64, w io.Writer) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -131,6 +134,9 @@ func get(ctx context.Context, url, accept string, limit int64, w io.Writer) erro
 		return fmt.Errorf("GET %s: %w", shown, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("GET %s: %w", shown, errNotFound)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GET %s: %s", shown, resp.Status)
 	}
@@ -213,9 +219,8 @@ func secure(u *neturl.URL) bool {
 	return u.Scheme == "https" || u.Hostname() == "localhost" || ip != nil && ip.IsLoopback()
 }
 
-// configFile reads the file named by env, else name in the home directory.
-func configFile(env, name string) string {
-	p := os.Getenv(env)
+// configFile reads the file at p, else name in the home directory.
+func configFile(p, name string) string {
 	if p == "" {
 		home, _ := os.UserHomeDir() // ponytail: no home means no file
 		p = filepath.Join(home, name)
@@ -230,8 +235,12 @@ func configFile(env, name string) string {
 // ponytail: only per-registry tokens; _auth, username and password lines
 // are ignored.
 func npmToken(hostPath string) string {
+	_, userconfig, err := npmEnv("userconfig")
+	if err != nil {
+		return "" // which .npmrc npm reads is unclear: send no token
+	}
 	tok, best := "", 0
-	for _, l := range strings.Split(configFile("NPM_CONFIG_USERCONFIG", ".npmrc"), "\n") {
+	for _, l := range strings.Split(configFile(userconfig, ".npmrc"), "\n") {
 		k, v, ok := strings.Cut(strings.TrimSpace(l), ":_authToken=")
 		k = strings.TrimPrefix(k, "//")
 		match := k == hostPath || strings.HasSuffix(k, "/") && strings.HasPrefix(hostPath, k) || strings.HasPrefix(hostPath, k+"/")
@@ -248,7 +257,7 @@ func npmToken(hostPath string) string {
 // used (curl would send it to any host), so a contract naming a host cannot
 // collect it.
 func netrc(host string) (login, pass string, ok bool) {
-	f := strings.Fields(configFile("NETRC", ".netrc"))
+	f := strings.Fields(configFile(os.Getenv("NETRC"), ".netrc"))
 	cur := ""
 	for i := 0; i < len(f); i++ {
 		if f[i] == "default" {

@@ -36,13 +36,18 @@ func splitImage(ref string) (repo, tag string) {
 	if tag == "" {
 		tag = "latest"
 	}
-	host, _, found := strings.Cut(repo, "/")
+	host, rest, found := strings.Cut(repo, "/")
 	// The OCI distribution reference grammar: a name without a registry
-	// host is on Docker Hub. This is the reference format's default, not a
-	// vendor choice.
+	// host is on Docker Hub, and a one-segment Docker Hub name is under
+	// library/. This is the reference format's default, not a vendor choice.
 	switch {
 	case !found:
 		repo = "docker.io/library/" + repo
+	case host == "docker.io" || host == "index.docker.io":
+		if !strings.Contains(rest, "/") {
+			rest = "library/" + rest
+		}
+		repo = "docker.io/" + rest
 	case !strings.ContainsAny(host, ".:") && host != "localhost":
 		repo = "docker.io/" + repo
 	}

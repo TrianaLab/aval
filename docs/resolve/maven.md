@@ -1,8 +1,8 @@
 # Maven artifacts
 
 `maven: <group>:<artifact>:<version>` hashes the POM of that version
-together with the checksum the repository publishes for its main artifact
-(`.sha256`, else `.sha1`).
+together with the checksums the repository publishes for its `.jar` and
+its main artifact (`.sha256`, else `.sha1`).
 
 An exact version binds that version. Anything else (a range, latest, a
 tag) binds the whole release list, so any new release of the package
@@ -23,21 +23,26 @@ scope:
   `RELEASE` or `latest.*`.
 - For anything else the id is a hash of the `<versioning>` block of
   `maven-metadata.xml` (every version, `<latest>` and `<release>`) and of
-  each listed version's POM and main artifact checksum, as for an exact
+  each listed version's POM and artifact checksums, as for an exact
   version. A new version, a moved `<release>` or a redeployed release
   changes the id. The manifest line says `floating`. A
-  `maven-metadata.xml` without versions, or with more than 100 (two
+  `maven-metadata.xml` without versions, or with more than 100 (up to six
   requests each), fails: use an exact version. Floating specs are
   impractical for popular artifacts (guava, jackson-databind list more
   than 200 versions).
-- A `-SNAPSHOT` version fails, in any letter case, and so does a floating
-  version whose list holds one: a snapshot is redeployed under the same
-  name. Resolve a release, or pin.
-- The main artifact follows the POM `packaging`: `jar` (the default),
-  `bundle`, `maven-plugin` and `ejb` give a `.jar`; `war`, `ear`, `rar` and
-  `aar` their own extension; `pom` (a BOM or parent) has none. Another
-  packaging, a missing checksum, or a checksum file that holds no checksum
-  (a proxy's error page), fails the fingerprint, so the test runs. Aval
+- A version ending in `SNAPSHOT` (`1.0-SNAPSHOT`, `1.0.SNAPSHOT`), in any
+  letter case, fails, and so does a floating version whose list holds
+  one: a snapshot is redeployed under the same name. Resolve a release,
+  or pin.
+- A tool that names `group:artifact:version` downloads the `.jar`
+  whatever the POM `packaging` says, so the `.jar` checksum is bound
+  whenever the repository has a `.jar`. The packaging adds its own file:
+  `war`, `ear`, `rar` and `aar` bind that file's checksum too. A `.jar`
+  is required for `jar` (the default), `bundle`, `maven-plugin` and
+  `ejb`; for `pom` (a BOM or parent) and the other packagings it is bound
+  only when present. Another packaging, a missing checksum, a `.jar`
+  served without one, or a checksum file that holds no checksum (a
+  proxy's error page), fails the fingerprint, so the test runs. Aval
   never downloads the jar: the id is only as fresh as the repository's
   published checksum. A jar overwritten under the same version on a
   private repository changes the id only if its checksum file is

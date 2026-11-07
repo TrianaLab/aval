@@ -483,6 +483,10 @@ func TestMaven(t *testing.T) {
 	mustFail(t, "maven", "x:snap:1.1-SNAPSHOT", "SNAPSHOT versions are not supported: resolve a release, or pin")
 	mustFail(t, "maven", "x:snap:1.1-snapshot", "SNAPSHOT versions are not supported")
 	mustFail(t, "maven", "x:snap:LATEST", "SNAPSHOT versions are not supported")
+	// maven-resolver reads any version ending in SNAPSHOT as one.
+	for _, v := range []string{"1.0.SNAPSHOT", "1.0SNAPSHOT", "1.0.snapshot"} {
+		mustFail(t, "maven", "x:snap:"+v, "SNAPSHOT versions are not supported")
+	}
 
 	// A jar: the published checksum of the artifact is part of the id.
 	const lib = "/org/x/lib/1.0/lib-1.0"
@@ -526,6 +530,54 @@ func TestMaven(t *testing.T) {
 	mustFail(t, "maven", "org.x:odd:1.0", "unknown artifact file")
 	f.set("/org/x/bad/1.0/bad-1.0.pom", "<project")
 	mustFail(t, "maven", "org.x:bad:1.0", "POM")
+}
+
+// TestMavenJar: a g:a:v consumer downloads <a>-<v>.jar whatever
+// <packaging> says, so a jar the repository has is always bound.
+func TestMavenJar(t *testing.T) {
+	f := newFake(t)
+	t.Setenv("AVAL_MAVEN_URL", f.url)
+	// A g:a:v consumer downloads <a>-<v>.jar whatever <packaging> says: a
+	// pom-packaged artifact with a jar beside it binds the jar too.
+	const bom = "/org/x/bom/1.0/bom-1.0"
+	f.set(bom+".pom", "<project><packaging>pom</packaging></project>")
+	pomOnly := mustResolve(t, "maven", "org.x:bom:1.0")
+	f.set(bom+".jar.sha1", strings.Repeat("a", 40))
+	withJar := mustResolve(t, "maven", "org.x:bom:1.0")
+	if withJar.ID == pomOnly.ID {
+		t.Fatal("a jar beside a pom-packaged POM must be part of the id")
+	}
+	f.set(bom+".jar.sha1", strings.Repeat("b", 40)) // redeployed with a fresh sha1
+	if again := mustResolve(t, "maven", "org.x:bom:1.0"); again.ID == withJar.ID {
+		t.Fatal("a jar redeployed beside a pom-packaged POM must change the id")
+	}
+	// A jar served without a checksum cannot be bound: fail, never skip it.
+	f.set("/org/x/nosum/1.0/nosum-1.0.pom", "<project><packaging>pom</packaging></project>")
+	f.set("/org/x/nosum/1.0/nosum-1.0.jar", "jar")
+	mustFail(t, "maven", "org.x:nosum:1.0", "has no published checksum")
+	// A war binds the war and, when there is one, the jar.
+	const war = "/org/x/web/1.0/web-1.0"
+	f.set(war+".pom", "<project><packaging>war</packaging></project>")
+	f.set(war+".war.sha1", strings.Repeat("a", 40))
+	warOnly := mustResolve(t, "maven", "org.x:web:1.0")
+	f.set(war+".jar.sha1", strings.Repeat("c", 40))
+	if again := mustResolve(t, "maven", "org.x:web:1.0"); again.ID == warOnly.ID {
+		t.Fatal("a jar beside a war must be part of the id")
+	}
+	// A jar packaging without a jar fails.
+	f.set("/org/x/nojar/1.0/nojar-1.0.pom", "<project></project>")
+	mustFail(t, "maven", "org.x:nojar:1.0", "404")
+	// Only a missing checksum is skipped: a failing server is not "no jar".
+	broken := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, ".pom") {
+			_, _ = io.WriteString(w, "<project><packaging>pom</packaging></project>")
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer broken.Close()
+	t.Setenv("AVAL_MAVEN_URL", broken.URL)
+	mustFail(t, "maven", "org.x:bom:1.0", "503")
 }
 
 func TestCrate(t *testing.T) {
@@ -1011,10 +1063,40 @@ func TestNpmRegistryFromEnvironment(t *testing.T) {
 		mustResolve(t, "npm", "left@1.0.0") // another scope
 		_ = os.Unsetenv(k)
 	}
+	t.Setenv("npm_config_@acme:registry", f.url)
+	t.Setenv("NPM_CONFIG_@ACME:REGISTRY", "https://evil.example/")
+	mustFail(t, "npm", "@acme/left@1.0.0", "set one")
+	_ = os.Unsetenv("npm_config_@acme:registry")
+	_ = os.Unsetenv("NPM_CONFIG_@ACME:REGISTRY")
 	t.Setenv("NPM_CONFIG_REGISTRY", f.url+"/")
 	mustResolve(t, "npm", "left@1.0.0")
 	t.Setenv("NPM_CONFIG_REGISTRY", "https://evil.example")
 	mustFail(t, "npm", "left@1.0.0", "NPM_CONFIG_REGISTRY")
+	_ = os.Unsetenv("NPM_CONFIG_REGISTRY")
+	_ = os.Unsetenv("npm_config_registry")
+
+	// npm reads npm_config_* in any letter case (@npmcli/config).
+	t.Setenv("Npm_Config_Registry", f.url)
+	mustResolve(t, "npm", "left@1.0.0") // resolved against that registry
+	t.Setenv("Npm_Config_Registry", "https://evil.example.invalid")
+	mustFail(t, "npm", "left@1.0.0", "evil.example.invalid")
+	t.Setenv("Npm_Config_Registry", f.url)
+	t.Setenv("npm_config_REGISTRY", "https://evil.example.invalid")
+	mustFail(t, "npm", "left@1.0.0", "set one")
+	_ = os.Unsetenv("npm_config_REGISTRY")
+	// The userconfig from any spelling is the .npmrc checked.
+	npmrc := filepath.Join(t.TempDir(), "npmrc")
+	if err := os.WriteFile(npmrc, []byte("@acme:registry=https://evil.example/\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NPM_CONFIG_USERCONFIG", "")
+	t.Setenv("npm_config_userconfig", npmrc)
+	mustFail(t, "npm", "@acme/left@1.0.0", "@acme:registry")
+	t.Setenv("npm_config_UserConfig", os.DevNull)
+	mustFail(t, "npm", "left@1.0.0", "set one")
+	if tok := npmToken(strings.TrimPrefix(f.url, "http://")); tok != "" {
+		t.Fatalf("conflicting userconfig spellings sent token %q", tok)
+	}
 }
 
 // TestUserAgent: Maven Central throttles Go's default User-Agent.

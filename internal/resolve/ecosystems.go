@@ -13,6 +13,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -74,33 +75,54 @@ func entry(fields ...string) string {
 // semverRe is an exact semver version: x.y.z[-pre][+build], no operator.
 var semverRe = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`)
 
-// npmRegistry fails when ~/.npmrc sends pkg to another registry than base:
-// a @scope:registry line for its scope (npm prefers it to the environment),
-// or a registry line when no environment variable sets one. The last line
-// wins, as in npm.
+// npmEnv returns npm_config_<key> and the spelling that set it, in any
+// letter case as npm reads it (@npmcli/config: /^npm_config_/i). Empty
+// values are ignored; two spellings with different values fail.
+func npmEnv(key string) (name, val string, err error) {
+	for _, kv := range os.Environ() {
+		k, v, _ := strings.Cut(kv, "=")
+		if v = strings.TrimSuffix(v, "/"); v == "" || !strings.EqualFold(k, "npm_config_"+key) {
+			continue
+		}
+		if name != "" && v != val {
+			return "", "", fmt.Errorf("%s is %s and %s is %s: set one", name, redact(val), k, redact(v))
+		}
+		name, val = k, v
+	}
+	return name, val, nil
+}
+
+// npmRegistry fails when the environment or the .npmrc npm reads
+// ($npm_config_userconfig, else ~/.npmrc) sends pkg to another registry
+// than base: a @scope:registry setting for its scope (npm prefers it to the
+// registry), or a registry line when no environment variable sets one. The
+// environment beats .npmrc and the last line wins, as in npm.
 func npmRegistry(pkg, base string) error {
+	_, userconfig, err := npmEnv("userconfig")
+	if err != nil {
+		return err
+	}
 	vals := map[string]string{}
-	for _, l := range strings.Split(configFile("NPM_CONFIG_USERCONFIG", ".npmrc"), "\n") {
+	for _, l := range strings.Split(configFile(userconfig, ".npmrc"), "\n") {
 		if k, v, ok := strings.Cut(l, "="); ok {
 			vals[strings.TrimSpace(k)] = strings.TrimSuffix(os.ExpandEnv(strings.TrimSpace(v)), "/")
 		}
 	}
 	key := "registry"
-	upper, lower := strings.TrimSuffix(os.Getenv("NPM_CONFIG_REGISTRY"), "/"), strings.TrimSuffix(os.Getenv("npm_config_registry"), "/")
-	if upper != "" && lower != "" && upper != lower {
-		return fmt.Errorf("NPM_CONFIG_REGISTRY is %s and npm_config_registry is %s: set one", redact(upper), redact(lower))
+	_, env, err := npmEnv("registry")
+	if err != nil {
+		return err
 	}
-	if upper != "" || lower != "" {
+	if env != "" {
 		key = ""
 	}
 	if scope, _, _ := strings.Cut(pkg, "/"); strings.HasPrefix(pkg, "@") {
-		// npm reads npm_config_* variables in any case; the environment
-		// beats .npmrc.
-		for _, kv := range os.Environ() {
-			k, v, _ := strings.Cut(kv, "=")
-			if v = strings.TrimSuffix(v, "/"); strings.EqualFold(k, "npm_config_"+scope+":registry") && v != base {
-				return fmt.Errorf("%s is %s, not %s: npm would install from there; set npm_config_registry to match", k, redact(v), redact(base))
-			}
+		k, v, err := npmEnv(scope + ":registry")
+		if err != nil {
+			return err
+		}
+		if v != "" && v != base {
+			return fmt.Errorf("%s is %s, not %s: npm would install from there; set npm_config_registry to match", k, redact(v), redact(base))
 		}
 		if _, ok := vals[scope+":registry"]; ok {
 			key = scope + ":registry"
@@ -121,7 +143,8 @@ func npm(ctx context.Context, ref string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	base := baseURL("https://registry.npmjs.org", "NPM_CONFIG_REGISTRY", "npm_config_registry")
+	_, env, _ := npmEnv("registry") // two different spellings fail in npmRegistry
+	base := cmp.Or(env, "https://registry.npmjs.org")
 	if err := npmRegistry(pkg, base); err != nil {
 		return "", "", err
 	}
@@ -479,13 +502,13 @@ func maven(ctx context.Context, ref string) (string, string, error) {
 	return releases(lines)
 }
 
-// maxMavenVersions caps the versions a floating Maven version fetches (two
-// requests each); above it the reference fails.
+// maxMavenVersions caps the versions a floating Maven version fetches (up to
+// six requests each); above it the reference fails.
 const maxMavenVersions = 100
 
 var errSnapshot = errors.New("SNAPSHOT versions are not supported: resolve a release, or pin")
 
-func isSnapshot(v string) bool { return strings.HasSuffix(strings.ToUpper(v), "-SNAPSHOT") }
+func isSnapshot(v string) bool { return strings.HasSuffix(strings.ToUpper(v), "SNAPSHOT") }
 
 // mavenArtifact returns a sha256 over the POM at base.pom and the checksum
 // of the main artifact its packaging names.
@@ -503,11 +526,23 @@ func mavenArtifact(ctx context.Context, base string) (string, error) {
 		return "", fmt.Errorf("POM: %w", err)
 	}
 	packaging := cmp.Or(strings.TrimSpace(proj.Packaging), "jar")
-	if packaging != "pom" {
-		ext, ok := mavenExt[packaging]
-		if !ok {
-			return "", fmt.Errorf("packaging %q: unknown artifact file, cannot hash its content", packaging)
-		}
+	ext, ok := mavenExt[packaging]
+	if !ok && packaging != "pom" {
+		return "", fmt.Errorf("packaging %q: unknown artifact file, cannot hash its content", packaging)
+	}
+	// A consumer naming g:a:v downloads <a>-<v>.jar whatever the packaging
+	// says, so a jar the repository has is always bound.
+	jar, err := optionalChecksum(ctx, base+".jar")
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case jar != "":
+		lines = append(lines, "jar "+jar)
+	case ext == "jar":
+		return "", fmt.Errorf("GET %s.jar: %w", redact(base), errNotFound)
+	}
+	if ext != "" && ext != "jar" {
 		sum, err := mavenChecksum(ctx, base+"."+ext)
 		if err != nil {
 			return "", err
@@ -515,6 +550,21 @@ func mavenArtifact(ctx context.Context, base string) (string, error) {
 		lines = append(lines, ext+" "+sum)
 	}
 	return sumLines(lines), nil
+}
+
+// optionalChecksum is mavenChecksum for a file that may not exist: "" when
+// neither it nor a checksum is there. A file served without a checksum
+// fails: it would be downloaded but not bound.
+func optionalChecksum(ctx context.Context, file string) (string, error) {
+	sum, err := mavenChecksum(ctx, file)
+	if !errors.Is(err, errNotFound) {
+		return sum, err
+	}
+	// ponytail: a GET capped at 0 bytes stands in for HEAD; it reads one byte.
+	if err := get(ctx, file, "", 0, io.Discard); !errors.Is(err, errNotFound) {
+		return "", fmt.Errorf("%s has no published checksum: cannot bind its content", redact(file))
+	}
+	return "", nil
 }
 
 // mavenExt maps a POM packaging to the file extension of its main artifact.
@@ -535,6 +585,8 @@ func mavenChecksum(ctx context.Context, file string) (string, error) {
 				return alg + ":" + strings.ToLower(f[0]), nil
 			}
 			return "", fmt.Errorf("GET %s.%s: not a checksum", redact(file), alg)
+		} else if !errors.Is(err, errNotFound) {
+			return "", err // only a missing .sha256 falls back to .sha1
 		}
 	}
 	return "", err
@@ -736,7 +788,7 @@ func download(ctx context.Context, ref string) (string, string, error) {
 
 // idOrErr fails when the registry lists a version without a checksum.
 func idOrErr(v, id string) (string, string, error) {
-	if id == "" || id == "sha256:" {
+	if id == "" {
 		return "", "", fmt.Errorf("version %s has no checksum in the registry", v)
 	}
 	return v, id, nil

@@ -61,7 +61,7 @@ page; when in doubt, a spec is floating. A spec the tool installs from
 somewhere else than the registry (an npm alias `npm:x`, `github:`,
 `org/repo`, `git+https:`, `file:`, `./dir`) fails: use the `git` or `url`
 kind, or pin. A package name must match its ecosystem's naming rules
-(npm's rules for new packages, PEP 508, crates.io, RubyGems, Maven
+(npm's rules for old packages, so uppercase is allowed; PEP 508, crates.io, RubyGems, Maven
 coordinates, Go module paths), checked when the contract is read and
 again before the lookup, so a path, a file or a URL never passes for a
 name (`left-pad/`, `./x`, `x.tgz`): `not a valid npm package name`. An
@@ -138,7 +138,8 @@ Nothing is looked up, the test runs, and the reason names the reference:
 | `git` | the URL in the reference | git's own (credential helpers, SSH keys) |
 | `url` | the URL in the reference | `~/.netrc` |
 
-`$NETRC` and `$NPM_CONFIG_USERCONFIG` point to other files. Only a
+`$NETRC` and `$npm_config_userconfig` (any letter case, as npm reads
+it) point to other files. Only a
 `machine` entry of `~/.netrc` is used, never `default`, and credentials are
 sent only over `https` or to a loopback host (also after a redirect).
 Credentials go in headers, never in the manifest, a URL or an error. A user or password
@@ -155,7 +156,7 @@ The resolved id vouches for the registry in the table, not for the one the
 tool installs from. Where the tool's own setting is known to point
 elsewhere, resolution fails: an npm `@scope:registry` or `registry` line in
 `~/.npmrc`, an `npm_config_@scope:registry` variable,
-`$NPM_CONFIG_REGISTRY` and `$npm_config_registry` that differ, `$GOPRIVATE`, `$GONOPROXY` or a `$GOPROXY` that starts with
+two spellings of an `npm_config_*` variable (npm reads any letter case) that differ, `$GOPRIVATE`, `$GONOPROXY` or a `$GOPROXY` that starts with
 `direct` or `off`, a Go module the checksum database would not verify
 (`GOSUMDB=off`, `$GONOSUMDB`, `$GOINSECURE`, `-insecure` in `$GOFLAGS`),
 and `$PIP_INDEX_URL`, `$PIP_EXTRA_INDEX_URL`, `$PIP_FIND_LINKS` or

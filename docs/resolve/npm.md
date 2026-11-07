@@ -35,13 +35,14 @@ scope:
   a version from the range: a publish, an unpublish, a deprecation or a
   moved tag changes the id. The manifest line says `floating`.
 - Registry: `$npm_config_registry`. Token: the `//host/:_authToken=` line
-  of `~/.npmrc`, `${VAR}` expanded.
+  of `~/.npmrc` (or `$npm_config_userconfig`), `${VAR}` expanded. As in
+  npm, `npm_config_*` variables are read in any letter case; two
+  spellings of one variable set to different values fail.
 - If the environment or `~/.npmrc` points the package elsewhere,
   resolution fails instead of binding the wrong registry: a
-  `npm_config_@scope:registry` variable (in any case) for the package's
-  scope, `$NPM_CONFIG_REGISTRY` and `$npm_config_registry` both set to
-  different URLs, a `@scope:registry=` line for the package's scope, or a
-  `registry=` line when neither variable is set, that differs from the
+  `npm_config_@scope:registry` variable for the package's scope, a
+  `@scope:registry=` line for the package's scope, or a
+  `registry=` line when no registry variable is set, that differs from the
   registry Aval uses. Set `$npm_config_registry` to the same URL. A
   project `.npmrc` and the global npmrc are not read.
 

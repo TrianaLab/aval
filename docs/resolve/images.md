@@ -13,7 +13,8 @@ scope:
 ```
 
 - A name without a host is a Docker Hub name: `postgres:16` is
-  `docker.io/library/postgres:16`. No tag means `latest`.
+  `docker.io/library/postgres:16`, and so are `docker.io/postgres:16` and
+  `index.docker.io/postgres:16`. No tag means `latest`.
 - The [scanner](../pinning.md#container-images) still reports the tag:
   `scope.resolve` never clears a finding. Pin by digest, or accept the
   tag with `scope.allowMutable`. The entry makes a repushed tag change the
