@@ -2,13 +2,14 @@
 # Tests scripts/deploy-docs.sh against a scratch copy of the repository whose
 # origin is a local bare repo, so nothing leaves the machine.
 #
-#   scripts/test-deploy-docs.sh            # needs mike (docs/requirements.txt)
+#   scripts/test-deploy-docs.sh            # needs mike (docs/requirements.txt) and Go
 #
 # It deploys main, a release v0.2.0, main again with a changed installer, a
 # release v0.3.0 and a release v0.3.1 tagged on an older commit, and checks
 # after each step where the site root redirects, which versions carry
-# `latest`, and that install.sh and install.ps1 at the gh-pages root are
-# byte-equal to main's scripts. Then it publishes stats.json
+# `latest`, that install.sh and install.ps1 at the gh-pages root are
+# byte-equal to main's scripts, and that main and a release ship the
+# "Try it" WebAssembly build. Then it publishes stats.json
 # (scripts/publish-stats.sh) and checks that a docs deploy keeps it and that
 # an invalid report never replaces it. Needs jq. Set
 # AVAL_TEST_KEEP=<dir> to keep the scratch copy (mike serve runs from it).
@@ -49,13 +50,21 @@ check() {
   pass "$1: root redirects to $2, installers published"
 }
 
+# wasm VERSION: the version ships the "Try it" WebAssembly build.
+wasm() {
+  [ -n "$(git --git-dir="$work/origin.git" ls-tree "gh-pages:$1/assets/demo" aval.wasm)" ] || die "$1 has no assets/demo/aval.wasm"
+  pass "$1 ships assets/demo/aval.wasm"
+}
+
 deploy() { PUSH=true scripts/deploy-docs.sh "$@" > "$work/deploy.log" 2>&1 || { cat "$work/deploy.log" >&2; die "deploy $*"; }; }
 
 deploy branch main
 check "first main deploy" main
+wasm main
 
 deploy tag v0.2.0
 check "release v0.2.0" latest
+wasm 0.2.0
 
 echo "# changed" >> scripts/get-aval.sh
 git commit -q -am "change the installer"

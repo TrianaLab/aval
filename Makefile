@@ -1,6 +1,6 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
 	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-false-hit ci-e2e ci-release ci-fuzz ci-security \
-	docs-lint docs-cli docs-site docs-deploy-test docs-nav-smoke docs-demos ci-docs brand
+	docs-lint docs-cli docs-wasm docs-site docs-demo-smoke docs-deploy-test docs-nav-smoke docs-demos ci-docs brand
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
 UNIT_PKGS = $(shell go list ./... | grep -v /tests/)
@@ -96,6 +96,8 @@ lint:
 	@v=$$(golangci-lint version --short 2>/dev/null); if [ "v$$v" != "$(GOLANGCI_LINT_VERSION)" ]; then \
 		echo "golangci-lint $(GOLANGCI_LINT_VERSION) required, found $${v:-none}"; exit 1; fi
 	golangci-lint run ./...
+	GOOS=js GOARCH=wasm go vet ./cmd/aval-wasm
+	GOOS=js GOARCH=wasm golangci-lint run ./cmd/aval-wasm
 	cd examples/evidence-consumer && golangci-lint run ./...
 	shellcheck scripts/*.sh docs/assets/tapes/*.sh
 
@@ -132,8 +134,30 @@ docs-lint:
 # from docs/requirements.in with `uv pip compile --universal --python-version
 # 3.12 --generate-hashes`); preview with `mkdocs serve`. NO_MKDOCS_2_WARNING
 # silences a banner Material prints on every build.
-docs-site:
+docs-site: docs-wasm
 	NO_MKDOCS_2_WARNING=1 mkdocs build --strict
+
+# The home page's "Try it" terminal: internal/demo compiled to WebAssembly
+# (cmd/aval-wasm) into docs/assets/demo/aval.wasm (not committed), so every
+# site build, mike's included, ships it. wasm_exec.js is vendored beside it
+# and must be the one of the Go toolchain building it; to update it after a
+# Go upgrade: cp "$$(go env GOROOT)/lib/wasm/wasm_exec.js" docs/assets/demo/.
+# The gzipped wasm must stay within WASM_BUDGET bytes (3 MB).
+WASM_BUDGET := 3145728
+
+docs-wasm:
+	@cmp -s "$$(go env GOROOT)/lib/wasm/wasm_exec.js" docs/assets/demo/wasm_exec.js || { \
+		echo "docs/assets/demo/wasm_exec.js is not the one of $$(go env GOVERSION): vendor it again (see the Makefile)"; exit 1; }
+	GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" -o docs/assets/demo/aval.wasm ./cmd/aval-wasm
+	@size=$$(gzip -9 -c docs/assets/demo/aval.wasm | wc -c | tr -d ' '); \
+	echo "aval.wasm: $$size bytes gzipped, budget $(WASM_BUDGET)"; \
+	if [ "$$size" -gt $(WASM_BUDGET) ]; then echo "aval.wasm is over its size budget"; exit 1; fi
+
+# Headless Chrome against the built site/: clicks the terminal, types aval run
+# twice (verified), then tamper and aval verify (exit 5). Needs Node and
+# Chrome or Chromium (CHROME=<path> to choose one).
+docs-demo-smoke: docs-site
+	node scripts/demo-smoke.mjs site
 
 # scripts/deploy-docs.sh (the docs.yaml deploy) against a scratch copy with a
 # local origin: default version, `latest` alias, the root installers and
@@ -220,7 +244,7 @@ ci-release: test-release
 ci-fuzz: fuzz
 ci-security: vuln
 # Fails when docs/cli-reference.md drifts from the CLI (TestCLIReference) or
-# the site does not build strictly, the mobile drawer does not open, or the
-# deploy logic breaks.
-ci-docs: docs-lint docs-site docs-nav-smoke docs-deploy-test
+# the site does not build strictly, the "Try it" terminal does not work in a
+# browser, the mobile drawer does not open, or the deploy logic breaks.
+ci-docs: docs-lint docs-site docs-demo-smoke docs-nav-smoke docs-deploy-test
 	go test -count=1 -run '^TestCLIReference$$' ./cmd/aval

@@ -71,7 +71,7 @@ func TestUnreadableInputsFailClosed(t *testing.T) {
 	if _, err := Compute(filepath.Join(t.TempDir(), "missing"), testContract(), fixedEnv); err == nil {
 		t.Error("missing contract root must fail")
 	}
-	if _, _, err := (&hasher{buf: make([]byte, 512)}).hashFile(filepath.Join(t.TempDir(), "gone.go")); err == nil {
+	if _, _, err := (&hasher{buf: make([]byte, 512)}).hashFile(os.DirFS(t.TempDir()), "gone.go"); err == nil {
 		t.Error("file removed after listing must fail")
 	}
 	f := newFixture(t)

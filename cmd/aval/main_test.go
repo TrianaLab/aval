@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TrianaLab/aval/internal/cliout"
 	"github.com/TrianaLab/aval/internal/policy"
 	"github.com/TrianaLab/aval/internal/registry"
 	"github.com/TrianaLab/aval/pkg/evidence"
@@ -55,23 +56,6 @@ func TestVersionFlag(t *testing.T) {
 	}
 }
 
-// oneLine escapes only what could start a line or move the cursor; quotes
-// and backslashes stay readable.
-func TestOneLine(t *testing.T) {
-	cases := map[string]string{
-		`unknown command "version"`: `unknown command "version"`,
-		`C:\path ünï 中`:             `C:\path ünï 中`,
-		"a\nb\r\x1b[31m\t\x00":      `a\nb\r\x1b[31m\t\x00`,
-		"line\u2028sep\u0085\u202e": `line\u2028sep\u0085\u202e`,
-		"bad\xffutf8 \uFFFD":        `bad\xffutf8 ` + "\uFFFD",
-	}
-	for in, want := range cases {
-		if got := oneLine(in); got != want {
-			t.Errorf("oneLine(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
 // Each errors.Join member gets its own aval: line, with the prefix of the
 // errors that wrap it; text inside a member is never split, and an error the
 // report already showed is not repeated.
@@ -89,7 +73,7 @@ func TestErrorLines(t *testing.T) {
 	for _, tc := range cases {
 		var b bytes.Buffer
 		for _, p := range errParts(tc.err) {
-			fmt.Fprintln(&b, "aval:", oneLine(p))
+			fmt.Fprintln(&b, "aval:", cliout.OneLine(p))
 		}
 		if b.String() != tc.want {
 			t.Errorf("%q printed as %q, want %q", tc.err, b.String(), tc.want)
@@ -310,18 +294,7 @@ type failWriter struct{}
 
 func (failWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
 
-func TestTextReportListsRejected(t *testing.T) {
-	var b strings.Builder
-	r := evidence.Report{Outcome: evidence.OutcomeVerified, Rejected: []evidence.Rejection{{Reference: "reg.example/r@sha256:ff", Outcome: evidence.OutcomeVerificationFailed, Reason: "untrusted"}}}
-	if err := writeReport(&b, "text", r); err != nil || !strings.Contains(b.String(), "rejected: reg.example/r@sha256:ff verification-failed: untrusted\n") {
-		t.Fatalf("text report %q, %v", b.String(), err)
-	}
-}
-
 func TestWriteReportPropagatesWriteErrors(t *testing.T) {
-	if err := writeReport(failWriter{}, "json", evidence.Report{}); err == nil {
-		t.Fatal("json write error must be returned")
-	}
 	root := newRootCmd()
 	root.SetOut(failWriter{})
 	root.SetArgs([]string{"verify", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "-o", "json"})

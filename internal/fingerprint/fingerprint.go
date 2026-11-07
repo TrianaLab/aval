@@ -79,12 +79,28 @@ const OutputDir = ".aval"
 // itself writes (the --result and --report paths); the ones inside dir are
 // not inputs and are skipped. Empty entries are ignored.
 func Compute(dir string, c *contract.Contract, env LookupEnv, outputs ...string) (Fingerprint, error) {
+	return compute(os.DirFS(dir), c, env, outputsUnder(dir, outputs))
+}
+
+// ComputeFS fingerprints the contract c rooted at fsys, such as the
+// in-memory project of the browser demo (cmd/aval-wasm). Its manifest is the
+// one Compute writes for the same tree. skip lists slash-separated paths,
+// relative to the root, that are Aval outputs and not inputs.
+func ComputeFS(fsys fs.FS, c *contract.Contract, env LookupEnv, skip ...string) (Fingerprint, error) {
+	m := map[string]bool{}
+	for _, s := range skip {
+		m[s] = true
+	}
+	return compute(fsys, c, env, m)
+}
+
+func compute(fsys fs.FS, c *contract.Contract, env LookupEnv, skip map[string]bool) (Fingerprint, error) {
 	if env == nil {
 		env = os.LookupEnv
 	}
 	canon := canonicalContract(c)
 	source, exclude, deps := splitGlobs(c.Scope.Source), splitGlobs(c.Scope.Exclude), splitGlobs(c.Scope.Dependencies)
-	files, err := listFiles(dir, outputsUnder(dir, outputs), slices.Concat(source, deps))
+	files, err := listFiles(fsys, skip, slices.Concat(source, deps))
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -93,7 +109,7 @@ func Compute(dir string, c *contract.Contract, env LookupEnv, outputs ...string)
 	lines = append(lines, Version, "contract "+sum(canon))
 
 	h := &hasher{buf: make([]byte, 32<<10)}
-	src, err := h.hashMatching(dir, files, "source", source, exclude)
+	src, err := h.hashMatching(fsys, files, "source", source, exclude)
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -102,7 +118,7 @@ func Compute(dir string, c *contract.Contract, env LookupEnv, outputs ...string)
 	}
 	lines = append(lines, src...)
 
-	dep, err := h.hashMatching(dir, files, "dependency", deps, nil)
+	dep, err := h.hashMatching(fsys, files, "dependency", deps, nil)
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -128,17 +144,17 @@ func Compute(dir string, c *contract.Contract, env LookupEnv, outputs ...string)
 	lines = append(lines, slices.Compact(section)...)
 
 	manifest := strings.Join(lines, "\n") + "\n"
-	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: findings(dir, c, slices.Concat(src, dep))}, nil
+	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: findings(fsys, c, slices.Concat(src, dep))}, nil
 }
 
 // findings scans the hashed files (from their manifest lines) and
 // runner.command, and marks the findings scope.allowMutable acknowledges.
-func findings(dir string, c *contract.Contract, lines []string) []pinning.Finding {
+func findings(fsys fs.FS, c *contract.Contract, lines []string) []pinning.Finding {
 	paths := make([]string, len(lines))
 	for i, l := range lines {
 		paths[i] = strings.SplitN(l, " ", 4)[3] // kind sum mode path
 	}
-	out := pinning.Scan(dir, paths, c.Runner.Command)
+	out := pinning.Scan(fsys, paths, c.Runner.Command)
 	for i := range out {
 		if out[i].Ecosystem == "scan" { // a file Aval cannot read is never accepted
 			continue
@@ -218,27 +234,25 @@ type file struct {
 	segs []string
 }
 
-// listFiles returns the regular files and symlinks under dir, sorted by
+// listFiles returns the regular files and symlinks in fsys, sorted by
 // path. VCS metadata, Aval's output directories and the paths in skip are
 // left out, and so is every directory no include glob can match a file in:
 // an unreadable or deep directory outside the scope is never opened.
-func listFiles(dir string, skip map[string]bool, include []contract.Glob) ([]file, error) {
+func listFiles(fsys fs.FS, skip map[string]bool, include []contract.Glob) ([]file, error) {
 	var out []file
-	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(fsys, ".", func(rel string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(dir, p) // cannot fail: WalkDir yields paths under dir
-		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
 			if d.Name() == ".git" || d.Name() == OutputDir {
-				return filepath.SkipDir
+				return fs.SkipDir
 			}
 			// WalkDir calls this before reading the directory, so a pruned
 			// directory is never opened.
 			segs := strings.Split(rel, "/")
 			if rel != "." && !slices.ContainsFunc(include, func(g contract.Glob) bool { return g.MayContain(segs) }) {
-				return filepath.SkipDir
+				return fs.SkipDir
 			}
 			return nil
 		}
@@ -258,7 +272,7 @@ type hasher struct{ buf []byte }
 // glob. Every include glob must match at least one file (before exclude): a
 // glob that matches nothing is a typo or a name that differs on disk (case,
 // Unicode form), and ignoring it would silently drop a declared input.
-func (h *hasher) hashMatching(dir string, files []file, kind string, include, exclude []contract.Glob) ([]string, error) {
+func (h *hasher) hashMatching(fsys fs.FS, files []file, kind string, include, exclude []contract.Glob) ([]string, error) {
 	var lines []string
 	for _, g := range include {
 		if !slices.ContainsFunc(files, func(f file) bool { return g.Match(f.segs) }) {
@@ -283,7 +297,7 @@ func (h *hasher) hashMatching(dir string, files []file, kind string, include, ex
 		if strings.ContainsAny(f.rel, "\n\r") {
 			return nil, fmt.Errorf("%s %q: control characters in path are not supported", kind, f.rel)
 		}
-		sum, mode, err := h.hashFile(filepath.Join(dir, filepath.FromSlash(f.rel)))
+		sum, mode, err := h.hashFile(fsys, f.rel)
 		if err != nil {
 			return nil, fmt.Errorf("%s %s: %w", kind, f.rel, err)
 		}
@@ -299,8 +313,8 @@ func matchesAny(globs []contract.Glob, f file) bool {
 // hashFile returns the content hash and a portable mode ("x" executable,
 // "-" otherwise). Symlinks are rejected: their target may live outside the
 // scope, and we cannot prove it did not change (fail closed).
-func (h *hasher) hashFile(p string) (string, string, error) {
-	fi, err := os.Lstat(p)
+func (h *hasher) hashFile(fsys fs.FS, p string) (string, string, error) {
+	fi, err := fs.Lstat(fsys, p)
 	if err != nil {
 		return "", "", err
 	}
@@ -308,9 +322,9 @@ func (h *hasher) hashFile(p string) (string, string, error) {
 		return "", "", errors.New("only regular files are supported in scope (symlinks and devices are rejected)")
 	}
 	d := sha256.New()
-	f, err := os.Open(p)
+	f, err := fsys.Open(p)
 	if err == nil { // one error branch for open and read
-		defer f.Close()
+		defer func() { _ = f.Close() }() // read-only: a close error loses nothing
 		// Hide *os.File's WriteTo, which copies through a fresh buffer.
 		_, err = io.CopyBuffer(d, struct{ io.Reader }{f}, h.buf)
 	}

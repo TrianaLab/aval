@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -178,5 +180,56 @@ func TestPreviewCheckCatchesMissingUpload(t *testing.T) {
 	}
 	if _, err := previewProblems([]byte("jobs: [")); err == nil {
 		t.Error("invalid YAML: want an error")
+	}
+}
+
+// The "Try it" terminal (#98) stays small and offline: Sigstore and ORAS
+// never reach the WebAssembly build, and neither does the testing package.
+func TestBrowserDemoDependencies(t *testing.T) {
+	cmd := exec.Command("go", "list", "-deps", "./cmd/aval-wasm")
+	cmd.Dir, cmd.Env = root, append(os.Environ(), "GOOS=js", "GOARCH=wasm")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps := strings.Fields(string(out))
+	if !slices.Contains(deps, "github.com/TrianaLab/aval/internal/demo") {
+		t.Fatalf("cmd/aval-wasm does not build internal/demo: %v", deps)
+	}
+	for _, d := range deps {
+		if strings.Contains(d, "sigstore") || strings.Contains(d, "oras.land") || d == "testing" {
+			t.Errorf("cmd/aval-wasm depends on %s", d)
+		}
+	}
+}
+
+// The "Try it" terminal (#98) loads the vendored wasm_exec.js, which must be
+// the one of the Go toolchain go.mod pins: the glue of another Go version
+// cannot run the wasm. CI builds with the go.mod version, so the check binds
+// there; another local toolchain skips it, and `make docs-wasm` refuses to
+// build with it. After a Go upgrade, vendor it again (see the Makefile).
+func TestVendoredWasmExec(t *testing.T) {
+	const vendored = "docs/assets/demo/wasm_exec.js"
+	m := regexp.MustCompile(`(?m)^go (\S+)$`).FindStringSubmatch(readFile(t, "go.mod"))
+	if m == nil {
+		t.Fatal("go.mod: no go line")
+	}
+	out, err := exec.Command("go", "env", "GOVERSION", "GOROOT").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := strings.Fields(string(out))
+	if env[0] != "go"+m[1] {
+		t.Skipf("toolchain %s, go.mod pins go%s", env[0], m[1])
+	}
+	want, err := os.ReadFile(filepath.Join(env[1], "lib", "wasm", "wasm_exec.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if readFile(t, vendored) != string(want) {
+		t.Errorf("%s is not the wasm_exec.js of go%s: vendor it again (Makefile, docs-wasm)", vendored, m[1])
+	}
+	if !strings.Contains(readFile(t, "docs/assets/demo/wasm_exec-LICENSE.txt"), "The Go Authors") {
+		t.Error("docs/assets/demo/wasm_exec-LICENSE.txt: Go's licence must ship with the vendored file")
 	}
 }

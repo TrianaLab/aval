@@ -163,6 +163,9 @@ extra_javascript:
   - javascripts/diagrams.js
   # Fills the home metric strip and the Stats page from /stats.json.
   - javascripts/stats.js
+  # "Try it" in the home page terminal; fetches the WebAssembly build in
+  # assets/demo/ (make docs-wasm) only when the visitor clicks.
+  - javascripts/try-aval.js
 
 # A reader's path: user pages first (Get started, Concepts, Guides), then
 # the pages to look things up. The dense design documents live under
