@@ -707,6 +707,10 @@ contract or policy file with `aval.dev/v1alpha1` is invalid.
 - A new key under `annotations`.
 - A new optional contract field. Older `aval` binaries reject a contract
   that uses it (unknown fields are rejected), which fails closed.
+- A new manifest section that only a new optional contract field brings.
+  Every contract without the field keeps its manifest byte for byte, and a
+  contract with it cannot have had a fingerprint before, so no fingerprint
+  changes meaning.
 
 Existing fields keep their name, JSON tag, type and meaning.
 
@@ -786,3 +790,7 @@ the old ones.
   validation is breaking for a frozen format; the identifier stays because
   it is provisional and no record `aval` writes is affected; the maintainers
   confirmed keeping `run-record/v1` (#88).
+- Within `aval-fingerprint/v1` (#102), the optional `scope.resolve`
+  contract field adds `resolve` lines after the `env` lines. Manifests of
+  contracts without it are unchanged (the v1 golden is untouched); the new
+  lines are pinned by their own golden.

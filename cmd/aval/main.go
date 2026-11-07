@@ -26,6 +26,7 @@ import (
 	"github.com/TrianaLab/aval/internal/fingerprint"
 	"github.com/TrianaLab/aval/internal/policy"
 	"github.com/TrianaLab/aval/internal/registry"
+	"github.com/TrianaLab/aval/internal/resolve"
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
@@ -44,6 +45,8 @@ const (
 
 // version is set at release build time (-ldflags "-X main.version=...").
 var version = "dev"
+
+func init() { resolve.Version = version }
 
 type usageError struct{ error }
 
@@ -230,7 +233,7 @@ func noArgs(c *cobra.Command, args []string) error {
 // returns the contract, so run can execute the test. outputs are the files
 // the command writes or reads as Aval output (--result, --report,
 // --record-file); inside the contract root they are not inputs.
-func loadAndFingerprint(file string, outputs ...string) (*contract.Contract, fingerprint.Fingerprint, error) {
+func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*contract.Contract, fingerprint.Fingerprint, error) {
 	c, err := contract.Load(file)
 	if err != nil {
 		return nil, fingerprint.Fingerprint{}, usageError{err}
@@ -241,7 +244,7 @@ func loadAndFingerprint(file string, outputs ...string) (*contract.Contract, fin
 			return nil, fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result or --report) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract directory", o, fingerprint.OutputDir)}
 		}
 	}
-	fp, err := fingerprint.Compute(filepath.Dir(file), c, os.LookupEnv, outputs...)
+	fp, err := fingerprint.Compute(ctx, filepath.Dir(file), c, os.LookupEnv, outputs...)
 	if err != nil {
 		// Cannot prove input equivalence: callers must run the test.
 		return c, fingerprint.Fingerprint{}, fmt.Errorf("fingerprint: %w", err)
@@ -369,7 +372,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout)); err != nil {
 				return err
 			}
-			c, fp, err := loadAndFingerprint(file)
+			c, fp, err := loadAndFingerprint(cmd.Context(), file)
 			if err != nil {
 				return err
 			}

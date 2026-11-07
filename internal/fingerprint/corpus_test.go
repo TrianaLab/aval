@@ -1,6 +1,7 @@
 package fingerprint
 
 import (
+	"context"
 	"maps"
 	"net"
 	"os"
@@ -126,7 +127,7 @@ func (f *fixture) parse(yaml string) {
 }
 
 func (f *fixture) compute() (Fingerprint, error) {
-	return Compute(f.dir, f.c, func(k string) (string, bool) { v, ok := f.env[k]; return v, ok }, f.outputs...)
+	return Compute(context.Background(), f.dir, f.c, func(k string) (string, bool) { v, ok := f.env[k]; return v, ok }, f.outputs...)
 }
 
 type corpusCase struct {

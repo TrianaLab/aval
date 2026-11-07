@@ -77,6 +77,7 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 | `scope.exclude` | list of globs | no | Removes files from the `source` set. Does not apply to `dependencies`. A glob may match nothing. |
 | `scope.dependencies` | list of globs | no | Lockfiles and manifests. Each glob must match at least one file at fingerprint time. |
 | `scope.allowMutable` | list of `{ref, reason}` | no | Acknowledges a mutable reference that would otherwise block reuse (see [Pin your dependencies](pinning.md)). `ref` is the reference exactly as Aval reports it; `reason` says why it is acceptable. Both must be non-blank. An entry accepts every occurrence of that reference in the scope and in `runner.command`. Part of the contract hash. |
+| `scope.resolve` | list of `kind: reference` | no | External artifacts resolved to an immutable id at fingerprint time (see [Resolve references](resolve/index.md)). Each entry has exactly one key, one of `image`, `npm`, `pypi`, `go`, `maven`, `crate`, `gem`, `git`, `url`; the reference is non-empty, without spaces or control characters, and without credentials. Rejected: a password in any URL; any user name in an `http(s)` URL or a scheme-less `//user@host` one (an `ssh://git@host` user is allowed); an `@` in the authority of a URL that does not parse; a query parameter named (in any case, `-` read as `_`, a trailing `[]` ignored) `token`, `private_token`, `access_token`, `key`, `apikey`, `api_key`, `sig`, `signature`, `X-Amz-Signature`, `X-Goog-Signature`, `auth`, `password`, `secret`, `credential`, `security_token`, `x_amz_security_token`, `client_secret`, `session` or `sessionid`. The error never echoes the reference. Part of the contract hash; order and duplicates do not matter. Never clears a scanner finding: pin the reference in place or accept it with `scope.allowMutable`. Binds the named artifact, not its dependencies. |
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
 | `environment.env` | list of strings | no | Environment variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
@@ -156,20 +157,21 @@ source <sha256> <mode> <path>
 dependency <sha256> <mode> <path>
 toolchain <key>=<value>
 env <NAME> <sha256 of value | unset>
+resolve <kind> <reference> <version> <immutable id>
 ```
 
-- **Header**: `aval-fingerprint/v1`. Bumped whenever the layout changes, so
+- **Header**: `aval-fingerprint/v1`. Bumped whenever the manifest of an existing contract would change, so
   fingerprints from different formats never collide.
 - **contract**: SHA-256 of the contract serialized as JSON after parsing.
   Comments, formatting and YAML key order do not matter. Set-like lists
-  (`source`, `exclude`, `dependencies`, `env`, `allowMutable`) are sorted
+  (`source`, `exclude`, `dependencies`, `env`, `allowMutable`, `resolve`) are sorted
   and deduplicated first, so their order does not matter. `runner.command` is not sorted:
   argv order is semantic. Map keys (`toolchain`) are sorted by the JSON
   encoder. Every field is included, so changing `metadata.name`,
   `runner.command` or `cacheability` changes the fingerprint. An explicitly
   empty list or map (`exclude: []`) hashes the same as an omitted field.
-  `allowMutable` is left out of the JSON when empty, so contracts without
-  it hash as they did before the field existed.
+  `allowMutable` and `resolve` are left out of the JSON when empty, so
+  contracts without them hash as they did before the fields existed.
 - **source**: one line per file that matches any `source` glob and no
   `exclude` glob.
 - **dependency**: one line per file that matches any `dependencies` glob.
@@ -183,6 +185,14 @@ env <NAME> <sha256 of value | unset>
 - **env**: one line per declared variable with the SHA-256 of its value, or
   `unset` if the variable is not set. Set-but-empty and unset are different.
   Values are never written in clear.
+- **resolve**: one line per `scope.resolve` entry: its kind, the reference
+  as written, what it resolved to (a version or ref name; `floating` for a
+  range, a tag or latest; `-` when there is none) and the immutable id
+  (digest, checksum, commit, or for `floating` the hash of the whole release
+  list) read from the registry when the fingerprint is computed. Only contracts with `scope.resolve` have these
+  lines, and only they need the network to fingerprint (see
+  [Resolve references](resolve/index.md)). The registry address is not
+  hashed.
 
 Lines are sorted within each section. The result does not depend on checkout
 path, directory iteration order or glob order. The `x` mode is taken from the
@@ -246,7 +256,9 @@ hashes (see above):
   list (corpus row).
 - Content behind a declared name: a container tag such as `postgres:16`
   that is repushed, a dependency fetched from the network at run time, a
-  service reached over the network. Only the declared text is hashed. The
+  service reached over the network. Only the declared text is hashed,
+  unless the reference is in `scope.resolve`, which hashes its immutable
+  id ([Resolve references](resolve/index.md)). The
   references the mutable-reference scanner recognizes block reuse for
   `hermetic` and `controlled-environment` (the `refused` corpus rows):
   images without a digest, manifests without a lockfile, unpinned installs,
@@ -278,6 +290,13 @@ variants, in `internal/pinning`, and a fuzz target over every detector. The test
 a manifest section is changed by no differ row, so a new section must come
 with corpus cases; a new attribute in an existing section or a new contract
 field needs its row added by review.
+
+`TestResolveFalseHits` runs the same outcomes through the real resolvers
+and in-process fakes: a republished download or a repushed image tag in
+`scope.resolve` changes the fingerprint, reordering or repeating entries
+does not, and an unresolvable reference fails closed; `internal/resolve`
+has the per-ecosystem tables. `TestResolveManifestGolden` pins the
+`resolve` lines in `testdata/golden/resolve-aval-fingerprint-vN.manifest`.
 
 `TestManifestGolden` pins, per manifest version, the manifests of three
 contracts over a fixed tree (`internal/fingerprint/testdata/golden/tree`),
@@ -363,6 +382,9 @@ test without recording it; `aval run --fingerprint-only`, `--explain`,
 - A path in scope contains a newline or carriage return: `control characters
   in path are not supported`. The manifest is line-oriented, so such a name
   could forge manifest lines and collide with a different tree.
+- A `scope.resolve` reference that cannot be resolved: `resolve <kind>
+  <reference>: <reason>` (network, credentials, an exact version that is not published, a
+  download over 256 MiB, the 2-minute deadline).
 - Any I/O error while walking or reading the root. The walk only enters
   directories that a `source` or `dependencies` glob can match a file in, so
   an unreadable directory outside the scope (a root-owned volume, a cache)

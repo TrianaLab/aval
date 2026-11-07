@@ -1,6 +1,7 @@
 package fingerprint
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -104,7 +105,7 @@ func goldenTree(t *testing.T) []Fingerprint {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fp, err := Compute(dir, c, goldenEnv)
+		fp, err := Compute(context.Background(), dir, c, goldenEnv)
 		if err != nil {
 			t.Fatal(err)
 		}
