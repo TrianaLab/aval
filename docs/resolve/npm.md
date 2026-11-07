@@ -45,6 +45,13 @@ scope:
   `registry=` line when no registry variable is set, that differs from the
   registry Aval uses. Set `$npm_config_registry` to the same URL. A
   project `.npmrc` and the global npmrc are not read.
+- `~/.npmrc` is read as npm reads it (ini): quotes around keys and values
+  are removed, `;` and `#` start a comment, and keys under a `[section]`
+  are ignored. `${VAR}` is expanded in keys and values as npm does (an
+  undefined variable stays literal). A line Aval cannot read as
+  `key=value` (a bare `key`, a list `key[]=`, a quoted key or value that
+  is JSON other than a string, a section named like a setting, a line
+  with U+2028 or U+2029) fails the fingerprint, and no token is sent.
 
 **Pin instead** for your project's own dependencies: commit
 `package-lock.json` (or `yarn.lock`, `pnpm-lock.yaml`, `bun.lock`) and add

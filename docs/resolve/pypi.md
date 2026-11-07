@@ -41,7 +41,10 @@ scope:
 - If `$PIP_INDEX_URL` is set to anything but that registry (or its
   `/simple` index), or `$PIP_EXTRA_INDEX_URL` or `$PIP_FIND_LINKS` is set
   at all, or `$PIP_NO_INDEX` is true, resolution fails: pip would install
-  from another source than the one Aval read.
+  from another source than the one Aval read. As in pip, the rest of the
+  name after `PIP_` is read in any letter case, with `-` equal to `_`
+  and one optional leading `--` (`PIP_index-url`, `PIP___INDEX_URL`);
+  two spellings set to different values fail.
   `pip.conf` and `uv` settings are not read.
 
 **Pin instead** for your requirements: `pip-compile --generate-hashes` or
