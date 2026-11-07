@@ -130,7 +130,7 @@ try {
   await p.s("Page.navigate", { url: site });
   await p.until(`document.readyState === "complete" && !!document.querySelector(".aval-term__try:not([hidden])")`, "the Try it button");
   check("the static transcript is shown before the click", (await p.js(termText)).includes("reused passed result"));
-  check("the terminal invites a click", /click to run Aval live/.test(await p.js(`document.querySelector(".aval-term__cta:not([hidden])")?.textContent`)));
+  check("the terminal invites a click", /(click|tap) to run Aval live/.test(await p.js(`document.querySelector(".aval-term__cta:not([hidden])")?.textContent`)));
   check("nothing is fetched before the click", !(await p.js(fetched)));
   await screenshots(p, "before");
   await click(p, ".aval-term pre");
