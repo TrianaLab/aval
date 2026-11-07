@@ -759,6 +759,8 @@
       
         
       
+        
+      
     
     
     
@@ -886,6 +888,354 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../resolve/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve references
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resolve references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container images
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/npm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    npm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/pypi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/go/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/maven/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maven
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/crates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust crates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/gems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ruby gems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/git/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Git
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/urls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Downloaded files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1993,6 +2343,14 @@ result the <abbr title="Your file that lists which signers you trust, and how mu
 <td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code></td>
 <td>give each entry a <code>ref</code> and a <code>reason</code> (<a href="../../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>)</td>
 </tr>
+<tr>
+<td><code>scope.resolve[&lt;i&gt;]: &lt;x&gt;</code>, <code>unknown kind &lt;x&gt;</code>, <code>the reference must be non-empty</code>, <code>credentials in the reference are not allowed</code>, <code>a scope.resolve entry is one</code></td>
+<td>one <code>kind: reference</code> per entry, a known kind, no spaces, no credentials (<a href="../../resolve/">Resolve references</a>)</td>
+</tr>
+<tr>
+<td><code>not a valid &lt;kind&gt; package name</code>, <code>is not a registry version, range or tag</code>, <code>want group:artifact:version</code></td>
+<td>a registry name that follows the ecosystem's naming rules and a version, range or tag, not a path, file or URL (<a href="../../resolve/#exact-or-floating">Resolve references</a>)</td>
+</tr>
 </tbody>
 </table>
 </details>
@@ -2022,6 +2380,10 @@ result cannot be published.</p>
 <tr>
 <td><code>only regular files are supported in scope</code>, <code>control characters in path are not supported</code></td>
 <td>keep symlinks and odd names out of <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr></td>
+</tr>
+<tr>
+<td><code>resolve &lt;kind&gt; &lt;ref&gt;: &lt;x&gt;</code></td>
+<td>a <code>scope.resolve</code> reference did not resolve: check the name, the version, the network and the credentials (<a href="../../resolve/">Resolve references</a>)</td>
 </tr>
 <tr>
 <td><code>decoding policy: &lt;x&gt;</code>, <code>minTrustLevel: &lt;x&gt; must be developer, runner or isolated</code>, <code>identities: at least one is required</code>, <code>identities[&lt;i&gt;]: &lt;x&gt;</code>, <code>trustLevel: &lt;x&gt; must be developer, runner or isolated</code></td>
@@ -2125,6 +2487,10 @@ result cannot be published.</p>
 <tr>
 <td><code>not reusable under the trust policy</code>, <code>signer &lt;x&gt; has trust level &lt;y&gt;, policy requires at least &lt;z&gt;</code></td>
 <td>the <abbr title="The identity behind a signature: a CI workload or a key.">signer</abbr> is below <code>minTrustLevel</code>; raise its <code>trustLevel</code> if you trust it</td>
+</tr>
+<tr>
+<td><code>mutable references in the inputs</code></td>
+<td>pin each reference the line lists, or acknowledge it with <code>scope.allowMutable</code> (<a href="../../pinning/">Pin your dependencies</a>)</td>
 </tr>
 <tr>
 <td><code>every listed attestation is gone</code>, <code>is gone, skipping it</code></td>

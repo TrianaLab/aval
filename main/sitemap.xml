@@ -92,4 +92,44 @@
          <loc>https://aval.run/main/guides/write-a-contract/</loc>
          <lastmod>2026-11-07</lastmod>
     </url>
+    <url>
+         <loc>https://aval.run/main/resolve/</loc>
+         <lastmod>2026-11-07</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/resolve/crates/</loc>
+         <lastmod>2026-11-07</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/resolve/gems/</loc>
+         <lastmod>2026-11-07</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/resolve/git/</loc>
+         <lastmod>2026-11-07</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/resolve/go/</loc>
+         <lastmod>2026-11-07</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/resolve/images/</loc>
+         <lastmod>2026-11-07</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/resolve/maven/</loc>
+         <lastmod>2026-11-07</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/resolve/npm/</loc>
+         <lastmod>2026-11-07</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/resolve/pypi/</loc>
+         <lastmod>2026-11-07</lastmod>
+    </url>
+    <url>
+         <loc>https://aval.run/main/resolve/urls/</loc>
+         <lastmod>2026-11-07</lastmod>
+    </url>
 </urlset>
