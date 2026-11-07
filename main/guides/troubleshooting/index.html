@@ -761,6 +761,8 @@
       
         
       
+        
+      
     
     
     
@@ -872,6 +874,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../depend-on-a-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../pinning/" class="md-nav__link">
         
   
@@ -940,7 +970,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -962,14 +992,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2348,6 +2378,10 @@ result the <abbr title="Your file that lists which signers you trust, and how mu
 <td>one <code>kind: reference</code> per entry, a known kind, no spaces, no credentials (<a href="../../resolve/">Resolve references</a>)</td>
 </tr>
 <tr>
+<td><code>scope.contracts[&lt;i&gt;]: &lt;x&gt;</code>, <code>must be slash-separated</code>, <code>must be a clean relative path</code>, <code>must name a contract file</code>, <code>is listed twice</code></td>
+<td>a relative path to a <code>.yaml</code> <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, such as <code>../backend/aval.yaml</code>, listed once (<a href="../depend-on-a-contract/">Depend on another part of the repo</a>)</td>
+</tr>
+<tr>
 <td><code>not a valid &lt;kind&gt; package name</code>, <code>is not a registry version, range or tag</code>, <code>want group:artifact:version</code></td>
 <td>a registry name that follows the ecosystem's naming rules and a version, range or tag, not a path, file or URL (<a href="../../resolve/#exact-or-floating">Resolve references</a>)</td>
 </tr>
@@ -2380,6 +2414,10 @@ result cannot be published.</p>
 <tr>
 <td><code>only regular files are supported in scope</code>, <code>control characters in path are not supported</code></td>
 <td>keep symlinks and odd names out of <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr></td>
+</tr>
+<tr>
+<td><code>scope.contracts &lt;path&gt;: &lt;x&gt;</code></td>
+<td>a referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> cannot be fingerprinted: fix it or the path (<a href="../depend-on-a-contract/">Depend on another part of the repo</a>)</td>
 </tr>
 <tr>
 <td><code>resolve &lt;kind&gt; &lt;ref&gt;: &lt;x&gt;</code></td>

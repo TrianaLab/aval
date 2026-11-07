@@ -761,6 +761,8 @@
       
         
       
+        
+      
     
     
     
@@ -872,6 +874,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/depend-on-a-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../pinning/" class="md-nav__link">
         
   
@@ -942,7 +972,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" checked>
         
           
           <div class="md-nav__link md-nav__container">
@@ -964,14 +994,14 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_4_4" id="__nav_4_4_label" tabindex="">
+              <label class="md-nav__link md-nav__link--active" for="__nav_4_5" id="__nav_4_5_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_4_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2195,7 +2225,8 @@ a nightly base image, a tool at <code>latest</code>, a fixtures branch.</p>
 <li>The manifest gets one line per reference, after the <code>env</code> lines:
   <code>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;id&gt;</code>, where <code>&lt;version&gt;</code> is
   <code>floating</code> for a reference that names no exact version. <code>aval run
-  --explain</code> shows them, and prints on stderr how long each lookup took.</li>
+  --explain</code> shows them, and prints on stderr how long each lookup took,
+  including those of the contracts in <code>scope.contracts</code>.</li>
 <li>The list is part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash; its order and duplicates do not
   matter. Contracts without <code>scope.resolve</code> never touch the network and keep
   their <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</li>

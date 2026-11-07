@@ -759,6 +759,8 @@
       
         
       
+        
+      
     
     
     
@@ -867,6 +869,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/depend-on-a-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../pinning/" class="md-nav__link">
         
   
@@ -932,7 +962,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -954,14 +984,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2454,6 +2484,16 @@ environment is valid in another.</p>
    and verify report version are frozen, with compatibility rules in
    <a href="../artifact-format/#versioning-and-compatibility">artifact-format.md</a>
    and golden files guarding the JSON shape (#17).</li>
+<li><strong>Contract composition for monorepos (Epic 10).</strong> Exit criterion: a test
+   in a monorepo reruns when, and only when, the declared inputs of the
+   parts it depends on change.
+   <em>In progress:</em> <code>scope.contracts</code> binds the fingerprints of other local
+   contracts, transitively (#124; see
+   <a href="../guides/depend-on-a-contract/">Depend on another part of the repo</a>).
+   Follow-up idea, not built: a remote dependency (another repository, by
+   OCI reference). Its files are not available to <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so it would
+   bind a published, verified result instead, which raises its own trust
+   questions (whose signature, which <abbr title="Your file that lists which signers you trust, and how much.">policy</abbr>, what a revoked result means).</li>
 </ol>
 
 

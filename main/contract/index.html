@@ -759,6 +759,8 @@
       
         
       
+        
+      
     
     
     
@@ -867,6 +869,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/depend-on-a-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../pinning/" class="md-nav__link">
         
   
@@ -932,7 +962,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -954,14 +984,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2487,6 +2517,12 @@ decoding errors (including unknown fields) are reported one at a time. An invali
 <td>External artifacts resolved to an immutable id at <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time (see <a href="../resolve/">Resolve references</a>). Each entry has exactly one key, one of <code>image</code>, <code>npm</code>, <code>pypi</code>, <code>go</code>, <code>maven</code>, <code>crate</code>, <code>gem</code>, <code>git</code>, <code>url</code>; the reference is non-empty, without spaces or control characters, and without credentials. Rejected: a password in any URL; any user name in an <code>http(s)</code> URL or a scheme-less <code>//user@host</code> one (an <code>ssh://git@host</code> user is allowed); an <code>@</code> in the authority of a URL that does not parse; a query parameter named (in any case, <code>-</code> read as <code>_</code>, a trailing <code>[]</code> ignored) <code>token</code>, <code>private_token</code>, <code>access_token</code>, <code>key</code>, <code>apikey</code>, <code>api_key</code>, <code>sig</code>, <code>signature</code>, <code>X-Amz-Signature</code>, <code>X-Goog-Signature</code>, <code>auth</code>, <code>password</code>, <code>secret</code>, <code>credential</code>, <code>security_token</code>, <code>x_amz_security_token</code>, <code>client_secret</code>, <code>session</code> or <code>sessionid</code>. The error never echoes the reference. Part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash; order and duplicates do not matter. Never clears a scanner finding: pin the reference in place or accept it with <code>scope.allowMutable</code>. Binds the named artifact, not its dependencies.</td>
 </tr>
 <tr>
+<td><code>scope.contracts</code></td>
+<td>list of paths</td>
+<td>no</td>
+<td>Other contracts this test depends on (see <a href="../guides/depend-on-a-contract/">Depend on another part of the repo</a>). Each path is relative to this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory: clean (<code>..</code> only at the start), slash-separated, without spaces, ending in <code>.yaml</code> or <code>.yml</code>, listed once. At <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time the file must exist, be a valid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and lie inside the git working tree of this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (the nearest directory at or above it with a <code>.git</code> entry). No component of the path may be a symlink. No cycles, at most 8 levels and 64 distinct contracts. A referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s mutable references block reuse here too, unless its own <code>scope.allowMutable</code> accepts them. Part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash; order does not matter.</td>
+</tr>
+<tr>
 <td><code>environment.toolchain</code></td>
 <td>map string to string</td>
 <td>no</td>
@@ -2598,19 +2634,20 @@ that was hashed. Layout, in this order:</p>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>toolchain &lt;key&gt;=&lt;value&gt;
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>env &lt;NAME&gt; &lt;sha256 of value | unset&gt;
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
 </span></code></pre></div>
 <ul>
 <li><strong>Header</strong>: <code>aval-fingerprint/v1</code>. Bumped whenever the manifest of an existing <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> would change, so
   fingerprints from different formats never collide.</li>
 <li><strong><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></strong>: SHA-256 of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> serialized as JSON after parsing.
   Comments, formatting and YAML key order do not matter. Set-like lists
-  (<code>source</code>, <code>exclude</code>, <code>dependencies</code>, <code>env</code>, <code>allowMutable</code>, <code>resolve</code>) are sorted
+  (<code>source</code>, <code>exclude</code>, <code>dependencies</code>, <code>env</code>, <code>allowMutable</code>, <code>resolve</code>, <code>contracts</code>) are sorted
   and deduplicated first, so their order does not matter. <code>runner.command</code> is not sorted:
   argv order is semantic. Map keys (<code>toolchain</code>) are sorted by the JSON
   encoder. Every field is included, so changing <code>metadata.name</code>,
   <code>runner.command</code> or <code>cacheability</code> changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. An explicitly
   empty list or map (<code>exclude: []</code>) hashes the same as an omitted field.
-  <code>allowMutable</code> and <code>resolve</code> are left out of the JSON when empty, so
+  <code>allowMutable</code>, <code>resolve</code> and <code>contracts</code> are left out of the JSON when empty, so
   contracts without them hash as they did before the fields existed.</li>
 <li><strong>source</strong>: one line per file that matches any <code>source</code> glob and no
   <code>exclude</code> glob.</li>
@@ -2633,6 +2670,13 @@ that was hashed. Layout, in this order:</p>
   lines, and only they need the network to <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> (see
   <a href="../resolve/">Resolve references</a>). The registry address is not
   hashed.</li>
+<li><strong><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></strong> with a path: one line per <code>scope.contracts</code> entry: the path
+  as written, the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <code>metadata.name</code> and its
+  <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, computed from its own directory, <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr>, environment,
+  <code>scope.resolve</code> and <code>scope.contracts</code> (so references are transitive).
+  Only contracts with <code>scope.contracts</code> have these lines. <code>--explain</code> also
+  prints the tree, one <code>depends on &lt;path&gt; (&lt;name&gt;) &lt;fingerprint&gt;</code> line per
+  reference, indented by level.</li>
 </ul>
 <p>Lines are sorted within each section. The result does not depend on checkout
 path, directory iteration order or glob order. The <code>x</code> mode is taken from the
@@ -2671,7 +2715,9 @@ file out of <abbr title="The files and dependencies the contract lists as test i
     (a real input) exits 2 before the test runs: skipping it would drop
     that input from the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. <code>aval run</code> also refuses, with exit 2,
     to overwrite any existing file at those paths that is not an Aval result
-    or report, wherever it lies.</li>
+    or report, wherever it lies. Only this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> skips them: in
+    a <code>scope.contracts</code> reference they stay inputs (a miss, never a false
+    hit).</li>
 <li>The git commit, branch or any VCS metadata. Two commits with identical
   <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> content produce the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and can reuse the same result.
   That is intended: a commit that only touches unrelated files should not
@@ -2731,6 +2777,14 @@ and in-process fakes: a republished download or a repushed image tag in
 does not, and an unresolvable reference fails closed; <code>internal/resolve</code>
 has the per-ecosystem tables. <code>TestResolveManifestGolden</code> pins the
 <code>resolve</code> lines in <code>testdata/golden/resolve-aval-fingerprint-vN.manifest</code>.</p>
+<p><code>TestContractsFalseHits</code> and <code>TestContractsFailClosed</code> cover
+<code>scope.contracts</code>: a change inside a referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> (also two
+levels down) changes the dependent's <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, a change outside it does
+not, and a missing, invalid, escaping, symlinked, cyclic or too deep
+reference fails closed. <code>TestContractsFindings</code> checks that a referenced
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s mutable references block the dependent. <code>TestContractsManifestGolden</code>
+pins the <code>contract &lt;path&gt;</code> lines in
+<code>testdata/golden/contracts-aval-fingerprint-vN.manifest</code>.</p>
 <p><code>TestManifestGolden</code> pins, per manifest version, the manifests of three
 contracts over a fixed tree (<code>internal/fingerprint/testdata/golden/tree</code>),
 concatenated in <code>testdata/golden/aval-fingerprint-vN.manifest</code>. One
@@ -2814,6 +2868,12 @@ test without recording it; <code>aval run --fingerprint-only</code>, <code>--exp
 <li>A <code>scope.resolve</code> reference that cannot be resolved: <code>resolve &lt;kind&gt;
   &lt;reference&gt;: &lt;reason&gt;</code> (network, credentials, an exact version that is not published, a
   download over 256 MiB, the 2-minute deadline).</li>
+<li>A <code>scope.contracts</code> reference that cannot be proven: <code>scope.contracts
+  &lt;path&gt;: &lt;reason&gt;</code>. The reason is any error above in the referenced
+  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or: the file is missing or not a valid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>; <code>leads outside
+  the repository root</code>; <code>no git working tree (.git) at or above &lt;dir&gt;</code>; <code>&lt;path&gt; is a
+  symlink</code>; <code>&lt;path&gt; is not a regular file</code>; <code>cycle: a/aval.yaml -&gt; b/aval.yaml -&gt; a/aval.yaml</code>; <code>more than
+  8 levels or 64 contracts</code>.</li>
 <li>Any I/O error while walking or reading the root. The walk only enters
   directories that a <code>source</code> or <code>dependencies</code> glob can match a file in, so
   an unreadable directory outside the <abbr title="The files and dependencies the contract lists as test inputs.">scope</abbr> (a root-owned volume, a cache)
