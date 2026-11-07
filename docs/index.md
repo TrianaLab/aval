@@ -4,6 +4,7 @@
 template: home.html
 hide:
   - footer
+  - toc
 ---
 
 # Run a heavy test once. Reuse the result safely everywhere

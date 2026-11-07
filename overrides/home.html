@@ -110,6 +110,7 @@ ran integration: <span class="g">passed</span> (exit 0)
 </div>
 {% endblock %}
 
-{# No sidebars and no article: the sections above are the page. #}
-{% block site_nav %}{% endblock %}
+{# No article: the sections above are the page. site_nav stays: on a phone
+   the primary sidebar is the drawer behind the hamburger menu (extra.css
+   hides <main> from 76.25em, and docs/index.md hides the toc). #}
 {% block container %}{% endblock %}
