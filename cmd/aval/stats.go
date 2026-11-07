@@ -16,6 +16,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/TrianaLab/aval/internal/cliout"
 	"github.com/TrianaLab/aval/internal/registry"
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
@@ -79,7 +80,7 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.`,
 				return err
 			}
 			if set.Truncated != "" {
-				fmt.Fprintf(cmd.ErrOrStderr(), "aval: warning: stopped reading run records: %s; the statistics cover only the records read before it. Prune old run records (docs/artifact-format.md, \"Pruning run records\")\n", oneLine(set.Truncated))
+				fmt.Fprintf(cmd.ErrOrStderr(), "aval: warning: stopped reading run records: %s; the statistics cover only the records read before it. Prune old run records (docs/artifact-format.md, \"Pruning run records\")\n", cliout.OneLine(set.Truncated))
 			}
 			return writeStats(cmd.OutOrStdout(), output, aggregate(repo, from, by == "repository", set))
 		},
@@ -215,11 +216,11 @@ func writeStats(w io.Writer, format string, r evidence.StatsReport) error {
 	if r.Repositories != nil {
 		groups = len(r.Repositories)
 		for _, g := range r.Repositories {
-			writeRunStats(w, oneLine(g.Repository), g.Stats)
+			writeRunStats(w, cliout.OneLine(g.Repository), g.Stats)
 		}
 	} else {
 		for _, t := range r.Tests {
-			writeRunStats(w, oneLine(t.TestID), t.Stats)
+			writeRunStats(w, cliout.OneLine(t.TestID), t.Stats)
 		}
 	}
 	if groups > 1 {
@@ -229,7 +230,7 @@ func writeStats(w io.Writer, format string, r evidence.StatsReport) error {
 		fmt.Fprintf(w, "skipped %d run records: unreadable, oversized, malformed, inconsistent or for another test\n", r.Skipped)
 	}
 	if r.Truncated != "" {
-		fmt.Fprintf(w, "incomplete: %s\n", oneLine(r.Truncated))
+		fmt.Fprintf(w, "incomplete: %s\n", cliout.OneLine(r.Truncated))
 	}
 	return nil
 }
