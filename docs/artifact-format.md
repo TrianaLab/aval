@@ -624,6 +624,14 @@ one, dispatching on the identifier, and old documents get no more trust than
 new ones; any identifier Aval does not know fails closed. Ending a transition
 is announced in the release notes of the release that removes it.
 
+### Golden files
+
+`pkg/evidence/testdata/*.golden.json` set every field of the statement,
+predicate, verify report, run record and stats report, and only grow: an
+additive change adds its field to the golden of its version, and a new
+version adds a new file. The tests that enforce this:
+[CONTRIBUTING.md](https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#golden-files).
+
 ### History
 
 ??? info "History"

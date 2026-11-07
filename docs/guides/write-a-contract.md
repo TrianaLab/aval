@@ -52,7 +52,7 @@ it, add it.
     One line per input: kind, sha256, `x` for an executable file, path.
 
     ```text
-    --8<-- "internal/fingerprint/testdata/golden/aval-fingerprint-v1.manifest:16:26"
+    --8<-- "internal/fingerprint/testdata/golden/aval-fingerprint-v1.manifest:1:26"
     ```
 
 ??? info "Globs that match nothing"

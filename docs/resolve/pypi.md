@@ -17,7 +17,8 @@ scope:
   ignored; environment markers are not supported.
 - `==X` binds every release pip would match for it, including local labels
   (`X+cu121`) and zero-padded forms (`X.0`); `==X+label` binds only that
-  label. A wheel added to the release later changes the id.
+  label. A wheel added to the release later changes the id. Other spellings
+  of a pre-release (`1.0c1` for `1.0rc1`) are not grouped.
 - Floating: every file of every release, with its sha256 and yanked flag.
 - The name must be a PEP 508 name, with optional `[extra,...]`. A path, a
   URL, a marker or an archive file name (`.whl`, `.tar.gz`, `.zip`, ...)

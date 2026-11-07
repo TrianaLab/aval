@@ -101,7 +101,7 @@ flowchart TB
   sig{signature valid?} -- yes --> who{signer in<br>the policy?}
   who -- yes --> st{statement and predicate<br>well-formed, subject matches?}
   st -- yes --> fp{fingerprint and<br>test id match?}
-  fp -- yes --> cls{signed cacheability equals<br>the contract's and is allowed?}
+  fp -- yes --> cls{signed cacheability equals<br>the contract's?}
   cls -- yes --> lvl{level ≥<br>minTrustLevel?}
   lvl -- yes --> ok([verified]):::ok
   lvl -- no --> miss([miss, exit 4]):::muted
@@ -111,6 +111,10 @@ flowchart TB
   fp -- no --> bad
   cls -- no --> bad
 ```
+
+A class the policy does not allow (`non-deterministic`, or
+`external-dependencies` not in `allowedCacheability`) is a miss before any
+lookup.
 
 A result whose only problem is a level below `minTrustLevel`, such as a
 developer result under a CI policy, is routine non-reuse: a miss, listed in

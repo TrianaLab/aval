@@ -370,8 +370,8 @@ Docker and openssl) and commit the GIFs.
 
 `tests/architecture` enforces these:
 
-- A concept page (`docs/concepts/`) and a task guide (`docs/guides/`) stay
-  under 120 lines; `README.md` stays under 150. Put details in collapsible
+- A concept page (`docs/concepts/`) stays under 80 lines and a task guide
+  (`docs/guides/`) under 120; `README.md` stays under 150. Put details in collapsible
   blocks or link to the reference.
 - A guide opens with a `Goal:` sentence, has a diagram and ends with
   `## Read next`. Its YAML, Go and JSON come from tested files through

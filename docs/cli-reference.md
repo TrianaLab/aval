@@ -90,10 +90,9 @@ Flags:
 
 ## aval record
 
-record publishes a run record that 'aval run --record-file' wrote, as
-'aval run --record' would have. Use it
-to publish, from a job with write credentials that runs no tests, the record
-of a run made without them. Run records are unsigned statistics: run and
+record publishes a run record that 'aval run --record-file' wrote, as 'aval
+run --record' would have. Use it to publish, from a job with write credentials
+that runs no tests, the record of a run made without them. Run records are unsigned statistics: run and
 verify never read them. --repository sets the record's source repository.
 
 ```text

@@ -31,9 +31,9 @@ test instead of reusing an old result.
 
 <!-- --8<-- [start:floating] -->
 
-An exact version binds that release. Anything else (a range, `latest`, a tag)
-binds the whole release list, so any new release runs the test again. Aval
-never picks a version from a range.
+For npm, PyPI, crates, gems and Maven, an exact version binds that release.
+Anything else (a range, `latest`, a tag) binds the whole release list, so any
+new release runs the test again. Aval never picks a version from a range.
 
 <!-- --8<-- [end:floating] -->
 
