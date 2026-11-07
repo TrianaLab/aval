@@ -23,7 +23,8 @@ aval stats --registry ghcr.io/trianalab/aval-stats \
 It publishes the [stats report](artifact-format.md#stats-report-json), plus
 `generatedAt`, as `stats.json` at the root of this site. This page and the
 home page read that file in your browser. If a refresh fails, the previous
-file stays.
+file stays. A maintainer can refresh it at any time from the Actions tab:
+open the `docs` workflow and choose "Run workflow" on `main`.
 
 ## Keep statistics of your own
 

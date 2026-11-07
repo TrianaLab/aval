@@ -10,8 +10,8 @@ name: docs
 #
 # Until a maintainer enables that (Settings > Pages > Source: GitHub Actions),
 # the `pages` job reports a notice and `deploy` is skipped, so the workflow
-# stays green. Write scopes only on push to main, a tag or the schedule,
-# never on pull_request; the PR-side check is `make docs-site` in ci.yaml (ci-docs).
+# stays green. Write scopes only on push to main, a tag, the schedule or a
+# manual run on main, never on pull_request; the PR-side check is `make docs-site` in ci.yaml (ci-docs).
 #
 # Live statistics (#97): twice an hour and on every push, `stats` runs `aval
 # stats` over the public stats registry (anonymous, no write scopes) and
@@ -20,6 +20,11 @@ name: docs
 # rebuilds no page. If anything in that path fails, the previous stats.json
 # stays and the run stays green. The schedule runs only on the default
 # branch, so its write scopes are those of a push to main.
+#
+# A manual run (Actions > docs > Run workflow, workflow_dispatch) behaves like
+# a scheduled one: it refreshes stats.json and rebuilds no page. It deploys
+# only when dispatched on main; on any other branch `deploy` is skipped, so a
+# branch's code never gets write scopes.
 
 on:
   push:
@@ -27,6 +32,7 @@ on:
     tags: ['v*']
   schedule:
     - cron: '7,37 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -96,8 +102,9 @@ jobs:
 
   deploy:
     needs: [pages, stats]
-    # !cancelled(): a failed stats job never blocks a docs deploy.
-    if: ${{ !cancelled() && needs.pages.outputs.enabled == 'true' && (github.event_name == 'push' || github.event_name == 'schedule') }}
+    # !cancelled(): a failed stats job never blocks a docs deploy. A manual
+    # run deploys only from main (tests/architecture/docs_workflow_test.go).
+    if: ${{ !cancelled() && needs.pages.outputs.enabled == 'true' && (github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # mike pushes the gh-pages branch
@@ -141,7 +148,7 @@ jobs:
         run: |
           PUSH=true scripts/publish-stats.sh "$RUNNER_TEMP/stats/stats-report.json"
           echo "published=true" >> "$GITHUB_OUTPUT"
-      # A scheduled run deploys only when it published a new stats.json.
+      # A scheduled or manual run deploys only when it published a new stats.json.
       - if: github.event_name == 'push' || steps.stats.outputs.published == 'true'
         run: git worktree add "$RUNNER_TEMP/gh-pages" gh-pages
       - if: github.event_name == 'push' || steps.stats.outputs.published == 'true'
