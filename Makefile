@@ -160,8 +160,9 @@ docs-demo-smoke: docs-site
 	node scripts/demo-smoke.mjs site
 
 # scripts/deploy-docs.sh (the docs.yaml deploy) against a scratch copy with a
-# local origin: default version, `latest` alias, the root installers and
-# stats.json (scripts/publish-stats.sh).
+# local origin: default version, `latest` alias, the root installers,
+# stats.json (scripts/publish-stats.sh) and, in headless Chrome, the outdated
+# banner hidden on latest/ and main/ and shown on an older release.
 docs-deploy-test:
 	scripts/test-deploy-docs.sh
 

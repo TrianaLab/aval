@@ -2,22 +2,25 @@
 # Tests scripts/deploy-docs.sh against a scratch copy of the repository whose
 # origin is a local bare repo, so nothing leaves the machine.
 #
-#   scripts/test-deploy-docs.sh            # needs mike (docs/requirements.txt) and Go
+#   scripts/test-deploy-docs.sh            # needs mike (docs/requirements.txt), Go, jq and Chrome
 #
 # It deploys main, a release v0.2.0, main again with a changed installer, a
 # release v0.3.0 and a release v0.3.1 tagged on an older commit, and checks
 # after each step where the site root redirects, which versions carry
 # `latest`, that install.sh and install.ps1 at the gh-pages root are
 # byte-equal to main's scripts, and that main and a release ship the
-# "Try it" WebAssembly build. Then it publishes stats.json
+# "Try it" WebAssembly build. It serves the result and checks in headless
+# Chrome that the outdated banner is hidden on latest/ and main/ and shown on
+# an older release. Then it publishes stats.json
 # (scripts/publish-stats.sh) and checks that a docs deploy keeps it and that
-# an invalid report never replaces it. Needs jq. Set
-# AVAL_TEST_KEEP=<dir> to keep the scratch copy (mike serve runs from it).
+# an invalid report never replaces it. CHROME overrides the Chrome binary.
+# Set AVAL_TEST_KEEP=<dir> to keep the scratch copy (mike serve runs from it).
 set -euo pipefail
 
 src=$(cd "$(dirname "$0")/.." && pwd)
 work=${AVAL_TEST_KEEP:-$(mktemp -d)}
-[ -n "${AVAL_TEST_KEEP:-}" ] || trap 'rm -rf "$work"' EXIT
+server=
+trap 'kill $server 2>/dev/null || true; [ -n "${AVAL_TEST_KEEP:-}" ] || rm -rf "$work"' EXIT
 mkdir -p "$work"
 
 pass() { printf 'ok   %s\n' "$1"; }
@@ -84,6 +87,41 @@ git checkout -q main
 aliases=$(pages versions.json | python3 -c 'import json,sys; print(" ".join(v["version"] + ":" + ",".join(v["aliases"]) for v in json.load(sys.stdin)))')
 [ "$aliases" = "main: 0.3.1:latest 0.3.0: 0.2.0:" ] || die "versions.json: got '$aliases'"
 pass "only 0.3.1 carries latest"
+
+# The outdated banner (#146): Material shows it on a version that matches no
+# extra.version.default. Each page loads in a fresh Chrome profile, so no
+# sessionStorage verdict carries over from another version.
+chrome=${CHROME:-$(for c in "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" /usr/bin/google-chrome /usr/bin/google-chrome-stable /usr/bin/chromium /usr/bin/chromium-browser; do [ -x "$c" ] && echo "$c" && break; done)}
+[ -n "$chrome" ] || die "no Chrome found; set CHROME"
+mkdir "$work/site"
+git --git-dir="$work/origin.git" archive gh-pages | tar -xf - -C "$work/site"
+python3 -u -m http.server -b 127.0.0.1 -d "$work/site" 0 > "$work/http.log" 2>&1 &
+server=$!
+for _ in $(seq 50); do
+  port=$(sed -n 's/.* port \([0-9]*\).*/\1/p' "$work/http.log")
+  [ -n "$port" ] && break
+  sleep 0.1
+done
+[ -n "$port" ] || die "http.server did not start"
+# banner VERSION: the outdated banner's opening tag after the page's scripts ran.
+banner() {
+  local profile
+  profile=$(mktemp -d)
+  "$chrome" --headless=new --no-sandbox --disable-gpu --no-first-run --user-data-dir="$profile" \
+    --virtual-time-budget=5000 --dump-dom "http://127.0.0.1:$port/$1/" 2>/dev/null |
+    grep -o '<[^>]*data-md-component="outdated"[^>]*>' || true
+  rm -rf "$profile"
+}
+for v in latest main; do
+  tag=$(banner "$v")
+  [[ "$tag" == *" hidden"* ]] || die "$v: outdated banner not hidden: '$tag'"
+done
+tag=$(banner 0.3.0)
+[[ -n "$tag" && "$tag" != *" hidden"* ]] || die "0.3.0: outdated banner not shown: '$tag'"
+pass "outdated banner hidden on latest and main, shown on 0.3.0"
+kill "$server"
+wait "$server" 2>/dev/null || true
+server=
 
 # stats.json (#97): a valid stats report is published at the gh-pages root
 # with generatedAt, survives a docs deploy, and anything else leaves it as

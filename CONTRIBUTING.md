@@ -225,7 +225,7 @@ rather than relying on a `major` bump from 0.x.
 | `ci-release` | level 5 against a snapshot dry-run of the release build |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
 | `ci-security` | govulncheck on both modules (needs network) |
-| `ci-docs` | markdownlint and vale (`make docs-lint`), `docs/cli-reference.md` matches the cobra commands, the site builds with `--strict` (`make docs-site`), the "Try it" terminal works in headless Chrome (`make docs-demo-smoke`), the mobile menu opens the site navigation on the home page and an inner page (`make docs-nav-smoke`), and `scripts/deploy-docs.sh` publishes the versions, default and root installers as expected (`make docs-deploy-test`); on a PR, the built site is uploaded for preview |
+| `ci-docs` | markdownlint and vale (`make docs-lint`), `docs/cli-reference.md` matches the cobra commands, the site builds with `--strict` (`make docs-site`), the "Try it" terminal works in headless Chrome (`make docs-demo-smoke`), the mobile menu opens the site navigation on the home page and an inner page (`make docs-nav-smoke`), and `scripts/deploy-docs.sh` publishes the versions, default and root installers as expected and the outdated banner shows only on releases older than `latest` (`make docs-deploy-test`); on a PR, the built site is uploaded for preview |
 
 CI also dogfoods Aval (#28). `dogfood-fingerprint` and `dogfood-compare`
 check that Aval's own contracts (`aval.yaml`, `aval.e2e.yaml`) fingerprint
