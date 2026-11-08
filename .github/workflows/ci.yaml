@@ -26,9 +26,11 @@ permissions:
 # Transition (#17): 0.1.0 reads only the pre-freeze apiVersion
 # aval.dev/v1alpha1, not this repository's aval.trianalab.io/v1 contracts and
 # policies, so while it is pinned those jobs build aval from the checked-out
-# commit instead. Pinning the first release that reads aval.trianalab.io/v1
-# switches them back to install.sh (tests/architecture enforces both, and
-# fails once CHANGELOG.md lists two releases newer than 0.1.0).
+# commit instead. 0.2.0 is skipped: the release jobs need features first
+# shipped in 0.3.0. Pinning 0.3.0 switches them back to install.sh
+# (tests/architecture enforces both, and fails once CHANGELOG.md lists a
+# release newer than 0.3.0 while 0.1.0 is pinned).
+# TODO(milestone-3): pin 0.3.0 (AVAL_VERSION, AVAL_SHA256 of aval_0.3.0_linux_amd64.tar.gz) once it is released, ending the #17 transition.
 env:
   AVAL_VERSION: 0.1.0
   AVAL_SHA256: 1128344383f48cd7dd8e46b21cbe838dd6e7b075f45a0365f9784c1b71f6e67a
