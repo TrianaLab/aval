@@ -249,13 +249,19 @@ on `main`, runner level) and `.github/aval/pr.yaml` (pull requests: also
 developer signatures); `tests/architecture/dogfood_test.go` enforces both,
 and fails if a dogfood suite reads a tracked file outside its contract's
 scope. On a pull request, `.github/aval/trust-from-base.sh` reads `pr.yaml`
-and the registry from the base branch, so a PR cannot change what its own CI
-trusts; `tests/architecture/policy_source_test.go` fails if a job that passes
-`--policy` on a pull request takes it from the working tree. A PR can still
-edit `ci.yaml` for its own run, so `.github/CODEOWNERS` names owners for
-`.github/aval/`, `.github/workflows/`, `tests/architecture/` and `AGENTS.md`;
-the `main` ruleset must require code-owner review for that to bind (a
-maintainer setting).
+and the registry from `main` (never from the PR or its base branch), so a PR
+cannot change them by editing those files, and the jobs that pass `--policy`
+verify with the pinned release (see below), not with an `aval` or a
+`Makefile` from the PR. `tests/architecture/policy_source_test.go` fails if a
+pull request job names `AVAL_POLICY` or `AVAL_REGISTRY` anywhere but the
+trust step and the `--policy`/`--registry` values, runs code from the
+checkout before its policy steps, or passes the policy through anything but
+one `aval` command. A PR can still edit `ci.yaml`, `install.sh` or
+`trust-from-base.sh` for its own run, so review must cover those:
+`.github/CODEOWNERS` names owners for `.github/aval/`, `.github/workflows/`,
+`tests/architecture/`, `AGENTS.md`, the `Makefile` and the `aval*.yaml`
+contracts, and the `main` ruleset must require code-owner review for that to
+bind (a maintainer setting).
 The release job refuses to publish without a verified, passing e2e
 attestation for the tagged commit. Roadmap milestone 3 (an end-to-end example
 in GitHub Actions) is in progress: the `example-go-compose` job runs the
@@ -281,16 +287,15 @@ offline).
 
 #### Which aval a CI job runs
 
-A job that tests the PR's code builds `aval` from source: `ci-e2e` (`make
-ci-e2e`, the same command as locally) and `dogfood-fingerprint`, which checks
-the PR's fingerprinting. A job that uses Aval as a user would runs a pinned
-release instead: the demo (`example-go-compose`), the shadow run
-(`dogfood-shadow`) and the publish steps (`dogfood-publish`,
+A job that tests the PR's fingerprinting builds `aval` from source:
+`dogfood-fingerprint`. A job that uses Aval as a user would, or decides
+reuse, runs a pinned release instead: the heavy suite (`ci-e2e`, the same
+`aval run -f aval.e2e.yaml` as `make ci-e2e`, but not through the PR's
+`Makefile` and `bin/aval`, #134), the demo (`example-go-compose`), the shadow
+run (`dogfood-shadow`) and the publish steps (`dogfood-publish`,
 `dogfood-record`). The suites those jobs run still build and test the PR's
 code; only the `aval` that looks up, verifies, records and pushes results is
-the release. `ci-e2e` could use the release for the same reason, but it would
-need a `Makefile` change, and the
-`Makefile` is in the e2e contract's scope.
+the release.
 
 `ci.yaml` pins the release as `AVAL_VERSION` and `AVAL_SHA256` (the sha256 of
 `aval_<version>_linux_amd64.tar.gz`). `.github/aval/install.sh` checks the
@@ -368,8 +373,8 @@ later runs on `main` reuse that one. A release requires a verified runner
 result: `release.yaml`'s `aval verify` exits 4 (a miss) on a developer-only
 fingerprint and stops. A signer that neither policy lists is still a
 verification failure (exit 5). To add a maintainer, add the identity at
-`developer` level to both `pr.yaml` and `main.yaml`. PR CI reads `pr.yaml` from the
-base branch, so the new identity counts only after that change is merged,
+`developer` level to both `pr.yaml` and `main.yaml`. PR CI reads `pr.yaml` from
+`main`, so the new identity counts only after that change is merged,
 never in the PR that adds it.
 
 ### Join the public stats

@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Usage: trust-from-base.sh (reads GITHUB_EVENT_NAME, BASE_REF, RUNNER_TEMP,
-# GITHUB_ENV)
+# Usage: trust-from-base.sh (reads GITHUB_EVENT_NAME, RUNNER_TEMP, GITHUB_ENV)
 # Sets AVAL_POLICY and AVAL_REGISTRY for the rest of the job (#134). On a
-# pull request both come from the base branch, never from the PR head, so a
-# PR that adds its own identity to pr.yaml or points the registry elsewhere
-# does not change what its own CI trusts. On push (main) they come from the
-# checkout, which is main. The registry is the one AVAL_REGISTRY value that
-# ci.yaml declares; anything else fails the job. A PR can still edit ci.yaml
-# or this script for its own run: tests/architecture, CODEOWNERS and review
-# guard those (docs/trust-model.md "Take the policy from a protected branch").
+# pull request both come from main, never from the PR head or its base
+# branch (a PR to another branch could control that), so a PR that adds its
+# own identity to pr.yaml or points the registry elsewhere does not change
+# what its own CI trusts. On push (main) they come from the checkout, which
+# is main. The registry is the one AVAL_REGISTRY value that ci.yaml declares;
+# anything else fails the job. A PR can still edit ci.yaml, install.sh or
+# this script for its own run: tests/architecture and enforced code-owner
+# review guard those (docs/trust-model.md "Take the policy from a protected
+# branch").
 set -euo pipefail
 : "${GITHUB_EVENT_NAME:?}" "${RUNNER_TEMP:?}" "${GITHUB_ENV:?}"
 if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-  : "${BASE_REF:?}"
-  git fetch --no-tags --depth=1 origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
-  src="origin/$BASE_REF" policy=pr.yaml
+  git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+  src=origin/main policy=pr.yaml
 else
   src=HEAD policy=main.yaml
 fi

@@ -45,7 +45,7 @@ Trust only this workflow on `main`: see
     `contents: read`, run `aval run` with `--registry` and `--policy`, and
     leave out the push. GHCR packages that are public can be read without a
     login.
-    Read the policy from the base branch, not from the PR:
+    Read the policy from the default branch, not from the PR:
     [Take the policy from a protected branch](../trust-model.md#take-the-policy-from-a-protected-branch).
 
 ## Read next

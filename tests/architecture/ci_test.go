@@ -64,6 +64,7 @@ type step struct {
 	Env             map[string]string `yaml:"env"`
 	Run             string            `yaml:"run"`
 	Uses            string            `yaml:"uses"`
+	Shell           string            `yaml:"shell"`
 	With            map[string]string `yaml:"with"`
 	ContinueOnError string            `yaml:"continue-on-error"`
 }
@@ -153,6 +154,11 @@ jobs:
 	}
 }
 
+// pinnedLegs run in CI through the pinned aval release instead of `make`,
+// with the same contract: `make ci-e2e` would verify with bin/aval and the
+// Makefile from the PR (#134).
+var pinnedLegs = map[string]string{"ci-e2e": "aval run -f aval.e2e.yaml "}
+
 // Every leg of `make ci` runs in the CI job of the same name and has a row in
 // the AGENTS.md Commands table, so local gates, CI and docs cannot drift apart.
 func TestMakeCILegsMirrorCIJobs(t *testing.T) {
@@ -179,9 +185,12 @@ func TestMakeCILegsMirrorCIJobs(t *testing.T) {
 			continue
 		}
 		if !slices.ContainsFunc(job.Steps, func(s step) bool {
+			if want, ok := pinnedLegs[leg]; ok {
+				return strings.HasPrefix(strings.TrimSpace(s.Run), want)
+			}
 			return strings.TrimSpace(s.Run) == "make "+leg
 		}) {
-			t.Errorf("CI job %s must run `make %s`", leg, leg)
+			t.Errorf("CI job %s must run `make %s` (or its pinnedLegs command)", leg, leg)
 		}
 	}
 	agents, err := os.ReadFile(filepath.Join("..", "..", "AGENTS.md"))

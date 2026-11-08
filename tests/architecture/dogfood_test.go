@@ -337,7 +337,7 @@ func TestDogfoodScopeCheckCatchesUndeclaredReads(t *testing.T) {
 
 // releaseJobs use Aval as a user would, so they run the pinned release that
 // .github/aval/install.sh verifies, never a binary built from the PR.
-var releaseJobs = []string{"example-go-compose", "dogfood-shadow", "dogfood-publish", "dogfood-record"}
+var releaseJobs = []string{"ci-e2e", "example-go-compose", "dogfood-shadow", "dogfood-publish", "dogfood-record"}
 
 var (
 	pinVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)

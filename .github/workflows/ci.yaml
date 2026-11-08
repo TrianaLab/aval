@@ -124,7 +124,10 @@ jobs:
   # permission reaches the suite. If the package cannot be read anonymously,
   # every lookup is an error and the suite runs. On main, dogfood-publish
   # signs and pushes the recorded result, and dogfood-record publishes the
-  # run record.
+  # run record. The pinned, verified aval release decides reuse, not
+  # `make ci-e2e` (#134): that would verify with bin/aval and the Makefile
+  # from the PR, so a PR could make its own CI accept anything. The suite
+  # itself (runner.command) still builds and tests the PR.
   ci-e2e:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -139,14 +142,21 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Install the pinned aval release (verified)
+        run: .github/aval/install.sh
       # AVAL_POLICY and AVAL_REGISTRY (#134): main reuses only this workflow
       # on main (main.yaml); a PR also developer signatures, with pr.yaml and
-      # the registry read from the base branch, never from the PR head.
-      - name: Trust policy and registry (base branch on pull requests)
-        env:
-          BASE_REF: ${{ github.base_ref }}
+      # the registry read from main, never from the PR head.
+      - name: Trust policy and registry (main on pull requests)
         run: .github/aval/trust-from-base.sh
-      - run: make ci-e2e
+      - name: Heavy suite through the pinned aval release
+        run: |
+          aval run -f aval.e2e.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
+            --result .aval/e2e-result.json --report .aval/e2e-report.json \
+            --record-file .aval/e2e-record.json --ci-run-url "$AVAL_CI_RUN_URL" --repository "$AVAL_REPOSITORY"
       - name: Summary
         if: always()
         run: .github/aval/summary.sh aval-e2e .aval/e2e-report.json
@@ -473,10 +483,8 @@ jobs:
         run: .github/aval/install.sh
       # AVAL_POLICY and AVAL_REGISTRY (#134): main reuses only this workflow
       # on main (main.yaml); a PR also developer signatures, with pr.yaml and
-      # the registry read from the base branch, never from the PR head.
-      - name: Trust policy and registry (base branch on pull requests)
-        env:
-          BASE_REF: ${{ github.base_ref }}
+      # the registry read from main, never from the PR head.
+      - name: Trust policy and registry (main on pull requests)
         run: .github/aval/trust-from-base.sh
       - name: Shadow run of the engine unit suite
         run: |
@@ -526,7 +534,7 @@ jobs:
       id-token: write
     env:
       # The one registry declaration: trust-from-base.sh reads it for the
-      # suites, from the base branch on pull requests.
+      # suites, from main on pull requests.
       AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
