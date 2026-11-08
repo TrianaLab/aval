@@ -1,5 +1,0 @@
----
-"aval": patch
----
-
-`scope.allowMutable` entries take an optional `file:` (the path a finding prints, relative to the contract, or `runner.command`): the entry then accepts the reference in that file only. A ref-only entry still accepts a reference that one file reports; when several files report it (generic refs such as `resources[0]` or `patches[0]` repeat across kustomizations), nothing is accepted and the finding asks for `file:`. With `scope.contracts`, each contract's entries apply to its own findings. The scanner also reports kustomize `helmCharts` entries other than a local chart in the scope, and patches given by a path outside the scope; checks instructions behind `ONBUILD`; uses the `# escape=` character when it splits heredoc words; and no longer reports a `range` loop's key variable used as a key directly under `labels:` or `annotations:` in a Helm template. Since the previous release, image refs in JSON files (`"image": "postgres:16",`) no longer end in `",`: update an acknowledgement written with the trailing characters to the bare reference (`postgres:16`).
