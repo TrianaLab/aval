@@ -72,7 +72,8 @@ verified result and exits 1 if they disagree (a false hit).
 
 Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
 2 usage. Keyless signing reads $` + idTokenEnv + `; runner.command never sees
-it.\n` + loginHelp + `.`,
+it.
+` + loginHelp + `.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runTest(cmd, o) },
 	}
@@ -132,6 +133,9 @@ const (
 // terminal), or a key that does not load.
 func checkSigner(key, token string, login bool) error {
 	if key == "" {
+		if login && token != "" {
+			return usageError{fmt.Errorf("--login and $%s exclude each other", idTokenEnv)}
+		}
 		if token == "" && !login && !isTerminal() {
 			return usageError{fmt.Errorf("signing needs --key or, for keyless signing, an OIDC token in $%s or a terminal for the interactive Sigstore login (--login)", idTokenEnv)}
 		}
@@ -527,7 +531,8 @@ func newPushCmd() *cobra.Command {
 		Short: "Sign and publish a recorded execution result",
 		Long: `push signs the result recorded by 'aval run' and publishes it. The result
 must be for the current inputs: same test id, cacheability and fingerprint.
-Keyless signing reads the OIDC token from $` + idTokenEnv + `.\n` + loginHelp + `.`,
+Keyless signing reads the OIDC token from $` + idTokenEnv + `.
+` + loginHelp + `.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if repo == "" {

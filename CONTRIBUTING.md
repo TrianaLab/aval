@@ -346,8 +346,7 @@ only `ci.yaml` on `main` at runner level, and `tests/architecture` fails if a
 developer identity is added there. Caveat: because `main.yaml` does not list
 the developer identity at all, a developer-signed result at a fingerprint
 `main` also computes (a PR merged unchanged) is a verification failure there
-(exit 5), not a miss. Until #130 settles where these results live, publish
-them only for runs whose inputs will not reach `main` unchanged.
+(exit 5), not a miss. Do not publish to `aval-attestations` yet; see #130.
 
 ### Join the public stats
 

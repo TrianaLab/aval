@@ -21,10 +21,10 @@ import (
 // ES256 ID token, and its JWKS.
 type fakeOIDC struct {
 	*httptest.Server
-	key      *ecdsa.PrivateKey
-	mu       sync.Mutex
-	nonce    string
-	verifier string // the PKCE challenge the token request must answer
+	key       *ecdsa.PrivateKey
+	mu        sync.Mutex
+	nonce     string
+	challenge string
 }
 
 func newFakeOIDC(t *testing.T) *fakeOIDC {
@@ -61,7 +61,7 @@ func newFakeOIDC(t *testing.T) *fakeOIDC {
 			return
 		}
 		f.mu.Lock()
-		f.nonce, f.verifier = q.Get("nonce"), q.Get("code_challenge")
+		f.nonce, f.challenge = q.Get("nonce"), q.Get("code_challenge")
 		f.mu.Unlock()
 		http.Redirect(w, r, q.Get("redirect_uri")+"?"+url.Values{"code": {"c"}, "state": {q.Get("state")}}.Encode(), http.StatusFound)
 	})
@@ -69,7 +69,7 @@ func newFakeOIDC(t *testing.T) *fakeOIDC {
 		_ = r.ParseForm()
 		sum := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
 		f.mu.Lock()
-		nonce, challenge := f.nonce, f.verifier
+		nonce, challenge := f.nonce, f.challenge
 		f.mu.Unlock()
 		if r.PostForm.Get("code") != "c" || b64(sum[:]) != challenge {
 			http.Error(w, `{"error":"invalid_grant"}`, http.StatusBadRequest)

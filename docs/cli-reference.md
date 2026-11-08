@@ -73,7 +73,8 @@ Use "aval completion [command] --help" for more information about a command.
 
 push signs the result recorded by 'aval run' and publishes it. The result
 must be for the current inputs: same test id, cacheability and fingerprint.
-Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.\nWithout --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
+Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
+Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
 --login) opens the interactive Sigstore login in the browser; no token is
 stored.
 
@@ -126,7 +127,8 @@ verified result and exits 1 if they disagree (a false hit).
 
 Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
 2 usage. Keyless signing reads $SIGSTORE_ID_TOKEN; runner.command never sees
-it.\nWithout --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
+it.
+Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
 --login) opens the interactive Sigstore login in the browser; no token is
 stored.
 

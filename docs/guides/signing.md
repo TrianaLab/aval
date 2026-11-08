@@ -41,7 +41,8 @@ flowchart LR
     that one signature and never stored. `--login` asks for the login without
     a terminal; `$SIGSTORE_OIDC_ISSUER` and `$SIGSTORE_OIDC_CLIENT_ID`
     override the issuer and client id. Give such an identity `developer` in
-    the policy.
+    the policy. In CI, set `$SIGSTORE_ID_TOKEN` or use `--key`: a terminal
+    without a browser prints the login URL and waits for a pasted code.
 
 ## Which one
 

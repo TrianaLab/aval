@@ -50,15 +50,25 @@ func TestInteractiveLogin(t *testing.T) {
 	}
 }
 
-// $SIGSTORE_ID_TOKEN and --key keep working without a login; --key and
-// --login exclude each other; a failed login publishes nothing.
+// $SIGSTORE_ID_TOKEN and --key keep working without a login; --login
+// excludes both; a failed login publishes nothing.
 func TestInteractiveLoginNotUsed(t *testing.T) {
 	fakePublish(t, nil, nil) // sets $SIGSTORE_ID_TOKEN
 	calls := fakeLogin(t, true, "", errors.New("closed"))
 	c := writeContract(t, "hermetic")
 	result := filepath.Join(t.TempDir(), "r.json")
-	if code, _, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--login", "--result", result); code != ExitOK || *calls != 0 {
+	if code, _, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result", result); code != ExitOK || *calls != 0 {
 		t.Fatalf("token: exit %d, %d logins, stderr %q", code, *calls, stderr)
+	}
+	for _, cmd := range []string{"run", "push"} {
+		t.Setenv(idTokenEnv, "token") // run unsets it before runner.command
+		args := []string{cmd, "-f", c, "--registry", "reg.example/r", "--login", "--result", result}
+		if cmd == "run" {
+			args = append(args, "--push")
+		}
+		if code, _, stderr := runCLI(args...); code != ExitUsage || !strings.Contains(stderr, "--login and $"+idTokenEnv+" exclude each other") || *calls != 0 {
+			t.Errorf("%s token --login: exit %d, stderr %q", cmd, code, stderr)
+		}
 	}
 	key, _ := devKey(t, t.TempDir(), "k")
 	for _, cmd := range []string{"run", "push"} {
