@@ -255,8 +255,11 @@ verify with the pinned release (see below), not with an `aval` or a
 `Makefile` from the PR. `tests/architecture/policy_source_test.go` fails if a
 pull request job names `AVAL_POLICY` or `AVAL_REGISTRY` anywhere but the
 trust step and the `--policy`/`--registry` values, runs code from the
-checkout before its policy steps, or passes the policy through anything but
-one `aval` command. A PR can still edit `ci.yaml`, `install.sh` or
+checkout before its policy steps, sets `PATH`, `BASH_ENV` or `ENV` there, or
+passes the policy through anything but one `aval` command. The trust step
+runs before `install.sh` and calls `/usr/bin/git`, and the jobs that use the
+policy need `ci-gates`, so their checks are skipped, not green, when the
+gates fail. A PR can still edit `ci.yaml`, `install.sh` or
 `trust-from-base.sh` for its own run, so review must cover those:
 `.github/CODEOWNERS` names owners for `.github/aval/`, `.github/workflows/`,
 `tests/architecture/`, `AGENTS.md`, the `Makefile` and the `aval*.yaml`

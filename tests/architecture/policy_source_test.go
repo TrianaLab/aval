@@ -80,21 +80,36 @@ func mentionsTrustVar(v any) bool {
 }
 
 type policyJob struct {
-	If       string `yaml:"if"`
-	Defaults any    `yaml:"defaults"`
-	Steps    []step `yaml:"steps"`
+	If       string            `yaml:"if"`
+	Defaults any               `yaml:"defaults"`
+	Env      map[string]string `yaml:"env"`
+	Steps    []step            `yaml:"steps"`
+}
+
+// envProblems: env sets a variable that changes which program runs or runs
+// code before it (PATH, BASH_ENV, ENV).
+func envProblems(where string, env map[string]string) []string {
+	var problems []string
+	for _, k := range []string{"PATH", "BASH_ENV", "ENV"} {
+		if _, ok := env[k]; ok {
+			problems = append(problems, where+" sets "+k)
+		}
+	}
+	return problems
 }
 
 // policySourceProblems: in a workflow that runs on pull requests, only
 // trustStep sets AVAL_POLICY and AVAL_REGISTRY (no env, inline assignment,
 // make variable, GITHUB_ENV write or shell names them), and a job that uses
 // the policy runs nothing from the checkout before its policy steps: remote
-// actions and installStep, then trustStep, then the policy steps, each one
+// actions, then trustStep, then installStep, then the policy steps, each one
 // pinned `aval` command whose --policy/--registry name only those variables.
+// Neither the workflow, the job nor a policy step sets PATH, BASH_ENV or ENV.
 func policySourceProblems(data []byte) ([]string, error) {
 	var wf struct {
 		On       yaml.Node            `yaml:"on"`
 		Defaults any                  `yaml:"defaults"`
+		Env      map[string]string    `yaml:"env"`
 		Jobs     map[string]policyJob `yaml:"jobs"`
 	}
 	var raw map[string]any
@@ -126,6 +141,8 @@ func policySourceProblems(data []byte) ([]string, error) {
 		if wf.Defaults != nil || j.Defaults != nil {
 			problems = append(problems, name+": sets defaults in a job that uses the policy")
 		}
+		problems = append(problems, envProblems(name+": the workflow", wf.Env)...)
+		problems = append(problems, envProblems(name+": a job that uses the policy", j.Env)...)
 		problems = append(problems, jobPolicyProblems(name, j.Steps)...)
 	}
 	slices.Sort(problems)
@@ -146,6 +163,7 @@ func jobPolicyProblems(name string, steps []step) []string {
 		case run == trustStep:
 			trusted, chain = true, true
 		case usesPolicy(run):
+			problems = append(problems, envProblems(name+": a policy step", s.Env)...)
 			if !chain {
 				problems = append(problems, name+": a policy step does not follow "+trustStep+" directly")
 			}
@@ -157,9 +175,12 @@ func jobPolicyProblems(name string, steps []step) []string {
 					problems = append(problems, name+": --"+m[1]+" is not $"+want+": "+m[0])
 				}
 			}
+		case trusted && run == installStep:
+			// install.sh keeps the chain: it runs after the trust step, so it
+			// cannot change the git that step reads main with.
 		case trusted:
 			chain = false
-		case run != installStep && (run != "" || s.Uses == "" || strings.HasPrefix(s.Uses, "./")):
+		case run != "" || s.Uses == "" || strings.HasPrefix(s.Uses, "./"):
 			problems = append(problems, name+": runs code from the checkout before "+trustStep+": "+run+s.Uses)
 		}
 	}
@@ -187,7 +208,7 @@ func TestPRPolicyComesFromBaseBranch(t *testing.T) {
 }
 
 func TestPolicySourceCheckCatchesWorkingTreePolicies(t *testing.T) {
-	const pre = "{uses: actions/checkout@x}, {uses: sigstore/cosign-installer@x}, {run: " + installStep + "}, {run: " + trustStep + "}"
+	const pre = "{uses: actions/checkout@x}, {uses: sigstore/cosign-installer@x}, {run: " + trustStep + "}, {run: " + installStep + "}"
 	ok := "on: [push, pull_request]\njobs:\n" +
 		"  a:\n    steps: [" + pre + ", {run: \"aval run --registry \\\"$AVAL_REGISTRY\\\" --registry-timeout 1m \\\\\\n  --policy=\\\"${AVAL_POLICY}\\\"\"}, {run: 'aval stats --registry \"$STATS\"'}, {run: make test}]\n" +
 		"  b:\n    if: github.event_name == 'push'\n    env: {AVAL_POLICY: p.yaml}\n    steps: [{run: aval run --policy p.yaml}]\n" +
@@ -211,6 +232,10 @@ func TestPolicySourceCheckCatchesWorkingTreePolicies(t *testing.T) {
 		"workflow env registry": "on: {pull_request: {}}\nenv: {AVAL_REGISTRY: evil.io/x}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
 		"no trust step":         pr("{run: " + installStep + "}, " + use),
 		"trust step too late":   pr("{run: " + installStep + "}, " + use + ", {run: " + trustStep + "}"),
+		"install before trust":  pr("{run: " + installStep + "}, {run: " + trustStep + "}, " + use),
+		"PATH override":         "on: pull_request\njobs:\n  a:\n    env: {PATH: './bin:/usr/bin'}\n    steps: [" + pre + ", " + use + "]\n",
+		"workflow PATH":         "on: pull_request\nenv: {PATH: './bin:/usr/bin'}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
+		"BASH_ENV":              pr(pre + ", {env: {BASH_ENV: ./evil.sh}, run: 'aval run --policy \"$AVAL_POLICY\"'}"),
 		"push or PR job":        "on: [push, pull_request]\njobs:\n  a:\n    if: github.event_name == 'push' || github.event_name == 'pull_request'\n    steps: [{run: aval run --policy p.yaml}]\n",
 		"negated push":          "on: [push, pull_request]\njobs:\n  a:\n    if: \"!(github.event_name == 'push')\"\n    env: {AVAL_POLICY: evil.yaml}\n    steps: [" + pre + ", " + use + "]\n",
 		"not push":              "on: [push, pull_request]\njobs:\n  a:\n    if: github.event_name != 'push'\n    steps: [{run: aval run --policy p.yaml}]\n",
@@ -294,8 +319,7 @@ func runTrustStep(t *testing.T, dir, event string) (map[string]string, error) {
 	envFile := filepath.Join(tmp, "env")
 	cmd := exec.Command("bash", script)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GITHUB_ACTIONS=true", "CI=true", "RUNNER_OS=Linux", "RUNNER_ENVIRONMENT=github-hosted",
-		"GITHUB_EVENT_NAME="+event, "BASE_REF=evil-base", "GITHUB_BASE_REF=evil-base", "RUNNER_TEMP="+tmp, "GITHUB_ENV="+envFile)
+	cmd.Env = runnerEnv(event, tmp, dir)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("%w\n%s", err, out)
 	}
@@ -309,6 +333,17 @@ func runTrustStep(t *testing.T, dir, event string) (map[string]string, error) {
 		vars[k] = v
 	}
 	return vars, nil
+}
+
+// runnerEnv is the environment of a GitHub-hosted runner for event, with
+// RUNNER_TEMP tmp (GITHUB_ENV in it) and workspace ws.
+func runnerEnv(event, tmp, ws string) []string {
+	return append(os.Environ(), "GITHUB_ACTIONS=true", "CI=true", "RUNNER_OS=Linux", "RUNNER_ENVIRONMENT=github-hosted",
+		"GITHUB_RUN_ID=1", "GITHUB_RUN_ATTEMPT=1", "GITHUB_WORKSPACE="+ws, "GITHUB_REPOSITORY=TrianaLab/aval",
+		"GITHUB_SERVER_URL=https://github.com", "GITHUB_WORKFLOW=ci", "GITHUB_SHA=0000000000000000000000000000000000000000",
+		"GITHUB_REF=refs/pull/1/merge", "GITHUB_HEAD_REF=pr", "GITHUB_ACTOR=attacker",
+		"GITHUB_EVENT_NAME="+event, "BASE_REF=evil-base", "GITHUB_BASE_REF=evil-base",
+		"RUNNER_TEMP="+tmp, "GITHUB_ENV="+filepath.Join(tmp, "env"))
 }
 
 func git(t *testing.T, dir string, args ...string) {
@@ -388,6 +423,43 @@ func TestTrustStepReadsTheBaseBranch(t *testing.T) {
 		if _, err := runTrustStep(t, clone, "pull_request"); err == nil {
 			t.Errorf("%s: trust step succeeded", name)
 		}
+	}
+}
+
+// The trust step runs git by absolute path, so nothing earlier in the job can
+// put a git on PATH that reads the PR's files instead of main's (#134).
+func TestTrustStepRunsGitByAbsolutePath(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(root, trustStep))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bare := regexp.MustCompile(`(?m)^[^#\n]*(?:^|[^/\w])git\s`).FindAllString(string(data), -1); len(bare) > 0 {
+		t.Errorf("%s runs git from PATH (%d times), want /usr/bin/git", trustStep, len(bare))
+	}
+}
+
+// A job that uses the policy waits for ci-gates, so when the gate fails its
+// check is skipped instead of green (#134).
+func TestPolicyJobsNeedGates(t *testing.T) {
+	var wf workflow
+	if err := yaml.Unmarshal(readCI(t), &wf); err != nil {
+		t.Fatal(err)
+	}
+	for name, j := range wf.Jobs {
+		if slices.ContainsFunc(j.Steps, func(s step) bool { return strings.TrimSpace(s.Run) == trustStep }) && !slices.Contains(j.Needs, "ci-gates") {
+			t.Errorf("%s runs %s but does not need ci-gates", name, trustStep)
+		}
+	}
+}
+
+// runTrustStep sets what a GitHub-hosted runner sets, so a trust step that
+// behaves differently on a real runner is caught (#134).
+func TestTrustStepEnvLooksLikeARunner(t *testing.T) {
+	probe := `for v in GITHUB_ACTIONS CI RUNNER_OS RUNNER_ENVIRONMENT GITHUB_RUN_ID GITHUB_RUN_ATTEMPT GITHUB_WORKSPACE GITHUB_REPOSITORY GITHUB_SERVER_URL GITHUB_WORKFLOW GITHUB_SHA GITHUB_REF GITHUB_HEAD_REF GITHUB_ACTOR; do [ -n "${!v:-}" ] || { echo "missing $v"; exit 1; }; done`
+	cmd := exec.Command("bash", "-c", probe)
+	cmd.Env = runnerEnv("pull_request", t.TempDir(), "/ws")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Errorf("%v: %s", err, out)
 	}
 }
 
