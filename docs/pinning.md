@@ -88,9 +88,14 @@ Find the digest with `crane digest <image:tag>` or
     - Images in test code: in `*.go`, `*.py`, `*.java`, `*.kt`, `*.ts`,
       `*.js` and `*.cs` files that mention testcontainers, a quoted
       `name:tag` without a digest (`PostgresContainer("postgres:16")`). A
-      `host:port` literal (`"localhost:5432"`, `"127.0.0.1:8080"`), a
-      literal with a space or a scheme, and a name without a tag are not
-      reported.
+      `localhost`, dotted or 4+ digit `host:port` literal
+      (`"localhost:5432"`, `"127.0.0.1:8080"`, `"db:5432"`), a clock time
+      (`"12:30"`), a `sha256:` digest, a literal with a space or a scheme,
+      and a name without a tag are not reported. Any other quoted
+      `name:tag`, such as `"classpath:schema.sql"`, is reported and can be
+      accepted in `scope.allowMutable`; an image whose tag is 4 or more
+      digits without a registry (`"app:2024"`) is taken for a `host:port`
+      and not reported.
     - Images in `docker run`, `podman run`, `docker compose` and
       `kubectl run`/`create --image` commands. A compose file the command uses
       must be in `scope.source`; it can be YAML or JSON (`compose.json`).
@@ -213,7 +218,9 @@ cacheability: controlled-environment
     - In test code: an image in a variable built from parts, in a constant
       or helper in a file that does not mention testcontainers, a
       module's default image (`PostgresContainer()` without an image), the
-      Ryuk reaper image, and source files larger than 1 MiB. Write the image with its digest
+      Ryuk reaper image, source files larger than 1 MiB or unreadable, and
+      source in other languages or extensions (`.rs`, `.mjs`, `.tsx`,
+      `.groovy`, `.scala`). Write the image with its digest
       (`"postgres:16@sha256:<digest>"`), or declare it in `scope.resolve`.
     - Shell commands are split without a full parser: a quoted `;` or `>`
       also splits, which can cause needless misses.

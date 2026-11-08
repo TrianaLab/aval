@@ -235,16 +235,18 @@ var fileCases = []fileCase{
 
 	// Container images in test code. The word is spliced in by tc so this
 	// file, in the scope of Aval's own hermetic contract, does not mention it.
+	// detectors.go and pinning.go do mention it: a quoted name:tag added there
+	// would make Aval's own run a miss.
 	{name: "tc go", path: "db_test.go", data: tc("import \"github.com/<tc>/<tc>-go/modules/postgres\"\nc, _ := postgres.Run(ctx, \"postgres:16-alpine\")\nr, _ := redis.Run(ctx, `redis:7`)\n"), want: []string{"postgres:16-alpine", "redis:7"}},
-	{name: "tc python", path: "tests/conftest.py", data: tc("from <tc>.postgres import PostgresContainer\nwith PostgresContainer('postgres:16') as pg:\n    pass\n"), want: []string{"postgres:16"}},
-	{name: "tc java", path: "src/test/java/DbIT.java", data: tc("import org.<tc>.containers.PostgreSQLContainer;\nnew PostgreSQLContainer<>(DockerImageName.parse(\"ghcr.io/acme/pg:16.4\"));\n"), want: []string{"ghcr.io/acme/pg:16.4"}},
-	{name: "tc kotlin", path: "DbTest.kt", data: tc("import org.<tc>.containers.GenericContainer\nval c = GenericContainer(\"localhost:5000/acme/app:dev\")\n"), want: []string{"localhost:5000/acme/app:dev"}},
-	{name: "tc typescript", path: "db.test.ts", data: tc("import { GenericContainer } from \"<tc>\";\nawait new GenericContainer(\"redis:7.4\").start();\n"), want: []string{"redis:7.4"}},
-	{name: "tc javascript", path: "db.test.js", data: tc("const { GenericContainer } = require('<tc>');\nnew GenericContainer('nginx:latest');\n"), want: []string{"nginx:latest"}},
-	{name: "tc csharp", path: "DbTests.cs", data: tc("using <TC>.PostgreSql;\nnew PostgreSqlBuilder().WithImage(\"postgres:16\").Build();\n"), want: []string{"postgres:16"}},
+	{name: "tc python", path: "tests/conftest.py", data: tc("from <tc>.postgres import PostgresContainer\nwith PostgresContainer('postgres:16') as pg:\n    pass\nPostgresContainer('postgres:16" + dg + "')\n"), want: []string{"postgres:16"}},
+	{name: "tc java", path: "src/test/java/DbIT.java", data: tc("import org.<tc>.containers.PostgreSQLContainer;\nnew PostgreSQLContainer<>(DockerImageName.parse(\"ghcr.io/acme/pg:16.4\"));\nnew GenericContainer(\"redis:7" + dg + "\");\n"), want: []string{"ghcr.io/acme/pg:16.4"}},
+	{name: "tc kotlin", path: "DbTest.kt", data: tc("import org.<tc>.containers.GenericContainer\nval c = GenericContainer(\"localhost:5000/acme/app:dev\")\nval p = GenericContainer(\"redis:7" + dg + "\")\n"), want: []string{"localhost:5000/acme/app:dev"}},
+	{name: "tc typescript", path: "db.test.ts", data: tc("import { GenericContainer } from \"<tc>\";\nawait new GenericContainer(\"redis:7.4\").start();\nnew GenericContainer(\"redis:7" + dg + "\");\n"), want: []string{"redis:7.4"}},
+	{name: "tc javascript", path: "db.test.js", data: tc("const { GenericContainer } = require('<tc>');\nnew GenericContainer('nginx:latest');\nnew GenericContainer('redis:7" + dg + "');\n"), want: []string{"nginx:latest"}},
+	{name: "tc csharp", path: "DbTests.cs", data: tc("using <TC>.PostgreSql;\nnew PostgreSqlBuilder().WithImage(\"postgres:16\").Build();\nnew PostgreSqlBuilder().WithImage(\"postgres:16" + dg + "\").Build();\n"), want: []string{"postgres:16"}},
 	{name: "tc pinned", path: "db_test.go", data: tc("// <tc>\npostgres.Run(ctx, \"postgres:16" + dg + "\")\nGenericContainer('postgres" + dg + "')\n"), want: nil},
 	{name: "tc untagged name is not reported", path: "db_test.go", data: tc("// <tc>\npostgres.Run(ctx, \"postgres\")\n"), want: nil},
-	{name: "tc host port and urls", path: "db_test.py", data: tc("# <tc>\nhost = 'localhost:5432'\nip = \"127.0.0.1:8080\"\ndb = 'db.internal:5432'\nurl = \"jdbc:postgresql://localhost:5432/test\"\nr = 'redis://cache:6379'\n"), want: nil},
+	{name: "tc host port and urls", path: "db_test.py", data: tc("# <tc>\nhost = 'localhost:5432'\nip = \"127.0.0.1:8080\"\ndb = 'db.internal:5432'\nurl = \"jdbc:postgresql://localhost:5432/test\"\nr = 'redis://cache:6379'\nn = 'db:5432'\nc = \"cache:6379\"\nt = '12:30'\nd = 'sha256:" + strings.Repeat("a", 64) + "'\n"), want: nil},
 	{name: "tc log strings", path: "db_test.go", data: tc("// <tc>\nt.Logf(\"started postgres:16 at %s\", h)\nlog.Println(\"error: \", err)\nfmt.Sprintf(\"%s:%d\", h, p)\n"), want: nil},
 	{name: "source without the library is not read", path: "db_test.go", data: tc("docker.Run(ctx, \"postgres:16\")\n"), want: nil},
 	{name: "tc in another language is not read", path: "db_test.rb", data: tc("# <tc>\nx = 'postgres:16'\n"), want: nil},

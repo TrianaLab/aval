@@ -101,8 +101,9 @@ func Scan(fsys fs.FS, files []string, command []string) []Finding {
 		}
 		data, err := readBounded(fsys, rel)
 		if err != nil && len(ds) == 1 && ds[0] == Detector(testcontainers{}) {
-			// ponytail: a large source file (a vendored bundle) is not read;
-			// a finding for each would make every such scope a miss.
+			// ponytail: a source file that cannot be read or is over 1 MiB (a
+			// vendored bundle) is not checked; a finding for each would make
+			// every such scope a miss.
 			continue
 		}
 		if err != nil {

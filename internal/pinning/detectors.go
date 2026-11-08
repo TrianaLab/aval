@@ -647,8 +647,9 @@ func (testcontainers) Detect(in Input) []Finding {
 		for _, re := range quotedRe {
 			for _, m := range re.FindAllStringSubmatch(l, -1) {
 				r := tagRefRe.FindStringSubmatch(m[1])
-				// host:port: an all-digit tag on localhost or a dotted name
-				if r == nil || r[1] == "" && digitsRe.MatchString(r[3]) && (r[2] == "localhost" || strings.Contains(r[2], ".")) {
+				// host:port (a 4+ digit tag, or localhost or a dotted name), a
+				// clock time or a sha256: digest is not an image
+				if r == nil || r[1] == "" && (digitsRe.MatchString(r[2]) || r[2] == "sha256" || digitsRe.MatchString(r[3]) && (len(r[3]) >= 4 || r[2] == "localhost" || strings.Contains(r[2], "."))) {
 					continue
 				}
 				out = append(out, image(in.Path, i+1, m[1], nil)...)
