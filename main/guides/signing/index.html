@@ -2176,6 +2176,16 @@
 </span></code></pre></div>
 <p>On GitHub Actions the job gets the token itself; see
 <a href="../github-actions/">Use GitHub Actions</a>.</p>
+<p>On a laptop, leave out the token too: with a terminal, <code>aval push</code> and
+<code>aval run --push</code> (once the test has run) open the interactive Sigstore
+login in the browser (<code>oauth2.sigstore.dev</code>, client id <code>sigstore</code>) and
+sign with the identity you log in with, for example your verified GitHub
+email with issuer <code>https://github.com/login/oauth</code>. The token is used for
+that one signature and never stored. <code>--login</code> asks for the login without
+a terminal; <code>$SIGSTORE_OIDC_ISSUER</code> and <code>$SIGSTORE_OIDC_CLIENT_ID</code>
+override the issuer and client id. Give such an identity <code>developer</code> in
+the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>. In CI, set <code>$SIGSTORE_ID_TOKEN</code> or use <code>--key</code>: a terminal
+without a browser prints the login URL and waits for a pasted code.</p>
 </div>
 </div>
 </div>

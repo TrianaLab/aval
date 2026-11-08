@@ -2361,7 +2361,10 @@ See each sub-command's help for details on how to use the generated script.</p>
 <h2 id="aval-push">aval push<a class="headerlink" href="#aval-push" title="Anchor link">&para;</a></h2>
 <p>push signs the result recorded by 'aval run' and publishes it. The result
 must be for the current inputs: same test id, <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> and <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.
-Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.</p>
+Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
+Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
+--login) opens the interactive Sigstore login in the browser; no token is
+stored.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Usage:
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  aval push [flags]
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
@@ -2369,9 +2372,10 @@ Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.</p>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  -f, --contract string             path to the test contract (default "aval.yaml")
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  -h, --help                        help for push
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>      --key string                  signing key path (default: keyless OIDC)
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>      --registry string             OCI repository for attestations (required)
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>      --result string               result recorded by 'aval run' (default ".aval/result.json")
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>      --registry string             OCI repository for attestations (required)
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>      --result string               result recorded by 'aval run' (default ".aval/result.json")
 </span></code></pre></div>
 <h2 id="aval-record">aval record<a class="headerlink" href="#aval-record" title="Anchor link">&para;</a></h2>
 <p>record publishes a run record that 'aval run --record-file' wrote, as 'aval
@@ -2400,7 +2404,10 @@ verified result and exits 1 if they disagree (a false hit).</p>
 --record-file writes it to a file for 'aval record'.</p>
 <p>Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
 2 usage. Keyless signing reads $SIGSTORE_ID_TOKEN; runner.command never sees
-it.</p>
+it.
+Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
+--login) opens the interactive Sigstore login in the browser; no token is
+stored.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Usage:
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  aval run [flags]
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
@@ -2411,17 +2418,18 @@ it.</p>
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>      --fingerprint-only            print the execution fingerprint and exit
 </span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  -h, --help                        help for run
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>      --key string                  signing key path for --push (default: keyless OIDC)
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>      --no-reuse                    always run, never reuse
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>      --policy string               trust policy file (required for reuse; without it the test always runs)
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>      --push                        sign and publish the result after running (needs --registry)
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>      --record                      publish a run record for statistics after the run (needs --registry; best-effort)
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>      --record-file string          also write the run record to this file, for 'aval record'
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>      --registry string             OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>      --report string               also write the lookup decision as a verify report (JSON) to this file
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>      --repository string           source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
-</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>      --result string               where to record the result for 'aval push' (default ".aval/result.json")
-</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>      --shadow                      verify, but run the test anyway and fail on a false hit
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>      --no-reuse                    always run, never reuse
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>      --policy string               trust policy file (required for reuse; without it the test always runs)
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>      --push                        sign and publish the result after running (needs --registry)
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>      --record                      publish a run record for statistics after the run (needs --registry; best-effort)
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>      --record-file string          also write the run record to this file, for 'aval record'
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>      --registry string             OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>      --report string               also write the lookup decision as a verify report (JSON) to this file
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>      --repository string           source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>      --result string               where to record the result for 'aval push' (default ".aval/result.json")
+</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>      --shadow                      verify, but run the test anyway and fail on a false hit
 </span></code></pre></div>
 <h2 id="aval-stats">aval stats<a class="headerlink" href="#aval-stats" title="Anchor link">&para;</a></h2>
 <p>stats reads the run records that 'aval run --record' and 'aval record'
