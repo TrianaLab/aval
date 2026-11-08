@@ -1302,10 +1302,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#aval-upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval upgrade
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#aval-verify" class="md-nav__link">
     <span class="md-ellipsis">
       
         aval verify
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aval-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval version
       
     </span>
   </a>
@@ -2206,10 +2228,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#aval-upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval upgrade
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#aval-verify" class="md-nav__link">
     <span class="md-ellipsis">
       
         aval verify
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aval-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aval version
       
     </span>
   </a>
@@ -2363,13 +2407,15 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  record      Publish a run record written by 'aval run --record-file'
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  run         Reuse a verified result for the current inputs, or run the test
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  stats       Aggregate the run records in the registry: reuse, misses, time saved
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  verify      Check whether a trusted result exists for the current inputs
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>Flags:
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  -h, --help      help for aval
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  -v, --version   version for aval
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>Use "aval [command] --help" for more information about a command.
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  upgrade     Replace this binary with a verified aval release
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  verify      Check whether a trusted result exists for the current inputs
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>  version     Print the aval version, Go version and platform
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>Flags:
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  -h, --help      help for aval
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  -v, --version   version for aval
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>Use "aval [command] --help" for more information about a command.
 </span></code></pre></div>
 <h2 id="aval-completion">aval completion<a class="headerlink" href="#aval-completion" title="Anchor link">&para;</a></h2>
 <p>Generate the autocompletion script for aval for the specified shell.
@@ -2488,21 +2534,45 @@ records.</p>
 </span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>      --since string                only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>      --test string                 only this test id (metadata.name); default: every test with run records
 </span></code></pre></div>
+<h2 id="aval-upgrade">aval upgrade<a class="headerlink" href="#aval-upgrade" title="Anchor link">&para;</a></h2>
+<p>upgrade downloads a release from GitHub Releases (the latest, or --version), checks that
+checksums.txt carries a keyless Sigstore signature from Aval's release workflow at that
+tag and that the archive matches it, then replaces the running binary. Any failed
+check replaces nothing. A bad signature or checksum is a security event: do not retry it
+away. Without --version it refuses to move to an older release than the running one.</p>
+<p>Exit codes: 0 upgraded or up to date (or --check printed), 1 error (download, signature,
+checksum, older latest release, replacing the binary), 2 usage.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Usage:
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  aval upgrade [flags]
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>Flags:
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>      --check            print the current and target versions without installing
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  -h, --help             help for upgrade
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>      --version string   release to install, e.g. v0.4.0 (default: latest)
+</span></code></pre></div>
 <h2 id="aval-verify">aval verify<a class="headerlink" href="#aval-verify" title="Anchor link">&para;</a></h2>
 <p>verify computes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, looks up the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> and verifies its
 signature and the trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, without running anything.</p>
 <p>Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 1 error (registry, <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>), 2 usage or invalid aval.yaml.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Usage:
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  aval verify [flags]
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>Flags:
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  -f, --contract string             path to the test contract (default "aval.yaml")
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  -h, --help                        help for verify
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  -o, --output string               output format: text or json (default "text")
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>      --policy string               trust policy file (without it every lookup is a miss)
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>      --registry string             OCI repository for attestations (required)
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Usage:
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  aval verify [flags]
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>Flags:
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>  -f, --contract string             path to the test contract (default "aval.yaml")
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>  -h, --help                        help for verify
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>  -o, --output string               output format: text or json (default "text")
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>      --policy string               trust policy file (without it every lookup is a miss)
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>      --registry string             OCI repository for attestations (required)
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+</span></code></pre></div>
+<h2 id="aval-version">aval version<a class="headerlink" href="#aval-version" title="Anchor link">&para;</a></h2>
+<p>Print the aval version, Go version and platform</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Usage:
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  aval version [flags]
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>Flags:
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>  -h, --help   help for version
 </span></code></pre></div>
 
 
