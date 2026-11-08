@@ -302,10 +302,11 @@ policies. While `AVAL_VERSION` is `0.1.0`, these three jobs build `aval` from
 the commit (`make build`) and install nothing; `tests/architecture` enforces
 that too. On `main` that is the code being released, so `dogfood-publish`
 writes the e2e attestation in the format the `release.yaml` gate (also a
-source build) verifies. Moving the pin to the first release that reads
-`aval.trianalab.io/v1` makes the test require `install.sh` again. The
-transition may outlive one release only: once `CHANGELOG.md` lists two
-releases newer than `0.1.0`, `tests/architecture` fails until the pin moves.
+source build) verifies. v0.2.0 is skipped because the release jobs use
+features first shipped in v0.3.0 (`aval run --record-file`, `aval stats`).
+Moving the pin to `0.3.0` makes the test require `install.sh` again. Once
+`CHANGELOG.md` lists a release newer than `0.3.0` while `0.1.0` is pinned,
+`tests/architecture` fails until the pin moves.
 
 Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
 marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint
