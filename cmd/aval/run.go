@@ -38,11 +38,19 @@ const defaultResult = ".aval/result.json"
 // convention). Obtaining it is the caller's job, so no CI vendor is assumed.
 const idTokenEnv = "SIGSTORE_ID_TOKEN"
 
+// Without a key or $SIGSTORE_ID_TOKEN, keyless signing can get its token
+// from the interactive Sigstore login in the browser. These override its
+// public defaults.
+const (
+	oidcIssuerEnv   = "SIGSTORE_OIDC_ISSUER"
+	oidcClientIDEnv = "SIGSTORE_OIDC_CLIENT_ID"
+)
+
 type runFlags struct {
 	file, repo, policyFile, resultFile, reportFile, key string
 	recordFile, ciRunURL, repository                    string
 	push, noReuse, shadow, fingerprintOnly, explain     bool
-	record                                              bool
+	record, login                                       bool
 	registryTimeout                                     time.Duration
 }
 
@@ -64,7 +72,8 @@ verified result and exits 1 if they disagree (a false hit).
 
 Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
 2 usage. Keyless signing reads $` + idTokenEnv + `; runner.command never sees
-it.`,
+it.
+` + loginHelp + `.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runTest(cmd, o) },
 	}
@@ -74,6 +83,7 @@ it.`,
 	f.StringVar(&o.policyFile, "policy", "", "trust policy file (required for reuse; without it the test always runs)")
 	f.BoolVar(&o.push, "push", false, "sign and publish the result after running (needs --registry)")
 	f.StringVar(&o.key, "key", "", "signing key path for --push (default: keyless OIDC)")
+	f.BoolVar(&o.login, "login", false, loginFlagHelp)
 	f.StringVar(&o.resultFile, "result", defaultResult, "where to record the result for 'aval push'")
 	f.StringVar(&o.reportFile, "report", "", "also write the lookup decision as a verify report (JSON) to this file")
 	f.BoolVar(&o.noReuse, "no-reuse", false, "always run, never reuse")
@@ -98,6 +108,8 @@ func (o runFlags) validate(token string) error {
 		return usageError{errors.New("--record requires --registry")}
 	case o.shadow && o.noReuse:
 		return usageError{errors.New("--shadow and --no-reuse exclude each other")}
+	case o.login && !o.push:
+		return usageError{errors.New("--login needs --push")}
 	case o.repo != "":
 		if err := checkRegistry(o.repo); err != nil {
 			return err
@@ -106,20 +118,33 @@ func (o runFlags) validate(token string) error {
 	if err := checkTimeout(o.registryTimeout); err != nil || !o.push {
 		return err
 	}
-	return checkSigner(o.key, token)
+	return checkSigner(o.key, token, o.login)
 }
 
 // keyHint is how to create a key aval can sign with.
 const keyHint = "aval signs with an unencrypted ECDSA P-256 private key in PEM (PKCS#8 or SEC1); cosign keys are encrypted and not supported; create one with: openssl ecparam -name prime256v1 -genkey -noout -out aval.key"
 
+// loginHelp and loginFlagHelp describe the interactive keyless login.
+const (
+	loginHelp     = "Without --key or $" + idTokenEnv + ", signing on a terminal (or with\n--login) opens the interactive Sigstore login in the browser; no token is\nstored"
+	loginFlagHelp = "sign keyless after the interactive Sigstore login, even without a terminal (overrides: $" + oidcIssuerEnv + ", $" + oidcClientIDEnv + ")"
+)
+
 // checkSigner fails fast, before the test runs, when signing could not
-// work: no key and no OIDC token, or a key that does not load.
-func checkSigner(key, token string) error {
+// work: no key, no OIDC token and no interactive login (--login or a
+// terminal), or a key that does not load.
+func checkSigner(key, token string, login bool) error {
 	if key == "" {
-		if token == "" {
-			return usageError{fmt.Errorf("signing needs --key or, for keyless signing, an OIDC token in $%s", idTokenEnv)}
+		if login && token != "" {
+			return usageError{fmt.Errorf("--login and $%s exclude each other", idTokenEnv)}
+		}
+		if token == "" && !login && !isTerminal() {
+			return usageError{fmt.Errorf("signing needs --key or, for keyless signing, an OIDC token in $%s or a terminal for the interactive Sigstore login (--login)", idTokenEnv)}
 		}
 		return nil
+	}
+	if login {
+		return usageError{errors.New("--key and --login exclude each other")}
 	}
 	if err := loadsAsP256(key); err != nil {
 		return usageError{fmt.Errorf("--key %s: %w; %s", key, err, keyHint)}
@@ -472,9 +497,17 @@ func writeJSON(path string, v any) error {
 }
 
 // signAndPush signs the predicate (key-based with key, else keyless with the
-// OIDC token) and publishes it under its fingerprint, within timeout.
+// OIDC token, from the interactive login when there is none) and publishes
+// it under its fingerprint, within timeout. The login runs only now, after
+// the test, so the short-lived token is fresh and runner.command never had
+// it.
 func signAndPush(ctx context.Context, p *evidence.Predicate, repo, key, token string, timeout time.Duration) (string, error) {
 	st, err := attest.NewStatement(p)
+	if err == nil && key == "" && token == "" {
+		if token, err = login(); err != nil {
+			err = fmt.Errorf("interactive Sigstore login: %w", err)
+		}
+	}
 	var s *attest.Signed
 	if err == nil {
 		s, err = sign(ctx, st, attest.SignOptions{Key: key, IDToken: token})
@@ -494,19 +527,21 @@ func signAndPush(ctx context.Context, p *evidence.Predicate, repo, key, token st
 func newPushCmd() *cobra.Command {
 	var file, repo, key, resultFile string
 	var timeout time.Duration
+	var interactive bool
 	cmd := &cobra.Command{
 		Use:   "push",
 		Short: "Sign and publish a recorded execution result",
 		Long: `push signs the result recorded by 'aval run' and publishes it. The result
 must be for the current inputs: same test id, cacheability and fingerprint.
-Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
+Keyless signing reads the OIDC token from $` + idTokenEnv + `.
+` + loginHelp + `.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if repo == "" {
 				return usageError{errors.New("--registry is required")}
 			}
 			token := os.Getenv(idTokenEnv)
-			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout), checkSigner(key, token)); err != nil {
+			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout), checkSigner(key, token, interactive)); err != nil {
 				return err
 			}
 			c, fp, err := loadAndFingerprint(cmd.Context(), file, resultFile)
@@ -540,6 +575,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.`,
 	f.StringVarP(&file, "contract", "f", contract.DefaultFile, "path to the test contract")
 	f.StringVar(&repo, "registry", "", "OCI repository for attestations (required)")
 	f.StringVar(&key, "key", "", "signing key path (default: keyless OIDC)")
+	f.BoolVar(&interactive, "login", false, loginFlagHelp)
 	f.StringVar(&resultFile, "result", defaultResult, "result recorded by 'aval run'")
 	registryTimeoutFlag(cmd, &timeout)
 	return cmd

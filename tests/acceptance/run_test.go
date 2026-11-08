@@ -128,6 +128,72 @@ func TestRunPushReuseStory(t *testing.T) {
 	}
 }
 
+// The shape of .github/aval/main.yaml (#130): minTrustLevel runner, a CI
+// identity at runner and a maintainer listed at developer. A fingerprint whose
+// only result the maintainer signed is a miss (the test runs, verify exits 4,
+// so a release stops), not a verification failure; once a runner-signed
+// sibling exists it is reused from that one; an unlisted signer is still a
+// security event (exit 5). Keys stand in for the keyless identities: the
+// trust level comes from the policy entry either way.
+func TestMainPolicyKnowsDevelopersStory(t *testing.T) {
+	srv := httptest.NewServer(ggcr.New(ggcr.Logger(log.New(io.Discard, "", 0))))
+	t.Cleanup(srv.Close)
+	repo := strings.TrimPrefix(srv.URL, "http://") + "/acme/main-policy-aval"
+
+	keys := t.TempDir()
+	devKey, devPub := keyPair(t, keys, "dev")
+	ciKey, ciPub := keyPair(t, keys, "ci")
+	otherKey, _ := keyPair(t, keys, "other")
+	mainPolicy := filepath.Join(keys, "main.yaml")
+	body := "apiVersion: aval.trianalab.io/v1\nkind: Policy\nminTrustLevel: runner\nidentities:\n" +
+		"  - publicKey: " + ciPub + "\n    trustLevel: runner\n" +
+		"  - publicKey: " + devPub + "\n    trustLevel: developer\n"
+	if err := os.WriteFile(mainPolicy, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	runner := strings.Replace(contract, `["true"]`, `["sh", "-c", "echo ran >> runs.log"]`, 1)
+	dir := writeProject(t, map[string]string{"aval.yaml": runner, "src/a.txt": "a\n"})
+	file := filepath.Join(dir, "aval.yaml")
+	result := filepath.Join(dir, ".aval", "result.json")
+	runs := func() int {
+		b, _ := os.ReadFile(filepath.Join(dir, "runs.log"))
+		return strings.Count(string(b), "ran\n")
+	}
+	run := []string{"run", "-f", file, "--registry", repo, "--result", result}
+	onMain := append(append([]string{}, run...), "--policy", mainPolicy)
+	verify := []string{"verify", "-f", file, "--registry", repo, "--policy", mainPolicy}
+	steps := []struct {
+		name                      string
+		args                      []string
+		change                    bool // edit the source first: a fresh fingerprint
+		code, runs                int
+		stdout, notStdout, stderr string
+	}{
+		{"developer publishes", append(run, "--push", "--key", devKey), false, 0, 1, "pushed ", "", ""},
+		{"developer-only is a miss on main", onMain, false, 0, 2, "trust level developer, policy requires at least runner", "reused", ""},
+		{"verify stops a release on it", verify, false, 4, 2, "miss story", "", ""},
+		{"CI publishes a runner sibling", []string{"push", "-f", file, "--registry", repo, "--key", ciKey, "--result", result}, false, 0, 2, "pushed ", "", ""},
+		{"main reuses the runner one", onMain, false, 0, 2, "trust level runner", "", ""},
+		{"verify picks the runner one", verify, false, 0, 2, "trust level runner", "", ""},
+		{"unlisted signer publishes", append(run, "--push", "--key", otherKey), true, 0, 3, "pushed ", "", ""},
+		{"unlisted signer is a security event", onMain, false, 5, 4, "ran story", "reused", "SECURITY"},
+		{"verify fails on it", verify, false, 5, 4, "verification-failed story", "", "SECURITY"},
+	}
+	for _, s := range steps {
+		if s.change {
+			if err := os.WriteFile(filepath.Join(dir, "src", "a.txt"), []byte("b\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		stdout, stderr, code := avalEnv(t, s.args...)
+		if code != s.code || runs() != s.runs || !strings.Contains(stdout, s.stdout) || (s.notStdout != "" && strings.Contains(stdout, s.notStdout)) ||
+			!strings.Contains(stderr, s.stderr) || (s.stderr == "" && strings.Contains(stderr, "SECURITY")) {
+			t.Fatalf("%s: exit %d, %d runs; want %d, %d\nstdout %s\nstderr %s", s.name, code, runs(), s.code, s.runs, stdout, stderr)
+		}
+	}
+}
+
 // A contract that declares the whole tree (scope.source ["**"]) is not
 // changed by Aval's own outputs (#63): a run writes its result and report
 // inside the root, the next run gets the same fingerprint, and push accepts
