@@ -1,5 +1,15 @@
 # aval
 
+## 0.4.0
+
+### Minor Changes
+
+- 4c8029a: `run --push` and `push` sign keyless from a laptop: without `--key` or `$SIGSTORE_ID_TOKEN` and with a terminal (or with the new `--login` flag), they open the interactive Sigstore login in the browser (`oauth2.sigstore.dev`, client id `sigstore`; `$SIGSTORE_OIDC_ISSUER` and `$SIGSTORE_OIDC_CLIENT_ID` override them) right before signing, after the test ran. The token is used for that signature only and never stored. Without a terminal and without `--login`, a run with no key and no token still fails fast with exit 2. `--key` and `--login` exclude each other.
+
+### Patch Changes
+
+- b619b24: More than 64 attestations for a fingerprint now prints an `aval: SECURITY:` line naming the cap, as a possible flooding attempt; the outcome stays `error` and the test runs. Aval's own CI and release jobs fail when a verify report lists a verification failure in `rejected`, even when a trusted result verified.
+
 ## 0.3.0
 
 ### Minor Changes
