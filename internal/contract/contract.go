@@ -170,9 +170,13 @@ type AllowMutable struct {
 
 // Environment declares execution conditions that are part of the fingerprint.
 type Environment struct {
-	// Toolchain is a declared map such as {go: "1.25"}. v0 trusts the
-	// declaration; detecting the real toolchain is future work.
+	// Toolchain is a declared map such as {go: "1.25"}. It is trusted as
+	// declared unless Probe checks it.
 	Toolchain map[string]string `yaml:"toolchain,omitempty" json:"toolchain"`
+	// Probe maps a Toolchain key to an argv that prints the installed
+	// version, such as {go: [go, version]}. Only `aval run` executes it.
+	// Omitted when empty, so contracts without it hash as before.
+	Probe map[string][]string `yaml:"probe,omitempty" json:"probe,omitempty"`
 	// Env lists environment variable names whose values are hashed.
 	Env []string `yaml:"env,omitempty" json:"env"`
 }
@@ -438,6 +442,16 @@ func (e Environment) validate(add func(string, ...any)) {
 	for k := range e.Toolchain {
 		if !toolKeyRe.MatchString(k) {
 			add("environment.toolchain: invalid key %q", k)
+		}
+	}
+	for k, argv := range e.Probe {
+		if v, ok := e.Toolchain[k]; !ok {
+			add("environment.probe.%s: not a key of environment.toolchain", k)
+		} else if strings.TrimSpace(v) == "" {
+			add("environment.probe.%s: environment.toolchain.%s must not be empty", k, k)
+		}
+		if len(argv) == 0 || strings.TrimSpace(argv[0]) == "" {
+			add("environment.probe.%s: must be a non-empty argv list", k)
 		}
 	}
 	for i, v := range e.Env {

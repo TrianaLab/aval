@@ -62,8 +62,11 @@ it, add it.
 
 ??? info "Environment"
     The `environment.toolchain` values (`go: "1.25"`) go into the fingerprint
-    as written; Aval does not check what is installed. `environment.env`
-    names variables whose values go into the fingerprint.
+    as written. To check what is installed, add `environment.probe`, for
+    example `go: [go, version]`: `aval run` fails the lookup, runs the test
+    and publishes nothing when `1.25` is not in the output
+    ([Probe the toolchain](../contract.md#probe-the-toolchain)).
+    `environment.env` names variables whose values go into the fingerprint.
 
 ## Restore coverage and reports on reuse
 

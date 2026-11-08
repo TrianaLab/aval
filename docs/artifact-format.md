@@ -453,7 +453,7 @@ checked by `Predicate.Validate` (called by `evidence.Parse`).
 | `execution` | object | | This run: its inputs and conditions. |
 | `execution.fingerprint` | string | yes, `sha256:<64 hex>` | Fingerprint over the declared inputs. |
 | `execution.fingerprintVersion` | string | | Manifest format, e.g. `aval-fingerprint/v1`. |
-| `execution.environment` | map string to string | no (omitted when empty) | Conditions of the run (toolchain, OS/arch). Only keys declared under `environment.toolchain` in `aval.yaml` are part of the fingerprint; anything else here is informational. |
+| `execution.environment` | map string to string | no (omitted when empty) | Conditions of the run (toolchain, OS/arch). Only keys declared under `environment.toolchain` in `aval.yaml` are part of the fingerprint; anything else here is informational. `os` and `arch` are always the real values, whatever the toolchain declares; `probe.<key>` is the output of an `environment.probe`. |
 | `execution.exitCode` | integer | | Exit code of `runner.command`. |
 | `execution.outputs` | object | no (omitted without contract `outputs`) | The [outputs](#outputs) of the run. |
 | `execution.outputs.manifest` | string | yes, `sha256:<64 hex>` | Digest of the outputs manifest. |

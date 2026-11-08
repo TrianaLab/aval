@@ -366,8 +366,9 @@ func (d *Demo) verify(c *contract.Contract, fp fingerprint.Fingerprint, errw io.
 // push signs a passing result for fp as an in-toto statement in a DSSE
 // envelope and stores it under a digest of the envelope.
 func (d *Demo) push(c *contract.Contract, fp fingerprint.Fingerprint, start time.Time) string {
-	env := map[string]string{"os": runtime.GOOS, "arch": runtime.GOARCH}
+	env := map[string]string{}
 	maps.Copy(env, c.Environment.Toolchain)
+	env["os"], env["arch"] = runtime.GOOS, runtime.GOARCH // real values win
 	p := evidence.Predicate{
 		SchemaVersion: evidence.SchemaVersion,
 		Subject:       evidence.Subject{Name: c.Metadata.Name, Digest: map[string]string{"sha256": fp.Hex()}},
