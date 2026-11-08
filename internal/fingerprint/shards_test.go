@@ -61,6 +61,9 @@ func TestShardFingerprints(t *testing.T) {
 	patternB := filepath.Join("testdata", "shards", "pattern-b.yaml")
 	base := map[string]string{"SHARD_INDEX": "0", "SHARD_TOTAL": "2"}
 	want := fp(patternB, base)
+	if fp(patternB, map[string]string{"SHARD_INDEX": "0", "SHARD_TOTAL": "2"}) != want {
+		t.Error("pattern B: same shard variables gave a different fingerprint (needless miss)")
+	}
 	for name, env := range map[string]map[string]string{
 		"SHARD_INDEX":       {"SHARD_INDEX": "1", "SHARD_TOTAL": "2"},
 		"SHARD_TOTAL":       {"SHARD_INDEX": "0", "SHARD_TOTAL": "3"},

@@ -28,6 +28,6 @@ scope:
   exclude: ["**/.aval/**"]
   dependencies: [go.mod, go.sum, Makefile]
 environment:
-  toolchain: {go: "1.27"}
+  toolchain: {go: "1.27", uv: "0.9.18"}
   env: [GOFLAGS, GOEXPERIMENT, CGO_ENABLED]
 cacheability: hermetic

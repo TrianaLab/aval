@@ -1,7 +1,9 @@
 # One contract for every shard of examples/uv-monorepo. Each matrix job sets
 # SHARD_INDEX and SHARD_TOTAL, so each shard gets its own fingerprint over
 # the whole suite's scope. Splitting by index needs a pytest plugin such as
-# pytest-shard, which the example does not lock.
+# pytest-shard, which the example does not lock. pytest-shard counts
+# SHARD_INDEX from 0: set it to `${{ strategy.job-index }}` and SHARD_TOTAL
+# to `${{ strategy.job-total }}`.
 apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:

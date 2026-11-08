@@ -22,8 +22,9 @@ in-process registry in Aval's CI.
 
 ## Run it locally
 
-You need uv, Docker, `openssl` and `aval`. Work in a copy, so the virtual
-environment uv creates stays out of the Aval checkout:
+You need uv, Docker, `openssl` and `aval` 0.5.0 or later (`outputs`). Work
+in a copy, so the virtual environment uv creates stays out of the Aval
+checkout:
 
 ```sh
 cp -R examples/uv-monorepo /tmp/uv-monorepo && cd /tmp/uv-monorepo

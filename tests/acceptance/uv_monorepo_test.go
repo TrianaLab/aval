@@ -37,7 +37,7 @@ func TestUVMonorepoShards(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"shard: [1, 2]", "-f aval.shard-${{ matrix.shard }}.yaml", "--result .aval/shard-${{ matrix.shard }}.json", "path: coverage-shard-${{ matrix.shard }}.xml"} {
+	for _, want := range []string{"shard: [1, 2]", "-f aval.shard-${{ matrix.shard }}.yaml", "--result .aval/shard-${{ matrix.shard }}.json", "path: coverage-shard-${{ matrix.shard }}.xml", "--version v0.5.0", "branches: [main]"} {
 		if !strings.Contains(string(wf), want) {
 			t.Errorf("workflow.yaml does not contain %q", want)
 		}
@@ -52,8 +52,12 @@ func TestUVMonorepoShards(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _ = f.WriteString("# only shard 2 reads this\n")
-	_ = f.Close()
+	if _, err := f.WriteString("# only shard 2 reads this\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 	for shard, want := range map[string]int{"1": 0, "2": 4} {
 		if stdout, stderr, code := avalEnv(t, "verify", "-f", filepath.Join(dir, "aval.shard-"+shard+".yaml"), "--registry", repo, "--policy", policy); code != want {
 			t.Errorf("shard %s verify after an app change: exit %d, want %d\nstdout %s\nstderr %s", shard, code, want, stdout, stderr)
