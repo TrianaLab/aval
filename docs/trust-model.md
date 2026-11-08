@@ -155,6 +155,49 @@ To avoid the dependency, pin the trusted root in the policy:
 
 Policies with only `publicKey` identities never fetch anything.
 
+### Take the policy from a protected branch
+
+A pull request can change any file in its checkout. If its CI job reads
+`--policy` (or `--registry`) from that checkout, the PR can add its own
+signing identity, sign a passing result for its own inputs, and get a green
+check it wrote itself. Read the policy and the registry from the default
+branch instead. Not from `github.base_ref`: a PR can target any branch,
+including one its author controls.
+
+```yaml
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Trust policy from the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          git show "origin/$DEFAULT_BRANCH:.aval/policy.yaml" > "$RUNNER_TEMP/policy.yaml"
+      - run: aval run --registry ghcr.io/acme/orders-aval --policy "$RUNNER_TEMP/policy.yaml"
+```
+
+Keep the registry out of files the PR can change for its own run, too: write
+it in the step, or read it from the default branch the same way. A
+`trustedRoot` path in the policy resolves next to the temp file, so read that
+file from the default branch as well, or use the default root.
+
+Run a pinned `aval` release, and take any script the step runs from the
+default branch too, so the workflow file is the only part a PR can change.
+That part it can still change: on `pull_request`, GitHub runs the PR's own
+workflow file, so a hostile PR can edit the step and make its own check
+green. No check in that run can stop it. What protects the default branch
+is review: CODEOWNERS for the workflows, the policy and the tests that guard
+them, a branch rule that requires code-owner review, and a default branch
+that trusts only its own CI (`main.yaml` in Aval's case).
+
 ## Fail closed
 
 If Aval cannot prove that a previous execution is equivalent and trusted,
@@ -228,4 +271,5 @@ contract's is a verification failure.
 | Content behind a declared name changed (repushed image tag, new upstream release, changed remote script) | The scanner reports the mutable references it recognizes in the scope and `runner.command`; for `hermetic` and `controlled-environment` an unaccepted one makes the lookup a `miss` and blocks publishing. Accepting one needs `scope.allowMutable`, which changes the fingerprint and shows in review. References it does not recognize stay a known gap ([Pin your dependencies](pinning.md)). |
 | Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with an `aval: SECURITY: ...` line on stderr. It can delete attestations (forcing re-runs) or deny service (`error`, re-run), for example by pushing more than 64 attestations for a fingerprint, which is reported with an `aval: SECURITY:` line as a possible flooding attempt. Availability is out of scope. |
 | Forged or tampered run records (anyone with push access) | Unsigned statistics, never read by `aval run` or `aval verify`; `aval stats` skips malformed records and caps how many it reads. |
+| Pull request that edits the policy or registry its own CI reads | Read both from the default branch ([Take the policy from a protected branch](#take-the-policy-from-a-protected-branch)) and verify with a pinned `aval` release. The workflow file still comes from the PR, so a hostile PR can make its own check green; required code-owner review keeps it off the default branch, which trusts only its own CI. |
 | Dishonest but trusted signer (ran a modified test and signed "passed") | Out of scope for Aval. A signature proves who claims it, not that the test ran honestly. Limit which identities get which level; level 3 (isolated) exists for this. |

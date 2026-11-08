@@ -164,7 +164,7 @@ func writeScopeProblems(data []byte) ([]string, error) {
 		if !writeScoped(j.Permissions) {
 			continue
 		}
-		if !strings.Contains(j.If, "github.event_name == 'push'") || strings.Contains(j.If, "pull_request") || strings.Contains(j.If, "||") {
+		if !pushOnly(j.If) {
 			problems = append(problems, name+": write scopes without a push-only condition")
 		}
 		if slices.Contains(liveSigningJobs, name) {
@@ -337,7 +337,7 @@ func TestDogfoodScopeCheckCatchesUndeclaredReads(t *testing.T) {
 
 // releaseJobs use Aval as a user would, so they run the pinned release that
 // .github/aval/install.sh verifies, never a binary built from the PR.
-var releaseJobs = []string{"example-go-compose", "dogfood-shadow", "dogfood-publish", "dogfood-record"}
+var releaseJobs = []string{"ci-e2e", "example-go-compose", "dogfood-shadow", "dogfood-publish", "dogfood-record"}
 
 var (
 	pinVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
@@ -381,7 +381,7 @@ func releaseJobProblems(name string, steps []step) []string {
 		switch {
 		case strings.HasPrefix(s.Uses, "sigstore/cosign-installer@"):
 			cosign = true
-		case strings.TrimSpace(s.Run) == ".github/aval/install.sh":
+		case strings.TrimSpace(s.Run) == ".github/aval/install.sh" || strings.TrimSpace(s.Run) == trustStep:
 			if !cosign {
 				problems = append(problems, name+": install.sh before cosign is installed")
 			}
