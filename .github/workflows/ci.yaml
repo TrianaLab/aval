@@ -18,22 +18,14 @@ permissions:
   contents: read
 
 # The aval release that jobs using Aval as a user would (the demo and the
-# dogfood shadow and publish jobs) install with .github/aval/install.sh,
+# dogfood shadow, publish and record jobs) install with .github/aval/install.sh,
 # verified before use. The sha256 is that of aval_<version>_linux_amd64.tar.gz
 # as checksums.txt lists it, so a re-tagged release cannot change what runs.
 # Jobs that test the PR's code build from source (CONTRIBUTING.md "Which aval
 # a CI job runs").
-# Transition (#17): 0.1.0 reads only the pre-freeze apiVersion
-# aval.dev/v1alpha1, not this repository's aval.trianalab.io/v1 contracts and
-# policies, so while it is pinned those jobs build aval from the checked-out
-# commit instead. 0.2.0 is skipped: the release jobs need features first
-# shipped in 0.3.0. Pinning 0.3.0 switches them back to install.sh
-# (tests/architecture enforces both, and fails once CHANGELOG.md lists a
-# release newer than 0.3.0 while 0.1.0 is pinned).
-# TODO(milestone-3): pin 0.3.0 (AVAL_VERSION, AVAL_SHA256 of aval_0.3.0_linux_amd64.tar.gz) once it is released, ending the #17 transition.
 env:
-  AVAL_VERSION: 0.1.0
-  AVAL_SHA256: 1128344383f48cd7dd8e46b21cbe838dd6e7b075f45a0365f9784c1b71f6e67a
+  AVAL_VERSION: 0.3.0
+  AVAL_SHA256: 11c19cea94784999474c07434873afa43e2f5f1cdb49ceffde9e561fb9b3f977
   # The public stats registry (#97): dogfood-record publishes run records
   # there and docs.yaml (which names it too) builds the site's stats.json.
   AVAL_STATS_REGISTRY: ghcr.io/trianalab/aval-stats
@@ -330,10 +322,11 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      # Transition (#17, see the top of this file): build aval from this
-      # commit while the pinned release cannot read its contracts.
-      - name: Build aval from this commit
-        run: make build && echo "$PWD/bin" >> "$GITHUB_PATH"
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Install the pinned aval release (verified)
+        run: .github/aval/install.sh
       # --8<-- [start:gha-steps]
       - name: Log in to GHCR
         env:
@@ -471,10 +464,11 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      # Transition (#17, see the top of this file): build aval from this
-      # commit while the pinned release cannot read its contracts.
-      - name: Build aval from this commit
-        run: make build && echo "$PWD/bin" >> "$GITHUB_PATH"
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Install the pinned aval release (verified)
+        run: .github/aval/install.sh
       - name: Shadow run of the engine unit suite
         run: |
           aval run --shadow -f aval.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
@@ -535,10 +529,11 @@ jobs:
           pattern: aval-*
           path: results
           merge-multiple: true
-      # Transition (#17, see the top of this file): build aval from this
-      # commit while the pinned release cannot read its contracts.
-      - name: Build aval from this commit
-        run: make build && echo "$PWD/bin" >> "$GITHUB_PATH"
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Install the pinned aval release (verified)
+        run: .github/aval/install.sh
       - name: Sign and push results that were not reused
         env:
           GH_TOKEN: ${{ github.token }}
@@ -621,19 +616,19 @@ jobs:
         continue-on-error: true
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        continue-on-error: true
-        with:
-          go-version-file: go.mod
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         continue-on-error: true
         with:
           pattern: aval-*
           path: results
           merge-multiple: true
-      - name: Build aval from this commit
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         continue-on-error: true
-        run: make build && echo "$PWD/bin" >> "$GITHUB_PATH"
+        with:
+          cosign-release: v3.0.6
+      - name: Install the pinned aval release (verified)
+        continue-on-error: true
+        run: .github/aval/install.sh
       - name: Publish run records
         continue-on-error: true
         env:
