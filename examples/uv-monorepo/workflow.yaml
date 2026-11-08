@@ -1,0 +1,38 @@
+# A two-shard matrix for this example as its own repository: copy it to
+# .github/workflows/ and set REPO and POLICY. Each job runs one shard
+# contract with its own --result; on main, reuses a verified result or runs
+# the shard; for pull requests read POLICY and REPO from the default branch
+# (docs/trust-model.md#take-the-policy-from-a-protected-branch). It uploads that shard's coverage, restored on reuse. Publishing
+# needs the push step from Aval's "Use GitHub Actions" guide.
+name: tests
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2]
+    env:
+      REPO: ghcr.io/acme/uv-monorepo-aval
+      POLICY: .github/aval/policy.yaml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.9.18"
+          enable-cache: false
+      - run: curl -fsSL https://aval.run/install.sh | bash -s -- --version v0.5.0
+      - run: >-
+          aval run -f aval.shard-${{ matrix.shard }}.yaml
+          --result .aval/shard-${{ matrix.shard }}.json
+          --registry "$REPO" --policy "$POLICY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-shard-${{ matrix.shard }}
+          path: coverage-shard-${{ matrix.shard }}.xml

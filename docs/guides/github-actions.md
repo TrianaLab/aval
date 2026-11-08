@@ -50,6 +50,7 @@ Trust only this workflow on `main`: see
 
 ## Read next
 
+- [Shards and matrices](shards-and-matrices.md): one job per shard
 - [Sign with a key or keyless](signing.md)
 - [Write a trust policy](trust-policy.md)
 - [Measure reuse](measure-reuse.md)

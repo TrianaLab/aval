@@ -93,6 +93,7 @@ them, so `**` can overwrite files later steps read.
 
 ## Read next
 
+- [Shards and matrices](shards-and-matrices.md): one contract per shard
 - [Write a trust policy](trust-policy.md)
 - [Pin your dependencies](../pinning.md)
 - [The test contract](../contract.md): every field and rule
