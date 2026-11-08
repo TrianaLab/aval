@@ -1,0 +1,4 @@
+# The workspace root: no package of its own, only the members and the one
+# uv.lock they share.
+[tool.uv.workspace]
+members = ["packages/*"]

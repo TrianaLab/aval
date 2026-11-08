@@ -1,0 +1,15 @@
+# Shard 2 of 2: the app package's tests. app imports core, so core's code is
+# in scope here too; app's files are not in shard 1's scope.
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata:
+  name: uv-monorepo-app
+runner:
+  command: ["uv", "run", "--locked", "--package", "app", "pytest", "packages/app", "--cov=app", "--cov-report=xml:coverage-shard-2.xml"]
+scope:
+  source: ["packages/app/**/*.py", "packages/core/src/**/*.py"]
+  dependencies: [pyproject.toml, "packages/*/pyproject.toml", uv.lock, .python-version]
+environment:
+  toolchain: {python: "3.12", uv: "0.9.18"}
+cacheability: hermetic
+outputs: [coverage-shard-2.xml]

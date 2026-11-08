@@ -19,6 +19,8 @@ All constants live in `pkg/evidence`.
 | `StatementType` | `https://in-toto.io/Statement/v1` | in-toto Statement `_type` | in-toto standard |
 | `PredicateType` | `https://aval.trianalab.io/attestation/execution/v2` | in-toto `predicateType` | frozen |
 | `SchemaVersion` | `v2` | Predicate `schemaVersion` | frozen |
+| `ArtifactTypeOutputs` | `application/vnd.trianalab.aval.outputs.v1` | `artifactType` of the manifest that carries the output files of one execution | frozen |
+| `MediaTypeOutput` | `application/vnd.trianalab.aval.output.v1` | Media type of one output file layer | frozen |
 | `ReportVersion` | `aval.trianalab.io/verify-report/v1` | `version` of the verify report | frozen |
 | `RunRecordVersion` | `aval.trianalab.io/run-record/v1` | `version` of a run record | provisional |
 | `ArtifactTypeRun` | `application/vnd.trianalab.aval.run.v1` | `artifactType` of a run record manifest | provisional |
@@ -44,6 +46,7 @@ flowchart LR
   e1[execution manifest] -- subject --> anchor
   e2[execution manifest] -- subject --> anchor
   e1 --> layers[layers: DSSE envelope,<br>Sigstore bundle]
+  o1[outputs manifest] -- subject --> anchor
   stag[tag stats-TEST] --> sanchor[stats anchor]
   r1[run record] -- subject --> sanchor
 ```
@@ -124,6 +127,37 @@ It is tagged `sha256-<fingerprint hex>`.
 - **subject**: always the anchor of the execution's fingerprint. The tested
   revision or artifact is recorded inside the statement, not in the manifest,
   so the referrers of a tested image do not list its evidence.
+
+### Outputs
+
+A contract with `outputs` publishes the files before the attestation, as one
+manifest with `artifactType` `application/vnd.trianalab.aval.outputs.v1`,
+the OCI empty config, one layer per file (media type
+`application/vnd.trianalab.aval.output.v1`, annotation
+`org.opencontainers.image.title` = the path relative to the contract) and
+the fingerprint anchor as `subject`. The predicate's `execution.outputs`
+holds its digest and every file's path, digest and size, so the signature
+covers them. Lookup lists only execution manifests: an outputs manifest is
+never a candidate and does not count toward the 64-candidate cap, and
+readers that do not know it ignore it.
+
+After a candidate verifies, Aval fetches its outputs by the signed digests,
+with the caps (256 files, 16 MiB each, 64 MiB in total) checked before
+reading. Each of these is a verification failure, never a miss:
+
+- the outputs manifest or a blob is missing, or does not match its digest
+  or size
+- the manifest's layers differ from the predicate's list (extra, missing,
+  renamed or reordered)
+- a path that matches no `outputs` glob, is the contract file, is in scope
+  or under `.git` or `.aval`; a glob that matches no path; a predicate without outputs for a
+  contract with `outputs`, or the reverse
+
+`aval run` then writes the files: each is staged next to its target and
+renamed into place once all are staged. A symlink on the way or anything
+but a regular file at the target stops the restore; the test runs and the
+command exits 1. A failure while renaming can leave some files restored;
+the test then runs and rewrites them.
 
 ### Push
 
@@ -421,6 +455,9 @@ checked by `Predicate.Validate` (called by `evidence.Parse`).
 | `execution.fingerprintVersion` | string | | Manifest format, e.g. `aval-fingerprint/v1`. |
 | `execution.environment` | map string to string | no (omitted when empty) | Conditions of the run (toolchain, OS/arch). Only keys declared under `environment.toolchain` in `aval.yaml` are part of the fingerprint; anything else here is informational. `os` and `arch` are always the real values, whatever the toolchain declares; `probe.<key>` is the output of an `environment.probe`. |
 | `execution.exitCode` | integer | | Exit code of `runner.command`. |
+| `execution.outputs` | object | no (omitted without contract `outputs`) | The [outputs](#outputs) of the run. |
+| `execution.outputs.manifest` | string | yes, `sha256:<64 hex>` | Digest of the outputs manifest. |
+| `execution.outputs.files` | list of `{path, digest, size}` | yes, non-empty | In layer order. `path` is relative to the contract, slash-separated and clean (no `..`, `.`, empty segment, leading `/`, backslash or control character), listed once; `digest` is `sha256:<64 hex>`; `size` is not negative. |
 | `runner` | object | | Who produced the result, **as claimed**. |
 | `runner.identity` | string | yes | Claimed producer identity. |
 | `runner.issuer` | string | no (omitted when empty) | Claimed identity issuer, e.g. an OIDC issuer URL. |
@@ -654,3 +691,7 @@ version adds a new file. The tests that enforce this:
       rejected; no record `aval` writes is affected.
     - Within `aval-fingerprint/v1` (#102), `scope.resolve` adds `resolve`
       lines after the `env` lines; manifests without it are unchanged.
+    - Within `execution/v2` (#141), the predicate gained `execution.outputs`
+      and the outputs manifest (`outputs.v1`, `output.v1`) was added; the
+      contract gained `outputs`, omitted when empty, so no existing
+      fingerprint changes.

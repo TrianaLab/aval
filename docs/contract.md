@@ -56,8 +56,10 @@ aval run -f path/to/aval.yaml --explain --fingerprint-only   # also prints the m
 ```
 
 Diff the `--explain` output of two machines to see which file, toolchain entry
-or variable differs. `-f` defaults to `./aval.yaml`; the root is always the
-contract file's directory.
+or variable differs. `-f` takes one path and defaults to `./aval.yaml`; the
+root is always the contract file's directory. A file holds one contract: give
+each shard of a split suite its own file
+([Shards and matrices](guides/shards-and-matrices.md)).
 
 ## Fields
 
@@ -81,10 +83,12 @@ contract file's directory.
 | `environment.probe` | map string to list of strings | no | Each key must be an `environment.toolchain` key with a non-empty value; each value a non-empty argv, first element not blank. See [Probe the toolchain](#probe-the-toolchain). |
 | `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
+| `outputs` | list of globs | no | Files the test writes that a reused result restores, such as `coverage.xml` ([Restore coverage and reports on reuse](guides/write-a-contract.md#restore-coverage-and-reports-on-reuse)). Same glob rules as `scope`. When publishing, each glob must match a regular file (no symlink) that is not the contract file, outside the scope, `.git` and `.aval`; at most 256 files, 16 MiB each, 64 MiB in total. Otherwise nothing is published (exit 1). Omitted from the fingerprint when empty, so existing contracts keep theirs; adding it changes the fingerprint, so a result without outputs is never reused for it. |
 
 ## Globs
 
-`scope.source`, `scope.exclude` and `scope.dependencies` use the same globs:
+`scope.source`, `scope.exclude`, `scope.dependencies` and `outputs` use the
+same globs:
 
 | Glob | Matches |
 |---|---|

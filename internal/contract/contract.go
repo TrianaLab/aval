@@ -85,6 +85,11 @@ type Contract struct {
 	Scope        Scope        `yaml:"scope" json:"scope"`
 	Environment  Environment  `yaml:"environment,omitempty" json:"environment"`
 	Cacheability Cacheability `yaml:"cacheability" json:"cacheability"`
+	// Outputs are globs of files the test writes that a reused result
+	// restores (a coverage or junit report). They are published with the
+	// result and are never inputs. Omitted when empty, so contracts without
+	// it hash as before.
+	Outputs []string `yaml:"outputs,omitempty" json:"outputs,omitempty"`
 }
 
 // Metadata identifies the test. Name is the test identity: *what* is being
@@ -241,6 +246,7 @@ func (c *Contract) Validate() error {
 		"scope.source":       c.Scope.Source,
 		"scope.exclude":      c.Scope.Exclude,
 		"scope.dependencies": c.Scope.Dependencies,
+		"outputs":            c.Outputs,
 	} {
 		for i, g := range globs {
 			if err := ValidateGlob(g); err != nil {
