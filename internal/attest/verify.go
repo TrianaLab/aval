@@ -217,3 +217,33 @@ func (v *Verifier) verifyKeyless(e verify.SignedEntity) (evidence.Signer, error)
 	}
 	return evidence.Signer{}, errors.New("certificate has no OIDC issuer or subject")
 }
+
+// VerifyBlob checks that bundleJSON is a keyless Sigstore signature over
+// artifact by exactly issuer and subject (no regexp), against the trusted
+// root at trustedRoot (the public-good root fetched with TUF when empty). It
+// requires the same SCT, Rekor entry and timestamp as attestations do.
+func VerifyBlob(trustedRoot string, bundleJSON, artifact []byte, issuer, subject string) error {
+	var b bundle.Bundle
+	if err := b.UnmarshalJSON(bundleJSON); err != nil {
+		return fmt.Errorf("decoding Sigstore bundle: %w", err)
+	}
+	return verifyBlob(trustedRoot, &b, artifact, issuer, subject)
+}
+
+func verifyBlob(trustedRoot string, e verify.SignedEntity, artifact []byte, issuer, subject string) error {
+	// An empty matcher accepts any value, so an empty identity fails closed.
+	if issuer == "" || subject == "" {
+		return errors.New("signer issuer and subject are required")
+	}
+	tm, err := loadTrustedRoot(trustedRoot)
+	if err != nil {
+		return fmt.Errorf("sigstore trusted root: %w", err)
+	}
+	v, err := verify.NewVerifier(tm, keylessOptions...)
+	if err != nil {
+		return fmt.Errorf("keyless verifier: %w", err)
+	}
+	id, _ := verify.NewShortCertificateIdentity(issuer, "", subject, "") // cannot fail: exact values, no regexp
+	_, err = v.Verify(e, verify.NewPolicy(verify.WithArtifact(bytes.NewReader(artifact)), verify.WithCertificateIdentity(id)))
+	return err
+}

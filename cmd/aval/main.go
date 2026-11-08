@@ -194,7 +194,7 @@ func newRootCmd() *cobra.Command {
 		return nil
 	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
-	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd())
+	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
 	return root
 }
 
