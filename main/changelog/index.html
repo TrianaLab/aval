@@ -1823,15 +1823,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#020" class="md-nav__link">
+  <a href="#030" class="md-nav__link">
     <span class="md-ellipsis">
       
-        0.2.0
+        0.3.0
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0.2.0">
+    <nav class="md-nav" aria-label="0.3.0">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1862,15 +1862,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#010" class="md-nav__link">
+  <a href="#020" class="md-nav__link">
     <span class="md-ellipsis">
       
-        0.1.0
+        0.2.0
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0.1.0">
+    <nav class="md-nav" aria-label="0.2.0">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1886,6 +1886,45 @@
         
           <li class="md-nav__item">
   <a href="#patch-changes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.1.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.1.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Patch Changes
@@ -2083,15 +2122,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#020" class="md-nav__link">
+  <a href="#030" class="md-nav__link">
     <span class="md-ellipsis">
       
-        0.2.0
+        0.3.0
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0.2.0">
+    <nav class="md-nav" aria-label="0.3.0">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2122,15 +2161,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#010" class="md-nav__link">
+  <a href="#020" class="md-nav__link">
     <span class="md-ellipsis">
       
-        0.1.0
+        0.2.0
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0.1.0">
+    <nav class="md-nav" aria-label="0.2.0">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2146,6 +2185,45 @@
         
           <li class="md-nav__item">
   <a href="#patch-changes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.1.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.1.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Patch Changes
@@ -2234,23 +2312,54 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Anchor link">&para;</a></h1>
-<h2 id="020">0.2.0<a class="headerlink" href="#020" title="Anchor link">&para;</a></h2>
+<h2 id="030">0.3.0<a class="headerlink" href="#030" title="Anchor link">&para;</a></h2>
 <h3 id="minor-changes">Minor Changes<a class="headerlink" href="#minor-changes" title="Anchor link">&para;</a></h3>
+<ul>
+<li>4b68dd5: <code>aval stats --registry &lt;repo&gt; [--test &lt;id&gt;] [--since &lt;duration|date&gt;] [--by test|repository] [--output text|json]</code> reads the run records in the registry and aggregates them on demand: runs, hit rate, misses by cause, verification failures, shadow false hits, and total and saved test time, per test (or per source repository with <code>--by repository</code>) and in total. It writes nothing. Records that are unreadable, oversized, malformed or inconsistent are skipped and counted; reading stops after 1000 records or 64 pages per listing, with a warning. New format, provisional: <code>aval.trianalab.io/stats-report/v1</code> (<code>pkg/evidence</code> adds <code>StatsReport</code>, <code>TestStats</code>, <code>RepositoryStats</code>, <code>RunStats</code>, <code>MissCauses</code>, <code>StatsReportVersion</code> and <code>StatsUnknownRepository</code>). Run records gain the optional <code>verifiedResult</code> and <code>repository</code> (<code>--repository</code> on <code>aval run</code> and <code>aval record</code>; records without it count as <code>unknown</code>), and <code>evidence.ParseRunRecord</code> now rejects inconsistent records (<code>reused: true</code> requires <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code> and <code>testDurationMs</code> 0; <code>verifiedResult</code> requires <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>), so <code>aval record</code> refuses a hand-edited record that claims a reuse that never happened. Docs explain pruning old records with ORAS.</li>
+<li>6351105: Registry I/O is bounded. <code>run</code>, <code>verify</code> and <code>push</code> take <code>--registry-timeout</code> (default <code>1m</code>). A registry that stalls past the timeout gives <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>, and <code>aval run</code> still runs the test. Lookup follows at most 64 referrers pages. A listed <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> whose manifest was deleted (404) counts as absent: the remaining candidates can still be reused, and the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is a miss if every candidate is gone. One credential store and one auth cache are shared by every registry call. The keyless trusted root (a TUF fetch when <code>trustedRoot</code> is not pinned) is loaded only when a candidate's bundle carries a certificate. After pushing, <code>push</code> and <code>run --push</code> confirm that the new digest is listed among the referrers, re-pushing up to three times, and fail if it never appears.</li>
+<li>7cd688f: Aval detects mutable references in a test's inputs and refuses to reuse them. A static, offline scanner reads the files in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> and <code>runner.command</code>, one detector per ecosystem: container images without a digest (Compose and Kubernetes <code>image:</code>, Dockerfile <code>FROM</code> and <code>COPY --from</code>, <code>docker run</code> and <code>podman run</code>, compose files the command uses but the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> does not hold), Go (<code>go.mod</code> without <code>go.sum</code>, <code>go install pkg@latest</code>), npm, yarn, pnpm and bun (<code>package.json</code> without a lockfile, unpinned <code>npm i</code> and <code>npx</code>), Python (unpinned <code>requirements*.txt</code> entries, missing hashes, Poetry and Pipenv without a lockfile, unpinned <code>pip install</code>), Rust (<code>Cargo.toml</code> without <code>Cargo.lock</code>), Java (Maven and Gradle <code>SNAPSHOT</code>, <code>LATEST</code>, <code>RELEASE</code>, dynamic versions and ranges), Ruby (<code>Gemfile</code> without <code>Gemfile.lock</code>), PHP (<code>composer.json</code> without <code>composer.lock</code>), OS packages (<code>apt-get install</code> and <code>apk add</code> without versions), remote scripts (<code>curl … | sh</code>, remote <code>ADD</code> without <code>--checksum</code>) and git (<code>git clone</code> without a commit, submodules that track a branch). For <code>hermetic</code> and <code>controlled-environment</code> contracts any unacknowledged finding makes the lookup a <code>miss</code> (exit 4 for <code>verify</code>) whose reason lists each reference, the test runs, and <code>run --push</code> and <code>push</code> do not publish (exit 1). <code>external-dependencies</code> contracts get the findings as information; <code>non-deterministic</code> is unchanged. <code>aval run</code> prints each finding as a <code>mutable:</code> line (<code>--fingerprint-only</code> prints them on stderr). Contract format change, additive within <code>aval.trianalab.io/v1</code>: the optional <code>scope.allowMutable</code> list (<code>ref</code> and <code>reason</code>) acknowledges a reference by the exact text Aval reports. It is part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash; contracts without it keep their <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, and the manifest stays <code>aval-fingerprint/v1</code>. Older <code>aval</code> binaries reject contracts that use the new field. A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> whose <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> holds a <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr> that earlier versions reused now misses until the reference is pinned or acknowledged. Guide: "Pin your dependencies" (<code>docs/pinning.md</code>).</li>
+<li>0e259b7: Aval resolves declared artifacts to immutable ids at <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time. The optional <code>scope.resolve</code> list takes <code>kind: reference</code> entries for container images (<code>image</code>, tag to manifest or index digest), npm, PyPI, Go modules (through the module proxy, <code>h1:</code> hash), Maven, crates.io, RubyGems, git (ref to commit with <code>git ls-remote</code>) and plain URLs (sha256 of the download, up to 256 MiB). Each resolves a tag, a version range or a branch to its digest, checksum or commit, which goes into the manifest as a <code>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;id&gt;</code> line: a repushed tag, a new release inside a range or a moved branch changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. Resolution is opt-in and stateless, bounded by a 2-minute deadline; a reference that cannot be resolved fails the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so nothing is looked up, the test runs and nothing is published, and the reason names the reference. <code>aval run --explain</code> prints the time each lookup took on stderr. <code>scope.resolve</code> never clears a finding of the mutable-reference scanner: it makes a move change the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, and the reference still blocks reuse until it is pinned in place or accepted with <code>scope.allowMutable</code>. <code>scope.resolve</code> binds the named artifact, not its transitive dependencies. Registries come from <code>$npm_config_registry</code>, <code>$GOPROXY</code>, <code>$AVAL_PYPI_URL</code>, <code>$AVAL_MAVEN_URL</code>, <code>$AVAL_CRATES_INDEX</code> and <code>$AVAL_RUBYGEMS_URL</code>; credentials from the Docker config, <code>~/.npmrc</code> tokens, <code>~/.netrc</code> machine entries and git, sent only over https or to a loopback host. Format changes, additive: the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field within <code>aval.trianalab.io/v1</code> (older binaries reject contracts that use it), and the <code>resolve</code> manifest lines within <code>aval-fingerprint/v1</code>, which only contracts with the field have; every other manifest is unchanged. Guide: "Resolve references" (<code>docs/resolve/</code>).</li>
+<li>8d4b8d8: Run statistics in the registry. <code>aval run --record</code> publishes one run record per run, for every <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>, with the test id, <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>, whether the result was reused, the result, the test duration, the saved duration, the aval version, a timestamp and an optional <code>--ci-run-url</code>. Records hang off a per-test stats anchor tagged <code>stats-&lt;test id&gt;</code>, never off a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> anchor. <code>run</code> and <code>verify</code> never read them, so a record cannot cause reuse or count toward the candidate cap. Recording is best-effort: a record that cannot be published, for example without write credentials, is a warning and never changes the exit code. <code>--record-file</code> writes the record to a file and <code>aval record</code> publishes it later. New format identifiers, provisional: <code>aval.trianalab.io/run-record/v1</code>, <code>application/vnd.trianalab.aval.run.v1</code> (<code>+json</code> for the layer) and <code>application/vnd.trianalab.aval.stats.v1</code>. <code>pkg/evidence</code> adds <code>RunRecord</code>, <code>ParseRunRecord</code> and these constants.</li>
+<li>ff2a2c8: A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> can depend on other contracts in the same repository. The optional <code>scope.contracts</code> list takes paths to other <code>aval.yaml</code> files, relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (<code>../backend/aval.yaml</code>). Each referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> is fingerprinted from its own directory and <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, and its <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> goes into the manifest as a <code>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;</code> line, transitively: a change inside a referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> makes the dependent miss and run, a change outside it does not. References must stay inside the git working tree of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (the nearest directory with a <code>.git</code> entry); a missing, invalid, symlinked or cyclic reference, or more than 8 levels or 64 contracts, fails the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so the test runs. A referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s mutable references block the dependent's reuse unless the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s own <code>scope.allowMutable</code> accepts them. <code>aval run --explain</code> prints the dependency tree after the manifest. Format changes, additive: the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field within <code>aval.trianalab.io/v1</code> (older binaries reject contracts that use it), and the <code>contract &lt;path&gt;</code> manifest lines within <code>aval-fingerprint/v1</code>, which only contracts with the field have; every other manifest is unchanged. Guide: "Depend on another part of the repo".</li>
+<li>6b94c21: One-line installers: <code>scripts/get-aval.sh</code> (Linux and macOS, <code>curl | bash</code>) and <code>scripts/install.ps1</code> (Windows, <code>irm | iex</code>). Both refuse a download whose sha256 does not match the release's <code>checksums.txt</code>, and verify the release signature (cosign) and SLSA provenance (<code>gh attestation verify</code>) when those tools are installed. See docs/install.md.</li>
+</ul>
+<h3 id="patch-changes">Patch Changes<a class="headerlink" href="#patch-changes" title="Anchor link">&para;</a></h3>
+<ul>
+<li>0553f1e: <code>scope.allowMutable</code> entries take an optional <code>file:</code> (the path a finding prints, relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or <code>runner.command</code>): the entry then accepts the reference in that file only. A ref-only entry still accepts a reference that one file reports; when several files report it (generic refs such as <code>resources[0]</code> or <code>patches[0]</code> repeat across kustomizations), nothing is accepted and the finding asks for <code>file:</code>. With <code>scope.contracts</code>, each <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s entries apply to its own findings. The scanner also reports kustomize <code>helmCharts</code> entries other than a local chart in the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, and patches given by a path outside the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>; checks instructions behind <code>ONBUILD</code>; uses the <code># escape=</code> character when it splits heredoc words; and no longer reports a <code>range</code> loop's key variable used as a key directly under <code>labels:</code> or <code>annotations:</code> in a Helm template. Since the previous release, image refs in JSON files (<code>"image": "postgres:16",</code>) no longer end in <code>",</code>: update an acknowledgement written with the trailing characters to the bare reference (<code>postgres:16</code>).</li>
+<li>2df8ee2: A <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> the trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> lists but below <code>minTrustLevel</code> is now reported as <code>miss</code> (exit 4), and with <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>miss</code> in the verify report's <code>rejected</code> list, instead of <code>verification-failed</code> (exit 5). Such an <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> is still never reused, and a false claim from that <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> stays <code>verification-failed</code>. The report stays <code>aval.trianalab.io/verify-report/v1</code>; <code>rejected[].outcome</code> may now also be <code>miss</code>. Rejected verification failures are printed with the <code>aval: SECURITY:</code> prefix even when another candidate verifies. <code>evidence.Verify</code> is unchanged.</li>
+<li>e5497e1: <code>--registry-timeout</code> help no longer claims "push has its own" deadline on <code>aval push</code>, <code>aval record</code> and <code>aval stats</code>; only <code>aval run</code> says lookup and fetch share one. Shorter <code>aval run</code>, <code>aval record</code> and <code>aval stats</code> help. The docs site is shorter and single-sourced: the README links into the site instead of copying the quickstart, and the resolver pages and vision move under Reference and Project.</li>
+<li>7fae6b0: The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> no longer hashes Aval's own outputs: <code>.aval</code> directories at any depth, and the <code>--result</code> and <code>--report</code> paths of the command when they fall inside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root. A broad <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> such as <code>scope.source: ["**"]</code> now keeps its <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> across <code>aval run</code>s, and <code>aval push</code> accepts the result <code>aval run</code> recorded. The manifest format stays <code>aval-fingerprint/v1</code>: trees with no Aval output in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> keep byte-identical manifests and digests (the committed v1 golden and Aval's own contracts are unchanged). Only manifests that listed a file under <code>.aval/</code> or a <code>--result</code>/<code>--report</code> file change, to the manifest of the same tree without those files. Such a manifest held a result from an earlier run, so it changed on every run and was not reusable in practice; results published from a clean checkout (no Aval output yet) keep their <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and stay reusable. <code>.aval/</code> is now reserved for Aval: a file the test reads must not live there.</li>
+<li>91a57b8: <code>run --push</code> and <code>push</code> check their preconditions before anything runs and exit 2 (usage) instead of failing with exit 1 after the test: a <code>--key</code> that cannot be read or is not an unencrypted ECDSA P-256 PEM key (the error names the requirement and the <code>openssl</code> command to create one; cosign keys are encrypted and not supported), or no <code>--key</code> and no <code>$SIGSTORE_ID_TOKEN</code>. <code>run</code>, <code>verify</code> and <code>push</code> reject a <code>--registry</code> that is not an OCI repository (a scheme, no repository, a tag or a digest) with exit 2 and an example. A <code>--result</code> or <code>--report</code> path that the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> includes and that holds a real input (anything other than an Aval result or report) exits 2 before the test runs, because skipping it would drop that input from the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; <code>run</code> also refuses to overwrite any existing file at those paths that is not exactly an Aval result or report. Exit codes keep their values; only these cases move from exit 1 to the existing exit 2.</li>
+<li>c7c5888: Docs site: live run statistics. The home metric strip and a new Stats page (Project &gt; Stats) read <code>stats.json</code>, which the docs workflow rebuilds twice an hour and on every push from <code>aval stats --by repository --since 30d</code> over the public stats registry <code>ghcr.io/trianalab/aval-stats</code>, without rebuilding any page; a failed refresh keeps the previous file, and a missing or stale file shows a neutral state. Aval's own CI now publishes its run records there. The Stats page explains how to keep statistics in your own registry and how a repository joins the public aggregate.</li>
+<li>f14b7b4: Docs site: the mobile menu (hamburger) now slides in the site navigation on every page. On inner pages the panel opened under the dark overlay; on the home page there was no panel at all. <code>make docs-nav-smoke</code>, part of <code>make ci-docs</code>, opens the menu at a phone width on the home page and an inner page and checks the panel is on screen with links.</li>
+<li>133adf0: The README now has an Install section and a local quickstart (registry:2, an openssl P-256 key, <code>aval run --push --key</code>, <code>aval verify</code>) that reaches <code>verified</code>; an acceptance test runs it as written. A missing <code>aval.yaml</code> and a pre-freeze <code>aval.dev/</code> <code>apiVersion</code> (<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> or <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>) now print a next step. <code>aval verify --help</code> lists exit codes 1 and 2, and <code>docs/cli-reference.md</code> has one exit-code table for every command. New docs: registry credentials, the network and HOME needs of keyless verification and how to pin <code>trustedRoot</code>, and the 64-candidate cap with its cleanup.</li>
+<li>ed37d7e: New docs Quickstart page: copy-paste steps with the expected output from an empty folder to a verified reuse, a changed input and a rejected <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> (exit 5), with terminal recordings of real runs and a "what just happened" diagram; an acceptance test runs the page and checks every output it shows. <code>make docs-demos</code> re-records the GIFs from VHS tapes. The Install page now shows a manual release download with cosign and checksum checks.</li>
+<li>5871b37: Readable errors and reasons. Output escapes only control and non-printable characters (quotes and backslashes print as they are), and each cause of a joined error gets its own <code>aval:</code> line (an invalid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>) or is separated by <code>;</code> in the report reason (an invalid <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>). A reason is printed once, in the report: stderr no longer repeats it, and a verification failure adds a single <code>aval: SECURITY: ...</code> line that links to <code>docs/trust-model.md</code>. A <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> missing from the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> gets the reason <code>signer key id "&lt;id&gt;" is not in the trust policy (trust policy &lt;file&gt;)</code> instead of the Sigstore error. Skipped lookups (no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, no registry, <code>--no-reuse</code>, a <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class that is never or not allowed to be reused) say only why they did not look; they stay misses. No <code>attest.Sign:</code> or <code>registry.Lookup</code> prefixes reach users. Text-mode <code>verify</code> prints <code>signer:</code> (with the <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> name) and <code>reference:</code> lines for a verified result. <code>non-deterministic</code> is called "never reusable" everywhere. The JSON verify report is unchanged except for the wording of <code>reason</code>, where joined causes are now separated by <code>;</code>.</li>
+<li>cb81760: <code>scope.resolve</code> detects registry overrides as the tools read them. pip variables match in any spelling pip reads (<code>PIP_</code> then any letter case, <code>-</code> equal to <code>_</code>, one optional leading <code>--</code>: <code>PIP_index-url</code>, <code>PIP___INDEX_URL</code>). <code>~/.npmrc</code> is read as ini, like npm: quotes stripped from keys and values, <code>;</code> and <code>#</code> comments, keys under a <code>[section]</code> ignored, <code>${VAR}</code> expanded in keys and values as npm does (an undefined variable stays literal); a line Aval cannot read (including one with U+2028 or U+2029, or a quoted key or value that is JSON other than a string) fails the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and sends no token. A floating Maven version fails when <code>&lt;latest&gt;</code> or <code>&lt;release&gt;</code> is a SNAPSHOT or not in <code>&lt;versions&gt;</code>. Errors show only the host of a URL, so a token in a registry path (<code>https://npm-proxy.fury.io/&lt;token&gt;/user/</code>) is masked too.</li>
+<li>9082a6c: <code>pkg/evidence</code>: <code>ErrNotImplemented</code>, <code>Verification.TrustLevel</code> (use <code>Verification.Signer.TrustLevel</code>) and <code>Runner.Issuer</code>/<code>Runner.TrustLevel</code> are deprecated; nothing is removed. Pushing an <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> without a Sigstore bundle is now refused, since it could never verify. Keyless signing always uses the Sigstore public-good instance, as the CLI already did.</li>
+<li>9556f78: The mutable-reference scanner adds parser-based detection to its line-by-line pass, which still runs on every file it ran on before, so it finds everything it found before. Dockerfiles named as such (<code>Dockerfile</code>, <code>Containerfile</code>, <code>Dockerfile.*</code>, <code>Dockerfile-dev</code>, <code>Dockerfile_windows</code>, <code>*.dockerfile</code>) are also split the way BuildKit does: a comment line ending in <code>\</code> no longer swallows the next instruction, continued lines join with nothing (<code>FROM db:1\</code> then <code>6</code> is <code>db:16</code>), comment and blank lines inside a continuation are dropped, a leading <code># escape=</code> sets the continuation character, and heredoc bodies are kept apart. YAML is also decoded: <code>image:</code> keys are matched by their decoded value (<code>"ima\x67e":</code>, <code>? image</code>, <code>!!binary</code>, tagged, anchored or alias keys, nested sequences), after an anchor or an empty flow value, or after a lone CR, NEL or LS line break. The scanner also reports kustomize <code>images:</code> and <code>imageTags:</code> entries with <code>newName</code>, <code>newTag</code> or <code>tagSuffix</code> and no digest, kustomize patches, replacements, transformers, generators and <code>helmCharts</code> that set an image (by ref, such as <code>patches[0]</code>), <code>kind: ImageTagTransformer</code>, images in Helm <code>*.tpl</code> helpers, <code>RUN --mount=...,from=</code> images, JSON manifests under <code>templates/</code> or listed in kustomize <code>resources</code>, Compose <code>build.dockerfile_inline</code> and <code>docker-image://</code> <code>additional_contexts</code>, and every name of a multi-name or lowercase Dockerfile <code>ARG</code>. What Aval reports because it cannot tell (a templated key in a Helm template, a YAML key with an unknown tag or an undecodable escape, an undecodable heredoc name, a <code>FROM</code> image with a variable that is not a global <code>ARG</code> with a value, a kustomize resource that is remote or outside the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> (<code>resources[2]</code>), a tagged key in a template the parser rejects, a Dockerfile BuildKit refuses) is in the <code>container</code> ecosystem, so <code>scope.allowMutable</code> can acknowledge it; only an unreadable or oversized file stays in <code>scan</code>. A shell continuation at the very end of a file is no longer dropped. docs/pinning.md now says the scanner is a best-effort safety net and lists its known limits.</li>
+<li>59adaf5: The installers are served from the docs site: <code>curl -fsSL https://aval.run/install.sh | bash</code> and <code>irm https://aval.run/install.ps1 | iex</code>. The site root redirects to the latest release (to <code>main</code> before the first one), and the outdated-version banner shows only on releases older than <code>latest</code>, never on <code>main</code>.</li>
+<li>6a2a118: <code>aval stats</code> finds run records on registries that do not sort tags, such as GHCR: it lists every tag and filters by the <code>stats-</code> prefix instead of starting the listing after <code>stats</code>. Up to 64 pages of tags are read (6400 tags at a registry page size of 100); past that the report carries a truncation warning.</li>
+<li>843f7a3: A symlink in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory under which a <code>source</code> or <code>dependencies</code> glob could match files (for example <code>pkg/sub -&gt; /elsewhere</code> with <code>**/*.go</code>), now fails the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> with an error naming the path. Before, it was skipped, so edits behind it kept the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and a stale result could be reused. A symlink no glob can reach is still ignored, and a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory that is itself a symlink fingerprints like its target.</li>
+<li>27d7391: Try Aval in the browser: click the terminal on the home page of the docs site (or its "Try it live" button) and it runs the real Aval compiled to WebAssembly, with a simulated test, an in-memory registry and a throwaway key generated in the browser. It supports <code>aval run</code> (a miss, then a verified reuse), <code>aval run --explain</code>, <code>aval verify -o json</code>, <code>edit &lt;file&gt;</code>, <code>tamper</code> (the next verify fails with exit 5), <code>reset</code> and <code>help</code>. Nothing is fetched until the visitor clicks the terminal or presses a key in it, and without WebAssembly the page keeps the recorded transcript. Keyless signing is not available in the browser.</li>
+</ul>
+<h2 id="020">0.2.0<a class="headerlink" href="#020" title="Anchor link">&para;</a></h2>
+<h3 id="minor-changes_1">Minor Changes<a class="headerlink" href="#minor-changes_1" title="Anchor link">&para;</a></h3>
 <ul>
 <li>0148c76: Formats are frozen. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> <code>apiVersion</code> is now <code>aval.trianalab.io/v1</code> and the verify report <code>version</code> is <code>aval.trianalab.io/verify-report/v1</code>; <code>aval.dev/v1alpha1</code> contracts and <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> files are rejected, so change that line in yours. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash covers <code>apiVersion</code>, so results published before are misses and each test runs once. The predicate type (<code>https://aval.trianalab.io/attestation/execution/v2</code>), media and artifact types (<code>application/vnd.trianalab.aval.execution.v2</code>, <code>application/vnd.trianalab.aval.fingerprint.v1</code>) and predicate <code>schemaVersion</code> <code>v2</code> are unchanged and now frozen, so attestations written by v0.1.0 keep a valid, readable format. Compatibility rules (additive changes within a version, what needs a new version, how consumers treat unknown fields and values, deprecation) are in <code>docs/artifact-format.md</code>, and golden files guard the JSON shape of the statement, predicate and verify report.</li>
 </ul>
-<h3 id="patch-changes">Patch Changes<a class="headerlink" href="#patch-changes" title="Anchor link">&para;</a></h3>
+<h3 id="patch-changes_1">Patch Changes<a class="headerlink" href="#patch-changes_1" title="Anchor link">&para;</a></h3>
 <ul>
 <li>c17dc26: <code>aval run</code> and <code>aval verify</code> escape newlines and control characters in reasons printed as text and on stderr, so text from an untrusted <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> cannot start a log line of its own. Aval's own CI now reuses its signed e2e results, and a release requires a verified e2e <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> for its commit.</li>
 <li>59b9b66: <code>pkg/evidence</code> is semver-stable Go API: within a major version it changes additively only, and CI fails when an exported identifier is removed or changes type or signature without a new major module path. <code>examples/evidence-consumer</code> is a separate module that consumes Aval evidence through <code>pkg/evidence</code> alone, with its own signature verifier. The <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> is in <code>docs/integrations.md</code>.</li>
 <li>bbf9e55: Fingerprinting fails closed in two more cases: a <code>scope.source</code> glob that matches no file (a typo, or a name that differs on disk by case or Unicode form), and a file excluded only because a trailing <code>**</code> in <code>exclude</code> matched zero segments (<code>build/**</code> against a file named <code>build</code>). Trees that fingerprinted before and still do keep the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. A table-driven false-hit corpus now pins every kind of relevant and irrelevant change.</li>
 </ul>
 <h2 id="010">0.1.0<a class="headerlink" href="#010" title="Anchor link">&para;</a></h2>
-<h3 id="minor-changes_1">Minor Changes<a class="headerlink" href="#minor-changes_1" title="Anchor link">&para;</a></h3>
+<h3 id="minor-changes_2">Minor Changes<a class="headerlink" href="#minor-changes_2" title="Anchor link">&para;</a></h3>
 <ul>
 <li>a6d2b1a: First release: signed <code>aval</code> binaries for Linux, macOS and Windows with checksums, SBOMs and SLSA provenance. <code>aval --version</code> prints the release version.</li>
 </ul>
-<h3 id="patch-changes_1">Patch Changes<a class="headerlink" href="#patch-changes_1" title="Anchor link">&para;</a></h3>
+<h3 id="patch-changes_2">Patch Changes<a class="headerlink" href="#patch-changes_2" title="Anchor link">&para;</a></h3>
 <ul>
 <li>59664a3: Dependency updates: <code>oras.land/oras-go/v2</code> 2.6.4 to 2.7.0; GitHub Actions <code>actions/checkout</code> to v7.0.1, <code>actions/setup-go</code> to v7.0.0, <code>actions/upload-artifact</code> to v7.0.2, <code>actions/download-artifact</code> to v8.0.2 and <code>actions/dependency-review-action</code> to v5.0.0 (Node 24 runtime).</li>
 </ul>
