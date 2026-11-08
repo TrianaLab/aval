@@ -198,7 +198,11 @@ Flags:
 upgrade downloads a release from GitHub Releases (the latest, or --version), checks that
 checksums.txt carries a keyless Sigstore signature from Aval's release workflow at that
 tag and that the archive matches it, then replaces the running binary. Any failed
-check replaces nothing.
+check replaces nothing. A bad signature or checksum is a security event: do not retry it
+away. Without --version it refuses to move to an older release than the running one.
+
+Exit codes: 0 upgraded or up to date (or --check printed), 1 error (download, signature,
+checksum, older latest release, replacing the binary), 2 usage.
 
 ```text
 Usage:

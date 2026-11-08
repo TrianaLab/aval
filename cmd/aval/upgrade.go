@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
 
 	"github.com/TrianaLab/aval/internal/attest"
 )
@@ -33,6 +34,7 @@ var (
 	httpClient   = &http.Client{Timeout: 5 * time.Minute}
 	maxDownload  = int64(256 << 20)
 	executable   = os.Executable
+	rename       = os.Rename
 	verifyBlob   = attest.VerifyBlob
 	goos, goarch = runtime.GOOS, runtime.GOARCH
 )
@@ -44,7 +46,11 @@ const (
 	releaseSigner = "https://github.com/TrianaLab/aval/.github/workflows/release.yaml@refs/tags/"
 )
 
-var releaseTag = regexp.MustCompile(`^v?\d+\.\d+\.\d+$`)
+// Same shape scripts/get-aval.sh accepts, prereleases included.
+var releaseTag = regexp.MustCompile(`^v?\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
+
+// maxSmall caps checksums.txt and its bundle, read before they are verified.
+const maxSmall = 1 << 20
 
 func newVersionCmd() *cobra.Command {
 	return &cobra.Command{
@@ -67,7 +73,10 @@ func newUpgradeCmd() *cobra.Command {
 		Long: "upgrade downloads a release from GitHub Releases (the latest, or --version), checks that\n" +
 			"checksums.txt carries a keyless Sigstore signature from Aval's release workflow at that\n" +
 			"tag and that the archive matches it, then replaces the running binary. Any failed\n" +
-			"check replaces nothing.",
+			"check replaces nothing. A bad signature or checksum is a security event: do not retry it\n" +
+			"away. Without --version it refuses to move to an older release than the running one.\n\n" +
+			"Exit codes: 0 upgraded or up to date (or --check printed), 1 error (download, signature,\n" +
+			"checksum, older latest release, replacing the binary), 2 usage.",
 		Args: noArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			if want != "" && !releaseTag.MatchString(want) {
@@ -90,26 +99,49 @@ func upgrade(out io.Writer, want string, check bool) error {
 		}
 	}
 	cur, next := strings.TrimPrefix(version, "v"), strings.TrimPrefix(tag, "v")
+	// A moved "latest" marker must not silently roll everyone back. A dev
+	// build (not a version) is always replaced.
+	older := semver.IsValid("v"+cur) && semver.Compare(tag, "v"+cur) < 0
 	switch {
 	case cur == next:
 		fmt.Fprintf(out, "aval %s is up to date\n", cur)
 		return nil
 	case check:
-		fmt.Fprintf(out, "current %s\nlatest  %s\n", cur, next)
+		fmt.Fprintf(out, "current %s\ntarget  %s\n", cur, next)
 		return nil
+	case older && want == "":
+		return fmt.Errorf("latest release %s is older than %s; pass --version %s to downgrade", next, cur, tag)
 	}
+	bin, err := fetchRelease(tag, next)
+	if err != nil {
+		return err
+	}
+	if err := replace(bin); err != nil {
+		return err
+	}
+	verb := "upgraded"
+	if older {
+		verb = "downgraded"
+	}
+	fmt.Fprintf(out, "%s aval %s -> %s\n", verb, cur, next)
+	return nil
+}
+
+// fetchRelease downloads the release binary for this platform and returns it only
+// once checksums.txt is signed by the release workflow and matches.
+func fetchRelease(tag, next string) ([]byte, error) {
 	base := releasesURL + "/download/" + tag + "/"
-	sums, err := download(base + "checksums.txt")
+	sums, err := download(base+"checksums.txt", maxSmall)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	bundle, err := download(base + "checksums.txt.sigstore.json")
+	bundle, err := download(base+"checksums.txt.sigstore.json", maxSmall)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Who published checksums.txt, before any sum in it is trusted.
 	if err := verifyBlob("", bundle, sums, releaseIssuer, releaseSigner+tag); err != nil {
-		return fmt.Errorf("checksums.txt is not signed by %s%s: %w", releaseSigner, tag, err)
+		return nil, fmt.Errorf("checksums.txt is not signed by %s%s: %w", releaseSigner, tag, err)
 	}
 	archive, name := fmt.Sprintf("aval_%s_%s_%s.tar.gz", next, goos, goarch), "aval"
 	if goos == "windows" {
@@ -117,24 +149,20 @@ func upgrade(out io.Writer, want string, check bool) error {
 	}
 	sum, ok := sumFor(sums, archive)
 	if !ok {
-		return fmt.Errorf("checksums.txt does not list %s", archive)
+		return nil, fmt.Errorf("checksums.txt does not list %s", archive)
 	}
-	data, err := download(base + archive)
+	data, err := download(base+archive, maxDownload)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if got := sha256.Sum256(data); hex.EncodeToString(got[:]) != sum {
-		return fmt.Errorf("checksum mismatch for %s", archive)
+		return nil, fmt.Errorf("checksum mismatch for %s", archive)
 	}
 	bin, err := extract(data, name)
 	if err != nil {
-		return fmt.Errorf("%s: %w", archive, err)
+		return nil, fmt.Errorf("%s: %w", archive, err)
 	}
-	if err := replace(bin); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "upgraded aval %s -> %s\n", cur, next)
-	return nil
+	return bin, nil
 }
 
 func latestTag() (string, error) {
@@ -151,13 +179,13 @@ func latestTag() (string, error) {
 	}
 	// The tag goes into URLs and the signer identity.
 	if tag := path.Base(loc.Path); releaseTag.MatchString(tag) {
-		return tag, nil
+		return "v" + strings.TrimPrefix(tag, "v"), nil
 	}
 	return "", fmt.Errorf("redirect to %s does not name a release version", loc)
 }
 
-// download GETs url, refusing anything but 200 and bodies over maxDownload.
-func download(url string) ([]byte, error) {
+// download GETs url, refusing anything but 200 and bodies over max.
+func download(url string, max int64) ([]byte, error) {
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, err
@@ -166,9 +194,9 @@ func download(url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GET %s: %s", url, resp.Status)
 	}
-	b, err := io.ReadAll(io.LimitReader(resp.Body, maxDownload+1))
-	if err == nil && int64(len(b)) > maxDownload {
-		err = fmt.Errorf("GET %s: larger than %d bytes", url, maxDownload)
+	b, err := io.ReadAll(io.LimitReader(resp.Body, max+1))
+	if err == nil && int64(len(b)) > max {
+		err = fmt.Errorf("GET %s: larger than %d bytes", url, max)
 	}
 	return b, err
 }
@@ -193,7 +221,7 @@ func extract(archive []byte, name string) ([]byte, error) {
 			return nil, err
 		}
 		for _, f := range zr.File {
-			if f.Name == name {
+			if f.Name == name && f.Mode().IsRegular() {
 				rc, err := f.Open()
 				if err != nil {
 					return nil, err
@@ -222,7 +250,8 @@ func extract(archive []byte, name string) ([]byte, error) {
 
 // replace writes bin next to the running executable and renames it over it,
 // so a failure leaves the old binary in place. Windows cannot replace a
-// running exe, only rename it, so the old one moves to <exe>.old first.
+// running exe, only rename it, so the old one moves to <exe>.old first and
+// back if the new one cannot take its place.
 func replace(bin []byte) error {
 	exe, err := executable()
 	if err == nil {
@@ -235,13 +264,19 @@ func replace(bin []byte) error {
 	if err == nil {
 		defer func() { _ = os.Remove(tmp.Name()) }() // a no-op once renamed
 		_, err = tmp.Write(bin)
-		err = errors.Join(err, tmp.Chmod(0o755), tmp.Close())
+		err = errors.Join(err, tmp.Chmod(0o755), tmp.Sync(), tmp.Close())
 	}
+	moved := false
 	if err == nil && goos == "windows" {
-		err = os.Rename(exe, exe+".old")
+		_ = os.Remove(exe + ".old") // left by a previous upgrade
+		err = rename(exe, exe+".old")
+		moved = err == nil
 	}
 	if err == nil {
-		err = os.Rename(tmp.Name(), exe)
+		err = rename(tmp.Name(), exe)
+	}
+	if err != nil && moved {
+		err = errors.Join(err, rename(exe+".old", exe))
 	}
 	if errors.Is(err, fs.ErrPermission) {
 		return fmt.Errorf("replacing %s: %w (run with sudo, or reinstall with the installer)", exe, err)

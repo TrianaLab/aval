@@ -55,15 +55,17 @@ A failed check installs nothing. A check that cannot run is reported.
 ```sh
 aval upgrade                    # to the latest release
 aval upgrade --version v0.4.0   # to a given release
-aval upgrade --check            # print the current and latest versions, change nothing
+aval upgrade --check            # print the current and target versions, change nothing
 ```
 
 `aval upgrade` replaces the running binary. It needs no `cosign`: it checks
 the Sigstore signature of `checksums.txt` itself (issuer
 `https://token.actions.githubusercontent.com`, signer Aval's release workflow
-at that tag), then the archive's sha256. A failed check replaces nothing. If
-the binary's directory is not writable, run it with `sudo` or use the
-installer again. `aval version` prints the version, Go version and platform.
+at that tag), then the archive's sha256. A failed check replaces nothing and
+exits 1; a bad signature or checksum is a security event, do not retry it
+away. Without `--version` it refuses to move to a release older than the
+running one; a `dev` build is always replaced. If the binary's directory is
+not writable, run it with `sudo` or use the installer again. `aval version` prints the version, Go version and platform.
 
 ## By hand
 

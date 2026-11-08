@@ -80,6 +80,9 @@ func newRelease(t *testing.T) *release {
 	mux.HandleFunc("/latest", func(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/TrianaLab/aval/releases/tag/v9.9.9", http.StatusFound)
 	})
+	mux.HandleFunc("/nov/latest", func(w http.ResponseWriter, req *http.Request) {
+		http.Redirect(w, req, "/TrianaLab/aval/releases/tag/9.9.9", http.StatusFound)
+	})
 	mux.HandleFunc("/bad/latest", func(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/TrianaLab/aval/releases/tag/main", http.StatusFound)
 	})
@@ -156,6 +159,55 @@ func TestUpgradeWindows(t *testing.T) {
 	}
 }
 
+// A redirect to a tag without the v still builds v9.9.9 URLs and identity.
+func TestUpgradeLatestWithoutV(t *testing.T) {
+	r := newRelease(t)
+	releasesURL += "/nov"
+	r.srv.Config.Handler = http.StripPrefix("/nov", r.srv.Config.Handler)
+	if code, _, errOut := runCLI("upgrade"); code != ExitOK || r.binary(t) != newBin {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+}
+
+// An older latest is refused; an explicit --version downgrades.
+func TestUpgradeDowngrade(t *testing.T) {
+	r := newRelease(t)
+	version = "10.0.0"
+	if code, _, errOut := runCLI("upgrade"); code != ExitError || !strings.Contains(errOut, "pass --version v9.9.9 to downgrade") || r.binary(t) != "old" {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	code, out, errOut := runCLI("upgrade", "--version", "v9.9.9")
+	if code != ExitOK || out != "downgraded aval 10.0.0 -> 9.9.9\n" || r.binary(t) != newBin {
+		t.Fatalf("exit %d, out %q: %s", code, out, errOut)
+	}
+}
+
+// A dev build is always replaced.
+func TestUpgradeDevBuild(t *testing.T) {
+	r := newRelease(t)
+	version = "dev"
+	if code, out, errOut := runCLI("upgrade"); code != ExitOK || out != "upgraded aval dev -> 9.9.9\n" || r.binary(t) != newBin {
+		t.Fatalf("exit %d, out %q: %s", code, out, errOut)
+	}
+}
+
+// If the new exe cannot take the old one's place, the old one moves back.
+func TestUpgradeWindowsRollback(t *testing.T) {
+	r := newRelease(t)
+	goos = "windows"
+	r.signAs("aval_9.9.9_windows_amd64.zip", zipped(t, "aval.exe", []byte(newBin), zip.Store))
+	t.Cleanup(func() { rename = os.Rename })
+	rename = func(from, to string) error {
+		if strings.Contains(from, ".aval-upgrade-") {
+			return errors.New("sharing violation")
+		}
+		return os.Rename(from, to)
+	}
+	if code, _, errOut := runCLI("upgrade"); code != ExitError || !strings.Contains(errOut, "sharing violation") || r.binary(t) != "old" {
+		t.Fatalf("exit %d: %s, binary %q", code, errOut, r.binary(t))
+	}
+}
+
 func TestUpgradeNoChange(t *testing.T) {
 	for name, tc := range map[string]struct {
 		version string
@@ -164,7 +216,8 @@ func TestUpgradeNoChange(t *testing.T) {
 	}{
 		"up to date":           {"9.9.9", nil, "aval 9.9.9 is up to date\n"},
 		"up to date, v prefix": {"v9.9.9", []string{"--version", "v9.9.9"}, "aval 9.9.9 is up to date\n"},
-		"check":                {"1.0.0", []string{"--check"}, "current 1.0.0\nlatest  9.9.9\n"},
+		"check":                {"1.0.0", []string{"--check"}, "current 1.0.0\ntarget  9.9.9\n"},
+		"check older":          {"1.0.0", []string{"--check", "--version", "v0.3.0-rc.1"}, "current 1.0.0\ntarget  0.3.0-rc.1\n"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := newRelease(t)
