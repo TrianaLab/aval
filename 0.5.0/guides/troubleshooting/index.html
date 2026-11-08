@@ -1,0 +1,2733 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.">
+      
+      
+      
+        <link rel="canonical" href="https://aval.run/0.5.0/guides/troubleshooting/">
+      
+      
+        <link rel="prev" href="../go-consumer/">
+      
+      
+        <link rel="next" href="../../cli-reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Troubleshooting - Aval</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/brand.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#troubleshooting" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You are viewing an old version of these docs.
+  <a href="../../.."><strong>Go to the latest version.</strong></a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("../..",location),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Aval" class="md-header__button md-logo" aria-label="Aval" data-md-component="logo">
+      
+<svg class="aval-wordmark" viewBox="1 2.5 66.5 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="aval-wordmark__mark"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></g><g class="aval-wordmark__word"><circle cx="34" cy="12" r="4"/><path d="M38 8v8"/><path d="m42 8 4 8 4-8"/><circle cx="57.5" cy="12" r="4"/><path d="M61.5 8v8"/><path d="M66.5 4.5V16"/></g></svg>
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Aval
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Troubleshooting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/TrianaLab/aval" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TrianaLab/aval
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../install/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../write-a-contract/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../cli-reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../changelog/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Aval" class="md-nav__button md-logo" aria-label="Aval" data-md-component="logo">
+      
+<svg class="aval-wordmark" viewBox="1 2.5 66.5 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="aval-wordmark__mark"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></g><g class="aval-wordmark__word"><circle cx="34" cy="12" r="4"/><path d="M38 8v8"/><path d="m42 8 4 8 4-8"/><circle cx="57.5" cy="12" r="4"/><path d="M61.5 8v8"/><path d="M66.5 4.5V16"/></g></svg>
+    </a>
+    Aval
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/TrianaLab/aval" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TrianaLab/aval
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../concepts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/trust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/outcomes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outcomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../write-a-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../depend-on-a-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trust-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a trust policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pinning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pin your dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../measure-reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure reuse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../go-consumer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume from Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#start-with-the-exit-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start with the exit code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flags-and-files-exit-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags and files (exit 2)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#errors-exit-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors (exit 1)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#misses-exit-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Misses (exit 4)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-failures-exit-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification failures (exit 5)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../resolve/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve references
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resolve references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container images
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/npm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    npm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/pypi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/go/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/maven/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maven
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/crates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust crates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/gems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ruby gems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/git/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Git
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/urls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Downloaded files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Specs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The test contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../artifact-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision and roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/SECURITY.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/CODE_OF_CONDUCT.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code of conduct
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#start-with-the-exit-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start with the exit code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flags-and-files-exit-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags and files (exit 2)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#errors-exit-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors (exit 1)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#misses-exit-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Misses (exit 4)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-failures-exit-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification failures (exit 5)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../write-a-contract/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Guides
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/TrianaLab/aval/edit/main/docs/guides/troubleshooting.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Anchor link">&para;</a></h1>
+<p>Goal: go from an exit code or an error message to its cause and its fix.
+In the messages below, text in <code>&lt;...&gt;</code> changes per run.</p>
+<pre class="aval-mermaid"><code>flowchart LR
+  code{exit code} -- 2 --&gt; u([Flags and files]):::warn
+  code -- 1 --&gt; e([Errors]):::warn
+  code -- 4 --&gt; m([Misses]):::muted
+  code -- 5 --&gt; s([Verification failures]):::err</code></pre>
+<h2 id="start-with-the-exit-code">Start with the exit code<a class="headerlink" href="#start-with-the-exit-code" title="Anchor link">&para;</a></h2>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>aval<span class="w"> </span>verify<span class="w"> </span>--registry<span class="w"> </span>ghcr.io/acme/orders-aval<span class="w"> </span>--policy<span class="w"> </span>policy.yaml<span class="p">;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"exit </span><span class="nv">$?</span><span class="s2">"</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th><code>aval run</code></th>
+<th><code>aval verify</code></th>
+<th><code>aval push</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>the test passed, or a verified passing result was reused</td>
+<td>a verified result exists (passing or failing)</td>
+<td>pushed</td>
+</tr>
+<tr>
+<td>1</td>
+<td>error (the test still runs when it can), or a false hit in <code>--shadow</code></td>
+<td>error: registry, <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, trusted root or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr></td>
+<td>error: signing, registry or a result that does not match the current inputs</td>
+</tr>
+<tr>
+<td>2</td>
+<td>bad flags or invalid <code>aval.yaml</code></td>
+<td>bad flags or invalid <code>aval.yaml</code></td>
+<td>bad flags or invalid <code>aval.yaml</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>the test failed, or a verified failing result was reused</td>
+<td>not used</td>
+<td>not used</td>
+</tr>
+<tr>
+<td>4</td>
+<td>not used: a miss runs the test</td>
+<td>miss: no result the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> can reuse</td>
+<td>not used</td>
+</tr>
+<tr>
+<td>5</td>
+<td>verification failed, after running the test: a security event</td>
+<td>verification failed: a security event</td>
+<td>not used</td>
+</tr>
+<tr>
+<td>6</td>
+<td>reserved, never returned</td>
+<td>reserved, never returned</td>
+<td>reserved, never returned</td>
+</tr>
+</tbody>
+</table>
+<p>A miss (4) is routine. A verification failure (5) means someone published a
+result the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> does not trust; never hide it or retry it away.</p>
+<h2 id="flags-and-files-exit-2">Flags and files (exit 2)<a class="headerlink" href="#flags-and-files-exit-2" title="Anchor link">&para;</a></h2>
+<details class="failure">
+<summary>Flag errors</summary>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--push requires --registry</code>, <code>--record requires --registry</code>, <code>--registry is required</code>, <code>--registry and --record-file are required</code></td>
+<td>add the flags it names</td>
+</tr>
+<tr>
+<td><code>--shadow and --no-reuse exclude each other</code></td>
+<td>pick one</td>
+</tr>
+<tr>
+<td><code>--registry &lt;x&gt; is not an OCI repository</code></td>
+<td>use <code>host/name</code>, no <code>https://</code>, tag or digest</td>
+</tr>
+<tr>
+<td><code>--registry-timeout must be positive</code>, <code>--output must be text or json</code>, <code>unknown command</code></td>
+<td>fix the value; see <code>aval &lt;command&gt; --help</code></td>
+</tr>
+<tr>
+<td><code>signing needs --key or, for keyless signing, an OIDC token</code></td>
+<td>pass <code>--key</code>, or set the token (<a href="../signing/">Signing</a>)</td>
+</tr>
+<tr>
+<td><code>not a PEM file</code>, <code>PEM type &lt;x&gt; is encrypted</code>, <code>not an ECDSA P-256 key</code></td>
+<td>make an unencrypted P-256 key (<a href="../signing/">Signing</a>)</td>
+</tr>
+<tr>
+<td><code>holds neither an Aval result nor a report</code>, <code>is an input of the test</code></td>
+<td>write <code>--result</code> and <code>--report</code> under <code>.aval/</code>; for <code>output &lt;x&gt; is an input of the test</code>, exclude it from <code>scope</code></td>
+</tr>
+</tbody>
+</table>
+</details>
+<details class="failure">
+<summary>Contract errors</summary>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>or pass its path with -f</code></td>
+<td>create <code>aval.yaml</code>, or pass <code>-f path/to/aval.yaml</code></td>
+</tr>
+<tr>
+<td><code>apiVersion: got &lt;x&gt;, want &lt;y&gt;</code>, <code>that is the pre-freeze version</code>, <code>kind: got &lt;x&gt;, want &lt;y&gt;</code></td>
+<td>set <code>apiVersion: aval.trianalab.io/v1</code>, <code>kind: Test</code></td>
+</tr>
+<tr>
+<td><code>decoding contract: &lt;x&gt;</code>, <code>multiple YAML documents are not allowed</code></td>
+<td>fix the YAML or the misspelt field; keep one document</td>
+</tr>
+<tr>
+<td><code>metadata.name: &lt;x&gt; must be 1-64 chars</code></td>
+<td>lower case letters, digits, <code>.</code>, <code>_</code>, <code>-</code></td>
+</tr>
+<tr>
+<td><code>runner.command: must be a non-empty argv list</code></td>
+<td><code>command: ["go", "test", "./..."]</code></td>
+</tr>
+<tr>
+<td><code>scope.source: at least one glob is required</code></td>
+<td>list the files the test reads</td>
+</tr>
+<tr>
+<td><code>empty glob</code>, <code>must be a relative, slash-separated path</code>, <code>empty, '.' or '..' segments are not allowed</code>, <code>'**' must be a whole path segment</code></td>
+<td>write globs like <code>src/**/*.go</code></td>
+</tr>
+<tr>
+<td><code>cacheability: required</code>, <code>cacheability: unknown class</code></td>
+<td>pick a <a href="../write-a-contract/#step-by-step">class</a></td>
+</tr>
+<tr>
+<td><code>environment.toolchain: invalid key</code>, <code>invalid variable name</code>, <code>environment.probe.&lt;key&gt;: not a key of environment.toolchain</code>, <code>environment.probe.&lt;key&gt;: must be a non-empty argv list</code>, <code>environment.probe.&lt;key&gt;: environment.toolchain.&lt;key&gt; must not be empty</code></td>
+<td>lower case tool names, valid variable names; probe only declared, non-empty toolchain keys, each with an argv</td>
+</tr>
+<tr>
+<td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code>, <code>file &lt;x&gt; must be a slash-separated path relative to the contract</code></td>
+<td>give each entry a <code>ref</code>, a <code>reason</code> and, if needed, a <code>file</code> as the finding prints it (<a href="../../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>)</td>
+</tr>
+<tr>
+<td><code>scope.resolve[&lt;i&gt;]: &lt;x&gt;</code>, <code>unknown kind &lt;x&gt;</code>, <code>the reference must be non-empty</code>, <code>credentials in the reference are not allowed</code>, <code>a scope.resolve entry is one</code></td>
+<td>one known <code>kind: reference</code> per entry, no credentials (<a href="../../resolve/">Resolve references</a>)</td>
+</tr>
+<tr>
+<td><code>scope.contracts[&lt;i&gt;]: &lt;x&gt;</code>, <code>must be slash-separated</code>, <code>must be a clean relative path</code>, <code>must name a contract file</code>, <code>is listed twice</code></td>
+<td>a relative path to a <code>.yaml</code> <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, listed once (<a href="../depend-on-a-contract/">Depend on another part of the repo</a>)</td>
+</tr>
+<tr>
+<td><code>not a valid &lt;kind&gt; package name</code>, <code>is not a registry version, range or tag</code>, <code>want group:artifact:version</code></td>
+<td>use the registry name and a version, range or tag, not a path, file or URL (<a href="../../resolve/#exact-or-floating">Resolve references</a>)</td>
+</tr>
+</tbody>
+</table>
+</details>
+<h2 id="errors-exit-1">Errors (exit 1)<a class="headerlink" href="#errors-exit-1" title="Anchor link">&para;</a></h2>
+<p><code>aval verify</code> exits 1. <code>aval run</code> prints these as <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>, runs the test and exits with the test's code. It exits 1 only when the test cannot start (<code>running &lt;x&gt;</code>), a probe fails (<code>environment.probe</code>) or the result cannot be published.</p>
+<details class="failure">
+<summary>Fingerprint and trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></summary>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scope.source matched no files</code>, <code>glob &lt;x&gt; matched no files</code></td>
+<td>fix the glob, or create the file</td>
+</tr>
+<tr>
+<td><code>is excluded only by a trailing</code></td>
+<td>exclude the file by name</td>
+</tr>
+<tr>
+<td><code>only regular files are supported in scope</code>, <code>control characters in path are not supported</code></td>
+<td>keep symlinks and odd names out of <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr></td>
+</tr>
+<tr>
+<td><code>scope.contracts &lt;path&gt;: &lt;x&gt;</code></td>
+<td>fix the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> or the path (<a href="../depend-on-a-contract/">Depend on another part of the repo</a>)</td>
+</tr>
+<tr>
+<td><code>resolve &lt;kind&gt; &lt;ref&gt;: &lt;x&gt;</code></td>
+<td>check name, version, network, credentials (<a href="../../resolve/">Resolve references</a>)</td>
+</tr>
+<tr>
+<td><code>decoding policy: &lt;x&gt;</code>, <code>minTrustLevel: &lt;x&gt; must be developer, runner or isolated</code>, <code>identities: at least one is required</code>, <code>identities[&lt;i&gt;]: &lt;x&gt;</code>, <code>trustLevel: &lt;x&gt; must be developer, runner or isolated</code></td>
+<td>fix the field (<a href="../trust-policy/">Write a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></a>)</td>
+</tr>
+<tr>
+<td><code>publicKey cannot be combined with issuer or subjectRegexp</code>, <code>issuer and subjectRegexp are required (or publicKey)</code></td>
+<td>one kind of <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> per identity</td>
+</tr>
+<tr>
+<td><code>publicKey: &lt;x&gt;</code>, <code>publicKey &lt;file&gt;: &lt;x&gt;</code>, <code>not a PEM public key</code>, <code>larger than &lt;n&gt; bytes</code>, <code>subjectRegexp: &lt;x&gt;</code></td>
+<td>fix the key file or the regexp</td>
+</tr>
+<tr>
+<td><code>allowedCacheability: non-deterministic results are never reusable</code>, <code>allowedCacheability: unknown class</code></td>
+<td>remove that class</td>
+</tr>
+<tr>
+<td><code>sigstore trusted root: &lt;x&gt;</code></td>
+<td>allow network and a writable <code>$HOME</code>, or pin <code>trustedRoot</code></td>
+</tr>
+</tbody>
+</table>
+</details>
+<details class="failure">
+<summary>Registry, push and record</summary>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>loading registry credentials: &lt;x&gt;</code>, <code>resolving &lt;tag&gt;: &lt;x&gt;</code>, <code>listing referrers: &lt;x&gt;</code>, <code>fetching manifest &lt;x&gt;</code>, <code>fetching layer &lt;x&gt;</code></td>
+<td>check the address, the network and <code>docker login</code></td>
+</tr>
+<tr>
+<td><code>signing: &lt;x&gt;</code>, <code>publishing: &lt;x&gt;</code>, <code>pushing manifest: &lt;x&gt;</code>, <code>tagging anchor: &lt;x&gt;</code></td>
+<td>check the token or key, and write access</td>
+</tr>
+<tr>
+<td><code>more than &lt;n&gt; attestations</code></td>
+<td>delete old results (<a href="../../artifact-format/#the-64-candidate-cap-and-cleanup">cleanup</a>); the <code>aval: SECURITY:</code> line before it means none was verified, so check who pushed them: it may be a flooding attempt</td>
+</tr>
+<tr>
+<td><code>is not listed among the referrers of</code></td>
+<td>push again, or use a registry with OCI 1.1 referrers</td>
+</tr>
+<tr>
+<td><code>running &lt;x&gt;</code>, <code>environment.probe &lt;key&gt; &lt;argv&gt;: declared &lt;x&gt;, observed &lt;y&gt;</code></td>
+<td>install the program <code>runner.command</code> starts, or the declared toolchain version (<a href="../../contract/#probe-the-toolchain">Probe the toolchain</a>)</td>
+</tr>
+<tr>
+<td><code>FALSE HIT: &lt;x&gt;</code> (with <code>--shadow</code>)</td>
+<td>the test reads an input <code>scope</code> does not list: <a href="../write-a-contract/#find-undeclared-inputs">find it</a></td>
+</tr>
+<tr>
+<td><code>writing report: &lt;x&gt;</code>, <code>result not published: &lt;x&gt;</code></td>
+<td>fix the <code>--report</code> path, or the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> error before it</td>
+</tr>
+<tr>
+<td><code>publishing outputs: &lt;x&gt;</code>, <code>more than &lt;n&gt; output files</code>, <code>outputs are capped at</code>, <code>is not a regular file (symlinks are not published)</code>, <code>backslashes and control characters in a path</code>, <code>is the contract</code>, <code>restoring outputs: &lt;x&gt;</code></td>
+<td>keep each output a regular file under the caps and narrow the globs; for <code>restoring outputs</code>, remove the symlink or directory in the way. The test ran instead (<a href="../write-a-contract/#restore-coverage-and-reports-on-reuse">Restore coverage and reports on reuse</a>)</td>
+</tr>
+<tr>
+<td><code>reading the result recorded by 'aval run'</code></td>
+<td>run <code>aval run</code> first</td>
+</tr>
+<tr>
+<td><code>recorded result is for test &lt;x&gt;</code></td>
+<td>an input changed: run the test again</td>
+</tr>
+<tr>
+<td><code>reading run record: &lt;x&gt;</code>, <code>run record &lt;file&gt;: &lt;x&gt;</code></td>
+<td>pass the file that <code>--record-file</code> wrote</td>
+</tr>
+<tr>
+<td><code>warning: run record not</code></td>
+<td>a warning only; check write access</td>
+</tr>
+</tbody>
+</table>
+</details>
+<h2 id="misses-exit-4">Misses (exit 4)<a class="headerlink" href="#misses-exit-4" title="Anchor link">&para;</a></h2>
+<details class="info">
+<summary>Why nothing was reused</summary>
+<table>
+<thead>
+<tr>
+<th>Reason</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>no attestation found for fingerprint</code></td>
+<td>none: the inputs changed or nobody pushed yet</td>
+</tr>
+<tr>
+<td><code>no trust policy configured</code>, <code>no registry configured</code>, <code>reuse disabled (--no-reuse)</code></td>
+<td>pass <code>--policy</code>, <code>--registry</code>, drop <code>--no-reuse</code></td>
+</tr>
+<tr>
+<td><code>cacheability &lt;x&gt; is never reusable</code>, <code>is not in allowedCacheability</code></td>
+<td>by design, or allow the class in the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></td>
+</tr>
+<tr>
+<td><code>not reusable under the trust policy</code>, <code>signer &lt;x&gt; has trust level &lt;y&gt;, policy requires at least &lt;z&gt;</code></td>
+<td>raise the <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr>'s <code>trustLevel</code> if you trust it</td>
+</tr>
+<tr>
+<td><code>mutable references in the inputs</code></td>
+<td>pin each reference the line lists, or acknowledge it with <code>scope.allowMutable</code>; for <code>lists this ref without file:</code>, add <code>file:</code> (<a href="../../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>)</td>
+</tr>
+<tr>
+<td><code>every listed attestation is gone</code>, <code>is gone, skipping it</code></td>
+<td>someone deleted results during the lookup: run again</td>
+</tr>
+</tbody>
+</table>
+</details>
+<h2 id="verification-failures-exit-5">Verification failures (exit 5)<a class="headerlink" href="#verification-failures-exit-5" title="Anchor link">&para;</a></h2>
+<p>The <code>aval: SECURITY:</code> line comes first and <code>reason:</code> says why. Usually a wrong
+<abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>; possibly an attacker. See
+<a href="../../concepts/outcomes/#a-verification-failure-is-a-security-event">Outcomes</a>.</p>
+<p>It also appears beside a verified result (exit 0), listed in <code>rejected</code>: gate
+on <code>rejected</code> where that must stop a pipeline (<code>.github/aval/summary.sh</code>).</p>
+<details class="danger">
+<summary>Reasons</summary>
+<table>
+<thead>
+<tr>
+<th>Reason</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>signature: &lt;x&gt;</code>, <code>signer key id &lt;x&gt; is not in the trust policy</code>, <code>it lists no keyless identities</code>, <code>is not accepted by the policy</code></td>
+<td>trust that <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr>, or find out who pushed</td>
+</tr>
+<tr>
+<td><code>bundle signs a different envelope</code>, <code>no Sigstore bundle stored with the attestation</code>, <code>decoding Sigstore bundle</code>, <code>bundle does not carry a DSSE envelope</code>, <code>envelope: missing or not an in-toto payload</code>, <code>decoding statement</code>, <code>statement: type &lt;x&gt;</code>, <code>predicate: &lt;x&gt;</code>, <code>malformed attestation: &lt;x&gt;</code></td>
+<td>a broken or forged result: delete it</td>
+</tr>
+<tr>
+<td><code>fingerprint &lt;x&gt;, want &lt;y&gt;</code>, <code>test id &lt;x&gt;, want &lt;y&gt;</code>, <code>statement subject does not match the predicate subject</code></td>
+<td>a result that claims other inputs: delete it</td>
+</tr>
+<tr>
+<td><code>cacheability &lt;x&gt; is not reusable under the policy</code>, <code>cacheability &lt;x&gt;, want &lt;y&gt;</code>, <code>tag &lt;x&gt; points at &lt;y&gt;, not the fingerprint anchor</code></td>
+<td>a lie about the result or the tag: find out who pushed</td>
+</tr>
+<tr>
+<td><code>outputs: &lt;x&gt;</code>, <code>the result carries no outputs, the contract declares outputs</code>, <code>is not a declared output of the contract, or is an input</code>, <code>matches no output of the result</code></td>
+<td>the stored outputs do not match the signed list or the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: a forged result, or the registry deleted the outputs. Find out who pushed, delete the result and push again</td>
+</tr>
+<tr>
+<td><code>no signature verifier configured</code>, <code>expected fingerprint and test id are required</code></td>
+<td>only from Go: fill in <code>VerifyOptions</code> (<a href="../go-consumer/">Consume from Go</a>)</td>
+</tr>
+</tbody>
+</table>
+</details>
+<h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
+<ul>
+<li><a href="../../concepts/outcomes/">Outcomes</a></li>
+<li><a href="../../pinning/">Pin your dependencies</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../go-consumer/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Consume from Go">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Consume from Go
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../cli-reference/" class="md-footer__link md-footer__link--next" aria-label="Next: CLI">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                CLI
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      
+<div class="md-copyright aval-footer">
+  <svg class="aval-footer__mark" viewBox="1 2.5 22 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></svg>
+  <span>Aval · <a href="https://github.com/TrianaLab/aval/blob/main/LICENSE">Apache-2.0</a> · © 2026 TrianaLab</span>
+  <span class="aval-footer__links">
+    <a href="https://github.com/TrianaLab/aval">GitHub</a>
+    <a href="../../changelog/">Changelog</a>
+    <span>Made with <a href="https://squidfunk.github.io/mkdocs-material/">Material for MkDocs</a></span>
+  </span>
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": ["^latest$", "^main$"], "provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/version-selector.js"></script>
+      
+        <script src="../../javascripts/diagrams.js"></script>
+      
+        <script src="../../javascripts/stats.js"></script>
+      
+        <script src="../../javascripts/try-aval.js"></script>
+      
+    
+  </body>
+</html>
