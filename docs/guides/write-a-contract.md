@@ -65,6 +65,29 @@ it, add it.
     as written; Aval does not check what is installed. `environment.env`
     names variables whose values go into the fingerprint.
 
+## Restore coverage and reports on reuse
+
+When Aval reuses a result the test does not run, so it writes no coverage
+or junit file, and a step that reads one fails. List those files under
+`outputs` (top level, next to `cacheability`), for example
+`outputs: [coverage.xml, junit.xml]`:
+
+- `aval run --push` and `aval push` publish them with the result, and the
+  signature covers each file's digest.
+- `aval run` writes them back on reuse, after the result verifies.
+  `aval verify` checks them and writes nothing.
+- They must not be inputs: keep them out of `scope`, and each glob must
+  match a file after the run, or nothing is published.
+- Caps: 256 files, 16 MiB each, 64 MiB in total.
+
+!!! warning "Outputs are published"
+    Anyone who can read the registry repository can read these files. Do
+    not list a file that holds secrets.
+
+Aval only refuses to restore over this contract's own inputs. Restoring into
+another contract's scope is your responsibility: it changes that contract's
+fingerprint.
+
 ## Read next
 
 - [Write a trust policy](trust-policy.md)

@@ -1,0 +1,5 @@
+---
+"aval": minor
+---
+
+A contract can list `outputs` (globs such as `coverage.xml`, `junit.xml`): `run --push` and `push` publish those files with the result, and a reused result restores them, so a coverage gate or a junit report downstream keeps working when the test is skipped. Outputs must not be inputs, each glob must match a regular file, and the caps are 256 files, 16 MiB each and 64 MiB in total; otherwise nothing is published (exit 1). On reuse the files are fetched by the digests the signature covers; a missing, changed or undeclared output is a verification failure (exit 5). Format changes, all additive: contract field `outputs` (omitted when empty, so existing fingerprints do not change; older `aval` binaries reject a contract that uses it), predicate field `execution.outputs` within `execution/v2`, and the OCI identifiers `application/vnd.trianalab.aval.outputs.v1` and `application/vnd.trianalab.aval.output.v1`. Outputs are published to the registry: do not list files that hold secrets.

@@ -78,6 +78,8 @@ var (
 	newVerifier    = attest.NewVerifier
 	sign           = attest.Sign
 	publish        = registry.Push
+	pushOutputs    = registry.PushOutputs
+	fetchOutputs   = registry.FetchOutputs
 	pushRecord     = registry.Record
 	readRecords    = registry.ReadRecords
 	now            = time.Now
@@ -385,7 +387,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
-			report, err := verify(ctx, cmd.ErrOrStderr(), c, fp, repo, policyFile)
+			report, _, err := verify(ctx, cmd.ErrOrStderr(), c, filepath.Dir(file), fp, repo, policyFile)
 			if werr := cliout.WriteReport(cmd.OutOrStdout(), output, report); werr != nil {
 				return werr
 			}
@@ -404,12 +406,13 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 	return cmd
 }
 
-// verify decides whether a trusted result exists. When any attestation
+// verify decides whether a trusted result exists and returns the outputs
+// it carries, fetched and checked (never written). When any attestation
 // failed verification it prints one SECURITY line, even beside a verified
 // candidate (invariant 4); the reasons are in the report. It prints one too
 // when the fingerprint holds more attestations than lookup lists.
-func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
-	r, err := lookupAndVerify(ctx, warn, c, fp, repo, policyFile)
+func verify(ctx context.Context, warn io.Writer, c *contract.Contract, dir string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
+	r, files, err := lookupAndVerify(ctx, warn, c, dir, fp, repo, policyFile)
 	n := 0
 	for _, rj := range r.Rejected {
 		if rj.Outcome == evidence.OutcomeVerificationFailed {
@@ -427,12 +430,15 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 	if errors.Is(err, registry.ErrTooManyCandidates) {
 		fmt.Fprintf(warn, "aval: SECURITY: %s for %s, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://github.com/TrianaLab/aval/blob/main/docs/trust-model.md\n", registry.ErrTooManyCandidates, r.TestID)
 	}
-	return r, err
+	return r, files, err
 }
 
-func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
+func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, dir string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
 	r := newReport(c, fp)
-	fail := func(err error) (evidence.Report, error) { return failReport(r, err) }
+	fail := func(err error) (evidence.Report, []registry.Output, error) {
+		r, err := failReport(r, err)
+		return r, nil, err
+	}
 
 	// Never reusable, so there is nothing to look up (invariant 7).
 	if c.Cacheability == contract.NonDeterministic {
@@ -466,13 +472,13 @@ func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, 
 	if err != nil {
 		return fail(err)
 	}
-	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest), sigs, string(c.Cacheability), policyFile)
+	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest), sigs, c, dir, policyFile)
 	r.Reference, r.Rejected = ref, rejected
 	if err != nil {
 		return fail(err)
 	}
 	r.Outcome, r.Result, r.Signer, r.Predicate = evidence.OutcomeVerified, best.Predicate.Result, &best.Signer, best.Predicate
-	return r, nil
+	return r, best.files, nil
 }
 
 // mutable returns errMutable, listing each reference, when c is of a class
@@ -533,16 +539,16 @@ func outcomeOf(err error) evidence.Outcome {
 // and error of the first verification failure, else of the first error, else
 // of the first below-minimum candidate: the security event must surface, and
 // an undecidable candidate outranks routine non-reuse.
-func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability, policyFile string) (*evidence.Verification, string, []evidence.Rejection, error) {
+func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, c *contract.Contract, dir, policyFile string) (*hit, string, []evidence.Rejection, error) {
 	var (
-		best             *evidence.Verification
+		best             *hit
 		bestRef, failRef string
 		failErr          error
 		unknown          bool // a candidate could not be evaluated
 		rejected         []evidence.Rejection
 	)
 	for _, d := range cands {
-		v, err := verifyCandidate(ctx, d, opts, sigs, cacheability, policyFile)
+		v, err := verifyCandidate(ctx, d, opts, sigs, c, dir, policyFile)
 		if errors.Is(err, evidence.ErrNotFound) && !errors.Is(err, evidence.ErrVerification) {
 			fmt.Fprintf(warn, "aval: warning: listed attestation %s is gone, skipping it: %s\n", d.Reference(), cliout.OneLine(err.Error()))
 			continue
@@ -573,7 +579,7 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 
 // outranks reports whether v beats the best verified candidate so far: a
 // higher trust level, or the same level with a non-passed result over a pass.
-func outranks(v, best *evidence.Verification) bool {
+func outranks(v, best *hit) bool {
 	return best == nil || v.Signer.TrustLevel > best.Signer.TrustLevel ||
 		(v.Signer.TrustLevel == best.Signer.TrustLevel && best.Predicate.Result == evidence.ResultPassed && v.Predicate.Result != evidence.ResultPassed)
 }
@@ -586,15 +592,21 @@ func outranks(v, best *evidence.Verification) bool {
 // signer below it is routine non-reuse (errBelowMinTrust, a miss), but only
 // once every claim checks out; a false claim stays a verification failure,
 // and names the policy file it was checked against.
-func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability, policyFile string) (*evidence.Verification, error) {
-	v, err := checkCandidate(ctx, d, opts, sigs, cacheability)
+func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, c *contract.Contract, dir, policyFile string) (*hit, error) {
+	v, err := checkCandidate(ctx, d, opts, sigs, c, dir)
 	if errors.Is(err, evidence.ErrVerification) {
 		err = fmt.Errorf("%w (trust policy %s)", err, policyFile)
 	}
 	return v, err
 }
 
-func checkCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, cacheability string) (*evidence.Verification, error) {
+// hit is a verified candidate and the outputs it carries.
+type hit struct {
+	*evidence.Verification
+	files []registry.Output
+}
+
+func checkCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, c *contract.Contract, dir string) (*hit, error) {
 	a, err := fetch(ctx, d)
 	if err != nil {
 		return nil, err
@@ -610,12 +622,17 @@ func checkCandidate(ctx context.Context, d registry.Descriptor, opts evidence.Ve
 	switch {
 	case err != nil:
 		return nil, err
-	case v.Predicate.Test.Cacheability != cacheability:
-		return nil, &evidence.VerificationError{Reason: fmt.Sprintf("cacheability %q, want %q", v.Predicate.Test.Cacheability, cacheability)}
+	case v.Predicate.Test.Cacheability != string(c.Cacheability):
+		return nil, &evidence.VerificationError{Reason: fmt.Sprintf("cacheability %q, want %q", v.Predicate.Test.Cacheability, c.Cacheability)}
+	}
+	files, err := verifyOutputs(ctx, d.Repository, c, dir, v.Predicate.Execution.Outputs)
+	switch {
+	case err != nil:
+		return nil, err
 	case v.Signer.TrustLevel < need:
 		return nil, fmt.Errorf("%w: signer %q has trust level %s, policy requires at least %s", errBelowMinTrust, cmp.Or(v.Signer.KeyID, v.Signer.Subject), v.Signer.TrustLevel, need)
 	}
-	return v, nil
+	return &hit{v, files}, nil
 }
 
 // severity ranks why a candidate was rejected: a verification failure, then

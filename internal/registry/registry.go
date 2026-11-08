@@ -406,7 +406,7 @@ func fetch(ctx context.Context, r *remote.Repository, dg digest.Digest) (*Attest
 	for _, l := range m.Layers {
 		switch {
 		case l.MediaType == evidence.MediaTypeDSSE && a.Envelope == nil:
-			raw, err := fetchBlob(ctx, r, l)
+			raw, err := fetchBlob(ctx, r, l, maxBlobSize)
 			if err != nil {
 				return nil, err
 			}
@@ -415,7 +415,7 @@ func fetch(ctx context.Context, r *remote.Repository, dg digest.Digest) (*Attest
 				return nil, malformed("envelope: %v", err)
 			}
 		case l.MediaType == MediaTypeSigstoreBundle && a.Bundle == nil:
-			if a.Bundle, err = fetchBlob(ctx, r, l); err != nil {
+			if a.Bundle, err = fetchBlob(ctx, r, l, maxBlobSize); err != nil {
 				return nil, err
 			}
 		default:
@@ -467,8 +467,10 @@ func fetchManifest(ctx context.Context, r *remote.Repository, dg digest.Digest) 
 	return raw, nil
 }
 
-func fetchBlob(ctx context.Context, r *remote.Repository, l ocispec.Descriptor) ([]byte, error) {
-	if l.Size < 0 || l.Size > maxBlobSize {
+// fetchBlob reads the layer l, of at most limit bytes, checking its size
+// and digest.
+func fetchBlob(ctx context.Context, r *remote.Repository, l ocispec.Descriptor, limit int64) ([]byte, error) {
+	if l.Size < 0 || l.Size > limit {
 		return nil, malformed("layer %s size %d out of range", l.Digest, l.Size)
 	}
 	if err := l.Digest.Validate(); err != nil {

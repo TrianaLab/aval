@@ -22,10 +22,13 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
+	"unicode"
 )
 
 const (
@@ -43,6 +46,15 @@ const (
 	// ArtifactTypeFingerprint is the OCI artifactType of the per-fingerprint
 	// anchor manifest that every execution manifest refers to (its subject).
 	ArtifactTypeFingerprint = "application/vnd.trianalab.aval.fingerprint.v1"
+
+	// ArtifactTypeOutputs is the OCI artifactType of the manifest that
+	// carries the output files of one execution (Execution.Outputs). Its
+	// subject is the fingerprint anchor.
+	ArtifactTypeOutputs = "application/vnd.trianalab.aval.outputs.v1"
+
+	// MediaTypeOutput is the media type of one output file layer; its
+	// org.opencontainers.image.title annotation is the file's path.
+	MediaTypeOutput = "application/vnd.trianalab.aval.output.v1"
 
 	// MediaTypeDSSE is the media type of the signed DSSE envelope layer.
 	MediaTypeDSSE = "application/vnd.dsse.envelope.v1+json"
@@ -134,6 +146,51 @@ type Execution struct {
 	// Environment holds declared conditions (toolchain, OS/arch).
 	Environment map[string]string `json:"environment,omitempty"`
 	ExitCode    int               `json:"exitCode"`
+	// Outputs are the files the run wrote that a reused result restores
+	// (contract outputs). Signed with the rest, so the signature covers
+	// every output digest.
+	Outputs *Outputs `json:"outputs,omitempty"`
+}
+
+// Outputs points at the OCI manifest (artifactType ArtifactTypeOutputs)
+// that carries the output files, and lists them in its layer order.
+type Outputs struct {
+	// Manifest is the digest of the outputs manifest, "sha256:<hex>".
+	Manifest string       `json:"manifest"`
+	Files    []OutputFile `json:"files"`
+}
+
+// OutputFile is one output: its slash-separated path relative to the
+// contract directory, and the digest and size of its content.
+type OutputFile struct {
+	Path   string `json:"path"`
+	Digest string `json:"digest"`
+	Size   int64  `json:"size"`
+}
+
+// validate checks the manifest digest and that every path is relative,
+// clean and listed once, so a restore can never leave the contract
+// directory.
+func (o *Outputs) validate() error {
+	if !fingerprintRe.MatchString(o.Manifest) {
+		return fmt.Errorf("execution.outputs.manifest: %q is not sha256:<64 hex>", o.Manifest)
+	}
+	if len(o.Files) == 0 {
+		return errors.New("execution.outputs.files: at least one file is required")
+	}
+	seen := map[string]bool{}
+	for i, f := range o.Files {
+		switch {
+		case !fs.ValidPath(f.Path) || f.Path == "." || strings.ContainsFunc(f.Path, func(r rune) bool { return r == '\\' || unicode.IsControl(r) }):
+			return fmt.Errorf("execution.outputs.files[%d]: path %q must be clean, relative and slash-separated", i, f.Path)
+		case seen[f.Path]:
+			return fmt.Errorf("execution.outputs.files[%d]: path %q is listed twice", i, f.Path)
+		case !fingerprintRe.MatchString(f.Digest) || f.Size < 0:
+			return fmt.Errorf("execution.outputs.files[%d]: digest %q or size %d is invalid", i, f.Digest, f.Size)
+		}
+		seen[f.Path] = true
+	}
+	return nil
 }
 
 // Runner is who produced the result, as claimed inside the predicate. The
@@ -211,6 +268,11 @@ func (p *Predicate) Validate() error {
 	}
 	if !fingerprintRe.MatchString(p.Execution.Fingerprint) {
 		errs = append(errs, fmt.Errorf("execution.fingerprint: %q is not sha256:<64 hex>", p.Execution.Fingerprint))
+	}
+	if p.Execution.Outputs != nil {
+		if err := p.Execution.Outputs.validate(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if p.Runner.Identity == "" {
 		errs = append(errs, errors.New("runner.identity: required"))

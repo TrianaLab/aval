@@ -131,3 +131,43 @@ func TestMatchIdentity(t *testing.T) {
 		t.Error("no identities must accept nothing")
 	}
 }
+
+// execution.outputs is optional: a predicate without it parses, one with it
+// round-trips, and every path is relative, clean and listed once, so a
+// signed predicate cannot point a restore outside the contract directory.
+func TestParseOutputs(t *testing.T) {
+	const d = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	with := func(outputs string) string {
+		return strings.Replace(validPredicate, `"exitCode": 0`, `"exitCode": 0, "outputs": `+outputs, 1)
+	}
+	file := func(path string) string {
+		return `{"path": "` + path + `", "digest": "` + d + `", "size": 3}`
+	}
+	p, err := Parse([]byte(with(`{"manifest": "` + d + `", "files": [` + file("coverage.xml") + `, ` + file("reports/junit.xml") + `]}`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o := p.Execution.Outputs; o == nil || o.Manifest != d || len(o.Files) != 2 || o.Files[1] != (OutputFile{Path: "reports/junit.xml", Digest: d, Size: 3}) {
+		t.Fatalf("outputs = %+v", p.Execution.Outputs)
+	}
+	if p, _ := Parse([]byte(validPredicate)); p.Execution.Outputs != nil {
+		t.Fatal("omitted outputs must stay nil")
+	}
+	for name, outputs := range map[string]string{
+		"bad manifest":  `{"manifest": "sha256:x", "files": [` + file("a") + `]}`,
+		"no files":      `{"manifest": "` + d + `", "files": []}`,
+		"traversal":     `{"manifest": "` + d + `", "files": [` + file("../etc/passwd") + `]}`,
+		"inner ..":      `{"manifest": "` + d + `", "files": [` + file("a/../../b") + `]}`,
+		"absolute":      `{"manifest": "` + d + `", "files": [` + file("/etc/passwd") + `]}`,
+		"dot":           `{"manifest": "` + d + `", "files": [` + file(".") + `]}`,
+		"backslash":     `{"manifest": "` + d + `", "files": [` + file(`..\\\\x`) + `]}`,
+		"control":       `{"manifest": "` + d + `", "files": [` + file(`a\nb`) + `]}`,
+		"duplicate":     `{"manifest": "` + d + `", "files": [` + file("a") + `, ` + file("a") + `]}`,
+		"bad digest":    `{"manifest": "` + d + `", "files": [{"path": "a", "digest": "md5:1", "size": 1}]}`,
+		"negative size": `{"manifest": "` + d + `", "files": [{"path": "a", "digest": "` + d + `", "size": -1}]}`,
+	} {
+		if _, err := Parse([]byte(with(outputs))); err == nil || !strings.Contains(err.Error(), "execution.outputs") {
+			t.Errorf("%s: got %v", name, err)
+		}
+	}
+}

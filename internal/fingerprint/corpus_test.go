@@ -209,6 +209,9 @@ var corpus = []corpusCase{
 	{name: "scope.allowMutable reason changed", setup: func(f *fixture) {
 		f.c.Scope.AllowMutable = []contract.AllowMutable{{Ref: "postgres:16", Reason: "a"}}
 	}, change: func(f *fixture) { f.c.Scope.AllowMutable[0].Reason = "b" }, want: differ},
+	// A result without outputs is never reused for a contract that restores them.
+	{name: "outputs added", change: func(f *fixture) { f.c.Outputs = []string{"coverage.xml"} }, want: differ},
+	{name: "outputs glob changed", setup: func(f *fixture) { f.c.Outputs = []string{"coverage.xml"} }, change: func(f *fixture) { f.c.Outputs = []string{"junit.xml"} }, want: differ},
 
 	// Irrelevant changes.
 	{name: "out-of-scope file edited", change: func(f *fixture) { f.write("README.md", "edited\n") }, want: same},
@@ -282,6 +285,10 @@ var corpus = []corpusCase{
 	}, change: func(f *fixture) {
 		f.c.Scope.AllowMutable = []contract.AllowMutable{{Ref: "b", Reason: "y"}, {Ref: "a", Reason: "x"}, {Ref: "b", Reason: "y"}}
 	}, want: same},
+	{name: "outputs order, duplicates and empty", setup: func(f *fixture) { f.c.Outputs = []string{"a.xml", "b.xml"} }, change: func(f *fixture) {
+		f.c.Outputs = []string{"b.xml", "a.xml", "b.xml"}
+	}, want: same},
+	{name: "empty outputs as omitted", change: func(f *fixture) { f.c.Outputs = []string{} }, want: same},
 
 	// Fail closed.
 	{name: "dependency deleted", change: func(f *fixture) { f.remove("go.sum") }, want: failClosed},
