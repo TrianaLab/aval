@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	orasregistry "oras.land/oras-go/v2/registry"
 
 	"github.com/TrianaLab/aval/internal/attest"
@@ -80,6 +81,12 @@ var (
 	pushRecord     = registry.Record
 	readRecords    = registry.ReadRecords
 	now            = time.Now
+	// isTerminal: stdin is a terminal, so the interactive login can run.
+	isTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+	// login runs the interactive Sigstore login on the terminal.
+	login = func() (string, error) {
+		return attest.Login(cmp.Or(os.Getenv(oidcIssuerEnv), attest.DefaultOIDCIssuer), cmp.Or(os.Getenv(oidcClientIDEnv), attest.DefaultOIDCClientID), os.Stdin, os.Stderr, nil)
+	}
 )
 
 var (

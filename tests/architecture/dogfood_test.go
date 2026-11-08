@@ -37,19 +37,35 @@ func loadPolicy(t *testing.T, name string) *policy.Policy {
 	return p
 }
 
-// mainPolicyProblems: main and releases trust only Aval's own workflows,
-// keyless, at runner level, and require runner level (#28).
+// mainPolicyProblems: main and releases require runner level (#28) and
+// grant it only to Aval's own workflows, keyless. Any other identity may be
+// listed at developer level only, below the minimum, so its results are a
+// miss on main, never reused and never a verification failure (#130).
 func mainPolicyProblems(p *policy.Policy) []string {
 	var problems []string
 	if p.MinTrustLevel != evidence.TrustRunner {
 		problems = append(problems, "minTrustLevel must be runner")
 	}
 	for _, id := range p.Identities {
-		if id.PublicKey != "" || id.Issuer != actionsIssuer || !strings.HasPrefix(id.SubjectRegexp, ownWorkflow) || id.TrustLevel != evidence.TrustRunner {
+		ownCI := id.PublicKey == "" && id.Issuer == actionsIssuer && strings.HasPrefix(id.SubjectRegexp, ownWorkflow) && literalRegexp(id.SubjectRegexp) && id.TrustLevel == evidence.TrustRunner
+		// A catch-all at developer level would turn a forged signature from
+		// a verification failure into a miss (invariant 4): keyless
+		// developers must name one subject.
+		if !ownCI && (id.TrustLevel != evidence.TrustDeveloper || (id.PublicKey == "" && !literalRegexp(id.SubjectRegexp))) {
 			problems = append(problems, "untrusted identity "+id.Issuer+" "+id.SubjectRegexp)
 		}
 	}
 	return problems
+}
+
+// literalRegexp reports whether s matches exactly one string.
+func literalRegexp(s string) bool {
+	re, err := regexp.Compile(s)
+	if err != nil {
+		return false
+	}
+	_, complete := re.LiteralPrefix()
+	return complete
 }
 
 // prPolicyProblems: a PR may also accept developer signatures, but grants
@@ -78,13 +94,23 @@ func TestDogfoodPolicyChecksCatchLooseTrust(t *testing.T) {
 		t.Fatalf("valid main policy reported %v", p)
 	}
 	dev := evidence.Identity{Issuer: "https://github.com/login/oauth", SubjectRegexp: `a@example\.com`, TrustLevel: evidence.TrustDeveloper}
+	if p := mainPolicyProblems(&policy.Policy{MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, dev}}); len(p) != 0 {
+		t.Fatalf("main policy with a developer identity at developer level reported %v", p)
+	}
+	runnerDev := dev
+	runnerDev.TrustLevel = evidence.TrustRunner
 	bad := map[string]*policy.Policy{
-		"developer level":     {MinTrustLevel: evidence.TrustDeveloper, Identities: []evidence.Identity{ci}},
-		"developer identity":  {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, dev}},
-		"key":                 {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{PublicKey: "k", TrustLevel: evidence.TrustRunner}}},
-		"other repository":    {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: `https://github\.com/evil/aval/.*`, TrustLevel: evidence.TrustRunner}}},
-		"other issuer":        {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: "https://evil", SubjectRegexp: ci.SubjectRegexp, TrustLevel: evidence.TrustRunner}}},
-		"isolated self-grant": {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: ci.SubjectRegexp, TrustLevel: evidence.TrustIsolated}}},
+		"developer level":              {MinTrustLevel: evidence.TrustDeveloper, Identities: []evidence.Identity{ci}},
+		"lowered minimum beside dev":   {MinTrustLevel: evidence.TrustDeveloper, Identities: []evidence.Identity{ci, dev}},
+		"developer identity at runner": {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, runnerDev}},
+		"developer key at runner":      {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, {PublicKey: "k", TrustLevel: evidence.TrustRunner}}},
+		"key":                          {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{PublicKey: "k", TrustLevel: evidence.TrustRunner}}},
+		"other repository":             {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: `https://github\.com/evil/aval/.*`, TrustLevel: evidence.TrustRunner}}},
+		"other issuer":                 {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: "https://evil", SubjectRegexp: ci.SubjectRegexp, TrustLevel: evidence.TrustRunner}}},
+		"wildcard developer":           {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, {Issuer: actionsIssuer, SubjectRegexp: ".*", TrustLevel: evidence.TrustDeveloper}}},
+		"wildcard after own workflow":  {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: ownWorkflow + ".*|.*", TrustLevel: evidence.TrustRunner}}},
+		"invalid developer regexp":     {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, {Issuer: actionsIssuer, SubjectRegexp: "(", TrustLevel: evidence.TrustDeveloper}}},
+		"isolated self-grant":          {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: ci.SubjectRegexp, TrustLevel: evidence.TrustIsolated}}},
 	}
 	for name, p := range bad {
 		if len(mainPolicyProblems(p)) == 0 {
@@ -94,10 +120,13 @@ func TestDogfoodPolicyChecksCatchLooseTrust(t *testing.T) {
 	if p := prPolicyProblems(&policy.Policy{Identities: []evidence.Identity{ci, dev}}, main); len(p) != 0 {
 		t.Errorf("PR policy with a developer identity reported %v", p)
 	}
-	runnerDev := dev
-	runnerDev.TrustLevel = evidence.TrustRunner
 	if len(prPolicyProblems(&policy.Policy{Identities: []evidence.Identity{ci, runnerDev}}, main)) == 0 {
 		t.Error("PR policy granting runner level to a developer: no problem reported")
+	}
+	// Main listing the developer (at developer level) does not let a PR raise it.
+	withDev := &policy.Policy{MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, dev}}
+	if len(prPolicyProblems(&policy.Policy{Identities: []evidence.Identity{ci, runnerDev}}, withDev)) == 0 {
+		t.Error("PR policy raising main's developer identity to runner: no problem reported")
 	}
 }
 

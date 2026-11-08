@@ -301,6 +301,68 @@ Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
 marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint
 every Markdown file except `.agents/`, `.claude/`, `CLAUDE.md`, `.changeset/` and the generated `CHANGELOG.md`.
 
+### Save PR CI time: sign a local run
+
+A maintainer whose keyless identity is in `.github/aval/pr.yaml` (trust level
+`developer`) can run the e2e suite on their laptop, sign the result with their
+own Sigstore identity and publish it. When the PR's inputs have the same
+fingerprint, `ci-e2e` reuses that result instead of running the suite.
+
+1. Check out the exact commit you push, with no local changes inside the e2e
+   contract's scope and `GOFLAGS`, `GOEXPERIMENT` and `CGO_ENABLED` as in CI
+   (unset), or the fingerprint differs.
+2. Log in to GHCR with a token that can write the
+   `aval-attestations` package (`write:packages`):
+
+    ```sh
+    echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
+    ```
+
+3. Run, sign and push:
+
+    ```sh
+    make build
+    bin/aval run -f aval.e2e.yaml --registry ghcr.io/trianalab/aval-attestations \
+      --policy .github/aval/pr.yaml --push
+    ```
+
+    Without `--key` or `$SIGSTORE_ID_TOKEN` and with a terminal, Aval runs
+    the suite, then opens the Sigstore login (`oauth2.sigstore.dev`) in the
+    browser. Log in with GitHub: the certificate then names your verified
+    email with issuer `https://github.com/login/oauth`. The token is used for
+    this signature only and not stored. Without a terminal, add `--login`.
+
+PR CI then prints, in `ci-e2e`:
+
+```text
+verified aval-e2e sha256:<fingerprint>
+signer: <your email> (issuer https://github.com/login/oauth), trust level developer
+reference: ghcr.io/trianalab/aval-attestations@sha256:<digest>
+reused passed result
+```
+
+`main` and releases never reuse this result. `.github/aval/main.yaml` lists
+your identity too, but at trust level `developer`, below its `minTrustLevel:
+runner`; only `ci.yaml` on `main` signs at runner level, and
+`tests/architecture` fails if any other identity gets runner level there. When
+a PR merges unchanged, `ci-e2e` on `main` computes the same fingerprint, finds
+only your result and prints a miss naming the minimum trust level, then runs
+the suite:
+
+```text
+miss aval-e2e sha256:<fingerprint>
+reference: ghcr.io/trianalab/aval-attestations@sha256:<digest>
+reason: not reusable under the trust policy: signer "<your email>" has trust level developer, policy requires at least runner
+ran aval-e2e: passed (exit 0)
+```
+
+`dogfood-publish` then pushes CI's own runner-signed result next to yours, and
+later runs on `main` reuse that one. A release requires a verified runner
+result: `release.yaml`'s `aval verify` exits 4 (a miss) on a developer-only
+fingerprint and stops. A signer that neither policy lists is still a
+verification failure (exit 5). To add a maintainer, add the identity at
+`developer` level to both `pr.yaml` and `main.yaml`.
+
 ### Join the public stats
 
 A repository appears on the [Stats](https://aval.run/main/stats/) page once it publishes run records to
