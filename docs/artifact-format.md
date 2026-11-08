@@ -197,8 +197,10 @@ verification add one `aval: SECURITY: ...` line on stderr.
 Every push adds one execution, even for the same inputs (hostname and
 timestamps differ), and Aval never deletes one. Past 64 executions, every
 lookup for that fingerprint is `error` and the test always runs; every push
-still adds one, then exits 1. Other fingerprints are not affected, so the next
-input change also ends it.
+still adds one, then exits 1. Nothing past the cap is verified, so the lookup
+also prints an `aval: SECURITY:` line naming the cap: someone with push
+access may be flooding the fingerprint to hide an untrusted attestation.
+Other fingerprints are not affected, so the next input change also ends it.
 
 Push from one place (for example CI on the main branch). `aval run --push`
 does not push after a reuse, but `aval run --shadow --push` pushes every time.
