@@ -2,7 +2,7 @@
 # Tests scripts/deploy-docs.sh against a scratch copy of the repository whose
 # origin is a local bare repo, so nothing leaves the machine.
 #
-#   scripts/test-deploy-docs.sh            # needs mike (docs/requirements.txt) and Go
+#   scripts/test-deploy-docs.sh            # needs mike (docs/requirements.txt), Go, jq and Chrome
 #
 # It deploys main, a release v0.2.0, main again with a changed installer, a
 # release v0.3.0 and a release v0.3.1 tagged on an older commit, and checks
@@ -13,9 +13,8 @@
 # Chrome that the outdated banner is hidden on latest/ and main/ and shown on
 # an older release. Then it publishes stats.json
 # (scripts/publish-stats.sh) and checks that a docs deploy keeps it and that
-# an invalid report never replaces it. Needs jq and Chrome (CHROME overrides
-# the binary). Set
-# AVAL_TEST_KEEP=<dir> to keep the scratch copy (mike serve runs from it).
+# an invalid report never replaces it. CHROME overrides the Chrome binary.
+# Set AVAL_TEST_KEEP=<dir> to keep the scratch copy (mike serve runs from it).
 set -euo pipefail
 
 src=$(cd "$(dirname "$0")/.." && pwd)
@@ -92,7 +91,7 @@ pass "only 0.3.1 carries latest"
 # The outdated banner (#146): Material shows it on a version that matches no
 # extra.version.default. Each page loads in a fresh Chrome profile, so no
 # sessionStorage verdict carries over from another version.
-chrome=${CHROME:-$(for c in "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" /usr/bin/google-chrome /usr/bin/chromium /usr/bin/chromium-browser; do [ -x "$c" ] && echo "$c" && break; done)}
+chrome=${CHROME:-$(for c in "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" /usr/bin/google-chrome /usr/bin/google-chrome-stable /usr/bin/chromium /usr/bin/chromium-browser; do [ -x "$c" ] && echo "$c" && break; done)}
 [ -n "$chrome" ] || die "no Chrome found; set CHROME"
 mkdir "$work/site"
 git --git-dir="$work/origin.git" archive gh-pages | tar -xf - -C "$work/site"
@@ -120,6 +119,9 @@ done
 tag=$(banner 0.3.0)
 [[ -n "$tag" && "$tag" != *" hidden"* ]] || die "0.3.0: outdated banner not shown: '$tag'"
 pass "outdated banner hidden on latest and main, shown on 0.3.0"
+kill "$server"
+wait "$server" 2>/dev/null || true
+server=
 
 # stats.json (#97): a valid stats report is published at the gh-pages root
 # with generatedAt, survives a docs deploy, and anything else leaves it as

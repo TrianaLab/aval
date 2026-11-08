@@ -247,11 +247,11 @@ jobs:
       - run: make ci-security
 
   # Docs gates: markdownlint, vale, CLI reference drift, the strict site
-  # Docs gates: markdownlint, vale, CLI reference drift, the strict site
   # build with the "Try it" WebAssembly and its size budget, the headless
   # Chrome smoke tests of the "Try it" terminal (scripts/demo-smoke.mjs) and
   # of the mobile drawer (scripts/docs-nav-smoke.mjs; Node and Chrome come
-  # with the runner image) and the deploy logic (scripts/test-deploy-docs.sh).
+  # with the runner image) and the deploy logic with the outdated banner check
+  # (scripts/test-deploy-docs.sh, also headless Chrome).
   # No path filter: a docs-only PR must run it too. Links, doc examples, page
   # length and the image and recording size budget are checked in ci-gates.
   # On a PR it uploads the built site as the docs-site artifact for preview.
