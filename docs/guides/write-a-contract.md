@@ -67,7 +67,10 @@ it, add it.
 
 ## Find undeclared inputs
 
-A file the test reads but `scope` does not list is a false hit waiting to happen: change it and Aval still reuses the old result. `--shadow` catches it only after it flips a result ([Measure reuse](measure-reuse.md)). Look for it before that: list the files the test opens and compare them with `--explain`.
+A file the test reads but `scope` does not list is a false hit waiting to
+happen: change it and Aval still reuses the old result. `--shadow` catches
+it only after it flips a result ([Measure reuse](measure-reuse.md)). Find
+it first: compare the files the test opens with `--explain`.
 
 Example: a pytest contract lists `src/**` and `tests/unit/**`, but pytest
 also loads `tests/conftest.py`. On Linux, from the contract's directory:
@@ -85,7 +88,10 @@ comm -23 read.txt scope.txt
 tests/conftest.py
 ```
 
-Add `tests/conftest.py` to `scope.source`. Some lines are directories or caches (`__pycache__`): read the list, do not paste it into the contract.
+Add `tests/conftest.py` to `scope.source`. Some lines are directories or
+caches (`__pycache__`): read the list, do not paste it into the contract.
+Files hashed by contracts in `scope.contracts` are not in this list; check
+those contracts the same way.
 
 ??? info "macOS and Windows"
     - macOS: while the test runs, `sudo fs_usage -w -f pathname <process
@@ -95,19 +101,17 @@ Add `tests/conftest.py` to `scope.source`. Some lines are directories or caches 
 
 ??? info "Without a tracer"
     Copy only the scope to an empty directory and run the test there. A
-    missing input fails the run:
+    missing input usually fails the run or changes its result:
 
     ```sh
-    mkdir /tmp/scope
+    scope=$(mktemp -d)
     aval run --explain --fingerprint-only | awk '$1 == "source" || $1 == "dependency"' \
-      | cut -d' ' -f4- | tar -cf - -T - | tar -xf - -C /tmp/scope
-    (cd /tmp/scope && pytest tests/unit)
+      | cut -d' ' -f4- | tar -cf - -T - | tar -xf - -C "$scope"
+    (cd "$scope" && pytest tests/unit)
     ```
 
-    It cannot catch inputs outside the directory: the toolchain, environment
-    variables, network services.
-
-Aval does not trace the test itself: tracing needs per-OS code and often root, and it would infer scope where the contract must declare it. Observed inputs that check a declared scope are future work ([The test contract](../contract.md#future-work)).
+Aval does not trace tests: that needs per-OS code and often root, and
+would infer scope ([future work](../contract.md#future-work)).
 
 ## Read next
 

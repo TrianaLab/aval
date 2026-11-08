@@ -32,9 +32,10 @@ scripts/estimate-reuse.sh services/orders/aval.yaml --max-count=200 main
 ```
 
 A fingerprint error or an unacknowledged mutable reference is a miss, as
-in CI. The number is an upper bound: it ignores branches, failing tests and
-trust policy. Shadow mode measures the real one. There is no `aval estimate`:
-reading CI history would tie Aval to one CI vendor's API.
+in CI, and a non-deterministic contract never reuses. The number is an
+upper bound: it ignores branches, failing tests and trust policy. Shadow
+mode measures the real one. There is no `aval estimate`: reading CI
+history would tie Aval to one CI vendor's API.
 
 ## Measure in shadow mode
 

@@ -13,6 +13,7 @@ import (
 // repeated fingerprint as reuse. A fingerprint error and an unacknowledged
 // mutable reference are misses (invariant 3), and neither makes a later
 // commit with the same fingerprint a hit, because nothing was published.
+// A non-deterministic contract is never reusable (invariant 7).
 func TestEstimateReuseStory(t *testing.T) {
 	dir := t.TempDir()
 	env := append(os.Environ(), "AVAL="+aval, "DOCKER_CONFIG="+t.TempDir(),
@@ -54,13 +55,19 @@ cacheability:`, 1)
 	commit("allow", map[string]string{"t/aval.yaml": ack})                                           // miss
 	commit("readme 3", map[string]string{"t/README": "z"})                                           // hit
 	commit("broken", map[string]string{"t/aval.yaml": strings.Replace(ack, "src/**", "gone/**", 1)}) // miss
+	nondet := strings.Replace(ack, "cacheability: hermetic", `cacheability: "non-deterministic"`, 1)
+	commit("nondet", map[string]string{"t/aval.yaml": nondet}) // miss, never reusable
+	commit("readme 4", map[string]string{"t/README": "w"})     // miss, not a hit
 
 	script, err := filepath.Abs("../../scripts/estimate-reuse.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
+	if out, err := exec.Command(script, filepath.Join(dir, "t/aval.yaml")).CombinedOutput(); err == nil {
+		t.Errorf("an absolute contract path was accepted\n%s", out)
+	}
 	cmd := exec.Command(script, "t/aval.yaml")
-	cmd.Dir, cmd.Env = dir, env
+	cmd.Dir, cmd.Env = filepath.Join(dir, "t"), env // from a subdirectory
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
@@ -71,10 +78,10 @@ cacheability:`, 1)
 			verdicts = append(verdicts, f[1])
 		}
 	}
-	if got, want := strings.Join(verdicts, " "), "miss hit miss miss miss miss hit miss"; got != want {
+	if got, want := strings.Join(verdicts, " "), "miss hit miss miss miss miss hit miss miss miss"; got != want {
 		t.Errorf("verdicts %q, want %q\n%s", got, want, out)
 	}
-	if !strings.Contains(string(out), "8 commits, 2 would reuse a result (25%, an upper bound)") {
+	if !strings.Contains(string(out), "10 commits, 2 would reuse a result (20%, an upper bound)") {
 		t.Errorf("summary missing\n%s", out)
 	}
 	git("worktree", "prune")

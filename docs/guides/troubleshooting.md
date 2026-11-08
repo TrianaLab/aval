@@ -1,6 +1,7 @@
 # Troubleshooting
 
 Goal: go from an exit code or an error message to its cause and its fix.
+In the messages below, text in `<...>` changes per run.
 
 ```mermaid
 flowchart LR
@@ -17,8 +18,6 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 ```
 
 --8<-- "docs/cli-reference.md:exit-codes"
-
-Text in `<...>` changes per run.
 
 ## Flags and files (exit 2)
 
@@ -52,7 +51,9 @@ Text in `<...>` changes per run.
 
 ## Errors (exit 1)
 
-`aval verify` exits 1. `aval run` prints these as outcome `error`, runs the test and exits with the test's code. It exits 1 only when the test cannot start (`running <x>`) or the result cannot be published.
+`aval verify` exits 1. `aval run` prints these as outcome `error`, runs the
+test and exits with the test's code. It exits 1 only when the test cannot
+start (`running <x>`) or the result cannot be published.
 
 ??? failure "Fingerprint and trust policy"
     | Message | Fix |
