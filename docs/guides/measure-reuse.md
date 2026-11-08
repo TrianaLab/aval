@@ -11,7 +11,32 @@ flowchart LR
   same -- no --> fh([FALSE HIT, exit 1]):::err
 ```
 
-## The example
+## Estimate from history
+
+Before any setup, estimate reuse from past commits.
+[`scripts/estimate-reuse.sh`](https://github.com/TrianaLab/aval/blob/main/scripts/estimate-reuse.sh)
+checks out each commit in a scratch `git worktree`, runs
+`aval run --fingerprint-only` there, and counts a fingerprint seen on an
+earlier commit as a hit. From the repository root:
+
+```sh
+scripts/estimate-reuse.sh services/orders/aval.yaml --max-count=200 main
+```
+
+```text
+<commit> miss sha256:4800...
+<commit> hit sha256:4800...
+<commit> miss unacknowledged mutable reference
+<commit> miss aval: fingerprint: source glob "gone/**" matched no files
+200 commits, 61 would reuse a result (30%, an upper bound)
+```
+
+A fingerprint error or an unacknowledged mutable reference is a miss, as
+in CI. The number is an upper bound: it ignores branches, failing tests and
+trust policy. Shadow mode measures the real one. There is no `aval estimate`:
+reading CI history would tie Aval to one CI vendor's API.
+
+## Measure in shadow mode
 
 Run in shadow mode and record every run:
 

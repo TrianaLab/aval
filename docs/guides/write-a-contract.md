@@ -65,6 +65,50 @@ it, add it.
     as written; Aval does not check what is installed. `environment.env`
     names variables whose values go into the fingerprint.
 
+## Find undeclared inputs
+
+A file the test reads but `scope` does not list is a false hit waiting to happen: change it and Aval still reuses the old result. `--shadow` catches it only after it flips a result ([Measure reuse](measure-reuse.md)). Look for it before that: list the files the test opens and compare them with `--explain`.
+
+Example: a pytest contract lists `src/**` and `tests/unit/**`, but pytest
+also loads `tests/conftest.py`. On Linux, from the contract's directory:
+
+```sh
+strace -f -e trace=openat -o trace.txt pytest tests/unit
+grep -v ENOENT trace.txt | grep -o '"[^"]*"' | tr -d '"' | sed "s|^$PWD/||" \
+  | grep -v '^/' | sort -u > read.txt
+aval run --explain --fingerprint-only | awk '$1 == "source" || $1 == "dependency"' \
+  | cut -d' ' -f4- | sort -u > scope.txt
+comm -23 read.txt scope.txt
+```
+
+```text
+tests/conftest.py
+```
+
+Add `tests/conftest.py` to `scope.source`. Some lines are directories or caches (`__pycache__`): read the list, do not paste it into the contract.
+
+??? info "macOS and Windows"
+    - macOS: while the test runs, `sudo fs_usage -w -f pathname <process
+      name>` lists the paths it opens.
+    - Windows: Process Monitor, filtered on the test's process and on
+      `Path begins with` the contract's directory.
+
+??? info "Without a tracer"
+    Copy only the scope to an empty directory and run the test there. A
+    missing input fails the run:
+
+    ```sh
+    mkdir /tmp/scope
+    aval run --explain --fingerprint-only | awk '$1 == "source" || $1 == "dependency"' \
+      | cut -d' ' -f4- | tar -cf - -T - | tar -xf - -C /tmp/scope
+    (cd /tmp/scope && pytest tests/unit)
+    ```
+
+    It cannot catch inputs outside the directory: the toolchain, environment
+    variables, network services.
+
+Aval does not trace the test itself: tracing needs per-OS code and often root, and it would infer scope where the contract must declare it. Observed inputs that check a declared scope are future work ([The test contract](../contract.md#future-work)).
+
 ## Read next
 
 - [Write a trust policy](trust-policy.md)

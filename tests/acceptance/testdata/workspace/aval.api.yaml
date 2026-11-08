@@ -1,0 +1,10 @@
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata:
+  name: api-unit
+runner:
+  command: ["uv", "run", "--package", "api", "pytest", "packages/api/tests"]
+scope:
+  source: ["packages/api/**"]
+  dependencies: ["pyproject.toml", "uv.lock"]
+cacheability: hermetic

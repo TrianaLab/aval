@@ -19,6 +19,8 @@ scope:
     - "examples/go-compose/**"
     # tests/acceptance runs the docs quickstart as written.
     - "docs/quickstart.md"
+    # tests/acceptance runs the history estimate script.
+    - "scripts/estimate-reuse.sh"
   # Redundant since #63 (Aval never hashes .aval/), kept so the canonical
   # contract, and with it the published results, stay the same.
   exclude: ["**/.aval/**"]

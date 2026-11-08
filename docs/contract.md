@@ -209,4 +209,6 @@ does not know, which fails closed.
 - **Detected toolchain**: verify or record the installed toolchain instead
   of trusting `environment.toolchain`. Not scheduled in milestones 1-5.
 - **Observed inputs**: trace which files the test actually reads, to flag
-  undeclared inputs or suggest scope. v0 never infers scope.
+  undeclared inputs or suggest scope. v0 never infers scope. Until then,
+  [find undeclared inputs](guides/write-a-contract.md#find-undeclared-inputs)
+  by hand.

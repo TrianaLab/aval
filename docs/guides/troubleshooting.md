@@ -52,9 +52,7 @@ Text in `<...>` changes per run.
 
 ## Errors (exit 1)
 
-`aval verify` exits 1. `aval run` prints these as outcome `error`, runs the
-test and exits with the test's code. It exits 1 only when the test cannot
-start (`running <x>`) or the result cannot be published.
+`aval verify` exits 1. `aval run` prints these as outcome `error`, runs the test and exits with the test's code. It exits 1 only when the test cannot start (`running <x>`) or the result cannot be published.
 
 ??? failure "Fingerprint and trust policy"
     | Message | Fix |
@@ -78,6 +76,7 @@ start (`running <x>`) or the result cannot be published.
     | `more than <n> attestations` | delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)); the `aval: SECURITY:` line before it means none was verified, so check who pushed them: it may be a flooding attempt |
     | `is not listed among the referrers of` | push again, or use a registry with OCI 1.1 referrers |
     | `running <x>` | install the program `runner.command` starts |
+    | `FALSE HIT: <x>` (with `--shadow`) | the test reads an input `scope` does not list: [find it](write-a-contract.md#find-undeclared-inputs) |
     | `writing report: <x>`, `result not published: <x>` | fix the `--report` path, or the fingerprint error before it |
     | `reading the result recorded by 'aval run'` | run `aval run` first |
     | `recorded result is for test <x>` | an input changed: run the test again |
