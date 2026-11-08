@@ -61,10 +61,10 @@ func TestCollectOutputs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return filepath.Dir(p), c
+		return p, c
 	}
-	dir, c := load(t, `["**/*.xml"]`, map[string]string{"coverage.xml": "cov", "reports/junit.xml": "junit", ".git/x.xml": "git", ".aval/y.xml": "aval", "notes.md": "n"})
-	got, err := collectOutputs(dir, c)
+	file, c := load(t, `["**/*.xml"]`, map[string]string{"coverage.xml": "cov", "reports/junit.xml": "junit", ".git/x.xml": "git", ".aval/y.xml": "aval", "notes.md": "n"})
+	got, err := collectOutputs(file, c)
 	if err != nil || fmt.Sprint(got) != fmt.Sprint([]registry.Output{{Path: "coverage.xml", Data: []byte("cov")}, {Path: "reports/junit.xml", Data: []byte("junit")}}) {
 		t.Fatalf("collectOutputs = %v %v", got, err)
 	}
@@ -74,9 +74,10 @@ func TestCollectOutputs(t *testing.T) {
 		setup   func(t *testing.T, dir string)
 		want    string
 	}{
-		"missing":   {`[coverage.xml]`, nil, `outputs glob "coverage.xml" matched no files`},
-		"an input":  {`["*.txt"]`, nil, "in.txt is an input of the test"},
-		"backslash": {`["*.xml"]`, func(t *testing.T, dir string) { write(t, dir, `a\b.xml`, "x") }, "backslashes"},
+		"missing":      {`[coverage.xml]`, nil, `outputs glob "coverage.xml" matched no files`},
+		"an input":     {`["*.txt"]`, nil, "in.txt is an input of the test"},
+		"the contract": {`["*.yaml"]`, nil, "aval.yaml is the contract"},
+		"backslash":    {`["*.xml"]`, func(t *testing.T, dir string) { write(t, dir, `a\b.xml`, "x") }, "backslashes"},
 		"symlink": {`[coverage.xml]`, func(t *testing.T, dir string) {
 			if err := os.Symlink("in.txt", filepath.Join(dir, "coverage.xml")); err != nil {
 				t.Fatal(err)
@@ -104,11 +105,11 @@ func TestCollectOutputs(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			dir, c := load(t, tc.outputs, nil)
+			file, c := load(t, tc.outputs, nil)
 			if tc.setup != nil {
-				tc.setup(t, dir)
+				tc.setup(t, filepath.Dir(file))
 			}
-			if got, err := collectOutputs(dir, c); err == nil || !strings.Contains(err.Error(), tc.want) || got != nil {
+			if got, err := collectOutputs(file, c); err == nil || !strings.Contains(err.Error(), tc.want) || got != nil {
 				t.Fatalf("got %v %v, want error ~%q", got, err, tc.want)
 			}
 		})
@@ -211,6 +212,17 @@ func TestRunPushOutputs(t *testing.T) {
 	}
 }
 
+// A failed login comes before the upload: no outputs without a result.
+func TestRunPushOutputsLoginFirst(t *testing.T) {
+	pushed := fakeOutputs(t, nil, nil)
+	fakeLogin(t, true, "", errors.New("closed"))
+	t.Setenv(idTokenEnv, "")
+	c := outputsContract(t, "[coverage.xml]", "sh", "-c", "printf cov > coverage.xml")
+	if code, _, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result", filepath.Join(t.TempDir(), "r.json")); code != ExitError || !strings.Contains(stderr, "interactive Sigstore login: closed") || *pushed != nil {
+		t.Fatalf("failed login: exit %d, stderr %q, pushed %v", code, stderr, *pushed)
+	}
+}
+
 // A verified result restores its outputs instead of running the test;
 // verify fetches and checks them but writes nothing.
 func TestReuseRestoresOutputs(t *testing.T) {
@@ -257,6 +269,7 @@ func TestOutputsVerificationFailures(t *testing.T) {
 		"glob without a path":           {"[coverage.xml, junit.xml]", listed("coverage.xml"), nil},
 		"path that is an input":         {`["**"]`, listed("in.txt"), nil},
 		"path under .git":               {`["**"]`, listed(".git/hooks/pre-commit"), nil},
+		"path that is the contract":     {`["*.yaml"]`, listed("aval.yaml"), nil},
 		"path under .aval":              {`["**"]`, listed(".aval/result.json"), nil},
 		"stored outputs differ (fetch)": {"[coverage.xml]", listed("coverage.xml"), &evidence.VerificationError{Reason: "outputs: layer 0 does not match"}},
 	}

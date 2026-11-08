@@ -73,7 +73,8 @@ or junit file, and a step that reads one fails. List those files under
 `outputs: [coverage.xml, junit.xml]`:
 
 - `aval run --push` and `aval push` publish them with the result, and the
-  signature covers each file's digest.
+  signature covers each file's digest. `aval push` reads them from disk
+  when it runs: push right after `aval run`, before anything rewrites them.
 - `aval run` writes them back on reuse, after the result verifies.
   `aval verify` checks them and writes nothing.
 - They must not be inputs: keep them out of `scope`, and each glob must
@@ -84,9 +85,11 @@ or junit file, and a step that reads one fails. List those files under
     Anyone who can read the registry repository can read these files. Do
     not list a file that holds secrets.
 
-Aval only refuses to restore over this contract's own inputs. Restoring into
-another contract's scope is your responsibility: it changes that contract's
-fingerprint.
+Aval only refuses to restore over this contract's own inputs and the
+contract file. Restoring into another contract's scope is your
+responsibility: it changes that contract's fingerprint. Keep the globs
+narrow: on reuse, Aval writes any file a trusted signer published under
+them, so `**` can overwrite files later steps read.
 
 ## Read next
 

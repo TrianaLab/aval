@@ -149,14 +149,15 @@ reading. Each of these is a verification failure, never a miss:
   or size
 - the manifest's layers differ from the predicate's list (extra, missing,
   renamed or reordered)
-- a path that matches no `outputs` glob, is in scope or under `.git` or
-  `.aval`; a glob that matches no path; a predicate without outputs for a
+- a path that matches no `outputs` glob, is the contract file, is in scope
+  or under `.git` or `.aval`; a glob that matches no path; a predicate without outputs for a
   contract with `outputs`, or the reverse
 
 `aval run` then writes the files: each is staged next to its target and
 renamed into place once all are staged. A symlink on the way or anything
 but a regular file at the target stops the restore; the test runs and the
-command exits 1.
+command exits 1. A failure while renaming can leave some files restored;
+the test then runs and rewrites them.
 
 ### Push
 

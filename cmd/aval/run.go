@@ -377,7 +377,7 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 	// The deadline bounds the registry, never runner.command.
 	ctx, cancel := context.WithTimeout(ctx, o.registryTimeout)
 	defer cancel()
-	return verify(ctx, warn, c, filepath.Dir(o.file), fp, o.repo, o.policyFile)
+	return verify(ctx, warn, c, o.file, fp, o.repo, o.policyFile)
 }
 
 // execute runs runner.command in the contract's directory and returns the
@@ -436,7 +436,7 @@ func keep(ctx context.Context, out io.Writer, c *contract.Contract, p *evidence.
 	if pinErr != nil {
 		return []error{fmt.Errorf("result not published: %s", pinErr)}
 	}
-	ref, err := signAndPush(ctx, p, c, filepath.Dir(o.file), o.repo, o.key, token, o.registryTimeout)
+	ref, err := signAndPush(ctx, p, c, o.file, o.repo, o.key, token, o.registryTimeout)
 	if err != nil {
 		return []error{err}
 	}
@@ -512,18 +512,27 @@ func writeJSON(path string, v any) error {
 	return os.WriteFile(path, append(raw, '\n'), 0o644)
 }
 
-// signAndPush publishes the outputs of c (rooted at dir), then signs the
-// predicate with them (key-based with key, else keyless with the OIDC token,
-// from the interactive login when there is none) and publishes it under its
-// fingerprint, each within timeout. Outputs that break a rule publish
-// nothing. The login runs only now, after the test, so the short-lived token
-// is fresh and runner.command never had it.
-func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contract, dir, repo, key, token string, timeout time.Duration) (string, error) {
+// signAndPush collects the outputs of c (loaded from file), takes the OIDC
+// token from the interactive login when there is no key and no token,
+// publishes the outputs, then signs the predicate with them (key-based with
+// key, else keyless with the token) and publishes it under its fingerprint,
+// each within timeout. Outputs that break a rule, or a failed login,
+// publish nothing. The login runs only now, after the test, so the
+// short-lived token is fresh and runner.command never had it.
+func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contract, file, repo, key, token string, timeout time.Duration) (string, error) {
+	var files []registry.Output
+	var err error
 	if len(c.Outputs) > 0 {
-		files, err := collectOutputs(dir, c)
-		if err != nil {
+		if files, err = collectOutputs(file, c); err != nil {
 			return "", fmt.Errorf("result not published: %w", err)
 		}
+	}
+	if key == "" && token == "" {
+		if token, err = login(); err != nil {
+			return "", fmt.Errorf("signing: interactive Sigstore login: %w", err)
+		}
+	}
+	if len(c.Outputs) > 0 {
 		octx, cancel := context.WithTimeout(ctx, timeout)
 		o, err := pushOutputs(octx, repo, p.Execution.Fingerprint, files)
 		cancel()
@@ -535,11 +544,6 @@ func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contrac
 		p = &q
 	}
 	st, err := attest.NewStatement(p)
-	if err == nil && key == "" && token == "" {
-		if token, err = login(); err != nil {
-			err = fmt.Errorf("interactive Sigstore login: %w", err)
-		}
-	}
 	var s *attest.Signed
 	if err == nil {
 		s, err = sign(ctx, st, attest.SignOptions{Key: key, IDToken: token})
@@ -595,7 +599,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 				return fmt.Errorf("recorded result is for test %q (%s) with fingerprint %s; the contract is %q (%s) with fingerprint %s: run the test again",
 					p.Test.ID, p.Test.Cacheability, p.Execution.Fingerprint, c.Metadata.Name, c.Cacheability, fp.Digest)
 			}
-			ref, err := signAndPush(cmd.Context(), p, c, filepath.Dir(file), repo, key, token, timeout)
+			ref, err := signAndPush(cmd.Context(), p, c, file, repo, key, token, timeout)
 			if err != nil {
 				return err
 			}

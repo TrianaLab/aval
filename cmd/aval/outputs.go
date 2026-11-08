@@ -18,12 +18,13 @@ import (
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
-// collectOutputs reads the files the outputs globs of c match under dir,
-// sorted by path. Every glob must match a file; a match that is not a
-// regular file (a symlink), that is an input (in scope) or that breaks a
-// cap is an error, so nothing is published. .git and .aval directories are
-// skipped, as in the fingerprint.
-func collectOutputs(dir string, c *contract.Contract) ([]registry.Output, error) {
+// collectOutputs reads the files the outputs globs of c, loaded from file,
+// match under its directory, sorted by path. Every glob must match a file; a
+// match that is not a regular file (a symlink), that is an input (in scope)
+// or the contract file, or that breaks a cap is an error, so nothing is
+// published. .git and .aval directories are skipped, as in the fingerprint.
+func collectOutputs(file string, c *contract.Contract) ([]registry.Output, error) {
+	dir := filepath.Dir(file)
 	globs := splitGlobs(c.Outputs)
 	matched := make([]bool, len(globs))
 	var out []registry.Output
@@ -45,7 +46,7 @@ func collectOutputs(dir string, c *contract.Contract) ([]registry.Output, error)
 		if len(out) == registry.MaxOutputFiles {
 			return fmt.Errorf("more than %d output files", registry.MaxOutputFiles)
 		}
-		data, err := readOutput(dir, c, rel, d)
+		data, err := readOutput(file, c, rel, d)
 		if err != nil {
 			return err
 		}
@@ -66,8 +67,9 @@ func collectOutputs(dir string, c *contract.Contract) ([]registry.Output, error)
 
 // readOutput reads the output rel, of at most one byte over the per-file
 // cap, unless it is not a regular file, has a path evidence.Parse rejects,
-// or is an input.
-func readOutput(dir string, c *contract.Contract, rel string, d fs.DirEntry) ([]byte, error) {
+// is an input or is the contract file.
+func readOutput(file string, c *contract.Contract, rel string, d fs.DirEntry) ([]byte, error) {
+	dir := filepath.Dir(file)
 	p := filepath.Join(dir, filepath.FromSlash(rel))
 	switch {
 	case !d.Type().IsRegular():
@@ -76,6 +78,8 @@ func readOutput(dir string, c *contract.Contract, rel string, d fs.DirEntry) ([]
 		return nil, fmt.Errorf("output %q: backslashes and control characters in a path are not supported", rel)
 	case inScope(dir, c, p):
 		return nil, fmt.Errorf("output %s is an input of the test (the scope includes it): exclude it from scope", rel)
+	case rel == filepath.Base(file):
+		return nil, fmt.Errorf("output %s is the contract: narrow the outputs globs", rel)
 	}
 	f, err := os.Open(p)
 	var data []byte
@@ -87,24 +91,25 @@ func readOutput(dir string, c *contract.Contract, rel string, d fs.DirEntry) ([]
 }
 
 // verifyOutputs checks the outputs a verified predicate lists against the
-// contract c, rooted at dir, then fetches them. The contract and the
+// contract c, loaded from file, then fetches them. The contract and the
 // predicate both have outputs or neither does; every path matches an
-// outputs glob, lies outside the scope and outside .git and .aval; every
-// glob matches a path. Anything else is a verification failure: the
+// outputs glob, is not the contract file, lies outside the scope and
+// outside .git and .aval; every glob matches a path. Anything else is a verification failure: the
 // publisher refuses all of it, so only a forged result gets here.
-func verifyOutputs(ctx context.Context, repo string, c *contract.Contract, dir string, o *evidence.Outputs) ([]registry.Output, error) {
+func verifyOutputs(ctx context.Context, repo string, c *contract.Contract, file string, o *evidence.Outputs) ([]registry.Output, error) {
 	if o == nil {
 		if len(c.Outputs) > 0 {
 			return nil, &evidence.VerificationError{Reason: "the result carries no outputs, the contract declares outputs"}
 		}
 		return nil, nil
 	}
+	dir := filepath.Dir(file)
 	globs := splitGlobs(c.Outputs)
 	matched := make([]bool, len(globs))
 	for _, f := range o.Files {
 		segs := strings.Split(f.Path, "/")
 		reserved := slices.ContainsFunc(segs, func(s string) bool { return s == ".git" || s == fingerprint.OutputDir })
-		if !matchOutput(globs, matched, segs) || reserved || inScope(dir, c, filepath.Join(dir, filepath.FromSlash(f.Path))) {
+		if !matchOutput(globs, matched, segs) || reserved || f.Path == filepath.Base(file) || inScope(dir, c, filepath.Join(dir, filepath.FromSlash(f.Path))) {
 			return nil, &evidence.VerificationError{Reason: fmt.Sprintf("output %q is not a declared output of the contract, or is an input", f.Path)}
 		}
 	}

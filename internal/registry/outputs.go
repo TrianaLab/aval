@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/opencontainers/go-digest"
-	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/errdef"
@@ -55,22 +54,10 @@ func PushOutputs(ctx context.Context, repo, fingerprint string, files []Output) 
 		layers = append(layers, d)
 		out.Files = append(out.Files, evidence.OutputFile{Path: f.Path, Digest: d.Digest.String(), Size: d.Size})
 	}
-	if _, err := pushBlob(ctx, r, ocispec.MediaTypeEmptyJSON, emptyJSON.Data); err != nil {
+	m, err := anchoredManifest(ctx, r, fingerprint, evidence.ArtifactTypeOutputs, layers)
+	if err != nil {
 		return nil, fmt.Errorf("%s: %w", repo, err)
 	}
-	anchorRaw, anchorDesc := anchor(fingerprint)
-	if _, err := oras.TagBytes(ctx, r, ocispec.MediaTypeImageManifest, anchorRaw, Tag(fingerprint)); err != nil {
-		return nil, fmt.Errorf("%s: tagging anchor: %w", repo, err)
-	}
-	m, _ := json.Marshal(ocispec.Manifest{ // ponytail: plain structs and strings, cannot fail
-		Versioned:    specs.Versioned{SchemaVersion: 2},
-		MediaType:    ocispec.MediaTypeImageManifest,
-		ArtifactType: evidence.ArtifactTypeOutputs,
-		Config:       emptyJSON,
-		Layers:       layers,
-		Subject:      &ocispec.Descriptor{MediaType: anchorDesc.MediaType, Digest: anchorDesc.Digest, Size: anchorDesc.Size},
-		Annotations:  map[string]string{AnnotationFingerprint: fingerprint},
-	})
 	d, err := oras.PushBytes(ctx, r, ocispec.MediaTypeImageManifest, m)
 	if err != nil {
 		return nil, fmt.Errorf("%s: pushing outputs manifest: %w", repo, err)

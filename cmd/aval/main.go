@@ -387,7 +387,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
-			report, _, err := verify(ctx, cmd.ErrOrStderr(), c, filepath.Dir(file), fp, repo, policyFile)
+			report, _, err := verify(ctx, cmd.ErrOrStderr(), c, file, fp, repo, policyFile)
 			if werr := cliout.WriteReport(cmd.OutOrStdout(), output, report); werr != nil {
 				return werr
 			}
@@ -411,8 +411,8 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 // failed verification it prints one SECURITY line, even beside a verified
 // candidate (invariant 4); the reasons are in the report. It prints one too
 // when the fingerprint holds more attestations than lookup lists.
-func verify(ctx context.Context, warn io.Writer, c *contract.Contract, dir string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
-	r, files, err := lookupAndVerify(ctx, warn, c, dir, fp, repo, policyFile)
+func verify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
+	r, files, err := lookupAndVerify(ctx, warn, c, file, fp, repo, policyFile)
 	n := 0
 	for _, rj := range r.Rejected {
 		if rj.Outcome == evidence.OutcomeVerificationFailed {
@@ -433,7 +433,7 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, dir strin
 	return r, files, err
 }
 
-func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, dir string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
+func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
 	r := newReport(c, fp)
 	fail := func(err error) (evidence.Report, []registry.Output, error) {
 		r, err := failReport(r, err)
@@ -472,7 +472,7 @@ func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, 
 	if err != nil {
 		return fail(err)
 	}
-	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest), sigs, c, dir, policyFile)
+	best, ref, rejected, err := pick(ctx, warn, cands, pol.VerifyOptions(c.Metadata.Name, fp.Digest), sigs, c, file, policyFile)
 	r.Reference, r.Rejected = ref, rejected
 	if err != nil {
 		return fail(err)
@@ -539,7 +539,7 @@ func outcomeOf(err error) evidence.Outcome {
 // and error of the first verification failure, else of the first error, else
 // of the first below-minimum candidate: the security event must surface, and
 // an undecidable candidate outranks routine non-reuse.
-func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, c *contract.Contract, dir, policyFile string) (*hit, string, []evidence.Rejection, error) {
+func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, c *contract.Contract, file, policyFile string) (*hit, string, []evidence.Rejection, error) {
 	var (
 		best             *hit
 		bestRef, failRef string
@@ -548,7 +548,7 @@ func pick(ctx context.Context, warn io.Writer, cands []registry.Descriptor, opts
 		rejected         []evidence.Rejection
 	)
 	for _, d := range cands {
-		v, err := verifyCandidate(ctx, d, opts, sigs, c, dir, policyFile)
+		v, err := verifyCandidate(ctx, d, opts, sigs, c, file, policyFile)
 		if errors.Is(err, evidence.ErrNotFound) && !errors.Is(err, evidence.ErrVerification) {
 			fmt.Fprintf(warn, "aval: warning: listed attestation %s is gone, skipping it: %s\n", d.Reference(), cliout.OneLine(err.Error()))
 			continue
@@ -592,8 +592,8 @@ func outranks(v, best *hit) bool {
 // signer below it is routine non-reuse (errBelowMinTrust, a miss), but only
 // once every claim checks out; a false claim stays a verification failure,
 // and names the policy file it was checked against.
-func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, c *contract.Contract, dir, policyFile string) (*hit, error) {
-	v, err := checkCandidate(ctx, d, opts, sigs, c, dir)
+func verifyCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, c *contract.Contract, file, policyFile string) (*hit, error) {
+	v, err := checkCandidate(ctx, d, opts, sigs, c, file)
 	if errors.Is(err, evidence.ErrVerification) {
 		err = fmt.Errorf("%w (trust policy %s)", err, policyFile)
 	}
@@ -606,7 +606,7 @@ type hit struct {
 	files []registry.Output
 }
 
-func checkCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, c *contract.Contract, dir string) (*hit, error) {
+func checkCandidate(ctx context.Context, d registry.Descriptor, opts evidence.VerifyOptions, sigs *attest.Verifier, c *contract.Contract, file string) (*hit, error) {
 	a, err := fetch(ctx, d)
 	if err != nil {
 		return nil, err
@@ -625,7 +625,10 @@ func checkCandidate(ctx context.Context, d registry.Descriptor, opts evidence.Ve
 	case v.Predicate.Test.Cacheability != string(c.Cacheability):
 		return nil, &evidence.VerificationError{Reason: fmt.Sprintf("cacheability %q, want %q", v.Predicate.Test.Cacheability, c.Cacheability)}
 	}
-	files, err := verifyOutputs(ctx, d.Repository, c, dir, v.Predicate.Execution.Outputs)
+	// ponytail: fetches the outputs of every candidate, even one later
+	// below the minimum trust level or outranked; ceiling is the candidate
+	// cap times MaxOutputTotal. Fetch only the chosen best if that bites.
+	files, err := verifyOutputs(ctx, d.Repository, c, file, v.Predicate.Execution.Outputs)
 	switch {
 	case err != nil:
 		return nil, err
