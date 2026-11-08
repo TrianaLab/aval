@@ -210,6 +210,10 @@ var corpus = []corpusCase{
 		f.c.Scope.AllowMutable = []contract.AllowMutable{{Ref: "postgres:16", Reason: "a"}}
 	}, change: func(f *fixture) { f.c.Scope.AllowMutable[0].Reason = "b" }, want: differ},
 
+	{name: "environment.probe added", change: func(f *fixture) {
+		f.c.Environment.Probe = map[string][]string{"go": {"go", "version"}}
+	}, want: differ},
+
 	// Irrelevant changes.
 	{name: "out-of-scope file edited", change: func(f *fixture) { f.write("README.md", "edited\n") }, want: same},
 	{name: "out-of-scope file added", change: func(f *fixture) { f.write("docs/new.md", "new\n") }, want: same},
@@ -272,9 +276,9 @@ var corpus = []corpusCase{
 	{name: "env name order", change: func(f *fixture) { f.c.Environment.Env = []string{"MODE", "DB_IMAGE"} }, want: same},
 	{name: "duplicate env names", change: func(f *fixture) { f.c.Environment.Env = append(f.c.Environment.Env, "MODE") }, want: same},
 	{name: "empty lists and maps as omitted", setup: func(f *fixture) {
-		f.c.Scope.Exclude, f.c.Environment.Toolchain = nil, nil
+		f.c.Scope.Exclude, f.c.Environment.Toolchain, f.c.Environment.Probe = nil, nil, nil
 	}, change: func(f *fixture) {
-		f.c.Scope.Exclude, f.c.Environment.Toolchain = []string{}, map[string]string{}
+		f.c.Scope.Exclude, f.c.Environment.Toolchain, f.c.Environment.Probe = []string{}, map[string]string{}, map[string][]string{}
 	}, want: same},
 	{name: "aval.yaml comments, formatting and key order", change: func(f *fixture) { f.parse(corpusYAML) }, want: same},
 	{name: "allowMutable order and duplicates", setup: func(f *fixture) {

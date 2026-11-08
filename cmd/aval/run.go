@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -222,7 +223,8 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 			return err
 		}
 	}
-	r, lookupErr := decide(ctx, out, warn, c, fp, fpErr, o)
+	observed, probeErr := probe(ctx, c, filepath.Dir(o.file))
+	r, lookupErr := decide(ctx, out, warn, c, fp, cmp.Or(fpErr, probeErr), o)
 	_ = cliout.WriteReport(out, "text", r) // text never fails, like the other lines printed
 	// No I/O failure may skip the test or hide a verification failure
 	// (invariants 3, 4): errors are collected, never returned early.
@@ -243,13 +245,13 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	if errors.Is(lookupErr, evidence.ErrVerification) {
 		errs = append(errs, shown{lookupErr})
 	}
-	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), fp)
+	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), fp, observed)
 	if err != nil {
 		recordRun(ctx, out, warn, o, r, false, nil)
 		return errors.Join(append(errs, err)...)
 	}
 	fmt.Fprintf(out, "ran %s: %s (exit %d)\n", c.Metadata.Name, p.Result, p.Execution.ExitCode)
-	errs = append(errs, keep(ctx, out, p, fpErr, mutable(c, fp), token, o)...)
+	errs = append(errs, keep(ctx, out, p, fpErr, probeErr, mutable(c, fp), token, o)...)
 	recordRun(ctx, out, warn, o, r, false, p)
 	return errors.Join(append(errs, judge(out, warn, r, p))...)
 }
@@ -364,15 +366,58 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 	return verify(ctx, warn, c, fp, o.repo, o.policyFile)
 }
 
+// probeTimeout bounds each environment.probe command.
+var probeTimeout = 10 * time.Second
+
+// probe runs each environment.probe argv in dir, without a shell or the
+// signing token, and checks that its output holds the declared toolchain
+// value as a version token. It returns the outputs as probe.<key>. Only
+// `aval run` calls it: a consumer never executes contract-supplied commands.
+func probe(ctx context.Context, c *contract.Contract, dir string) (map[string]string, error) {
+	seen := map[string]string{}
+	for _, k := range slices.Sorted(maps.Keys(c.Environment.Probe)) {
+		argv, want := c.Environment.Probe[k], c.Environment.Toolchain[k]
+		pctx, cancel := context.WithTimeout(ctx, probeTimeout)
+		x := exec.CommandContext(pctx, argv[0], argv[1:]...)
+		x.Dir, x.Env, x.WaitDelay = dir, childEnv(), time.Second
+		raw, err := x.CombinedOutput()
+		cancel()
+		got := strings.TrimSpace(string(raw))
+		switch {
+		case errors.Is(pctx.Err(), context.DeadlineExceeded):
+			err = fmt.Errorf("timed out after %s", probeTimeout)
+		case err == nil && !hasVersion(got, want):
+			err = errors.New("the declared value is not in the output")
+		}
+		if err != nil {
+			return nil, fmt.Errorf("environment.probe %s %q: declared %q, observed %q: %w", k, argv, want, cliout.OneLine(got), err)
+		}
+		seen["probe."+k] = got
+	}
+	return seen, nil
+}
+
+// hasVersion reports whether want appears in out as a version token: not
+// preceded by a digit or dot, not followed by a digit (3.13 is in
+// "Python 3.13.1", not in "Python 3.130"; 3.1 is not in "Python 3.13").
+func hasVersion(out, want string) bool {
+	return want != "" && regexp.MustCompile(`(^|[^0-9.])`+regexp.QuoteMeta(want)+`([^0-9]|$)`).MatchString(out)
+}
+
+// childEnv is the environment of commands Aval runs, without the signing
+// token: the code under test must not be able to sign results as this
+// workload.
+func childEnv() []string {
+	return slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, idTokenEnv+"=") })
+}
+
 // execute runs runner.command in the contract's directory and returns the
-// unsigned predicate for the run. A command that cannot start is an error,
-// not a failed test. The signing token is withheld from the command: the code
-// under test must not be able to sign results as this workload.
-func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract, dir string, fp fingerprint.Fingerprint) (*evidence.Predicate, error) {
+// unsigned predicate for the run, with the probe outputs (observed) in its
+// environment. A command that cannot start is an error, not a failed test.
+func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract, dir string, fp fingerprint.Fingerprint, observed map[string]string) (*evidence.Predicate, error) {
 	argv := c.Runner.Command
 	x := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	x.Dir, x.Stdout, x.Stderr = dir, stdout, stderr
-	x.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, idTokenEnv+"=") })
+	x.Dir, x.Stdout, x.Stderr, x.Env = dir, stdout, stderr, childEnv()
 	start := time.Now().UTC()
 	err := x.Run()
 	var exit *exec.ExitError
@@ -380,8 +425,11 @@ func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract
 		return nil, fmt.Errorf("running %q: %w", argv[0], err)
 	}
 	code := x.ProcessState.ExitCode()
-	env := map[string]string{"os": runtime.GOOS, "arch": runtime.GOARCH}
+	// The real os and arch win over toolchain keys of the same name.
+	env := map[string]string{}
 	maps.Copy(env, c.Environment.Toolchain)
+	maps.Copy(env, observed)
+	env["os"], env["arch"] = runtime.GOOS, runtime.GOARCH
 	host, _ := os.Hostname()
 	result := evidence.ResultPassed
 	if code != 0 {
@@ -403,8 +451,12 @@ func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract
 // keep records the result and, with --push, publishes it. Without a
 // fingerprint there is nothing a result could be reused for; with
 // unacknowledged mutable references (pinErr) nothing may reuse it, so it is
-// recorded but not published.
-func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr, pinErr error, token string, o runFlags) []error {
+// recorded but not published. After a failed probe it is not even recorded,
+// so 'aval push' cannot publish it.
+func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr, probeErr, pinErr error, token string, o runFlags) []error {
+	if probeErr != nil {
+		return []error{fmt.Errorf("result not recorded: %w", probeErr)}
+	}
 	if fpErr != nil {
 		if o.push {
 			return []error{fmt.Errorf("result not published: %w", fpErr)}
