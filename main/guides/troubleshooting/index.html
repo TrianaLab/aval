@@ -2459,8 +2459,8 @@ start (<code>running &lt;x&gt;</code>) or the result cannot be published.</p>
 <td>check the token or key, and write access</td>
 </tr>
 <tr>
-<td><code>more than &lt;n&gt; attestations for fingerprint</code></td>
-<td>delete old results (<a href="../../artifact-format/#the-64-candidate-cap-and-cleanup">cleanup</a>)</td>
+<td><code>more than &lt;n&gt; attestations</code></td>
+<td>delete old results (<a href="../../artifact-format/#the-64-candidate-cap-and-cleanup">cleanup</a>); the <code>aval: SECURITY:</code> line before it means none was verified, so check who pushed them: it may be a flooding attempt</td>
 </tr>
 <tr>
 <td><code>is not listed among the referrers of</code></td>
@@ -2535,6 +2535,8 @@ start (<code>running &lt;x&gt;</code>) or the result cannot be published.</p>
 <p>The <code>aval: SECURITY:</code> line comes first and <code>reason:</code> says why. Usually a wrong
 <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>; possibly an attacker. See
 <a href="../../concepts/outcomes/#a-verification-failure-is-a-security-event">Outcomes</a>.</p>
+<p>It also appears beside a verified result (exit 0), listed in <code>rejected</code>: gate
+on <code>rejected</code> where that must stop a pipeline (<code>.github/aval/summary.sh</code>).</p>
 <details class="danger">
 <summary>Reasons</summary>
 <table>

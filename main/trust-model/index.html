@@ -2607,7 +2607,9 @@ the test runs.</p>
 <li><strong>No silent replacement:</strong> pushes only add results. Every candidate is
   verified and the highest trusted level wins. A candidate that fails
   verification is listed in <code>rejected</code> and stays visible; one that cannot be
-  fetched or checked blocks reuse.</li>
+  fetched or checked blocks reuse. More than 64 candidates is <code>error</code> with an
+  <code>aval: SECURITY:</code> line naming the cap: none was verified, so an untrusted
+  one may hide among them.</li>
 <li><strong>Unknown or missing fields</strong> in <code>aval.yaml</code>: rejected, exit 2.</li>
 </ul>
 <p><code>aval run --no-reuse</code> always runs and never looks anything up. What each
@@ -2724,7 +2726,7 @@ copied into the predicate as <code>test.cacheability</code>.</p>
 </tr>
 <tr>
 <td>Registry compromise (attacker can write arbitrary manifests and tags)</td>
-<td>Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as <code>verification-failed</code>, or, when another candidate verifies, as a <code>rejected</code> entry with an <code>aval: SECURITY: ...</code> line on stderr. It can delete attestations (forcing re-runs) or deny service (<code>error</code>, re-run). Availability is out of <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.</td>
+<td>Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as <code>verification-failed</code>, or, when another candidate verifies, as a <code>rejected</code> entry with an <code>aval: SECURITY: ...</code> line on stderr. It can delete attestations (forcing re-runs) or deny service (<code>error</code>, re-run), for example by pushing more than 64 attestations for a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, which is reported with an <code>aval: SECURITY:</code> line as a possible flooding attempt. Availability is out of <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.</td>
 </tr>
 <tr>
 <td>Forged or tampered run records (anyone with push access)</td>

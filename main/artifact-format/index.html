@@ -3024,8 +3024,10 @@ verification add one <code>aval: SECURITY: ...</code> line on stderr.</p>
 <p>Every push adds one execution, even for the same inputs (hostname and
 timestamps differ), and Aval never deletes one. Past 64 executions, every
 lookup for that <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>error</code> and the test always runs; every push
-still adds one, then exits 1. Other fingerprints are not affected, so the next
-input change also ends it.</p>
+still adds one, then exits 1. Nothing past the cap is verified, so the lookup
+also prints an <code>aval: SECURITY:</code> line naming the cap: someone with push
+access may be flooding the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> to hide an untrusted <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>.
+Other fingerprints are not affected, so the next input change also ends it.</p>
 <p>Push from one place (for example CI on the main branch). <code>aval run --push</code>
 does not push after a reuse, but <code>aval run --shadow --push</code> pushes every time.</p>
 <p>To clean up, list the executions and delete the ones you no longer need, for
