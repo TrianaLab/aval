@@ -130,9 +130,6 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     env:
-      AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
-      # Main accepts only this workflow on main; PRs also developer signatures.
-      AVAL_POLICY: ${{ github.event_name == 'push' && '.github/aval/main.yaml' || '.github/aval/pr.yaml' }}
       AVAL_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       AVAL_REPOSITORY: ${{ github.repository }}
     steps:
@@ -142,6 +139,13 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # AVAL_POLICY and AVAL_REGISTRY (#134): main reuses only this workflow
+      # on main (main.yaml); a PR also developer signatures, with pr.yaml and
+      # the registry read from the base branch, never from the PR head.
+      - name: Trust policy and registry (base branch on pull requests)
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: .github/aval/trust-from-base.sh
       - run: make ci-e2e
       - name: Summary
         if: always()
@@ -453,8 +457,6 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     env:
-      AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
-      AVAL_POLICY: ${{ github.event_name == 'push' && '.github/aval/main.yaml' || '.github/aval/pr.yaml' }}
       AVAL_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       AVAL_REPOSITORY: ${{ github.repository }}
     steps:
@@ -469,6 +471,13 @@ jobs:
           cosign-release: v3.0.6
       - name: Install the pinned aval release (verified)
         run: .github/aval/install.sh
+      # AVAL_POLICY and AVAL_REGISTRY (#134): main reuses only this workflow
+      # on main (main.yaml); a PR also developer signatures, with pr.yaml and
+      # the registry read from the base branch, never from the PR head.
+      - name: Trust policy and registry (base branch on pull requests)
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: .github/aval/trust-from-base.sh
       - name: Shadow run of the engine unit suite
         run: |
           aval run --shadow -f aval.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
@@ -516,6 +525,8 @@ jobs:
       packages: write
       id-token: write
     env:
+      # The one registry declaration: trust-from-base.sh reads it for the
+      # suites, from the base branch on pull requests.
       AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

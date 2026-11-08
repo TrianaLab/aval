@@ -155,6 +155,47 @@ To avoid the dependency, pin the trusted root in the policy:
 
 Policies with only `publicKey` identities never fetch anything.
 
+### Take the policy from a protected branch
+
+A pull request can change any file in its checkout. If its CI job reads
+`--policy` (or `--registry`) from that checkout, the PR can add its own
+signing identity, sign a passing result for its own inputs, and get a green
+check it wrote itself. Read the policy and the registry from the base branch
+instead:
+
+```yaml
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Trust policy from the base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+          git show "origin/$BASE_REF:.aval/policy.yaml" > "$RUNNER_TEMP/policy.yaml"
+      - run: aval run --registry ghcr.io/acme/orders-aval --policy "$RUNNER_TEMP/policy.yaml"
+```
+
+Keep the registry out of files the PR can change for its own run, too: write
+it in the step, or read it from the base branch the same way. A `trustedRoot`
+path in the policy resolves next to the temp file, so read that file from the
+base branch as well, or use the default root.
+
+This does not cover the workflow file. On `pull_request`, GitHub runs the
+workflow from the PR's merge commit, so a PR can edit the step above for its
+own run. Protect the workflow and the policy with review: a CODEOWNERS entry
+for both and a branch rule that requires code-owner review. Aval's own CI
+does this with `.github/aval/trust-from-base.sh`; `tests/architecture` fails
+if a job that passes `--policy` on a pull request takes it from the working
+tree.
+
 ## Fail closed
 
 If Aval cannot prove that a previous execution is equivalent and trusted,
@@ -228,4 +269,5 @@ contract's is a verification failure.
 | Content behind a declared name changed (repushed image tag, new upstream release, changed remote script) | The scanner reports the mutable references it recognizes in the scope and `runner.command`; for `hermetic` and `controlled-environment` an unaccepted one makes the lookup a `miss` and blocks publishing. Accepting one needs `scope.allowMutable`, which changes the fingerprint and shows in review. References it does not recognize stay a known gap ([Pin your dependencies](pinning.md)). |
 | Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with an `aval: SECURITY: ...` line on stderr. It can delete attestations (forcing re-runs) or deny service (`error`, re-run), for example by pushing more than 64 attestations for a fingerprint, which is reported with an `aval: SECURITY:` line as a possible flooding attempt. Availability is out of scope. |
 | Forged or tampered run records (anyone with push access) | Unsigned statistics, never read by `aval run` or `aval verify`; `aval stats` skips malformed records and caps how many it reads. |
+| Pull request that edits the policy or registry its own CI reads | Read both from the base branch ([Take the policy from a protected branch](#take-the-policy-from-a-protected-branch)). The workflow file itself still comes from the PR, so review it: CODEOWNERS plus required code-owner review. |
 | Dishonest but trusted signer (ran a modified test and signed "passed") | Out of scope for Aval. A signature proves who claims it, not that the test ran honestly. Limit which identities get which level; level 3 (isolated) exists for this. |

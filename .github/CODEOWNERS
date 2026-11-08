@@ -1,0 +1,8 @@
+# Paths that decide what CI trusts and what the gates enforce (#134). A PR
+# can change them for its own run, so they need a code owner's review;
+# tests/architecture/policy_source_test.go fails if one is not owned here.
+/.github/aval/ @edu-diaz
+/.github/workflows/ @edu-diaz
+/.github/CODEOWNERS @edu-diaz
+/tests/architecture/ @edu-diaz
+/AGENTS.md @edu-diaz

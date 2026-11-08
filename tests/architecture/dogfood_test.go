@@ -164,7 +164,7 @@ func writeScopeProblems(data []byte) ([]string, error) {
 		if !writeScoped(j.Permissions) {
 			continue
 		}
-		if !strings.Contains(j.If, "github.event_name == 'push'") || strings.Contains(j.If, "pull_request") || strings.Contains(j.If, "||") {
+		if !pushOnly(j.If) {
 			problems = append(problems, name+": write scopes without a push-only condition")
 		}
 		if slices.Contains(liveSigningJobs, name) {

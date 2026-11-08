@@ -248,7 +248,14 @@ Trust comes from `.github/aval/main.yaml` (main and releases: only `ci.yaml`
 on `main`, runner level) and `.github/aval/pr.yaml` (pull requests: also
 developer signatures); `tests/architecture/dogfood_test.go` enforces both,
 and fails if a dogfood suite reads a tracked file outside its contract's
-scope.
+scope. On a pull request, `.github/aval/trust-from-base.sh` reads `pr.yaml`
+and the registry from the base branch, so a PR cannot change what its own CI
+trusts; `tests/architecture/policy_source_test.go` fails if a job that passes
+`--policy` on a pull request takes it from the working tree. A PR can still
+edit `ci.yaml` for its own run, so `.github/CODEOWNERS` names owners for
+`.github/aval/`, `.github/workflows/`, `tests/architecture/` and `AGENTS.md`;
+the `main` ruleset must require code-owner review for that to bind (a
+maintainer setting).
 The release job refuses to publish without a verified, passing e2e
 attestation for the tagged commit. Roadmap milestone 3 (an end-to-end example
 in GitHub Actions) is in progress: the `example-go-compose` job runs the
@@ -361,7 +368,9 @@ later runs on `main` reuse that one. A release requires a verified runner
 result: `release.yaml`'s `aval verify` exits 4 (a miss) on a developer-only
 fingerprint and stops. A signer that neither policy lists is still a
 verification failure (exit 5). To add a maintainer, add the identity at
-`developer` level to both `pr.yaml` and `main.yaml`.
+`developer` level to both `pr.yaml` and `main.yaml`. PR CI reads `pr.yaml` from the
+base branch, so the new identity counts only after that change is merged,
+never in the PR that adds it.
 
 ### Join the public stats
 
