@@ -1,6 +1,7 @@
 # Troubleshooting
 
 Goal: go from an exit code or an error message to its cause and its fix.
+In the messages below, text in `<...>` changes per run.
 
 ```mermaid
 flowchart LR
@@ -17,8 +18,6 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 ```
 
 --8<-- "docs/cli-reference.md:exit-codes"
-
-Text in `<...>` changes per run.
 
 ## Flags and files (exit 2)
 
@@ -76,6 +75,7 @@ Text in `<...>` changes per run.
     | `more than <n> attestations` | delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)); the `aval: SECURITY:` line before it means none was verified, so check who pushed them: it may be a flooding attempt |
     | `is not listed among the referrers of` | push again, or use a registry with OCI 1.1 referrers |
     | `running <x>`, `environment.probe <key> <argv>: declared <x>, observed <y>` | install the program `runner.command` starts, or the declared toolchain version ([Probe the toolchain](../contract.md#probe-the-toolchain)) |
+    | `FALSE HIT: <x>` (with `--shadow`) | the test reads an input `scope` does not list: [find it](write-a-contract.md#find-undeclared-inputs) |
     | `writing report: <x>`, `result not published: <x>` | fix the `--report` path, or the fingerprint error before it |
     | `publishing outputs: <x>`, `more than <n> output files`, `outputs are capped at`, `is not a regular file (symlinks are not published)`, `backslashes and control characters in a path`, `is the contract`, `restoring outputs: <x>` | keep each output a regular file under the caps and narrow the globs; for `restoring outputs`, remove the symlink or directory in the way. The test ran instead ([Restore coverage and reports on reuse](write-a-contract.md#restore-coverage-and-reports-on-reuse)) |
     | `reading the result recorded by 'aval run'` | run `aval run` first |

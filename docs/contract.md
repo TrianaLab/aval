@@ -247,4 +247,6 @@ does not know, which fails closed.
 ## Future work
 
 - **Observed inputs**: trace which files the test actually reads, to flag
-  undeclared inputs or suggest scope. v0 never infers scope.
+  undeclared inputs or suggest scope. v0 never infers scope. Until then,
+  [find undeclared inputs](guides/write-a-contract.md#find-undeclared-inputs)
+  by hand.

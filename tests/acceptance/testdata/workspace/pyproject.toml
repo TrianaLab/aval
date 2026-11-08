@@ -1,0 +1,6 @@
+[project]
+name = "workspace"
+version = "0.1.0"
+
+[tool.uv.workspace]
+members = ["packages/*"]
