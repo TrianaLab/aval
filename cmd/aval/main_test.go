@@ -512,3 +512,21 @@ func TestVerifyBelowMinTrust(t *testing.T) {
 		})
 	}
 }
+
+// #135: more attestations than the lookup cap is a possible flooding attempt
+// that hides any untrusted candidate. It stays an error (run the test, fail
+// closed) and prints a SECURITY line naming the cap, never a quiet error.
+func TestVerifyFlagsCandidateFlood(t *testing.T) {
+	fakeCandidates(t, fmt.Errorf("listing referrers: %w", registry.ErrTooManyCandidates), nil)
+	code, stdout, stderr := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "--policy", "p.yaml", "-o", "json")
+	var r evidence.Report
+	if err := json.Unmarshal([]byte(stdout), &r); err != nil {
+		t.Fatal(err)
+	}
+	if code != ExitError || r.Outcome != evidence.OutcomeError || len(r.Rejected) != 0 {
+		t.Fatalf("exit %d report %+v; want exit %d outcome error", code, r, ExitError)
+	}
+	if !strings.Contains(stderr, "aval: SECURITY: more than 64 attestations for unit") || !strings.Contains(stderr, "flooding") {
+		t.Fatalf("stderr %q; want a SECURITY line naming the cap", stderr)
+	}
+}

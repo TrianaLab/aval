@@ -406,7 +406,8 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 
 // verify decides whether a trusted result exists. When any attestation
 // failed verification it prints one SECURITY line, even beside a verified
-// candidate (invariant 4); the reasons are in the report.
+// candidate (invariant 4); the reasons are in the report. It prints one too
+// when the fingerprint holds more attestations than lookup lists.
 func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, error) {
 	r, err := lookupAndVerify(ctx, warn, c, fp, repo, policyFile)
 	n := 0
@@ -420,6 +421,11 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, fp finger
 	}
 	if n > 0 {
 		cliout.Security(warn, n, r.TestID)
+	}
+	// Over the cap nothing was verified, so an untrusted attestation may hide
+	// among them (#135). The outcome stays error: the test runs.
+	if errors.Is(err, registry.ErrTooManyCandidates) {
+		fmt.Fprintf(warn, "aval: SECURITY: %s for %s, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://github.com/TrianaLab/aval/blob/main/docs/trust-model.md\n", registry.ErrTooManyCandidates, r.TestID)
 	}
 	return r, err
 }

@@ -3,6 +3,7 @@ package architecture
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -11,6 +12,42 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+// #135: summary.sh gates every aval report in CI and the release job. A
+// verification failure fails the step even when a trusted sibling verified
+// (an entry in rejected); a below-minimum signer (rejected miss) does not
+// (invariant 4).
+func TestSummaryFailsOnSecurityEvent(t *testing.T) {
+	cases := []struct {
+		name, report string
+		fail         bool
+	}{
+		{"verified", `{"outcome":"verified","result":"passed"}`, false},
+		{"verified beside a below-minimum signer", `{"outcome":"verified","result":"passed","rejected":[{"reference":"r@sha256:bb","outcome":"miss","reason":"x"}]}`, false},
+		{"miss", `{"outcome":"miss"}`, false},
+		{"verification failed", `{"outcome":"verification-failed"}`, true},
+		{"verified beside an untrusted signer", `{"outcome":"verified","result":"passed","rejected":[{"reference":"r@sha256:bb","outcome":"verification-failed","reason":"x"}]}`, true},
+		{"error beside an untrusted signer", `{"outcome":"error","rejected":[{"reference":"r@sha256:aa","outcome":"error","reason":"x"},{"reference":"r@sha256:bb","outcome":"verification-failed","reason":"x"}]}`, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			report, summary := filepath.Join(dir, "report.json"), filepath.Join(dir, "summary.md")
+			if err := os.WriteFile(report, []byte(tc.report), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command("bash", filepath.Join(root, ".github", "aval", "summary.sh"), "e2e", report)
+			cmd.Env = append(os.Environ(), "GITHUB_STEP_SUMMARY="+summary)
+			out, err := cmd.CombinedOutput()
+			if (err != nil) != tc.fail {
+				t.Fatalf("summary.sh error %v, want failure %v; output %s", err, tc.fail, out)
+			}
+			if tc.fail && !strings.Contains(string(out), "::error title=aval verification failed (e2e)::") {
+				t.Fatalf("no error annotation: %s", out)
+			}
+		})
+	}
+}
 
 const aggregator = "required"
 

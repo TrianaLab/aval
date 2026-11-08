@@ -75,7 +75,7 @@ start (`running <x>`) or the result cannot be published.
     |---|---|
     | `loading registry credentials: <x>`, `resolving <tag>: <x>`, `listing referrers: <x>`, `fetching manifest <x>`, `fetching layer <x>` | check the address, the network and `docker login` |
     | `signing: <x>`, `publishing: <x>`, `pushing manifest: <x>`, `tagging anchor: <x>` | check the token or key, and write access |
-    | `more than <n> attestations for fingerprint` | delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)) |
+    | `more than <n> attestations` | delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)); the `aval: SECURITY:` line before it means none was verified, so check who pushed them: it may be a flooding attempt |
     | `is not listed among the referrers of` | push again, or use a registry with OCI 1.1 referrers |
     | `running <x>` | install the program `runner.command` starts |
     | `writing report: <x>`, `result not published: <x>` | fix the `--report` path, or the fingerprint error before it |
@@ -101,6 +101,9 @@ start (`running <x>`) or the result cannot be published.
 The `aval: SECURITY:` line comes first and `reason:` says why. Usually a wrong
 policy; possibly an attacker. See
 [Outcomes](../concepts/outcomes.md#a-verification-failure-is-a-security-event).
+
+It also appears beside a verified result (exit 0), listed in `rejected`: gate
+on `rejected` where that must stop a pipeline (`.github/aval/summary.sh`).
 
 ??? danger "Reasons"
     | Reason | Fix |

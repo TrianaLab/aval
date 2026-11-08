@@ -472,7 +472,9 @@ func TestReleaseWorkflowVerifiesBeforePublishing(t *testing.T) {
 		// #28: no release without a verified e2e attestation for the commit,
 		// under the main policy.
 		case strings.Contains(s.Run, "aval verify -f aval.e2e.yaml") && strings.Contains(s.Run, "--policy .github/aval/main.yaml"):
-			e2e = true
+			// #135: summary.sh fails on a verification failure among the
+			// candidates, which verify exits 0 for beside a trusted result.
+			e2e = strings.Contains(s.Run, ".github/aval/summary.sh")
 		case strings.Contains(s.Run, "./tests/release/") && s.Env[envTag] != "" && s.Env[envDist] != "":
 			verified = true
 		case strings.Contains(s.Run, "gh release create"):
@@ -481,7 +483,7 @@ func TestReleaseWorkflowVerifiesBeforePublishing(t *testing.T) {
 				t.Error("release job publishes before tests/release verifies the tagged dist/")
 			}
 			if !e2e {
-				t.Error("release job publishes without verifying the e2e attestation (aval.e2e.yaml) for the commit")
+				t.Error("release job publishes without verifying the e2e attestation (aval.e2e.yaml) for the commit and checking the report with .github/aval/summary.sh")
 			}
 			checkPublishedFiles(t, s.Run)
 		}

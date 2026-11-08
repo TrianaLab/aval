@@ -53,8 +53,8 @@ const (
 	maxBlobSize = 4 << 20
 	// maxCandidates caps the attestations listed for one fingerprint, so
 	// anyone with push access cannot make verify fetch an unbounded number
-	// of manifests. Over the cap lookup fails with a plain error (outcome
-	// error: run the test).
+	// of manifests. Over the cap lookup fails with ErrTooManyCandidates, a
+	// plain error (outcome error: run the test).
 	maxCandidates = 64
 	// maxReferrerPages caps the referrers pages one listing requests. oras
 	// follows Link headers without a limit and skips empty pages, so a
@@ -68,6 +68,11 @@ const (
 // pushConfirmDelay is the wait between push confirmation attempts; a
 // variable so tests do not sleep.
 var pushConfirmDelay = time.Second
+
+// ErrTooManyCandidates is wrapped by Lookup when a fingerprint holds more
+// attestations than it lists. None of them was verified, so an untrusted one
+// may hide among them: callers report it as a possible flooding attempt.
+var ErrTooManyCandidates = fmt.Errorf("more than %d attestations", maxCandidates)
 
 var fingerprintRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
@@ -346,7 +351,7 @@ func lookup(ctx context.Context, r *remote.Repository, fingerprint string) ([]st
 			ds = append(ds, d.Digest.String())
 		}
 		if len(ds) > maxCandidates {
-			return fmt.Errorf("more than %d attestations for fingerprint %s", maxCandidates, fingerprint)
+			return fmt.Errorf("%w for fingerprint %s", ErrTooManyCandidates, fingerprint)
 		}
 		return nil
 	})
