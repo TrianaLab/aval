@@ -1,0 +1,10 @@
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata:
+  name: workspace-lock
+runner:
+  command: ["uv", "lock", "--check"]
+scope:
+  source: ["pyproject.toml"]
+  dependencies: ["uv.lock"]
+cacheability: hermetic

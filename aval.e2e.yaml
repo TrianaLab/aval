@@ -17,13 +17,19 @@ scope:
     - "tests/integration/**"
     - "tests/acceptance/**"
     - "examples/go-compose/**"
+    # Top-level files and packages/ only: a local uv run leaves a .venv with
+    # symlinks at the example's root.
+    - "examples/uv-monorepo/*"
+    - "examples/uv-monorepo/packages/**"
     # tests/acceptance runs the docs quickstart as written.
     - "docs/quickstart.md"
+    # tests/acceptance runs the history estimate script.
+    - "scripts/estimate-reuse.sh"
   # Redundant since #63 (Aval never hashes .aval/), kept so the canonical
   # contract, and with it the published results, stay the same.
   exclude: ["**/.aval/**"]
   dependencies: [go.mod, go.sum, Makefile]
 environment:
-  toolchain: {go: "1.27"}
+  toolchain: {go: "1.27", uv: "0.9.18"}
   env: [GOFLAGS, GOEXPERIMENT, CGO_ENABLED]
 cacheability: hermetic

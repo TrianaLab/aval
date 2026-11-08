@@ -1,0 +1,18 @@
+# Shard 1 of 2: the core package's tests. It lives at the workspace root,
+# beside aval.shard-2.yaml, because globs cannot leave the contract's
+# directory and the uv workspace files are here. Run with
+# `aval run -f aval.shard-1.yaml`.
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata:
+  name: uv-monorepo-core
+runner:
+  command: ["uv", "run", "--locked", "--package", "core", "pytest", "packages/core", "--cov=core", "--cov-report=xml:coverage-shard-1.xml"]
+scope:
+  source: ["packages/core/**/*.py"]
+  # uv checks the lock against every member's pyproject.toml.
+  dependencies: [pyproject.toml, "packages/*/pyproject.toml", uv.lock, .python-version]
+environment:
+  toolchain: {python: "3.12", uv: "0.9.18"}
+cacheability: hermetic
+outputs: [coverage-shard-1.xml]

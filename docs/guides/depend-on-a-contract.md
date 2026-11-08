@@ -56,6 +56,56 @@ backend), list the API file (OpenAPI, `.proto`) in `scope.dependencies`
 instead. Only an interface change reruns the test. Globs cannot leave the
 contract's directory, so keep the file in the frontend's tree.
 
+## Workspaces
+
+uv, pnpm and cargo workspaces keep one lockfile at the root. A member's
+contract cannot list it: globs cannot use `..`. Two layouts work.
+
+**Contracts at the root**, one per member, named `aval.<member>.yaml`:
+
+```yaml title="aval.api.yaml"
+--8<-- "tests/acceptance/testdata/workspace/aval.api.yaml"
+```
+
+**A root contract owns the lockfile**, and each member names it in
+`scope.contracts`, which may use `..`:
+
+```yaml title="aval.lock.yaml"
+--8<-- "tests/acceptance/testdata/workspace/aval.lock.yaml"
+```
+
+```yaml title="packages/api/aval.yaml"
+--8<-- "tests/acceptance/testdata/workspace/packages/api/aval.yaml"
+```
+
+Either way, any lockfile change reruns every member. The same layouts fit
+the other tools:
+
+| Tool | Root files to hash | Lockfile check |
+|---|---|---|
+| uv | `pyproject.toml`, `uv.lock` | `uv lock --check` |
+| pnpm | `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` | `pnpm install --frozen-lockfile` |
+| cargo | `Cargo.toml`, `Cargo.lock` | `cargo metadata --locked` |
+
+A member that imports another member lists that member's sources too, or
+names its contract.
+
+??? info "Inputs the workspace graph does not show"
+    Check each one against the test, and list the ones it reads:
+
+    - shared config at the root: `tsconfig.base.json`, `.npmrc`,
+      `conftest.py`, `pytest.ini`, `.cargo/config.toml`, `rust-toolchain.toml`,
+      `.python-version`, `.nvmrc`;
+    - patches: pnpm `patches/`, cargo `[patch]` sources;
+    - build scripts and generated code: `build.rs`, codegen inputs;
+    - shared fixtures or test data outside the member;
+    - environment variables (`environment.env`).
+
+There is no `aval init`: generating scope from manifests would infer it,
+and choosing the scope is the hard part, not typing the YAML.
+[Find undeclared inputs](write-a-contract.md#find-undeclared-inputs) checks
+what you chose.
+
 ## Read next
 
 - [Write a contract](write-a-contract.md)

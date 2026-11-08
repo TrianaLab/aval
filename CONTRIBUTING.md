@@ -8,6 +8,7 @@
 - For `make docs-lint`: Node.js (`npx` fetches markdownlint-cli2 at the pinned `MARKDOWNLINT_CLI2_VERSION`) and [Vale](https://vale.sh) at the exact `VALE_VERSION` in the `Makefile`.
 - For `make docs-site`: Python 3.12 and the hash-pinned tools, `pip install --require-hashes -r docs/requirements.txt` (regenerate that file from `docs/requirements.in`, command in its header). It also builds the home page's "Try it" terminal with Go (`make docs-wasm`).
 - For `make docs-demo-smoke`: Node.js and Chrome or Chromium (`CHROME=<path>` picks one).
+- For `make test-acceptance` (and `ci-e2e`): [uv](https://docs.astral.sh/uv/) on `PATH` (CI pins the version) and network access to PyPI, for `examples/uv-monorepo`. The test fails without uv instead of skipping, so a passing e2e result always includes it.
 
 ```sh
 make build   # bin/aval
@@ -220,7 +221,7 @@ rather than relying on a `major` bump from 0.x.
 | `ci-gates` | level 3 |
 | `ci-engine` | level 1 with `-race`, the `examples/go-compose` module |
 | `ci-false-hit` | the false-hit corpus, glob tables, the manifest golden and the append-only check on goldens: a change to the golden tree's manifests fails unless `fingerprint.Version` is bumped |
-| `ci-e2e` | levels 2 and 4, run through `aval run -f aval.e2e.yaml` (reused in CI on a verified hit) |
+| `ci-e2e` | levels 2 and 4, run through `aval run -f aval.e2e.yaml` (reused in CI on a verified hit), including the `examples/uv-monorepo` shards (needs uv) |
 | `ci-release` | level 5 against a snapshot dry-run of the release build |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
 | `ci-security` | govulncheck on both modules (needs network) |

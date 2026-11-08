@@ -115,8 +115,9 @@ Flags:
 ## aval run
 
 run computes the fingerprint, looks up a signed result and reuses it if the
-trust policy accepts it. Otherwise it runs runner.command, records the result
-(--result) and, with --push, signs and publishes it.
+trust policy accepts it, restoring the contract's outputs. Otherwise it runs
+runner.command, records the result (--result) and, with --push, signs and
+publishes it with its outputs.
 
 Anything Aval cannot prove runs the test. A verification failure runs the
 test and exits 5: a security event. --shadow runs the test even after a
