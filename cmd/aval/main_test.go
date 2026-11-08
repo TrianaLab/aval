@@ -80,8 +80,8 @@ func TestErrorLines(t *testing.T) {
 		}
 	}
 	var out bytes.Buffer
-	if code := run([]string{"version"}, &out, &out); code != ExitUsage || out.String() != "aval: unknown command \"version\"\n" {
-		t.Errorf("aval version: exit %d, output %q", code, out.String())
+	if code := run([]string{"nope"}, &out, &out); code != ExitUsage || out.String() != "aval: unknown command \"nope\"\n" {
+		t.Errorf("aval nope: exit %d, output %q", code, out.String())
 	}
 }
 

@@ -39,7 +39,9 @@ Available Commands:
   record      Publish a run record written by 'aval run --record-file'
   run         Reuse a verified result for the current inputs, or run the test
   stats       Aggregate the run records in the registry: reuse, misses, time saved
+  upgrade     Replace this binary with a verified aval release
   verify      Check whether a trusted result exists for the current inputs
+  version     Print the aval version, Go version and platform
 
 Flags:
   -h, --help      help for aval
@@ -191,6 +193,23 @@ Flags:
       --test string                 only this test id (metadata.name); default: every test with run records
 ```
 
+## aval upgrade
+
+upgrade downloads a release from GitHub Releases (the latest, or --version), checks that
+checksums.txt carries a keyless Sigstore signature from Aval's release workflow at that
+tag and that the archive matches it, then replaces the running binary. Any failed
+check replaces nothing.
+
+```text
+Usage:
+  aval upgrade [flags]
+
+Flags:
+      --check            print the current and target versions without installing
+  -h, --help             help for upgrade
+      --version string   release to install, e.g. v0.4.0 (default: latest)
+```
+
 ## aval verify
 
 verify computes the fingerprint, looks up the attestation and verifies its
@@ -210,4 +229,16 @@ Flags:
       --policy string               trust policy file (without it every lookup is a miss)
       --registry string             OCI repository for attestations (required)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+```
+
+## aval version
+
+Print the aval version, Go version and platform
+
+```text
+Usage:
+  aval version [flags]
+
+Flags:
+  -h, --help   help for version
 ```

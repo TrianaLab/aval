@@ -50,6 +50,21 @@ above.
 
 A failed check installs nothing. A check that cannot run is reported.
 
+## Upgrade
+
+```sh
+aval upgrade                    # to the latest release
+aval upgrade --version v0.4.0   # to a given release
+aval upgrade --check            # print the current and latest versions, change nothing
+```
+
+`aval upgrade` replaces the running binary. It needs no `cosign`: it checks
+the Sigstore signature of `checksums.txt` itself (issuer
+`https://token.actions.githubusercontent.com`, signer Aval's release workflow
+at that tag), then the archive's sha256. A failed check replaces nothing. If
+the binary's directory is not writable, run it with `sudo` or use the
+installer again. `aval version` prints the version, Go version and platform.
+
 ## By hand
 
 Download the archive, `checksums.txt` and the signatures, check them, then put
