@@ -252,19 +252,24 @@ scope. On a pull request, `.github/aval/trust-from-base.sh` reads `pr.yaml`
 and the registry from `main` (never from the PR or its base branch), so a PR
 cannot change them by editing those files, and the jobs that pass `--policy`
 verify with the pinned release (see below), not with an `aval` or a
-`Makefile` from the PR. `tests/architecture/policy_source_test.go` fails if a
-pull request job names `AVAL_POLICY` or `AVAL_REGISTRY` anywhere but the
-trust step and the `--policy`/`--registry` values, runs code from the
-checkout before its policy steps, sets `PATH`, `BASH_ENV` or `ENV` there, or
-passes the policy through anything but one `aval` command. The trust step
-runs before `install.sh` and calls `/usr/bin/git`, and the jobs that use the
-policy need `ci-gates`, so their checks are skipped, not green, when the
-gates fail. A PR can still edit `ci.yaml`, `install.sh` or
-`trust-from-base.sh` for its own run, so review must cover those:
-`.github/CODEOWNERS` names owners for `.github/aval/`, `.github/workflows/`,
-`tests/architecture/`, `AGENTS.md`, the `Makefile` and the `aval*.yaml`
-contracts, and the `main` ruleset must require code-owner review for that to
-bind (a maintainer setting).
+`Makefile` from the PR. Those jobs run `main`'s copies of
+`trust-from-base.sh` and `install.sh` with `/bin/bash`, and both scripts call
+their tools by absolute path; if `main` has no `trust-from-base.sh` yet, no
+policy is set and nothing is reused. `tests/architecture/policy_source_test.go`
+fails if a pull request job names `AVAL_POLICY` or `AVAL_REGISTRY` anywhere
+but the trust step and the `--policy`/`--registry` values, runs anything but
+`actions/checkout`, `actions/setup-go` and `sigstore/cosign-installer` before
+the trust step, sets `PATH`, `BASH_ENV` or `ENV` there, or passes the policy
+through anything but one `aval` command. The jobs that use the policy need
+`ci-gates`, so their checks are skipped when the gates fail.
+
+None of this stops a hostile PR from turning its own checks green: on
+`pull_request`, GitHub runs the PR's own `ci.yaml`, which can skip the trust
+step or edit the tests. What protects `main` is review plus `main` trusting
+only its own CI (`main.yaml`): `.github/CODEOWNERS` names owners for
+`.github/aval/`, `.github/workflows/`, `tests/architecture/`, `AGENTS.md`,
+the `Makefile` and the `aval*.yaml` contracts, and the `main` ruleset must
+require code-owner review for that to bind (a maintainer setting).
 The release job refuses to publish without a verified, passing e2e
 attestation for the tagged commit. Roadmap milestone 3 (an end-to-end example
 in GitHub Actions) is in progress: the `example-go-compose` job runs the

@@ -381,7 +381,7 @@ func releaseJobProblems(name string, steps []step) []string {
 		switch {
 		case strings.HasPrefix(s.Uses, "sigstore/cosign-installer@"):
 			cosign = true
-		case strings.TrimSpace(s.Run) == ".github/aval/install.sh":
+		case strings.TrimSpace(s.Run) == ".github/aval/install.sh" || strings.TrimSpace(s.Run) == trustStep:
 			if !cosign {
 				problems = append(problems, name+": install.sh before cosign is installed")
 			}

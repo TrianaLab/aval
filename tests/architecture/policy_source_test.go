@@ -7,18 +7,37 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
 )
 
-// trustStep sets AVAL_POLICY and AVAL_REGISTRY from main on pull requests
-// (#134).
-const trustStep = ".github/aval/trust-from-base.sh"
+// trustScript sets AVAL_POLICY and AVAL_REGISTRY from main on pull requests
+// (#134); installScript installs the pinned, verified aval release.
+const (
+	trustScript   = ".github/aval/trust-from-base.sh"
+	installScript = ".github/aval/install.sh"
+)
 
-// installStep installs the pinned, verified aval release.
-const installStep = ".github/aval/install.sh"
+// trustStep is the one step that sets the policy and installs aval in a job
+// that uses the policy: it runs main's copies of trustScript and
+// installScript, not the PR's, with /bin/bash. If main has no trustScript
+// (before #134 lands) it sets no policy, so nothing is reused (fail closed).
+const trustStep = `/usr/bin/git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+/usr/bin/git show origin/main:.github/aval/install.sh > "$RUNNER_TEMP/install.sh"
+if /usr/bin/git show origin/main:.github/aval/trust-from-base.sh > "$RUNNER_TEMP/trust-from-base.sh"; then
+  /bin/bash "$RUNNER_TEMP/trust-from-base.sh"
+else
+  echo "::warning::main has no .github/aval/trust-from-base.sh: no trust policy, nothing is reused"
+fi
+/bin/bash "$RUNNER_TEMP/install.sh"`
+
+// remoteBeforeTrust are the only actions a job that uses the policy may run
+// before trustStep: each can write GITHUB_PATH, so each is trusted not to
+// shim the tools trustStep calls.
+var remoteBeforeTrust = []string{"actions/checkout@", "actions/setup-go@", "sigstore/cosign-installer@"}
 
 var (
 	// trustFlag matches --policy and --registry (not --registry-timeout) and
@@ -101,9 +120,9 @@ func envProblems(where string, env map[string]string) []string {
 // policySourceProblems: in a workflow that runs on pull requests, only
 // trustStep sets AVAL_POLICY and AVAL_REGISTRY (no env, inline assignment,
 // make variable, GITHUB_ENV write or shell names them), and a job that uses
-// the policy runs nothing from the checkout before its policy steps: remote
-// actions, then trustStep, then installStep, then the policy steps, each one
-// pinned `aval` command whose --policy/--registry name only those variables.
+// the policy runs nothing from the checkout before its policy steps: allowed
+// remote actions, then trustStep, then the policy steps, each one pinned
+// `aval` command whose --policy/--registry name only those variables.
 // Neither the workflow, the job nor a policy step sets PATH, BASH_ENV or ENV.
 func policySourceProblems(data []byte) ([]string, error) {
 	var wf struct {
@@ -133,7 +152,7 @@ func policySourceProblems(data []byte) ([]string, error) {
 			continue
 		}
 		if mentionsTrustVar(rawJobs[name]) {
-			problems = append(problems, name+": names AVAL_POLICY or AVAL_REGISTRY outside "+trustStep+" and the --policy/--registry values")
+			problems = append(problems, name+": names AVAL_POLICY or AVAL_REGISTRY outside the trust step and the --policy/--registry values")
 		}
 		if !slices.ContainsFunc(j.Steps, func(s step) bool { return usesPolicy(s.Run) || strings.TrimSpace(s.Run) == trustStep }) {
 			continue
@@ -165,7 +184,7 @@ func jobPolicyProblems(name string, steps []step) []string {
 		case usesPolicy(run):
 			problems = append(problems, envProblems(name+": a policy step", s.Env)...)
 			if !chain {
-				problems = append(problems, name+": a policy step does not follow "+trustStep+" directly")
+				problems = append(problems, name+": a policy step does not follow the trust step directly")
 			}
 			if !pinnedAval.MatchString(run) {
 				problems = append(problems, name+": a policy step must be one command of the pinned aval release: "+run)
@@ -175,13 +194,10 @@ func jobPolicyProblems(name string, steps []step) []string {
 					problems = append(problems, name+": --"+m[1]+" is not $"+want+": "+m[0])
 				}
 			}
-		case trusted && run == installStep:
-			// install.sh keeps the chain: it runs after the trust step, so it
-			// cannot change the git that step reads main with.
 		case trusted:
 			chain = false
-		case run != "" || s.Uses == "" || strings.HasPrefix(s.Uses, "./"):
-			problems = append(problems, name+": runs code from the checkout before "+trustStep+": "+run+s.Uses)
+		case run != "" || !slices.ContainsFunc(remoteBeforeTrust, func(p string) bool { return strings.HasPrefix(s.Uses, p) }):
+			problems = append(problems, name+": runs code other than "+strings.Join(remoteBeforeTrust, ", ")+" before the trust step: "+run+s.Uses)
 		}
 	}
 	return problems
@@ -208,7 +224,8 @@ func TestPRPolicyComesFromBaseBranch(t *testing.T) {
 }
 
 func TestPolicySourceCheckCatchesWorkingTreePolicies(t *testing.T) {
-	const pre = "{uses: actions/checkout@x}, {uses: sigstore/cosign-installer@x}, {run: " + trustStep + "}, {run: " + installStep + "}"
+	step := func(run string) string { return "{run: " + strconv.Quote(run) + "}" }
+	pre := "{uses: actions/checkout@x}, {uses: actions/setup-go@x}, {uses: sigstore/cosign-installer@x}, " + step(trustStep)
 	ok := "on: [push, pull_request]\njobs:\n" +
 		"  a:\n    steps: [" + pre + ", {run: \"aval run --registry \\\"$AVAL_REGISTRY\\\" --registry-timeout 1m \\\\\\n  --policy=\\\"${AVAL_POLICY}\\\"\"}, {run: 'aval stats --registry \"$STATS\"'}, {run: make test}]\n" +
 		"  b:\n    if: github.event_name == 'push'\n    env: {AVAL_POLICY: p.yaml}\n    steps: [{run: aval run --policy p.yaml}]\n" +
@@ -230,9 +247,14 @@ func TestPolicySourceCheckCatchesWorkingTreePolicies(t *testing.T) {
 		"step env registry":     pr(pre + ", {env: {AVAL_REGISTRY: evil.io/x}, run: 'aval run --policy \"$AVAL_POLICY\"'}"),
 		"literal registry":      pr(pre + ", {run: 'aval run --registry evil.io/x --policy \"$AVAL_POLICY\"'}"),
 		"workflow env registry": "on: {pull_request: {}}\nenv: {AVAL_REGISTRY: evil.io/x}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
-		"no trust step":         pr("{run: " + installStep + "}, " + use),
-		"trust step too late":   pr("{run: " + installStep + "}, " + use + ", {run: " + trustStep + "}"),
-		"install before trust":  pr("{run: " + installStep + "}, {run: " + trustStep + "}, " + use),
+		"no trust step":         pr("{run: " + installScript + "}, " + use),
+		"trust step too late":   pr(use + ", " + step(trustStep)),
+		"head's scripts":        pr("{run: " + trustScript + "}, {run: " + installScript + "}, " + use),
+		"bash from PATH":        pr(step(strings.ReplaceAll(trustStep, "/bin/bash", "bash")) + ", " + use),
+		"head copy":             pr(step(strings.ReplaceAll(trustStep, "origin/main:", "HEAD:")) + ", " + use),
+		"other remote action":   pr("{uses: evil/setup@x}, " + step(trustStep) + ", " + use),
+		"lookalike action":      pr("{uses: actions/checkout-evil@x}, " + step(trustStep) + ", " + use),
+		"step after trust":      pr(step(trustStep) + ", {uses: actions/checkout@x}, " + use),
 		"PATH override":         "on: pull_request\njobs:\n  a:\n    env: {PATH: './bin:/usr/bin'}\n    steps: [" + pre + ", " + use + "]\n",
 		"workflow PATH":         "on: pull_request\nenv: {PATH: './bin:/usr/bin'}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
 		"BASH_ENV":              pr(pre + ", {env: {BASH_ENV: ./evil.sh}, run: 'aval run --policy \"$AVAL_POLICY\"'}"),
@@ -304,20 +326,20 @@ func TestCodeOwnersCoverTrust(t *testing.T) {
 // variables it exported.
 func runTrustStep(t *testing.T, dir, event string) (map[string]string, error) {
 	t.Helper()
-	script, err := filepath.Abs(filepath.Join(root, trustStep))
+	script, err := filepath.Abs(filepath.Join(root, trustScript))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// As on a GitHub-hosted runner, so a script that behaves differently
-	// there is caught; it cannot catch every hostile edit, which is why
-	// CODEOWNERS must be enforced (#134). BASE_REF names a branch the PR
-	// author controls: the script must ignore it and read main.
+	// As on a GitHub-hosted runner. This checks main's script, not what a
+	// hostile PR runs: on pull_request the PR's own ci.yaml runs, so only
+	// required code-owner review keeps such a PR off main (#134). BASE_REF
+	// names a branch the PR author controls: the script must ignore it.
 	tmp := filepath.Join(t.TempDir(), "_temp")
 	if err := os.Mkdir(tmp, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	envFile := filepath.Join(tmp, "env")
-	cmd := exec.Command("bash", script)
+	cmd := exec.Command("/bin/bash", script)
 	cmd.Dir = dir
 	cmd.Env = runnerEnv(event, tmp, dir)
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -426,15 +448,22 @@ func TestTrustStepReadsTheBaseBranch(t *testing.T) {
 	}
 }
 
-// The trust step runs git by absolute path, so nothing earlier in the job can
-// put a git on PATH that reads the PR's files instead of main's (#134).
-func TestTrustStepRunsGitByAbsolutePath(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(root, trustStep))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if bare := regexp.MustCompile(`(?m)^[^#\n]*(?:^|[^/\w])git\s`).FindAllString(string(data), -1); len(bare) > 0 {
-		t.Errorf("%s runs git from PATH (%d times), want /usr/bin/git", trustStep, len(bare))
+// The scripts the trust step runs use /bin/bash and call their tools by
+// absolute path, so an earlier step that writes GITHUB_PATH cannot shim them
+// (#134). cosign comes from sigstore/cosign-installer, an allowed action.
+func TestTrustScriptsCallToolsByAbsolutePath(t *testing.T) {
+	bare := regexp.MustCompile(`(?m)^[^#\n]*(?:^|[^/\w-])(?:git|sed|sort|grep|curl|sha256sum|tar|mkdir|bash)\s`)
+	for _, f := range []string{trustScript, installScript} {
+		data, err := os.ReadFile(filepath.Join(root, f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(string(data), "#!/bin/bash\n") {
+			t.Errorf("%s: shebang is not #!/bin/bash", f)
+		}
+		if m := bare.FindAllString(string(data), -1); len(m) > 0 {
+			t.Errorf("%s calls tools from PATH: %q", f, m)
+		}
 	}
 }
 
@@ -447,13 +476,13 @@ func TestPolicyJobsNeedGates(t *testing.T) {
 	}
 	for name, j := range wf.Jobs {
 		if slices.ContainsFunc(j.Steps, func(s step) bool { return strings.TrimSpace(s.Run) == trustStep }) && !slices.Contains(j.Needs, "ci-gates") {
-			t.Errorf("%s runs %s but does not need ci-gates", name, trustStep)
+			t.Errorf("%s runs the trust step but does not need ci-gates", name)
 		}
 	}
 }
 
-// runTrustStep sets what a GitHub-hosted runner sets, so a trust step that
-// behaves differently on a real runner is caught (#134).
+// runnerEnv sets what a GitHub-hosted runner sets, so the test runs the
+// trust script as a real runner would (#134).
 func TestTrustStepEnvLooksLikeARunner(t *testing.T) {
 	probe := `for v in GITHUB_ACTIONS CI RUNNER_OS RUNNER_ENVIRONMENT GITHUB_RUN_ID GITHUB_RUN_ATTEMPT GITHUB_WORKSPACE GITHUB_REPOSITORY GITHUB_SERVER_URL GITHUB_WORKFLOW GITHUB_SHA GITHUB_REF GITHUB_HEAD_REF GITHUB_ACTOR; do [ -n "${!v:-}" ] || { echo "missing $v"; exit 1; }; done`
 	cmd := exec.Command("bash", "-c", probe)

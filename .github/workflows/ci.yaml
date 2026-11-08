@@ -128,9 +128,8 @@ jobs:
   # signs and pushes the recorded result, and dogfood-record publishes the
   # run record. The pinned, verified aval release decides reuse, not
   # `make ci-e2e` (#134): that would verify with bin/aval and the Makefile
-  # from the PR, so a PR could make its own CI accept anything. The suite
-  # itself (runner.command) still builds and tests the PR. It needs ci-gates,
-  # so when the trust gates fail this check is skipped, not green.
+  # from the PR. The suite itself (runner.command) still builds and tests the
+  # PR. It needs ci-gates, so when the gates fail this check is skipped.
   ci-e2e:
     needs: [changes, ci-gates]
     if: needs.changes.outputs.code == 'true'
@@ -150,12 +149,21 @@ jobs:
           cosign-release: v3.0.6
       # AVAL_POLICY and AVAL_REGISTRY (#134): main reuses only this workflow
       # on main (main.yaml); a PR also developer signatures, with pr.yaml and
-      # the registry read from main, never from the PR head. Before
-      # install.sh, so that script cannot shim the git it reads main with.
-      - name: Trust policy and registry (main on pull requests)
-        run: .github/aval/trust-from-base.sh
-      - name: Install the pinned aval release (verified)
-        run: .github/aval/install.sh
+      # the registry read from main. Both scripts are main's copies, run by
+      # absolute path. If main has no trust-from-base.sh (before #134 lands),
+      # no policy is set and nothing is reused. This step is still the PR's
+      # own ci.yaml: on pull_request a hostile PR can make its own check
+      # green; required code-owner review is what protects main.
+      - name: Trust policy, registry and pinned aval release, from main
+        run: |
+          /usr/bin/git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          /usr/bin/git show origin/main:.github/aval/install.sh > "$RUNNER_TEMP/install.sh"
+          if /usr/bin/git show origin/main:.github/aval/trust-from-base.sh > "$RUNNER_TEMP/trust-from-base.sh"; then
+            /bin/bash "$RUNNER_TEMP/trust-from-base.sh"
+          else
+            echo "::warning::main has no .github/aval/trust-from-base.sh: no trust policy, nothing is reused"
+          fi
+          /bin/bash "$RUNNER_TEMP/install.sh"
       - name: Heavy suite through the pinned aval release
         run: |
           aval run -f aval.e2e.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
@@ -485,12 +493,21 @@ jobs:
           cosign-release: v3.0.6
       # AVAL_POLICY and AVAL_REGISTRY (#134): main reuses only this workflow
       # on main (main.yaml); a PR also developer signatures, with pr.yaml and
-      # the registry read from main, never from the PR head. Before
-      # install.sh, so that script cannot shim the git it reads main with.
-      - name: Trust policy and registry (main on pull requests)
-        run: .github/aval/trust-from-base.sh
-      - name: Install the pinned aval release (verified)
-        run: .github/aval/install.sh
+      # the registry read from main. Both scripts are main's copies, run by
+      # absolute path. If main has no trust-from-base.sh (before #134 lands),
+      # no policy is set and nothing is reused. This step is still the PR's
+      # own ci.yaml: on pull_request a hostile PR can make its own check
+      # green; required code-owner review is what protects main.
+      - name: Trust policy, registry and pinned aval release, from main
+        run: |
+          /usr/bin/git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          /usr/bin/git show origin/main:.github/aval/install.sh > "$RUNNER_TEMP/install.sh"
+          if /usr/bin/git show origin/main:.github/aval/trust-from-base.sh > "$RUNNER_TEMP/trust-from-base.sh"; then
+            /bin/bash "$RUNNER_TEMP/trust-from-base.sh"
+          else
+            echo "::warning::main has no .github/aval/trust-from-base.sh: no trust policy, nothing is reused"
+          fi
+          /bin/bash "$RUNNER_TEMP/install.sh"
       - name: Shadow run of the engine unit suite
         run: |
           aval run --shadow -f aval.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
