@@ -36,8 +36,9 @@ fi
 
 // remoteBeforeTrust are the only actions a job that uses the policy may run
 // before trustStep: each can write GITHUB_PATH, so each is trusted not to
-// shim the tools trustStep calls.
-var remoteBeforeTrust = []string{"actions/checkout@", "actions/setup-go@", "sigstore/cosign-installer@"}
+// shim the tools trustStep calls. setup-uv is there for ci-e2e, whose
+// acceptance tests run examples/uv-monorepo.
+var remoteBeforeTrust = []string{"actions/checkout@", "actions/setup-go@", "sigstore/cosign-installer@", "astral-sh/setup-uv@"}
 
 var (
 	// trustFlag matches --policy and --registry (not --registry-timeout) and

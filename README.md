@@ -36,7 +36,8 @@ see the [roadmap](https://aval.run/main/vision/#roadmap).
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and the
-[Go + Compose example](examples/go-compose).
+[Go + Compose](examples/go-compose) and [uv monorepo](examples/uv-monorepo)
+examples.
 
 ## License
 

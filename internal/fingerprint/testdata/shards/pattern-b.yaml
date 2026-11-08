@@ -1,0 +1,18 @@
+# One contract for every shard of examples/uv-monorepo. Each matrix job sets
+# SHARD_INDEX and SHARD_TOTAL, so each shard gets its own fingerprint over
+# the whole suite's scope. Splitting by index needs a pytest plugin such as
+# pytest-shard, which the example does not lock.
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata:
+  name: uv-monorepo-tests
+runner:
+  command: ["sh", "-c", "uv run --locked --all-packages pytest packages --shard-id=$SHARD_INDEX --num-shards=$SHARD_TOTAL"]
+scope:
+  source: ["packages/**/*.py"]
+  dependencies: [pyproject.toml, "packages/*/pyproject.toml", uv.lock, .python-version]
+environment:
+  toolchain: {python: "3.12", uv: "0.9.18"}
+  # Leave one out and every shard shares one fingerprint: a false hit.
+  env: [SHARD_INDEX, SHARD_TOTAL]
+cacheability: hermetic

@@ -54,8 +54,10 @@ aval run -f path/to/aval.yaml --explain --fingerprint-only   # also prints the m
 ```
 
 Diff the `--explain` output of two machines to see which file, toolchain entry
-or variable differs. `-f` defaults to `./aval.yaml`; the root is always the
-contract file's directory.
+or variable differs. `-f` takes one path and defaults to `./aval.yaml`; the
+root is always the contract file's directory. A file holds one contract: give
+each shard of a split suite its own file
+([Shards and matrices](guides/shards-and-matrices.md)).
 
 ## Fields
 
