@@ -22,6 +22,7 @@ import (
 // Issue #67: --push that could not sign fails with exit 2 before the test
 // runs, for run --push and push alike; the hint names the key format.
 func TestPushPreconditionsFailFast(t *testing.T) {
+	fakeLogin(t, false, "", nil) // no terminal: no interactive login (#130)
 	s := sign
 	t.Cleanup(func() { sign = s })
 	sign = func(context.Context, *evidence.Statement, attest.SignOptions) (*attest.Signed, error) {

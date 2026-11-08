@@ -73,7 +73,9 @@ Use "aval completion [command] --help" for more information about a command.
 
 push signs the result recorded by 'aval run' and publishes it. The result
 must be for the current inputs: same test id, cacheability and fingerprint.
-Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
+Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.\nWithout --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
+--login) opens the interactive Sigstore login in the browser; no token is
+stored.
 
 ```text
 Usage:
@@ -83,6 +85,7 @@ Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
   -h, --help                        help for push
       --key string                  signing key path (default: keyless OIDC)
+      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
       --registry string             OCI repository for attestations (required)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --result string               result recorded by 'aval run' (default ".aval/result.json")
@@ -123,7 +126,9 @@ verified result and exits 1 if they disagree (a false hit).
 
 Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
 2 usage. Keyless signing reads $SIGSTORE_ID_TOKEN; runner.command never sees
-it.
+it.\nWithout --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
+--login) opens the interactive Sigstore login in the browser; no token is
+stored.
 
 ```text
 Usage:
@@ -136,6 +141,7 @@ Flags:
       --fingerprint-only            print the execution fingerprint and exit
   -h, --help                        help for run
       --key string                  signing key path for --push (default: keyless OIDC)
+      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
       --no-reuse                    always run, never reuse
       --policy string               trust policy file (required for reuse; without it the test always runs)
       --push                        sign and publish the result after running (needs --registry)

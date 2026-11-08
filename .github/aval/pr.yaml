@@ -9,8 +9,9 @@ identities:
   - issuer: https://token.actions.githubusercontent.com
     subjectRegexp: https://github\.com/TrianaLab/aval/\.github/workflows/ci\.yaml@refs/heads/main
     trustLevel: runner
-  # Maintainers add their own signing identity here, always at developer
-  # level, e.g. a keyless Sigstore identity:
-  #   - issuer: https://github.com/login/oauth
-  #     subjectRegexp: maintainer@example\.com
-  #     trustLevel: developer
+  # Maintainers, always at developer level only: a local run they signed
+  # keyless after the interactive Sigstore login (CONTRIBUTING.md, "Save PR
+  # CI time: sign a local run"). main.yaml never trusts these.
+  - issuer: https://github.com/login/oauth
+    subjectRegexp: edudiazasencio@gmail\.com
+    trustLevel: developer

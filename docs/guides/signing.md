@@ -33,6 +33,16 @@ flowchart LR
     On GitHub Actions the job gets the token itself; see
     [Use GitHub Actions](github-actions.md).
 
+    On a laptop, leave out the token too: with a terminal, `aval push` and
+    `aval run --push` (once the test has run) open the interactive Sigstore
+    login in the browser (`oauth2.sigstore.dev`, client id `sigstore`) and
+    sign with the identity you log in with, for example your verified GitHub
+    email with issuer `https://github.com/login/oauth`. The token is used for
+    that one signature and never stored. `--login` asks for the login without
+    a terminal; `$SIGSTORE_OIDC_ISSUER` and `$SIGSTORE_OIDC_CLIENT_ID`
+    override the issuer and client id. Give such an identity `developer` in
+    the policy.
+
 ## Which one
 
 | | Key | Keyless |
