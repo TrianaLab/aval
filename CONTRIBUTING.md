@@ -278,10 +278,11 @@ A job that tests the PR's code builds `aval` from source: `ci-e2e` (`make
 ci-e2e`, the same command as locally) and `dogfood-fingerprint`, which checks
 the PR's fingerprinting. A job that uses Aval as a user would runs a pinned
 release instead: the demo (`example-go-compose`), the shadow run
-(`dogfood-shadow`) and the publish step (`dogfood-publish`). The suites those
-jobs run still build and test the PR's code; only the `aval` that looks up,
-verifies, records and pushes results is the release. `ci-e2e` could use the
-release for the same reason, but it would need a `Makefile` change, and the
+(`dogfood-shadow`) and the publish steps (`dogfood-publish`,
+`dogfood-record`). The suites those jobs run still build and test the PR's
+code; only the `aval` that looks up, verifies, records and pushes results is
+the release. `ci-e2e` could use the release for the same reason, but it would
+need a `Makefile` change, and the
 `Makefile` is in the e2e contract's scope.
 
 `ci.yaml` pins the release as `AVAL_VERSION` and `AVAL_SHA256` (the sha256 of
@@ -295,18 +296,6 @@ installed. To move the pin, take the sha256 from the new release's verified
 update both values; `tests/architecture` checks that the version has a
 `CHANGELOG.md` section and that each of these jobs installs the release and
 builds nothing.
-
-Transition: v0.1.0 reads only the pre-freeze `apiVersion` `aval.dev/v1alpha1`,
-not the frozen `aval.trianalab.io/v1` of this repository's contracts and
-policies. While `AVAL_VERSION` is `0.1.0`, these three jobs build `aval` from
-the commit (`make build`) and install nothing; `tests/architecture` enforces
-that too. On `main` that is the code being released, so `dogfood-publish`
-writes the e2e attestation in the format the `release.yaml` gate (also a
-source build) verifies. v0.2.0 is skipped because the release jobs use
-features first shipped in v0.3.0 (`aval run --record-file`, `aval stats`).
-Moving the pin to `0.3.0` makes the test require `install.sh` again. Once
-`CHANGELOG.md` lists a release newer than `0.3.0` while `0.1.0` is pinned,
-`tests/architecture` fails until the pin moves.
 
 Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
 marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint
