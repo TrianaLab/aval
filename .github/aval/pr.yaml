@@ -1,7 +1,8 @@
 # Dogfooding trust policy for pull requests (#28): the main policy's CI
 # identity, plus developer signatures (trust level developer). Only this file
-# may accept developer signatures; tests/architecture/dogfood_test.go fails if
-# it grants runner level to anything the main policy does not trust.
+# accepts developer signatures (main.yaml lists them below its minimum);
+# tests/architecture/dogfood_test.go fails if it grants runner level to
+# anything the main policy does not trust at runner level.
 apiVersion: aval.trianalab.io/v1
 kind: Policy
 minTrustLevel: developer
@@ -11,7 +12,8 @@ identities:
     trustLevel: runner
   # Maintainers, always at developer level only: a local run they signed
   # keyless after the interactive Sigstore login (CONTRIBUTING.md, "Save PR
-  # CI time: sign a local run"). main.yaml never trusts these.
+  # CI time: sign a local run"). main.yaml lists them at developer level too,
+  # below its minTrustLevel runner, so main never reuses their results.
   - issuer: https://github.com/login/oauth
     subjectRegexp: edudiazasencio@gmail\.com
     trustLevel: developer

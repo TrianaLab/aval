@@ -341,12 +341,27 @@ reference: ghcr.io/trianalab/aval-attestations@sha256:<digest>
 reused passed result
 ```
 
-`main` and releases never accept this result: `.github/aval/main.yaml` trusts
-only `ci.yaml` on `main` at runner level, and `tests/architecture` fails if a
-developer identity is added there. Caveat: because `main.yaml` does not list
-the developer identity at all, a developer-signed result at a fingerprint
-`main` also computes (a PR merged unchanged) is a verification failure there
-(exit 5), not a miss. Do not publish to `aval-attestations` yet; see #130.
+`main` and releases never reuse this result. `.github/aval/main.yaml` lists
+your identity too, but at trust level `developer`, below its `minTrustLevel:
+runner`; only `ci.yaml` on `main` signs at runner level, and
+`tests/architecture` fails if any other identity gets runner level there. When
+a PR merges unchanged, `ci-e2e` on `main` computes the same fingerprint, finds
+only your result and prints a miss naming the minimum trust level, then runs
+the suite:
+
+```text
+miss aval-e2e sha256:<fingerprint>
+reference: ghcr.io/trianalab/aval-attestations@sha256:<digest>
+reason: not reusable under the trust policy: signer "<your email>" has trust level developer, policy requires at least runner
+ran aval-e2e: passed (exit 0)
+```
+
+`dogfood-publish` then pushes CI's own runner-signed result next to yours, and
+later runs on `main` reuse that one. A release requires a verified runner
+result: `release.yaml`'s `aval verify` exits 4 (a miss) on a developer-only
+fingerprint and stops. A signer that neither policy lists is still a
+verification failure (exit 5). To add a maintainer, add the identity at
+`developer` level to both `pr.yaml` and `main.yaml`.
 
 ### Join the public stats
 
