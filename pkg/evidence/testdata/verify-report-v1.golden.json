@@ -33,7 +33,17 @@
         "go": "1.23.4",
         "os": "linux"
       },
-      "exitCode": 0
+      "exitCode": 0,
+      "outputs": {
+        "manifest": "sha256:5d2f8c1a9e3b7d4f6a0c2e8b1d3f5a7c9e0b2d4f6a8c1e3b5d7f9a0c2e4b6d8f",
+        "files": [
+          {
+            "path": "coverage.xml",
+            "digest": "sha256:8e1c3a5b7d9f0a2c4e6b8d0f1a3c5e7b9d1f3a5c7e9b0d2f4a6c8e0b2d4f6a8c",
+            "size": 18432
+          }
+        ]
+      }
     },
     "runner": {
       "identity": "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main",

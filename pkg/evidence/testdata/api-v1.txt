@@ -173,3 +173,14 @@ field RepositoryStats.Stats RunStats "json:\"stats\""
 field RunRecord.Repository string "json:\"repository,omitempty\""
 field StatsReport.Repositories []RepositoryStats "json:\"repositories,omitempty\""
 type RepositoryStats struct
+comparable OutputFile
+const ArtifactTypeOutputs untyped string
+const MediaTypeOutput untyped string
+field Execution.Outputs *Outputs "json:\"outputs,omitempty\""
+field OutputFile.Digest string "json:\"digest\""
+field OutputFile.Path string "json:\"path\""
+field OutputFile.Size int64 "json:\"size\""
+field Outputs.Files []OutputFile "json:\"files\""
+field Outputs.Manifest string "json:\"manifest\""
+type OutputFile struct
+type Outputs struct

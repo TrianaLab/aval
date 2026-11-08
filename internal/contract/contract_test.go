@@ -103,6 +103,9 @@ func TestParseInvalid(t *testing.T) {
 		"contracts not yaml":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../backend]", "must name a contract file"},
 		"contracts listed twice": {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../b/aval.yaml, ../b/aval.yaml]", "scope.contracts[1]: \"../b/aval.yaml\" is listed twice"},
 		"contracts not a list":   {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: ../b/aval.yaml", "cannot unmarshal"},
+		"outputs escaping":       {"cacheability:", "outputs: [../coverage.xml]\ncacheability:", "outputs[0]"},
+		"outputs absolute":       {"cacheability:", "outputs: [/tmp/junit.xml]\ncacheability:", "outputs[0]"},
+		"outputs empty":          {"cacheability:", "outputs: [\"\"]\ncacheability:", "outputs[0]: empty glob"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -133,6 +136,20 @@ func TestParseAllowMutable(t *testing.T) {
 	}
 	if c, _ := Parse([]byte(valid)); c.Scope.AllowMutable != nil {
 		t.Fatalf("omitted allowMutable = %+v, want nil", c.Scope.AllowMutable)
+	}
+}
+
+// TestParseOutputs: outputs is optional and keeps each glob as written.
+func TestParseOutputs(t *testing.T) {
+	c, err := Parse([]byte(strings.Replace(valid, "cacheability:", "outputs: [coverage.xml, reports/*.xml]\ncacheability:", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(c.Outputs) != "[coverage.xml reports/*.xml]" {
+		t.Fatalf("outputs = %v", c.Outputs)
+	}
+	if c, _ := Parse([]byte(valid)); c.Outputs != nil {
+		t.Fatalf("omitted outputs = %v, want nil", c.Outputs)
 	}
 }
 
