@@ -26,8 +26,8 @@ permissions:
 # Jobs that test the PR's code build from source (CONTRIBUTING.md "Which aval
 # a CI job runs").
 env:
-  AVAL_VERSION: 0.3.0
-  AVAL_SHA256: 11c19cea94784999474c07434873afa43e2f5f1cdb49ceffde9e561fb9b3f977
+  AVAL_VERSION: 0.4.0
+  AVAL_SHA256: fd5e4c430b8be2475a9fa1d1ff96b545bb10e08843b38c3c5bfe338facca50d0
   # The public stats registry (#97): dogfood-record publishes run records
   # there and docs.yaml (which names it too) builds the site's stats.json.
   AVAL_STATS_REGISTRY: ghcr.io/trianalab/aval-stats
