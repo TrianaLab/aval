@@ -213,6 +213,12 @@ var corpus = []corpusCase{
 	{name: "environment.probe added", change: func(f *fixture) {
 		f.c.Environment.Probe = map[string][]string{"go": {"go", "version"}}
 	}, want: differ},
+	{name: "environment.probe argv changed", setup: func(f *fixture) {
+		f.c.Environment.Probe = map[string][]string{"go": {"go", "version"}}
+	}, change: func(f *fixture) { f.c.Environment.Probe["go"] = []string{"go", "env", "GOVERSION"} }, want: differ},
+	{name: "environment.probe argv order", setup: func(f *fixture) {
+		f.c.Environment.Probe = map[string][]string{"go": {"go", "version"}}
+	}, change: func(f *fixture) { f.c.Environment.Probe["go"] = []string{"version", "go"} }, want: differ},
 
 	// Irrelevant changes.
 	{name: "out-of-scope file edited", change: func(f *fixture) { f.write("README.md", "edited\n") }, want: same},

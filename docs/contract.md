@@ -78,7 +78,7 @@ contract file's directory.
 | `scope.resolve` | list of `kind: reference` | no | One `kind: reference` per entry. Kind is one of `image`, `npm`, `pypi`, `go`, `maven`, `crate`, `gem`, `git`, `url`. The reference must not contain credentials. See [Resolve references](resolve/index.md). |
 | `scope.contracts` | list of paths | no | Other contracts this test depends on ([Depend on another part of the repo](guides/depend-on-a-contract.md)). Each path is relative to this contract's directory: clean (`..` only at the start), slash-separated, no spaces, ending in `.yaml` or `.yml`, listed once. At fingerprint time the file must be a valid contract inside the git working tree of this contract (the nearest directory at or above it with a `.git` entry), with no symlink on the path; if this contract's own directory is a symlink, `..` is resolved from its real location. No cycles, at most 8 levels and 64 distinct contracts. A referenced contract's mutable references block reuse here too, unless its own `scope.allowMutable` accepts them. |
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
-| `environment.probe` | map string to list of strings | no | Each key must be an `environment.toolchain` key; each value a non-empty argv, first element not blank. See [Probe the toolchain](#probe-the-toolchain). |
+| `environment.probe` | map string to list of strings | no | Each key must be an `environment.toolchain` key with a non-empty value; each value a non-empty argv, first element not blank. See [Probe the toolchain](#probe-the-toolchain). |
 | `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
 
@@ -217,7 +217,8 @@ environment:
     python: [python3, --version]
 ```
 
-On a mismatch, a probe that cannot start, a non-zero exit or a timeout,
+On a mismatch, a probe that cannot start, a non-zero exit, a timeout or
+output over 4 KiB (it is signed into the predicate),
 `aval run` looks nothing up (outcome `error`; the reason names the probe, the
 declared and the observed value), runs the test, records and publishes
 nothing, and exits 1 (3 if the test failed). On a match, the output goes into

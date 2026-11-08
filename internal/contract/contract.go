@@ -439,8 +439,10 @@ func (e Environment) validate(add func(string, ...any)) {
 		}
 	}
 	for k, argv := range e.Probe {
-		if _, ok := e.Toolchain[k]; !ok {
+		if v, ok := e.Toolchain[k]; !ok {
 			add("environment.probe.%s: not a key of environment.toolchain", k)
+		} else if strings.TrimSpace(v) == "" {
+			add("environment.probe.%s: environment.toolchain.%s must not be empty", k, k)
 		}
 		if len(argv) == 0 || strings.TrimSpace(argv[0]) == "" {
 			add("environment.probe.%s: must be a non-empty argv list", k)

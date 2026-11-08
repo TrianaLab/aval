@@ -80,7 +80,8 @@ func TestProbeFailureRunsAndPublishesNothing(t *testing.T) {
 	}{
 		"mismatch":    {[]string{"sh", "-c", "echo Python 3.12.4"}, `declared "3.13", observed "Python 3.12.4"`},
 		"prefix trap": {[]string{"sh", "-c", "echo Python 3.130"}, `observed "Python 3.130"`},
-		"not found":   {[]string{"aval-no-such-probe"}, "aval-no-such-probe"},
+		"not found":   {[]string{"aval-no-such-probe"}, "executable file not found"},
+		"oversized":   {[]string{"sh", "-c", "echo Python 3.13.1; head -c 5000 /dev/zero"}, "output over 4096 bytes"},
 		"non-zero":    {[]string{"sh", "-c", "echo Python 3.13.1; exit 2"}, "exit status 2"},
 		"timeout":     {[]string{"sleep", "5"}, "timed out after 1s"},
 	} {

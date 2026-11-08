@@ -67,6 +67,7 @@ func TestParseInvalid(t *testing.T) {
 		"bad kind":                    {"kind: Test", "kind: Suite", "kind"},
 		"bad tool key":                {"{go: ", "{Go: ", "environment.toolchain"},
 		"probe without toolchain key": {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {python: [python, --version]}", "environment.probe.python: not a key of environment.toolchain"},
+		"probe empty toolchain value": {`toolchain: {go: "1.25"}`, "toolchain: {go: \" \"}\n  probe: {go: [go, version]}", "environment.probe.go: environment.toolchain.go must not be empty"},
 		"probe empty argv":            {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: []}", "environment.probe.go: must be a non-empty argv list"},
 		"probe blank command":         {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: [\" \"]}", "environment.probe.go: must be a non-empty argv list"},
 		"probe not a list":            {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: go version}", "cannot unmarshal"},

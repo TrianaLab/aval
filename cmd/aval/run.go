@@ -369,6 +369,10 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 // probeTimeout bounds each environment.probe command.
 var probeTimeout = 10 * time.Second
 
+// maxProbeOutput caps a probe's output: it is signed into the predicate, and
+// an envelope over the registry blob limit would read as a security event.
+const maxProbeOutput = 4 << 10
+
 // probe runs each environment.probe argv in dir, without a shell or the
 // signing token, and checks that its output holds the declared toolchain
 // value as a version token. It returns the outputs as probe.<key>. Only
@@ -382,6 +386,9 @@ func probe(ctx context.Context, c *contract.Contract, dir string) (map[string]st
 		x.Dir, x.Env, x.WaitDelay = dir, childEnv(), time.Second
 		raw, err := x.CombinedOutput()
 		cancel()
+		if err == nil && len(raw) > maxProbeOutput {
+			err, raw = fmt.Errorf("output over %d bytes", maxProbeOutput), raw[:maxProbeOutput]
+		}
 		got := strings.TrimSpace(string(raw))
 		switch {
 		case errors.Is(pctx.Err(), context.DeadlineExceeded):
