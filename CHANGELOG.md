@@ -1,5 +1,18 @@
 # aval
 
+## 0.5.0
+
+### Minor Changes
+
+- 028329d: A contract can list `outputs` (globs such as `coverage.xml`, `junit.xml`): `run --push` and `push` publish those files with the result, and a reused result restores them, so a coverage gate or a junit report downstream keeps working when the test is skipped. Outputs must not be inputs or the contract file, each glob must match a regular file, and the caps are 256 files, 16 MiB each and 64 MiB in total; otherwise nothing is published (exit 1). On reuse the files are fetched by the digests the signature covers; a missing, changed or undeclared output is a verification failure (exit 5). Format changes, all additive: contract field `outputs` (omitted when empty, so existing fingerprints do not change; older `aval` binaries reject a contract that uses it), predicate field `execution.outputs` within `execution/v2`, and the OCI identifiers `application/vnd.trianalab.aval.outputs.v1` and `application/vnd.trianalab.aval.output.v1`. Outputs are published to the registry: do not list files that hold secrets.
+- b3758d5: The mutable-reference scanner now reports container images named in test code that uses testcontainers: a quoted `name:tag` without a digest in a `*.go`, `*.py`, `*.java`, `*.kt`, `*.ts`, `*.js` or `*.cs` file that mentions testcontainers. Adopters may see new findings that turn hits into misses for `hermetic` and `controlled-environment` tests: pin the image by digest, or accept it in `scope.allowMutable`.
+- 318966e: New optional `environment.probe` in `aval.yaml` (additive to `aval.trianalab.io/v1`; older `aval` binaries reject contracts that use it): a map from an `environment.toolchain` key to an argv such as `python: [python3, --version]`. `aval run` runs each probe before the lookup, without a shell, with a 10 s timeout and without `$SIGSTORE_ID_TOKEN`, and requires the declared value in the output as a version token (`3.13` matches `Python 3.13.1`, not `Python 3.130`). A mismatch, a probe that cannot start, a non-zero exit, a timeout or output over 4 KiB skips the lookup (outcome `error`), runs the test, records and publishes nothing and exits 1. The observed output goes into `execution.environment` as `probe.<key>`. `verify`, `push`, `--fingerprint-only` and the browser demo never run probes. Fix: a toolchain key named `os` or `arch` no longer overwrites the real values in `execution.environment`.
+
+### Patch Changes
+
+- 554569c: Adoption guides: find undeclared inputs with strace, fs_usage, Process Monitor or a scope-only copy (Write a contract); map uv, pnpm and cargo workspaces to contracts (Depend on another part of the repo); estimate reuse from past commits with `scripts/estimate-reuse.sh`, which runs `aval run --fingerprint-only` over a scratch worktree and counts fingerprint errors and unacknowledged mutable references as misses (Measure reuse).
+- 176cfc2: Docs: the guide "Shards and matrices" shows two ways to split a suite across CI matrix jobs with existing fields: one contract per shard (`aval.shard-1.yaml`, run with `-f`) or one contract with `SHARD_INDEX` and `SHARD_TOTAL` in `environment.env`. New example `examples/uv-monorepo`: a uv workspace with two packages, two shard contracts and coverage restored on reuse. No behaviour or format change.
+
 ## 0.4.0
 
 ### Minor Changes
