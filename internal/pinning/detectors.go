@@ -615,3 +615,45 @@ func (gitmodules) Detect(in Input) []Finding {
 	}
 	return out
 }
+
+// testcontainers checks quoted image references, such as the argument of
+// PostgresContainer, in test source that mentions testcontainers.
+// ponytail: literals only; an image built in a variable or a helper file
+// that does not mention testcontainers is not seen (docs/pinning.md Limits).
+type testcontainers struct{}
+
+func (testcontainers) Applies(p string) bool {
+	switch path.Ext(p) {
+	case ".go", ".py", ".java", ".kt", ".ts", ".js", ".cs":
+		return true
+	}
+	return false
+}
+
+var (
+	quotedRe = []*regexp.Regexp{regexp.MustCompile(`"([^"]*)"`), regexp.MustCompile(`'([^']*)'`), regexp.MustCompile("`([^`]*)`")}
+	// tagRefRe is name:tag with an optional registry host and port; a
+	// digest, a space or a scheme does not match.
+	tagRefRe = regexp.MustCompile(`^(?:([a-zA-Z0-9.-]+(?::[0-9]+)?)/)?([a-z0-9]+(?:[._-]+[a-z0-9]+)*(?:/[a-z0-9]+(?:[._-]+[a-z0-9]+)*)*):(\w[\w.-]{0,127})$`)
+	digitsRe = regexp.MustCompile(`^[0-9]+$`)
+)
+
+func (testcontainers) Detect(in Input) []Finding {
+	if !strings.Contains(strings.ToLower(string(in.Data)), "testcontainers") {
+		return nil
+	}
+	var out []Finding
+	for i, l := range strings.Split(string(in.Data), "\n") {
+		for _, re := range quotedRe {
+			for _, m := range re.FindAllStringSubmatch(l, -1) {
+				r := tagRefRe.FindStringSubmatch(m[1])
+				// host:port: an all-digit tag on localhost or a dotted name
+				if r == nil || r[1] == "" && digitsRe.MatchString(r[3]) && (r[2] == "localhost" || strings.Contains(r[2], ".")) {
+					continue
+				}
+				out = append(out, image(in.Path, i+1, m[1], nil)...)
+			}
+		}
+	}
+	return out
+}

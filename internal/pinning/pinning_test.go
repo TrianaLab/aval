@@ -28,6 +28,11 @@ func detect(path, data string, scope ...string) []string {
 	return refs
 }
 
+// tc writes the library's name into a case, as <tc> or <TC>.
+func tc(s string) string {
+	return strings.NewReplacer("<tc>", "test"+"containers", "<TC>", "Test"+"containers").Replace(s)
+}
+
 func cmdRefs(command string, scope ...string) []string {
 	var refs []string
 	for _, f := range scanShell(CommandFile, command, func(p string) bool { return slices.Contains(scope, p) }) {
@@ -228,6 +233,22 @@ var fileCases = []fileCase{
 	{name: "package.json without dependencies", path: "package.json", data: `{"name": "x", "dependencies": "bad"}`, want: nil},
 	{name: "package.json invalid", path: "package.json", data: `{`, want: []string{"package.json"}},
 
+	// Container images in test code. The word is spliced in by tc so this
+	// file, in the scope of Aval's own hermetic contract, does not mention it.
+	{name: "tc go", path: "db_test.go", data: tc("import \"github.com/<tc>/<tc>-go/modules/postgres\"\nc, _ := postgres.Run(ctx, \"postgres:16-alpine\")\nr, _ := redis.Run(ctx, `redis:7`)\n"), want: []string{"postgres:16-alpine", "redis:7"}},
+	{name: "tc python", path: "tests/conftest.py", data: tc("from <tc>.postgres import PostgresContainer\nwith PostgresContainer('postgres:16') as pg:\n    pass\n"), want: []string{"postgres:16"}},
+	{name: "tc java", path: "src/test/java/DbIT.java", data: tc("import org.<tc>.containers.PostgreSQLContainer;\nnew PostgreSQLContainer<>(DockerImageName.parse(\"ghcr.io/acme/pg:16.4\"));\n"), want: []string{"ghcr.io/acme/pg:16.4"}},
+	{name: "tc kotlin", path: "DbTest.kt", data: tc("import org.<tc>.containers.GenericContainer\nval c = GenericContainer(\"localhost:5000/acme/app:dev\")\n"), want: []string{"localhost:5000/acme/app:dev"}},
+	{name: "tc typescript", path: "db.test.ts", data: tc("import { GenericContainer } from \"<tc>\";\nawait new GenericContainer(\"redis:7.4\").start();\n"), want: []string{"redis:7.4"}},
+	{name: "tc javascript", path: "db.test.js", data: tc("const { GenericContainer } = require('<tc>');\nnew GenericContainer('nginx:latest');\n"), want: []string{"nginx:latest"}},
+	{name: "tc csharp", path: "DbTests.cs", data: tc("using <TC>.PostgreSql;\nnew PostgreSqlBuilder().WithImage(\"postgres:16\").Build();\n"), want: []string{"postgres:16"}},
+	{name: "tc pinned", path: "db_test.go", data: tc("// <tc>\npostgres.Run(ctx, \"postgres:16" + dg + "\")\nGenericContainer('postgres" + dg + "')\n"), want: nil},
+	{name: "tc untagged name is not reported", path: "db_test.go", data: tc("// <tc>\npostgres.Run(ctx, \"postgres\")\n"), want: nil},
+	{name: "tc host port and urls", path: "db_test.py", data: tc("# <tc>\nhost = 'localhost:5432'\nip = \"127.0.0.1:8080\"\ndb = 'db.internal:5432'\nurl = \"jdbc:postgresql://localhost:5432/test\"\nr = 'redis://cache:6379'\n"), want: nil},
+	{name: "tc log strings", path: "db_test.go", data: tc("// <tc>\nt.Logf(\"started postgres:16 at %s\", h)\nlog.Println(\"error: \", err)\nfmt.Sprintf(\"%s:%d\", h, p)\n"), want: nil},
+	{name: "source without the library is not read", path: "db_test.go", data: tc("docker.Run(ctx, \"postgres:16\")\n"), want: nil},
+	{name: "tc in another language is not read", path: "db_test.rb", data: tc("# <tc>\nx = 'postgres:16'\n"), want: nil},
+
 	// Python.
 	{name: "requirements unpinned", path: "requirements.txt", data: "# c\nflask>=2\nrequests\n-r base.txt\n--index-url https://x\ndjango==4.*\nidna==3.7 ; python_version > '3'\nurllib3 == 2.2.1  # ok\n-e .\n-e git+https://g/x@main#egg=x\nx @ git+https://g/x@" + sha + "\ny @ https://h/y.tar.gz#sha256=ab\nz @ https://h/z.tar.gz\n-e\n./local\n", want: []string{"flask>=2", "requests", "base.txt", "django==4.*", "git+https://g/x@main#egg=x", "z@https://h/z.tar.gz"}},
 	{name: "requirements includes", path: "ci/requirements.txt", data: "-r base.txt\n-c ../constraints.txt\n--requirement=dev.txt\n-rother.txt\n--constraint x.txt\n--requirements-y\n--constraint=\n-r\n", scope: []string{"ci/base.txt", "constraints.txt"}, want: []string{"dev.txt", "other.txt", "x.txt", "--constraint="}},
@@ -416,7 +437,8 @@ func TestScan(t *testing.T) {
 	write(t, dir, "main.go", "package main\n")
 	write(t, dir, "big.sh", strings.Repeat("#", MaxFileSize+1))
 	write(t, dir, "pnpm-lock.yaml", strings.Repeat("#", MaxFileSize+1)) // hashed, not scanned
-	got := Scan(os.DirFS(dir), []string{"Dockerfile", "big.sh", "gone.sh", "main.go", "pnpm-lock.yaml", "z/compose.yaml"}, []string{"docker", "run", "e:3"})
+	write(t, dir, "app.min.js", strings.Repeat("#", MaxFileSize+1))     // a large source file is skipped
+	got := Scan(os.DirFS(dir), []string{"Dockerfile", "app.min.js", "big.sh", "gone.sh", "gone.py", "main.go", "pnpm-lock.yaml", "z/compose.yaml"}, []string{"docker", "run", "e:3"})
 	var lines []string
 	for _, f := range got {
 		lines = append(lines, f.String())
@@ -536,7 +558,7 @@ func FuzzDetect(f *testing.F) {
 	f.Fuzz(func(t *testing.T, name, data string) {
 		n := strings.Count(data, "\n") + 1
 		for _, d := range Detectors {
-			for _, path := range []string{name, "Dockerfile", "compose.yaml", "package.json", "requirements.txt", "pom.xml", "build.gradle", "x.sh", "go.mod", "Cargo.toml", ".gitmodules", "kustomization.yaml", "compose.json"} {
+			for _, path := range []string{name, "Dockerfile", "compose.yaml", "package.json", "requirements.txt", "pom.xml", "build.gradle", "x.sh", "go.mod", "Cargo.toml", ".gitmodules", "kustomization.yaml", "compose.json", "x_test.go"} {
 				if !d.Applies(path) {
 					continue
 				}

@@ -85,6 +85,12 @@ Find the digest with `crane digest <image:tag>` or
 `docker buildx imagetools inspect <image:tag>`.
 
 ??? info "What else is checked"
+    - Images in test code: in `*.go`, `*.py`, `*.java`, `*.kt`, `*.ts`,
+      `*.js` and `*.cs` files that mention testcontainers, a quoted
+      `name:tag` without a digest (`PostgresContainer("postgres:16")`). A
+      `host:port` literal (`"localhost:5432"`, `"127.0.0.1:8080"`), a
+      literal with a space or a scheme, and a name without a tag are not
+      reported.
     - Images in `docker run`, `podman run`, `docker compose` and
       `kubectl run`/`create --image` commands. A compose file the command uses
       must be in `scope.source`; it can be YAML or JSON (`compose.json`).
@@ -204,6 +210,11 @@ cacheability: controlled-environment
       (the `ARG` default is checked; outside `FROM` the last value of a name
       wins); the BuildKit pass on a source file named like
       `dockerfile_test.go`.
+    - In test code: an image in a variable built from parts, in a constant
+      or helper in a file that does not mention testcontainers, a
+      module's default image (`PostgresContainer()` without an image), the
+      Ryuk reaper image, and source files larger than 1 MiB. Write the image with its digest
+      (`"postgres:16@sha256:<digest>"`), or declare it in `scope.resolve`.
     - Shell commands are split without a full parser: a quoted `;` or `>`
       also splits, which can cause needless misses.
     - An option Aval does not know to take a value

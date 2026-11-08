@@ -21,6 +21,25 @@ scope:
 - Also covers what the [scanner](../pinning.md#container-images) cannot see,
   such as Helm values that split `repository` and `tag`: declare the image
   those values make.
+- An image test code starts through testcontainers is declared the same
+  way. The scanner reports the literal; resolving the tag puts its digest in
+  the fingerprint:
+
+    ```go
+    // db_test.go
+    pg, err := postgres.Run(ctx, "postgres:16")
+    ```
+
+    ```yaml
+    scope:
+      source: ["**/*.go"]
+      resolve:
+        - image: postgres:16
+      allowMutable:
+        - ref: postgres:16
+          reason: resolved in scope.resolve
+    ```
+
 - Credentials come from `docker login` (`$DOCKER_CONFIG`). A loopback
   registry (`localhost:5000`) is reached over plain HTTP.
 
