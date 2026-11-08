@@ -35,8 +35,10 @@ scope:
       reason: "rebuilt and scanned nightly"
 
 environment:
-  toolchain:                    # optional, declared, not detected (v0)
+  toolchain:                    # optional, declared
     go: "1.25"
+  probe:                        # optional, checks a toolchain entry before the run
+    go: [go, version]
   env:                          # optional, names only; values are hashed
     - CGO_ENABLED
     - GOFLAGS
@@ -54,8 +56,10 @@ aval run -f path/to/aval.yaml --explain --fingerprint-only   # also prints the m
 ```
 
 Diff the `--explain` output of two machines to see which file, toolchain entry
-or variable differs. `-f` defaults to `./aval.yaml`; the root is always the
-contract file's directory.
+or variable differs. `-f` takes one path and defaults to `./aval.yaml`; the
+root is always the contract file's directory. A file holds one contract: give
+each shard of a split suite its own file
+([Shards and matrices](guides/shards-and-matrices.md)).
 
 ## Fields
 
@@ -76,12 +80,15 @@ contract file's directory.
 | `scope.resolve` | list of `kind: reference` | no | One `kind: reference` per entry. Kind is one of `image`, `npm`, `pypi`, `go`, `maven`, `crate`, `gem`, `git`, `url`. The reference must not contain credentials. See [Resolve references](resolve/index.md). |
 | `scope.contracts` | list of paths | no | Other contracts this test depends on ([Depend on another part of the repo](guides/depend-on-a-contract.md)). Each path is relative to this contract's directory: clean (`..` only at the start), slash-separated, no spaces, ending in `.yaml` or `.yml`, listed once. At fingerprint time the file must be a valid contract inside the git working tree of this contract (the nearest directory at or above it with a `.git` entry), with no symlink on the path; if this contract's own directory is a symlink, `..` is resolved from its real location. No cycles, at most 8 levels and 64 distinct contracts. A referenced contract's mutable references block reuse here too, unless its own `scope.allowMutable` accepts them. |
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
+| `environment.probe` | map string to list of strings | no | Each key must be an `environment.toolchain` key with a non-empty value; each value a non-empty argv, first element not blank. See [Probe the toolchain](#probe-the-toolchain). |
 | `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
+| `outputs` | list of globs | no | Files the test writes that a reused result restores, such as `coverage.xml` ([Restore coverage and reports on reuse](guides/write-a-contract.md#restore-coverage-and-reports-on-reuse)). Same glob rules as `scope`. When publishing, each glob must match a regular file (no symlink) that is not the contract file, outside the scope, `.git` and `.aval`; at most 256 files, 16 MiB each, 64 MiB in total. Otherwise nothing is published (exit 1). Omitted from the fingerprint when empty, so existing contracts keep theirs; adding it changes the fingerprint, so a result without outputs is never reused for it. |
 
 ## Globs
 
-`scope.source`, `scope.exclude` and `scope.dependencies` use the same globs:
+`scope.source`, `scope.exclude`, `scope.dependencies` and `outputs` use the
+same globs:
 
 | Glob | Matches |
 |---|---|
@@ -141,7 +148,7 @@ contract <path> <name> <fingerprint>
 | header | `aval-fingerprint/v1`, bumped when an existing contract's manifest would change | |
 | `contract` | sha256 of the parsed contract as JSON | comments, formatting, key order, the order and duplicates of set-like lists (argv order counts; an empty list equals an omitted one) |
 | `source`, `dependency` | sha256 of the content, `x` (any exec bit) or `-`, path. A file in both sets appears twice | owner, timestamps, other permission bits |
-| `toolchain` | `key=value` as written; not checked against the installed tools | |
+| `toolchain` | `key=value` as written; checked against the installed tools only by `environment.probe` | |
 | `env` | sha256 of the value, or `unset` (empty is not unset); values never appear in clear | |
 | `resolve` | kind, reference, version or `floating`, immutable id; only with `scope.resolve`, and needs the network ([Resolve references](resolve/index.md)) | the registry address |
 | `contract <path>` | one line per `scope.contracts` entry: the path as written, the referenced contract's `metadata.name` and its fingerprint, computed from its own directory and inputs (so references are transitive). `--explain` also prints the tree, one `depends on <path> (<name>) <fingerprint>` line per reference | |
@@ -159,7 +166,7 @@ executable file fingerprints differently there than on Unix.
 | `.aval/` directories and the command's `--result`/`--report` files | so `["**"]` stays stable; keep them under `.aval/`. A path in scope that holds a real input exits 2. In a `scope.contracts` reference they stay inputs (a miss, never a false hit) |
 | commit, branch, VCS metadata | two commits with the same scope share a result |
 | environment variables not in `environment.env` | |
-| the real toolchain, OS and architecture | unless declared |
+| the real toolchain, OS and architecture | unless declared; probe output is never hashed |
 
 ### Known gaps
 
@@ -171,7 +178,8 @@ depends on one of these can reuse a result it should not:
 - an environment variable the test reads that `environment.env` does not list
 - content behind a name the [scanner](pinning.md) does not recognize, or a
   network service: use `scope.resolve` or `external-dependencies`
-- the installed toolchain, OS and architecture
+- the installed toolchain, OS and architecture, unless `environment.probe`
+  checks the toolchain entry
 
 Mitigation: review the contract, use `aval run --shadow`, pick the right
 cacheability class.
@@ -195,6 +203,38 @@ test and records nothing; `--fingerprint-only`, `--explain`, `aval verify` and
 | `scope.contracts <path>: <reason>` | any error above in the referenced contract, or: missing or invalid contract, `leads outside the repository root`, `no git working tree (.git) at or above <dir>`, `<path> is a symlink`, `<path> is not a regular file`, `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`, `more than 8 levels or 64 contracts` |
 | any I/O error while walking or reading | make the file or directory readable; the walk only enters directories a glob can match |
 
+## Probe the toolchain
+
+`environment.toolchain` is a claim. `environment.probe` checks it: before the
+lookup, `aval run` runs each probe in the contract directory, without a
+shell, with a 10 s timeout and without `$SIGSTORE_ID_TOKEN`. The declared
+value must appear in the output (stdout and stderr) as a version token: not
+preceded by a digit or a dot, not followed by a digit. `3.13` matches
+`Python 3.13.1`; it does not match `Python 3.130`, and `3.1` does not match
+`Python 3.13`.
+
+```yaml
+environment:
+  toolchain:
+    python: "3.13"
+  probe:
+    python: [python3, --version]
+```
+
+On a mismatch, a probe that cannot start, a non-zero exit, a timeout or
+output over 4 KiB (it is signed into the predicate),
+`aval run` looks nothing up (outcome `error`; the reason names the probe, the
+declared and the observed value), runs the test, records and publishes
+nothing, and exits 1 (3 if the test failed). On a match, the output goes into
+the predicate's `execution.environment` as `probe.<key>`.
+
+Only `aval run` executes probes. `aval verify`, `aval push`,
+`--fingerprint-only` and the browser demo never do: a consumer never executes
+commands from a contract. `--explain` prints the manifest before any probe
+runs; when it goes on to run the test, the probe runs as in any run. The probe
+argv is part of the contract, so adding or changing one changes the
+fingerprint; its output is not hashed, since it varies by build and platform.
+
 ## Versioning
 
 `aval.trianalab.io/v1` is frozen; policy files use the same value. Within v1
@@ -206,7 +246,5 @@ does not know, which fails closed.
 
 ## Future work
 
-- **Detected toolchain**: verify or record the installed toolchain instead
-  of trusting `environment.toolchain`. Not scheduled in milestones 1-5.
 - **Observed inputs**: trace which files the test actually reads, to flag
   undeclared inputs or suggest scope. v0 never infers scope.

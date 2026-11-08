@@ -437,6 +437,7 @@ func canonicalContract(c *contract.Contract) []byte {
 	cc.Scope.AllowMutable = slices.Compact(cc.Scope.AllowMutable)
 	cc.Scope.Resolve = canonicalResolve(c.Scope.Resolve)
 	cc.Scope.Contracts = sorted(c.Scope.Contracts)
+	cc.Outputs = sorted(c.Outputs)
 	// Marshal cannot fail: the contract holds only strings, string slices
 	// and string maps. Map keys are sorted by encoding/json.
 	b, _ := json.Marshal(cc)

@@ -245,10 +245,31 @@ func Push(ctx context.Context, repo, fingerprint string, a Attestation) (Descrip
 	return Descriptor{Repository: repo, Digest: d.Digest.String()}, nil
 }
 
-func push(ctx context.Context, r *remote.Repository, fingerprint string, a Attestation) (ocispec.Descriptor, error) {
+// anchoredManifest uploads the empty config, tags the fingerprint's anchor and
+// returns a manifest of artifactType with layers whose subject is the
+// anchor. Re-tagging the deterministic anchor is idempotent and repairs a
+// moved tag.
+func anchoredManifest(ctx context.Context, r *remote.Repository, fingerprint, artifactType string, layers []ocispec.Descriptor) ([]byte, error) {
 	if _, err := pushBlob(ctx, r, ocispec.MediaTypeEmptyJSON, emptyJSON.Data); err != nil {
-		return ocispec.Descriptor{}, err
+		return nil, err
 	}
+	anchorRaw, anchorDesc := anchor(fingerprint)
+	if _, err := oras.TagBytes(ctx, r, ocispec.MediaTypeImageManifest, anchorRaw, Tag(fingerprint)); err != nil {
+		return nil, fmt.Errorf("tagging anchor: %w", err)
+	}
+	raw, _ := json.Marshal(ocispec.Manifest{ // ponytail: plain structs and strings, cannot fail
+		Versioned:    specs.Versioned{SchemaVersion: 2},
+		MediaType:    ocispec.MediaTypeImageManifest,
+		ArtifactType: artifactType,
+		Config:       emptyJSON,
+		Layers:       layers,
+		Subject:      &ocispec.Descriptor{MediaType: anchorDesc.MediaType, Digest: anchorDesc.Digest, Size: anchorDesc.Size},
+		Annotations:  map[string]string{AnnotationFingerprint: fingerprint},
+	})
+	return raw, nil
+}
+
+func push(ctx context.Context, r *remote.Repository, fingerprint string, a Attestation) (ocispec.Descriptor, error) {
 	env, _ := json.Marshal(a.Envelope) // ponytail: strings and byte slices, cannot fail
 	envDesc, err := pushBlob(ctx, r, evidence.MediaTypeDSSE, env)
 	if err != nil {
@@ -258,23 +279,10 @@ func push(ctx context.Context, r *remote.Repository, fingerprint string, a Attes
 	if err != nil {
 		return ocispec.Descriptor{}, err
 	}
-	layers := []ocispec.Descriptor{envDesc, bundleDesc}
-	anchorRaw, anchorDesc := anchor(fingerprint)
-	// Re-tagging the deterministic anchor is idempotent and repairs a
-	// moved tag.
-	if _, err := oras.TagBytes(ctx, r, ocispec.MediaTypeImageManifest, anchorRaw, Tag(fingerprint)); err != nil {
-		return ocispec.Descriptor{}, fmt.Errorf("tagging anchor: %w", err)
+	raw, err := anchoredManifest(ctx, r, fingerprint, evidence.ArtifactType, []ocispec.Descriptor{envDesc, bundleDesc})
+	if err != nil {
+		return ocispec.Descriptor{}, err
 	}
-	m := ocispec.Manifest{
-		Versioned:    specs.Versioned{SchemaVersion: 2},
-		MediaType:    ocispec.MediaTypeImageManifest,
-		ArtifactType: evidence.ArtifactType,
-		Config:       emptyJSON,
-		Layers:       layers,
-		Subject:      &ocispec.Descriptor{MediaType: anchorDesc.MediaType, Digest: anchorDesc.Digest, Size: anchorDesc.Size},
-		Annotations:  map[string]string{AnnotationFingerprint: fingerprint},
-	}
-	raw, _ := json.Marshal(m) // ponytail: plain structs and strings, cannot fail
 	d := content.NewDescriptorFromBytes(ocispec.MediaTypeImageManifest, raw)
 	var listed error
 	for attempt := range pushConfirmAttempts {
@@ -406,7 +414,7 @@ func fetch(ctx context.Context, r *remote.Repository, dg digest.Digest) (*Attest
 	for _, l := range m.Layers {
 		switch {
 		case l.MediaType == evidence.MediaTypeDSSE && a.Envelope == nil:
-			raw, err := fetchBlob(ctx, r, l)
+			raw, err := fetchBlob(ctx, r, l, maxBlobSize)
 			if err != nil {
 				return nil, err
 			}
@@ -415,7 +423,7 @@ func fetch(ctx context.Context, r *remote.Repository, dg digest.Digest) (*Attest
 				return nil, malformed("envelope: %v", err)
 			}
 		case l.MediaType == MediaTypeSigstoreBundle && a.Bundle == nil:
-			if a.Bundle, err = fetchBlob(ctx, r, l); err != nil {
+			if a.Bundle, err = fetchBlob(ctx, r, l, maxBlobSize); err != nil {
 				return nil, err
 			}
 		default:
@@ -467,8 +475,10 @@ func fetchManifest(ctx context.Context, r *remote.Repository, dg digest.Digest) 
 	return raw, nil
 }
 
-func fetchBlob(ctx context.Context, r *remote.Repository, l ocispec.Descriptor) ([]byte, error) {
-	if l.Size < 0 || l.Size > maxBlobSize {
+// fetchBlob reads the layer l, of at most limit bytes, checking its size
+// and digest.
+func fetchBlob(ctx context.Context, r *remote.Repository, l ocispec.Descriptor, limit int64) ([]byte, error) {
+	if l.Size < 0 || l.Size > limit {
 		return nil, malformed("layer %s size %d out of range", l.Digest, l.Size)
 	}
 	if err := l.Digest.Validate(); err != nil {

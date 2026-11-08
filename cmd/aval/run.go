@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -60,8 +61,9 @@ func newRunCmd() *cobra.Command {
 		Use:   "run",
 		Short: "Reuse a verified result for the current inputs, or run the test",
 		Long: `run computes the fingerprint, looks up a signed result and reuses it if the
-trust policy accepts it. Otherwise it runs runner.command, records the result
-(--result) and, with --push, signs and publishes it.
+trust policy accepts it, restoring the contract's outputs. Otherwise it runs
+runner.command, records the result (--result) and, with --push, signs and
+publishes it with its outputs.
 
 Anything Aval cannot prove runs the test. A verification failure runs the
 test and exits 5: a security event. --shadow runs the test even after a
@@ -222,7 +224,8 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 			return err
 		}
 	}
-	r, lookupErr := decide(ctx, out, warn, c, fp, fpErr, o)
+	observed, probeErr := probe(ctx, c, filepath.Dir(o.file))
+	r, files, lookupErr := decide(ctx, out, warn, c, fp, cmp.Or(fpErr, probeErr), o)
 	_ = cliout.WriteReport(out, "text", r) // text never fails, like the other lines printed
 	// No I/O failure may skip the test or hide a verification failure
 	// (invariants 3, 4): errors are collected, never returned early.
@@ -231,27 +234,37 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 		errs = append(errs, err)
 	}
 	if r.Outcome == evidence.OutcomeVerified && !o.shadow && len(errs) == 0 {
-		fmt.Fprintf(out, "reused %s result\n", r.Result) // WriteReport printed the reference
-		recordRun(ctx, out, warn, o, r, true, nil)
-		if r.Result != evidence.ResultPassed {
-			return fmt.Errorf("reused result %s: %w", r.Result, errTestFailed)
+		// Outputs that cannot be written safely run the test instead.
+		if err := restore(out, filepath.Dir(o.file), files); err != nil {
+			errs = append(errs, fmt.Errorf("restoring outputs: %w", err))
+		} else {
+			return reuse(ctx, out, warn, o, r)
 		}
-		return nil
 	}
 	// A security event: run the test, then exit 5 (invariant 4). verify
 	// printed the SECURITY line and the report the reason.
 	if errors.Is(lookupErr, evidence.ErrVerification) {
 		errs = append(errs, shown{lookupErr})
 	}
-	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), fp)
+	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), fp, observed)
 	if err != nil {
 		recordRun(ctx, out, warn, o, r, false, nil)
 		return errors.Join(append(errs, err)...)
 	}
 	fmt.Fprintf(out, "ran %s: %s (exit %d)\n", c.Metadata.Name, p.Result, p.Execution.ExitCode)
-	errs = append(errs, keep(ctx, out, p, fpErr, mutable(c, fp), token, o)...)
+	errs = append(errs, keep(ctx, out, c, p, fpErr, probeErr, mutable(c, fp), token, o)...)
 	recordRun(ctx, out, warn, o, r, false, p)
 	return errors.Join(append(errs, judge(out, warn, r, p))...)
+}
+
+// reuse reports the reused verified result r; a failing one exits 3.
+func reuse(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.Report) error {
+	fmt.Fprintf(out, "reused %s result\n", r.Result) // WriteReport printed the reference
+	recordRun(ctx, out, warn, o, r, true, nil)
+	if r.Result != evidence.ResultPassed {
+		return fmt.Errorf("reused result %s: %w", r.Result, errTestFailed)
+	}
+	return nil
 }
 
 // printFingerprint handles --explain and --fingerprint-only. Both need the
@@ -336,7 +349,8 @@ func judge(out, warn io.Writer, r evidence.Report, p *evidence.Predicate) error 
 
 // decide looks up and verifies a result unless reuse is impossible or
 // disabled. Every way of not reusing comes back as a report, never silently.
-func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, fpErr error, o runFlags) (evidence.Report, error) {
+// A verified result comes with its outputs, checked but not yet written.
+func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, fpErr error, o runFlags) (evidence.Report, []registry.Output, error) {
 	if fpErr == nil {
 		fmt.Fprintf(out, "test %s fingerprint %s\n", c.Metadata.Name, fp.Digest)
 		printFindings(out, fp)
@@ -347,32 +361,86 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 	case contract.ExternalDependencies:
 		fmt.Fprintf(out, "cacheability %s: not reusable by default (the policy may allow it)\n", c.Cacheability)
 	}
-	r := newReport(c, fp)
+	var err error
 	switch {
 	case fpErr != nil:
-		return failReport(r, fpErr)
+		err = fpErr
 	case mutable(c, fp) != nil:
-		return failReport(r, mutable(c, fp))
+		err = mutable(c, fp)
 	case o.noReuse:
-		return failReport(r, skipped("reuse disabled (--no-reuse)"))
+		err = skipped("reuse disabled (--no-reuse)")
 	case o.repo == "":
-		return failReport(r, skipped("no registry configured: pass --registry to reuse verified results"))
+		err = skipped("no registry configured: pass --registry to reuse verified results")
+	}
+	if err != nil {
+		r, err := failReport(newReport(c, fp), err)
+		return r, nil, err
 	}
 	// The deadline bounds the registry, never runner.command.
 	ctx, cancel := context.WithTimeout(ctx, o.registryTimeout)
 	defer cancel()
-	return verify(ctx, warn, c, fp, o.repo, o.policyFile)
+	return verify(ctx, warn, c, o.file, fp, o.repo, o.policyFile)
+}
+
+// probeTimeout bounds each environment.probe command.
+var probeTimeout = 10 * time.Second
+
+// maxProbeOutput caps a probe's output: it is signed into the predicate, and
+// an envelope over the registry blob limit would read as a security event.
+const maxProbeOutput = 4 << 10
+
+// probe runs each environment.probe argv in dir, without a shell or the
+// signing token, and checks that its output holds the declared toolchain
+// value as a version token. It returns the outputs as probe.<key>. Only
+// `aval run` calls it: a consumer never executes contract-supplied commands.
+func probe(ctx context.Context, c *contract.Contract, dir string) (map[string]string, error) {
+	seen := map[string]string{}
+	for _, k := range slices.Sorted(maps.Keys(c.Environment.Probe)) {
+		argv, want := c.Environment.Probe[k], c.Environment.Toolchain[k]
+		pctx, cancel := context.WithTimeout(ctx, probeTimeout)
+		x := exec.CommandContext(pctx, argv[0], argv[1:]...)
+		x.Dir, x.Env, x.WaitDelay = dir, childEnv(), time.Second
+		raw, err := x.CombinedOutput()
+		cancel()
+		if err == nil && len(raw) > maxProbeOutput {
+			err, raw = fmt.Errorf("output over %d bytes", maxProbeOutput), raw[:maxProbeOutput]
+		}
+		got := strings.TrimSpace(string(raw))
+		switch {
+		case errors.Is(pctx.Err(), context.DeadlineExceeded):
+			err = fmt.Errorf("timed out after %s", probeTimeout)
+		case err == nil && !hasVersion(got, want):
+			err = errors.New("the declared value is not in the output")
+		}
+		if err != nil {
+			return nil, fmt.Errorf("environment.probe %s %q: declared %q, observed %q: %w", k, argv, want, cliout.OneLine(got), err)
+		}
+		seen["probe."+k] = got
+	}
+	return seen, nil
+}
+
+// hasVersion reports whether want appears in out as a version token: not
+// preceded by a digit or dot, not followed by a digit (3.13 is in
+// "Python 3.13.1", not in "Python 3.130"; 3.1 is not in "Python 3.13").
+func hasVersion(out, want string) bool {
+	return want != "" && regexp.MustCompile(`(^|[^0-9.])`+regexp.QuoteMeta(want)+`([^0-9]|$)`).MatchString(out)
+}
+
+// childEnv is the environment of commands Aval runs, without the signing
+// token: the code under test must not be able to sign results as this
+// workload.
+func childEnv() []string {
+	return slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, idTokenEnv+"=") })
 }
 
 // execute runs runner.command in the contract's directory and returns the
-// unsigned predicate for the run. A command that cannot start is an error,
-// not a failed test. The signing token is withheld from the command: the code
-// under test must not be able to sign results as this workload.
-func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract, dir string, fp fingerprint.Fingerprint) (*evidence.Predicate, error) {
+// unsigned predicate for the run, with the probe outputs (observed) in its
+// environment. A command that cannot start is an error, not a failed test.
+func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract, dir string, fp fingerprint.Fingerprint, observed map[string]string) (*evidence.Predicate, error) {
 	argv := c.Runner.Command
 	x := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	x.Dir, x.Stdout, x.Stderr = dir, stdout, stderr
-	x.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, idTokenEnv+"=") })
+	x.Dir, x.Stdout, x.Stderr, x.Env = dir, stdout, stderr, childEnv()
 	start := time.Now().UTC()
 	err := x.Run()
 	var exit *exec.ExitError
@@ -380,8 +448,11 @@ func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract
 		return nil, fmt.Errorf("running %q: %w", argv[0], err)
 	}
 	code := x.ProcessState.ExitCode()
-	env := map[string]string{"os": runtime.GOOS, "arch": runtime.GOARCH}
+	// The real os and arch win over toolchain keys of the same name.
+	env := map[string]string{}
 	maps.Copy(env, c.Environment.Toolchain)
+	maps.Copy(env, observed)
+	env["os"], env["arch"] = runtime.GOOS, runtime.GOARCH
 	host, _ := os.Hostname()
 	result := evidence.ResultPassed
 	if code != 0 {
@@ -403,8 +474,12 @@ func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract
 // keep records the result and, with --push, publishes it. Without a
 // fingerprint there is nothing a result could be reused for; with
 // unacknowledged mutable references (pinErr) nothing may reuse it, so it is
-// recorded but not published.
-func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr, pinErr error, token string, o runFlags) []error {
+// recorded but not published. After a failed probe it is not even recorded,
+// so 'aval push' cannot publish it.
+func keep(ctx context.Context, out io.Writer, c *contract.Contract, p *evidence.Predicate, fpErr, probeErr, pinErr error, token string, o runFlags) []error {
+	if probeErr != nil {
+		return []error{fmt.Errorf("result not recorded: %w", probeErr)}
+	}
 	if fpErr != nil {
 		if o.push {
 			return []error{fmt.Errorf("result not published: %w", fpErr)}
@@ -420,7 +495,7 @@ func keep(ctx context.Context, out io.Writer, p *evidence.Predicate, fpErr, pinE
 	if pinErr != nil {
 		return []error{fmt.Errorf("result not published: %s", pinErr)}
 	}
-	ref, err := signAndPush(ctx, p, o.repo, o.key, token, o.registryTimeout)
+	ref, err := signAndPush(ctx, p, c, o.file, o.repo, o.key, token, o.registryTimeout)
 	if err != nil {
 		return []error{err}
 	}
@@ -496,18 +571,38 @@ func writeJSON(path string, v any) error {
 	return os.WriteFile(path, append(raw, '\n'), 0o644)
 }
 
-// signAndPush signs the predicate (key-based with key, else keyless with the
-// OIDC token, from the interactive login when there is none) and publishes
-// it under its fingerprint, within timeout. The login runs only now, after
-// the test, so the short-lived token is fresh and runner.command never had
-// it.
-func signAndPush(ctx context.Context, p *evidence.Predicate, repo, key, token string, timeout time.Duration) (string, error) {
-	st, err := attest.NewStatement(p)
-	if err == nil && key == "" && token == "" {
-		if token, err = login(); err != nil {
-			err = fmt.Errorf("interactive Sigstore login: %w", err)
+// signAndPush collects the outputs of c (loaded from file), takes the OIDC
+// token from the interactive login when there is no key and no token,
+// publishes the outputs, then signs the predicate with them (key-based with
+// key, else keyless with the token) and publishes it under its fingerprint,
+// each within timeout. Outputs that break a rule, or a failed login,
+// publish nothing. The login runs only now, after the test, so the
+// short-lived token is fresh and runner.command never had it.
+func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contract, file, repo, key, token string, timeout time.Duration) (string, error) {
+	var files []registry.Output
+	var err error
+	if len(c.Outputs) > 0 {
+		if files, err = collectOutputs(file, c); err != nil {
+			return "", fmt.Errorf("result not published: %w", err)
 		}
 	}
+	if key == "" && token == "" {
+		if token, err = login(); err != nil {
+			return "", fmt.Errorf("signing: interactive Sigstore login: %w", err)
+		}
+	}
+	if len(c.Outputs) > 0 {
+		octx, cancel := context.WithTimeout(ctx, timeout)
+		o, err := pushOutputs(octx, repo, p.Execution.Fingerprint, files)
+		cancel()
+		if err != nil {
+			return "", fmt.Errorf("publishing outputs: %w", err)
+		}
+		q := *p
+		q.Execution.Outputs = o
+		p = &q
+	}
+	st, err := attest.NewStatement(p)
 	var s *attest.Signed
 	if err == nil {
 		s, err = sign(ctx, st, attest.SignOptions{Key: key, IDToken: token})
@@ -563,7 +658,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 				return fmt.Errorf("recorded result is for test %q (%s) with fingerprint %s; the contract is %q (%s) with fingerprint %s: run the test again",
 					p.Test.ID, p.Test.Cacheability, p.Execution.Fingerprint, c.Metadata.Name, c.Cacheability, fp.Digest)
 			}
-			ref, err := signAndPush(cmd.Context(), p, repo, key, token, timeout)
+			ref, err := signAndPush(cmd.Context(), p, c, file, repo, key, token, timeout)
 			if err != nil {
 				return err
 			}

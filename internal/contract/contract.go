@@ -85,6 +85,11 @@ type Contract struct {
 	Scope        Scope        `yaml:"scope" json:"scope"`
 	Environment  Environment  `yaml:"environment,omitempty" json:"environment"`
 	Cacheability Cacheability `yaml:"cacheability" json:"cacheability"`
+	// Outputs are globs of files the test writes that a reused result
+	// restores (a coverage or junit report). They are published with the
+	// result and are never inputs. Omitted when empty, so contracts without
+	// it hash as before.
+	Outputs []string `yaml:"outputs,omitempty" json:"outputs,omitempty"`
 }
 
 // Metadata identifies the test. Name is the test identity: *what* is being
@@ -165,9 +170,13 @@ type AllowMutable struct {
 
 // Environment declares execution conditions that are part of the fingerprint.
 type Environment struct {
-	// Toolchain is a declared map such as {go: "1.25"}. v0 trusts the
-	// declaration; detecting the real toolchain is future work.
+	// Toolchain is a declared map such as {go: "1.25"}. It is trusted as
+	// declared unless Probe checks it.
 	Toolchain map[string]string `yaml:"toolchain,omitempty" json:"toolchain"`
+	// Probe maps a Toolchain key to an argv that prints the installed
+	// version, such as {go: [go, version]}. Only `aval run` executes it.
+	// Omitted when empty, so contracts without it hash as before.
+	Probe map[string][]string `yaml:"probe,omitempty" json:"probe,omitempty"`
 	// Env lists environment variable names whose values are hashed.
 	Env []string `yaml:"env,omitempty" json:"env"`
 }
@@ -237,6 +246,7 @@ func (c *Contract) Validate() error {
 		"scope.source":       c.Scope.Source,
 		"scope.exclude":      c.Scope.Exclude,
 		"scope.dependencies": c.Scope.Dependencies,
+		"outputs":            c.Outputs,
 	} {
 		for i, g := range globs {
 			if err := ValidateGlob(g); err != nil {
@@ -432,6 +442,16 @@ func (e Environment) validate(add func(string, ...any)) {
 	for k := range e.Toolchain {
 		if !toolKeyRe.MatchString(k) {
 			add("environment.toolchain: invalid key %q", k)
+		}
+	}
+	for k, argv := range e.Probe {
+		if v, ok := e.Toolchain[k]; !ok {
+			add("environment.probe.%s: not a key of environment.toolchain", k)
+		} else if strings.TrimSpace(v) == "" {
+			add("environment.probe.%s: environment.toolchain.%s must not be empty", k, k)
+		}
+		if len(argv) == 0 || strings.TrimSpace(argv[0]) == "" {
+			add("environment.probe.%s: must be a non-empty argv list", k)
 		}
 	}
 	for i, v := range e.Env {
