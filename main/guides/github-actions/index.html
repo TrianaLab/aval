@@ -2176,7 +2176,9 @@ test cannot outlive it. <code>aval push</code> reads it from <code>$SIGSTORE_ID_
 only on push to <code>main</code>. A pull request job can still reuse: give it
 <code>contents: read</code>, run <code>aval run</code> with <code>--registry</code> and <code>--policy</code>, and
 leave out the push. GHCR packages that are public can be read without a
-login.</p>
+login.
+Read the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from the default branch, not from the PR:
+<a href="../../trust-model/#take-the-policy-from-a-protected-branch">Take the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from a protected branch</a>.</p>
 </details>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
 <ul>
