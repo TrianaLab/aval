@@ -38,32 +38,47 @@ func TestParseValid(t *testing.T) {
 	}
 }
 
+func TestParseProbe(t *testing.T) {
+	c, err := Parse([]byte(strings.Replace(valid, `toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: [go, version]}", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.Environment.Probe["go"]; len(got) != 2 || got[1] != "version" {
+		t.Fatalf("probe %q", got)
+	}
+}
+
 func TestParseInvalid(t *testing.T) {
 	cases := map[string]struct{ from, to, wantErr string }{
 		"bad apiVersion": {"aval.trianalab.io/v1", "aval.trianalab.io/v9", "apiVersion"},
 		// No accept window for the pre-freeze identifiers (fail closed).
-		"pre-freeze apiVersion": {"aval.trianalab.io/v1", "aval.dev/v1alpha1", "change the line to apiVersion: aval.trianalab.io/v1"},
-		"alpha apiVersion":      {"aval.trianalab.io/v1", "aval.trianalab.io/v1alpha1", "apiVersion"},
-		"empty apiVersion":      {"apiVersion: aval.trianalab.io/v1", "apiVersion: \"\"", "apiVersion"},
-		"unknown field":         {"cacheability:", "cachability:", "cachability"},
-		"bad class":             {"controlled-environment", "sometimes", "unknown class"},
-		"escaping glob":         {`"compose.yaml"`, `"../secrets"`, "segments"},
-		"absolute glob":         {`"compose.yaml"`, `"/etc/passwd"`, "relative"},
-		"partial **":            {`"**/*.go"`, `"a**/*.go"`, "whole path segment"},
-		"empty command":         {`["go", "test", "./..."]`, `[]`, "runner.command"},
-		"bad name":              {"orders-integration", "Orders Integration", "metadata.name"},
-		"bad env name":          {"[DB_IMAGE]", "[DB-IMAGE]", "environment.env"},
-		"missing scope":         {`source: ["**/*.go", "compose.yaml"]`, `source: []`, "scope.source"},
-		"bad kind":              {"kind: Test", "kind: Suite", "kind"},
-		"bad tool key":          {"{go: ", "{Go: ", "environment.toolchain"},
-		"no class":              {"cacheability: controlled-environment", "", "cacheability: required"},
-		"empty glob":            {`["go.sum"]`, `[""]`, "empty glob"},
-		"malformed glob":        {`["go.sum"]`, `["go.[sum"]`, "syntax error"},
-		"backslash glob":        {`["go.sum"]`, `["a\\\\b"]`, "slash-separated"},
-		"trailing slash":        {`["go.sum"]`, `["dir/"]`, "segments"},
-		"dot segment":           {`["go.sum"]`, `["./go.sum"]`, "segments"},
-		"empty segment":         {`["go.sum"]`, `["a//b"]`, "segments"},
-		"inner ..":              {`["go.sum"]`, `["a/../../b"]`, "segments"},
+		"pre-freeze apiVersion":       {"aval.trianalab.io/v1", "aval.dev/v1alpha1", "change the line to apiVersion: aval.trianalab.io/v1"},
+		"alpha apiVersion":            {"aval.trianalab.io/v1", "aval.trianalab.io/v1alpha1", "apiVersion"},
+		"empty apiVersion":            {"apiVersion: aval.trianalab.io/v1", "apiVersion: \"\"", "apiVersion"},
+		"unknown field":               {"cacheability:", "cachability:", "cachability"},
+		"bad class":                   {"controlled-environment", "sometimes", "unknown class"},
+		"escaping glob":               {`"compose.yaml"`, `"../secrets"`, "segments"},
+		"absolute glob":               {`"compose.yaml"`, `"/etc/passwd"`, "relative"},
+		"partial **":                  {`"**/*.go"`, `"a**/*.go"`, "whole path segment"},
+		"empty command":               {`["go", "test", "./..."]`, `[]`, "runner.command"},
+		"bad name":                    {"orders-integration", "Orders Integration", "metadata.name"},
+		"bad env name":                {"[DB_IMAGE]", "[DB-IMAGE]", "environment.env"},
+		"missing scope":               {`source: ["**/*.go", "compose.yaml"]`, `source: []`, "scope.source"},
+		"bad kind":                    {"kind: Test", "kind: Suite", "kind"},
+		"bad tool key":                {"{go: ", "{Go: ", "environment.toolchain"},
+		"probe without toolchain key": {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {python: [python, --version]}", "environment.probe.python: not a key of environment.toolchain"},
+		"probe empty toolchain value": {`toolchain: {go: "1.25"}`, "toolchain: {go: \" \"}\n  probe: {go: [go, version]}", "environment.probe.go: environment.toolchain.go must not be empty"},
+		"probe empty argv":            {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: []}", "environment.probe.go: must be a non-empty argv list"},
+		"probe blank command":         {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: [\" \"]}", "environment.probe.go: must be a non-empty argv list"},
+		"probe not a list":            {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: go version}", "cannot unmarshal"},
+		"no class":                    {"cacheability: controlled-environment", "", "cacheability: required"},
+		"empty glob":                  {`["go.sum"]`, `[""]`, "empty glob"},
+		"malformed glob":              {`["go.sum"]`, `["go.[sum"]`, "syntax error"},
+		"backslash glob":              {`["go.sum"]`, `["a\\\\b"]`, "slash-separated"},
+		"trailing slash":              {`["go.sum"]`, `["dir/"]`, "segments"},
+		"dot segment":                 {`["go.sum"]`, `["./go.sum"]`, "segments"},
+		"empty segment":               {`["go.sum"]`, `["a//b"]`, "segments"},
+		"inner ..":                    {`["go.sum"]`, `["a/../../b"]`, "segments"},
 		"allowMutable without reason": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   allowMutable: [{ref: "postgres:16"}]`, "scope.allowMutable[0]: ref and reason are both required"},
 		"allowMutable blank ref": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
@@ -103,6 +118,9 @@ func TestParseInvalid(t *testing.T) {
 		"contracts not yaml":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../backend]", "must name a contract file"},
 		"contracts listed twice": {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../b/aval.yaml, ../b/aval.yaml]", "scope.contracts[1]: \"../b/aval.yaml\" is listed twice"},
 		"contracts not a list":   {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: ../b/aval.yaml", "cannot unmarshal"},
+		"outputs escaping":       {"cacheability:", "outputs: [../coverage.xml]\ncacheability:", "outputs[0]"},
+		"outputs absolute":       {"cacheability:", "outputs: [/tmp/junit.xml]\ncacheability:", "outputs[0]"},
+		"outputs empty":          {"cacheability:", "outputs: [\"\"]\ncacheability:", "outputs[0]: empty glob"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -133,6 +151,20 @@ func TestParseAllowMutable(t *testing.T) {
 	}
 	if c, _ := Parse([]byte(valid)); c.Scope.AllowMutable != nil {
 		t.Fatalf("omitted allowMutable = %+v, want nil", c.Scope.AllowMutable)
+	}
+}
+
+// TestParseOutputs: outputs is optional and keeps each glob as written.
+func TestParseOutputs(t *testing.T) {
+	c, err := Parse([]byte(strings.Replace(valid, "cacheability:", "outputs: [coverage.xml, reports/*.xml]\ncacheability:", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(c.Outputs) != "[coverage.xml reports/*.xml]" {
+		t.Fatalf("outputs = %v", c.Outputs)
+	}
+	if c, _ := Parse([]byte(valid)); c.Outputs != nil {
+		t.Fatalf("omitted outputs = %v, want nil", c.Outputs)
 	}
 }
 

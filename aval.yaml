@@ -1,9 +1,10 @@
 # Aval dogfooding: the engine unit suite. tests/architecture is deliberately
 # out of scope (it reads .agents/ and .claude/, which hold symlinks) and
 # always runs. The scope is every file the suite reads (invariant 2):
-# testdata, the CLI reference cmd/aval checks, and the contracts the contract
-# fuzz target seeds from. tests/architecture/dogfood_test.go fails if a suite
-# reads a repository file outside its contract's scope.
+# testdata, the CLI reference cmd/aval checks, the contracts the contract
+# fuzz target seeds from, and the example the shard test reads.
+# tests/architecture/dogfood_test.go fails if a suite reads a repository file
+# outside its contract's scope.
 apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
@@ -18,6 +19,10 @@ scope:
     - "docs/cli-reference.md"
     - "aval.yaml"
     - "examples/go-compose/aval.yaml"
+    # internal/fingerprint's shard test. Top-level files and packages/ only:
+    # a local uv run leaves a .venv with symlinks at the example's root.
+    - "examples/uv-monorepo/*"
+    - "examples/uv-monorepo/packages/**"
   # Redundant since #63 (Aval never hashes .aval/), kept so the canonical
   # contract, and with it the published results, stay the same.
   exclude: ["**/.aval/**"]

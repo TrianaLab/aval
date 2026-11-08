@@ -158,7 +158,7 @@ func readRecord(ctx context.Context, r *remote.Repository, dg, anchor digest.Dig
 	if m.Layers[0].Size > maxRecordSize {
 		return nil, fmt.Errorf("record larger than %d bytes", maxRecordSize)
 	}
-	body, err := fetchBlob(ctx, r, m.Layers[0])
+	body, err := fetchBlob(ctx, r, m.Layers[0], maxBlobSize)
 	if err != nil {
 		return nil, err
 	}

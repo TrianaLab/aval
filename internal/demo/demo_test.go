@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -143,6 +144,16 @@ func TestFingerprintErrors(t *testing.T) {
 	d.files["aval.yaml"] = []byte(strings.Replace(project["aval.yaml"], "  toolchain:", "  env: [HOME]\n  toolchain:", 1))
 	out, _ := exec(t, d, "aval run --explain", exitOK)
 	mustContain(t, "env", out, "\nenv HOME unset\n")
+
+	// A declared os is overridden by the real one in the pushed predicate.
+	d = New()
+	d.files["aval.yaml"] = []byte(strings.Replace(project["aval.yaml"], "toolchain: {go: \"1.27\"}", "toolchain: {go: \"1.27\", os: plan9}", 1))
+	exec(t, d, "aval run", exitOK)
+	out, _ = exec(t, d, "aval verify -o json", exitOK)
+	var r evidence.Report
+	if err := json.Unmarshal([]byte(out), &r); err != nil || r.Predicate.Execution.Environment["os"] != runtime.GOOS {
+		t.Fatalf("verify report %+v, %v", r, err)
+	}
 
 	d = New()
 	delete(d.files, "go.mod")

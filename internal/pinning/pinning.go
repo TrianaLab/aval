@@ -79,7 +79,7 @@ type Detector interface {
 // Detectors are every ecosystem Scan checks.
 var Detectors = []Detector{
 	composeImages{}, kustomize{}, dockerfile{}, shellScripts{}, gomod{}, npm{}, python{},
-	cargo{}, java{}, ruby{}, php{}, gitmodules{},
+	cargo{}, java{}, ruby{}, php{}, gitmodules{}, testcontainers{},
 }
 
 // Scan reads the in-scope files (slash-separated, relative to the root of
@@ -95,22 +95,17 @@ func Scan(fsys fs.FS, files []string, command []string) []Finding {
 	manifests := kustomizeJSON(fsys, files, has)
 	var out []Finding
 	for _, rel := range files {
-		var ds []Detector
-		for _, d := range Detectors {
-			if d.Applies(rel) {
-				ds = append(ds, d)
-			}
-		}
-		if manifests[rel] && !(composeImages{}).Applies(rel) {
-			ds = append(ds, composeImages{})
-		}
-		if len(ds) == 0 && path.Ext(rel) == "" && isShellScript(fsys, rel) {
-			ds = []Detector{shellScripts{}}
-		}
+		ds := detectorsFor(fsys, rel, manifests[rel])
 		if len(ds) == 0 {
 			continue
 		}
 		data, err := readBounded(fsys, rel)
+		if err != nil && len(ds) == 1 && ds[0] == Detector(testcontainers{}) {
+			// ponytail: a source file that cannot be read or is over 1 MiB (a
+			// vendored bundle) is not checked; a finding for each would make
+			// every such scope a miss.
+			continue
+		}
 		if err != nil {
 			out = append(out, Finding{File: rel, Ecosystem: "scan", Ref: rel, Fix: err.Error() + ": Aval cannot check its references; shrink or split the file"})
 			continue
@@ -127,6 +122,24 @@ func Scan(fsys fs.FS, files []string, command []string) []Finding {
 		return a.Line - b.Line
 	})
 	return slices.CompactFunc(out, func(a, b Finding) bool { return a == b })
+}
+
+// detectorsFor returns the detectors that read rel; manifest says a
+// kustomization lists it in resources.
+func detectorsFor(fsys fs.FS, rel string, manifest bool) []Detector {
+	var ds []Detector
+	for _, d := range Detectors {
+		if d.Applies(rel) {
+			ds = append(ds, d)
+		}
+	}
+	if manifest && !(composeImages{}).Applies(rel) {
+		ds = append(ds, composeImages{})
+	}
+	if len(ds) == 0 && path.Ext(rel) == "" && isShellScript(fsys, rel) {
+		ds = []Detector{shellScripts{}}
+	}
+	return ds
 }
 
 // kustomizeJSON returns the in-scope .json files that an in-scope

@@ -236,6 +236,12 @@ outcome does: [Outcomes](concepts/outcomes.md).
 - `--record` publishes an unsigned run record for every outcome; it never
   affects reuse or the exit code
   ([run records](artifact-format.md#run-records)).
+- Restored outputs are as trustworthy as the signer that published them: a
+  signer at the policy's minimum level can publish any coverage or junit
+  content a later gate reads. Aval checks only that the outputs match the
+  signed digests and the contract's `outputs` globs, are not the contract
+  file, lie outside the scope, `.git` and `.aval`, and that no symlink is
+  on the way.
 
 ## Miss vs verification failure
 

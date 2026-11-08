@@ -17,6 +17,10 @@ scope:
     - "tests/integration/**"
     - "tests/acceptance/**"
     - "examples/go-compose/**"
+    # Top-level files and packages/ only: a local uv run leaves a .venv with
+    # symlinks at the example's root.
+    - "examples/uv-monorepo/*"
+    - "examples/uv-monorepo/packages/**"
     # tests/acceptance runs the docs quickstart as written.
     - "docs/quickstart.md"
     # tests/acceptance runs the history estimate script.
@@ -26,6 +30,6 @@ scope:
   exclude: ["**/.aval/**"]
   dependencies: [go.mod, go.sum, Makefile]
 environment:
-  toolchain: {go: "1.27"}
+  toolchain: {go: "1.27", uv: "0.9.18"}
   env: [GOFLAGS, GOEXPERIMENT, CGO_ENABLED]
 cacheability: hermetic

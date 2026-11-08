@@ -1,5 +1,6 @@
 // Package acceptance holds level 4 tests: whole user stories through the
-// aval binary, no cluster and no network.
+// aval binary, no cluster and no network (except uv in
+// TestUVMonorepoShards).
 package acceptance
 
 import (
