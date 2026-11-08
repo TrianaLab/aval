@@ -108,6 +108,8 @@ func (o runFlags) validate(token string) error {
 		return usageError{errors.New("--record requires --registry")}
 	case o.shadow && o.noReuse:
 		return usageError{errors.New("--shadow and --no-reuse exclude each other")}
+	case o.login && !o.push:
+		return usageError{errors.New("--login needs --push")}
 	case o.repo != "":
 		if err := checkRegistry(o.repo); err != nil {
 			return err

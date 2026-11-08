@@ -87,6 +87,15 @@ func TestInteractiveLoginNotUsed(t *testing.T) {
 	}
 }
 
+// run --login without --push would sign nothing: a usage error, no login.
+func TestRunLoginNeedsPush(t *testing.T) {
+	calls := fakeLogin(t, true, "", nil)
+	c := writeContract(t, "hermetic")
+	if code, _, stderr := runCLI("run", "-f", c, "--login", "--result", filepath.Join(t.TempDir(), "r.json")); code != ExitUsage || !strings.Contains(stderr, "--login needs --push") || *calls != 0 {
+		t.Errorf("exit %d, stderr %q", code, stderr)
+	}
+}
+
 // The production seams: the terminal check answers, and the login uses the
 // issuer from $SIGSTORE_OIDC_ISSUER (here one that is gone, so it fails).
 func TestLoginSeams(t *testing.T) {

@@ -47,12 +47,25 @@ func mainPolicyProblems(p *policy.Policy) []string {
 		problems = append(problems, "minTrustLevel must be runner")
 	}
 	for _, id := range p.Identities {
-		ownCI := id.PublicKey == "" && id.Issuer == actionsIssuer && strings.HasPrefix(id.SubjectRegexp, ownWorkflow) && id.TrustLevel == evidence.TrustRunner
-		if !ownCI && id.TrustLevel != evidence.TrustDeveloper {
+		ownCI := id.PublicKey == "" && id.Issuer == actionsIssuer && strings.HasPrefix(id.SubjectRegexp, ownWorkflow) && literalRegexp(id.SubjectRegexp) && id.TrustLevel == evidence.TrustRunner
+		// A catch-all at developer level would turn a forged signature from
+		// a verification failure into a miss (invariant 4): keyless
+		// developers must name one subject.
+		if !ownCI && (id.TrustLevel != evidence.TrustDeveloper || (id.PublicKey == "" && !literalRegexp(id.SubjectRegexp))) {
 			problems = append(problems, "untrusted identity "+id.Issuer+" "+id.SubjectRegexp)
 		}
 	}
 	return problems
+}
+
+// literalRegexp reports whether s matches exactly one string.
+func literalRegexp(s string) bool {
+	re, err := regexp.Compile(s)
+	if err != nil {
+		return false
+	}
+	_, complete := re.LiteralPrefix()
+	return complete
 }
 
 // prPolicyProblems: a PR may also accept developer signatures, but grants
@@ -94,6 +107,9 @@ func TestDogfoodPolicyChecksCatchLooseTrust(t *testing.T) {
 		"key":                          {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{PublicKey: "k", TrustLevel: evidence.TrustRunner}}},
 		"other repository":             {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: `https://github\.com/evil/aval/.*`, TrustLevel: evidence.TrustRunner}}},
 		"other issuer":                 {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: "https://evil", SubjectRegexp: ci.SubjectRegexp, TrustLevel: evidence.TrustRunner}}},
+		"wildcard developer":           {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, {Issuer: actionsIssuer, SubjectRegexp: ".*", TrustLevel: evidence.TrustDeveloper}}},
+		"wildcard after own workflow":  {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: ownWorkflow + ".*|.*", TrustLevel: evidence.TrustRunner}}},
+		"invalid developer regexp":     {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, {Issuer: actionsIssuer, SubjectRegexp: "(", TrustLevel: evidence.TrustDeveloper}}},
 		"isolated self-grant":          {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: ci.SubjectRegexp, TrustLevel: evidence.TrustIsolated}}},
 	}
 	for name, p := range bad {
