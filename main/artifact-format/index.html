@@ -759,6 +759,8 @@
       
         
       
+        
+      
     
     
     
@@ -847,6 +849,34 @@
     
   
     Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
   
 
     
@@ -1717,6 +1747,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#push" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2352,6 +2393,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#push" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2801,6 +2853,18 @@ truth. The identifiers and JSON shapes below are frozen; see
 <td>frozen</td>
 </tr>
 <tr>
+<td><code>ArtifactTypeOutputs</code></td>
+<td><code>application/vnd.trianalab.aval.outputs.v1</code></td>
+<td><code>artifactType</code> of the manifest that carries the output files of one execution</td>
+<td>frozen</td>
+</tr>
+<tr>
+<td><code>MediaTypeOutput</code></td>
+<td><code>application/vnd.trianalab.aval.output.v1</code></td>
+<td>Media type of one output file layer</td>
+<td>frozen</td>
+</tr>
+<tr>
 <td><code>ReportVersion</code></td>
 <td><code>aval.trianalab.io/verify-report/v1</code></td>
 <td><code>version</code> of the verify report</td>
@@ -2852,6 +2916,7 @@ reads the <abbr title="One sha256 hash of every input the contract declares.">fi
   e1[execution manifest] -- subject --&gt; anchor
   e2[execution manifest] -- subject --&gt; anchor
   e1 --&gt; layers[layers: DSSE envelope,&lt;br&gt;Sigstore bundle]
+  o1[outputs manifest] -- subject --&gt; anchor
   stag[tag stats-TEST] --&gt; sanchor[stats anchor]
   r1[run record] -- subject --&gt; sanchor</code></pre>
 <p>Per <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> there is one <strong>anchor</strong> manifest, and one <strong>execution</strong>
@@ -2931,6 +2996,34 @@ It is tagged <code>sha256-&lt;fingerprint hex&gt;</code>.</p>
   revision or artifact is recorded inside the statement, not in the manifest,
   so the referrers of a tested image do not list its evidence.</li>
 </ul>
+<h3 id="outputs">Outputs<a class="headerlink" href="#outputs" title="Anchor link">&para;</a></h3>
+<p>A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> with <code>outputs</code> publishes the files before the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>, as one
+manifest with <code>artifactType</code> <code>application/vnd.trianalab.aval.outputs.v1</code>,
+the OCI empty config, one layer per file (media type
+<code>application/vnd.trianalab.aval.output.v1</code>, annotation
+<code>org.opencontainers.image.title</code> = the path relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>) and
+the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> anchor as <code>subject</code>. The predicate's <code>execution.outputs</code>
+holds its digest and every file's path, digest and size, so the signature
+covers them. Lookup lists only execution manifests: an outputs manifest is
+never a candidate and does not count toward the 64-candidate cap, and
+readers that do not know it ignore it.</p>
+<p>After a candidate verifies, Aval fetches its outputs by the signed digests,
+with the caps (256 files, 16 MiB each, 64 MiB in total) checked before
+reading. Each of these is a verification failure, never a miss:</p>
+<ul>
+<li>the outputs manifest or a blob is missing, or does not match its digest
+  or size</li>
+<li>the manifest's layers differ from the predicate's list (extra, missing,
+  renamed or reordered)</li>
+<li>a path that matches no <code>outputs</code> glob, is the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file, is in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>
+  or under <code>.git</code> or <code>.aval</code>; a glob that matches no path; a predicate without outputs for a
+  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> with <code>outputs</code>, or the reverse</li>
+</ul>
+<p><code>aval run</code> then writes the files: each is staged next to its target and
+renamed into place once all are staged. A symlink on the way or anything
+but a regular file at the target stops the restore; the test runs and the
+command exits 1. A failure while renaming can leave some files restored;
+the test then runs and rewrites them.</p>
 <h3 id="push">Push<a class="headerlink" href="#push" title="Anchor link">&para;</a></h3>
 <ul>
 <li>Push never replaces: identical bytes are a no-op, anything else adds a
@@ -3464,13 +3557,31 @@ checked by <code>Predicate.Validate</code> (called by <code>evidence.Parse</code
 <td><code>execution.environment</code></td>
 <td>map string to string</td>
 <td>no (omitted when empty)</td>
-<td>Conditions of the run (toolchain, OS/arch). Only keys declared under <code>environment.toolchain</code> in <code>aval.yaml</code> are part of the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; anything else here is informational.</td>
+<td>Conditions of the run (toolchain, OS/arch). Only keys declared under <code>environment.toolchain</code> in <code>aval.yaml</code> are part of the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; anything else here is informational. <code>os</code> and <code>arch</code> are always the real values, whatever the toolchain declares; <code>probe.&lt;key&gt;</code> is the output of an <code>environment.probe</code>.</td>
 </tr>
 <tr>
 <td><code>execution.exitCode</code></td>
 <td>integer</td>
 <td></td>
 <td>Exit code of <code>runner.command</code>.</td>
+</tr>
+<tr>
+<td><code>execution.outputs</code></td>
+<td>object</td>
+<td>no (omitted without <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <code>outputs</code>)</td>
+<td>The <a href="#outputs">outputs</a> of the run.</td>
+</tr>
+<tr>
+<td><code>execution.outputs.manifest</code></td>
+<td>string</td>
+<td>yes, <code>sha256:&lt;64 hex&gt;</code></td>
+<td>Digest of the outputs manifest.</td>
+</tr>
+<tr>
+<td><code>execution.outputs.files</code></td>
+<td>list of <code>{path, digest, size}</code></td>
+<td>yes, non-empty</td>
+<td>In layer order. <code>path</code> is relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, slash-separated and clean (no <code>..</code>, <code>.</code>, empty segment, leading <code>/</code>, backslash or control character), listed once; <code>digest</code> is <code>sha256:&lt;64 hex&gt;</code>; <code>size</code> is not negative.</td>
 </tr>
 <tr>
 <td><code>runner</code></td>
@@ -3832,6 +3943,10 @@ version adds a new file. The tests that enforce this:
   rejected; no record <code>aval</code> writes is affected.</li>
 <li>Within <code>aval-fingerprint/v1</code> (#102), <code>scope.resolve</code> adds <code>resolve</code>
   lines after the <code>env</code> lines; manifests without it are unchanged.</li>
+<li>Within <code>execution/v2</code> (#141), the predicate gained <code>execution.outputs</code>
+  and the outputs manifest (<code>outputs.v1</code>, <code>output.v1</code>) was added; the
+  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> gained <code>outputs</code>, omitted when empty, so no existing
+  <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> changes.</li>
 </ul>
 </details>
 

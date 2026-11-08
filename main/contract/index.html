@@ -759,6 +759,8 @@
       
         
       
+        
+      
     
     
     
@@ -847,6 +849,34 @@
     
   
     Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
   
 
     
@@ -1743,6 +1773,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#probe-the-toolchain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Probe the toolchain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#versioning" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2245,6 +2286,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#probe-the-toolchain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Probe the toolchain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#versioning" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2388,21 +2440,25 @@ do not declare is invisible to Aval. Format: <code>aval.trianalab.io/v1</code>, 
 </span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="s">"rebuilt</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">scanned</span><span class="nv"> </span><span class="s">nightly"</span>
 </span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
 </span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="nt">environment</span><span class="p">:</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span><span class="w">                    </span><span class="c1"># optional, declared, not detected (v0)</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span><span class="w">                    </span><span class="c1"># optional, declared</span>
 </span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">    </span><span class="nt">go</span><span class="p">:</span><span class="w"> </span><span class="s">"1.25"</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w">                          </span><span class="c1"># optional, names only; values are hashed</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CGO_ENABLED</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOFLAGS</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span><span class="w">          </span><span class="c1"># required, see "Cacheability classes"</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span><span class="w">                        </span><span class="c1"># optional, checks a toolchain entry before the run</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">    </span><span class="nt">go</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">go</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">version</span><span class="p p-Indicator">]</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w">                          </span><span class="c1"># optional, names only; values are hashed</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CGO_ENABLED</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOFLAGS</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span><span class="w">          </span><span class="c1"># required, see "Cacheability classes"</span>
 </span></code></pre></div>
 <p>Check it locally:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>path/to/aval.yaml<span class="w"> </span>--fingerprint-only<span class="w">   </span><span class="c1"># prints sha256:&lt;hex&gt;</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>path/to/aval.yaml<span class="w"> </span>--explain<span class="w"> </span>--fingerprint-only<span class="w">   </span><span class="c1"># also prints the manifest</span>
 </span></code></pre></div>
 <p>Diff the <code>--explain</code> output of two machines to see which file, toolchain entry
-or variable differs. <code>-f</code> defaults to <code>./aval.yaml</code>; the root is always the
-<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file's directory.</p>
+or variable differs. <code>-f</code> takes one path and defaults to <code>./aval.yaml</code>; the
+root is always the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file's directory. A file holds one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: give
+each shard of a split suite its own file
+(<a href="../guides/shards-and-matrices/">Shards and matrices</a>).</p>
 <h2 id="fields">Fields<a class="headerlink" href="#fields" title="Anchor link">&para;</a></h2>
 <ul>
 <li>Unknown fields and files with more than one YAML document are rejected
@@ -2486,6 +2542,12 @@ or variable differs. <code>-f</code> defaults to <code>./aval.yaml</code>; the r
 <td>Keys match <code>^[a-z0-9][a-z0-9._-]*$</code>. Values are not validated.</td>
 </tr>
 <tr>
+<td><code>environment.probe</code></td>
+<td>map string to list of strings</td>
+<td>no</td>
+<td>Each key must be an <code>environment.toolchain</code> key with a non-empty value; each value a non-empty argv, first element not blank. See <a href="#probe-the-toolchain">Probe the toolchain</a>.</td>
+</tr>
+<tr>
 <td><code>environment.env</code></td>
 <td>list of strings</td>
 <td>no</td>
@@ -2497,10 +2559,17 @@ or variable differs. <code>-f</code> defaults to <code>./aval.yaml</code>; the r
 <td>yes</td>
 <td>One of <code>hermetic</code>, <code>controlled-environment</code>, <code>external-dependencies</code>, <code>non-deterministic</code>.</td>
 </tr>
+<tr>
+<td><code>outputs</code></td>
+<td>list of globs</td>
+<td>no</td>
+<td>Files the test writes that a reused result restores, such as <code>coverage.xml</code> (<a href="../guides/write-a-contract/#restore-coverage-and-reports-on-reuse">Restore coverage and reports on reuse</a>). Same glob rules as <code>scope</code>. When publishing, each glob must match a regular file (no symlink) that is not the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file, outside the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, <code>.git</code> and <code>.aval</code>; at most 256 files, 16 MiB each, 64 MiB in total. Otherwise nothing is published (exit 1). Omitted from the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> when empty, so existing contracts keep theirs; adding it changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so a result without outputs is never reused for it.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="globs">Globs<a class="headerlink" href="#globs" title="Anchor link">&para;</a></h2>
-<p><code>scope.source</code>, <code>scope.exclude</code> and <code>scope.dependencies</code> use the same globs:</p>
+<p><code>scope.source</code>, <code>scope.exclude</code>, <code>scope.dependencies</code> and <code>outputs</code> use the
+same globs:</p>
 <table>
 <thead>
 <tr>
@@ -2615,7 +2684,7 @@ hashed, in this order:</p>
 </tr>
 <tr>
 <td><code>toolchain</code></td>
-<td><code>key=value</code> as written; not checked against the installed tools</td>
+<td><code>key=value</code> as written; checked against the installed tools only by <code>environment.probe</code></td>
 <td></td>
 </tr>
 <tr>
@@ -2669,7 +2738,7 @@ executable file fingerprints differently there than on Unix.</p>
 </tr>
 <tr>
 <td>the real toolchain, OS and architecture</td>
-<td>unless declared</td>
+<td>unless declared; probe output is never hashed</td>
 </tr>
 </tbody>
 </table>
@@ -2682,7 +2751,8 @@ depends on one of these can reuse a result it should not:</p>
 <li>an environment variable the test reads that <code>environment.env</code> does not list</li>
 <li>content behind a name the <a href="../pinning/">scanner</a> does not recognize, or a
   network service: use <code>scope.resolve</code> or <code>external-dependencies</code></li>
-<li>the installed toolchain, OS and architecture</li>
+<li>the installed toolchain, OS and architecture, unless <code>environment.probe</code>
+  checks the toolchain entry</li>
 </ul>
 <p>Mitigation: review the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, use <code>aval run --shadow</code>, pick the right
 <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class.</p>
@@ -2740,6 +2810,32 @@ test and records nothing; <code>--fingerprint-only</code>, <code>--explain</code
 </tr>
 </tbody>
 </table>
+<h2 id="probe-the-toolchain">Probe the toolchain<a class="headerlink" href="#probe-the-toolchain" title="Anchor link">&para;</a></h2>
+<p><code>environment.toolchain</code> is a claim. <code>environment.probe</code> checks it: before the
+lookup, <code>aval run</code> runs each probe in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory, without a
+shell, with a 10 s timeout and without <code>$SIGSTORE_ID_TOKEN</code>. The declared
+value must appear in the output (stdout and stderr) as a version token: not
+preceded by a digit or a dot, not followed by a digit. <code>3.13</code> matches
+<code>Python 3.13.1</code>; it does not match <code>Python 3.130</code>, and <code>3.1</code> does not match
+<code>Python 3.13</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<p>On a mismatch, a probe that cannot start, a non-zero exit, a timeout or
+output over 4 KiB (it is signed into the predicate),
+<code>aval run</code> looks nothing up (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>; the reason names the probe, the
+declared and the observed value), runs the test, records and publishes
+nothing, and exits 1 (3 if the test failed). On a match, the output goes into
+the predicate's <code>execution.environment</code> as <code>probe.&lt;key&gt;</code>.</p>
+<p>Only <code>aval run</code> executes probes. <code>aval verify</code>, <code>aval push</code>,
+<code>--fingerprint-only</code> and the browser demo never do: a consumer never executes
+commands from a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>. <code>--explain</code> prints the manifest before any probe
+runs; when it goes on to run the test, the probe runs as in any run. The probe
+argv is part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, so adding or changing one changes the
+<abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; its output is not hashed, since it varies by build and platform.</p>
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Anchor link">&para;</a></h2>
 <p><code>aval.trianalab.io/v1</code> is frozen; <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> files use the same value. Within v1
 the schema only gets new optional fields. An older <code>aval</code> rejects a field it
@@ -2748,10 +2844,10 @@ does not know, which fails closed.</p>
 <a href="../artifact-format/#versioning-and-compatibility">artifact format</a>.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Anchor link">&para;</a></h2>
 <ul>
-<li><strong>Detected toolchain</strong>: verify or record the installed toolchain instead
-  of trusting <code>environment.toolchain</code>. Not scheduled in milestones 1-5.</li>
 <li><strong>Observed inputs</strong>: trace which files the test actually reads, to flag
-  undeclared inputs or suggest <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. v0 never infers <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.</li>
+  undeclared inputs or suggest <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. v0 never infers <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. Until then,
+  <a href="../guides/write-a-contract/#find-undeclared-inputs">find undeclared inputs</a>
+  by hand.</li>
 </ul>
 
 

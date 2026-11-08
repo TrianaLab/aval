@@ -759,6 +759,8 @@
       
         
       
+        
+      
     
     
     
@@ -847,6 +849,34 @@
     
   
     Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
   
 
     
@@ -2687,6 +2717,12 @@ the test runs.</p>
 <li><code>--record</code> publishes an unsigned run record for every <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>; it never
   affects reuse or the exit code
   (<a href="../artifact-format/#run-records">run records</a>).</li>
+<li>Restored outputs are as trustworthy as the <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> that published them: a
+  <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> at the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s minimum level can publish any coverage or junit
+  content a later gate reads. Aval checks only that the outputs match the
+  signed digests and the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <code>outputs</code> globs, are not the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
+  file, lie outside the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, <code>.git</code> and <code>.aval</code>, and that no symlink is
+  on the way.</li>
 </ul>
 <h2 id="miss-vs-verification-failure">Miss vs verification failure<a class="headerlink" href="#miss-vs-verification-failure" title="Anchor link">&para;</a></h2>
 <table>
@@ -2777,7 +2813,7 @@ copied into the predicate as <code>test.cacheability</code>.</p>
 </tr>
 <tr>
 <td>Undeclared input changed (file outside <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, unlisted env var, network service)</td>
-<td>Not detected: the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> only covers declared inputs. Mitigated by <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> review, <code>external-dependencies</code> not being reusable by default and <code>non-deterministic</code> never being reusable, and the false-hit suite. Observed-input tracing is future work.</td>
+<td>Not detected: the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> only covers declared inputs. Mitigated by <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> review, <code>external-dependencies</code> not being reusable by default and <code>non-deterministic</code> never being reusable, and the false-hit suite. Observed-input tracing is future work; until then, <a href="../guides/write-a-contract/#find-undeclared-inputs">find undeclared inputs</a> by hand.</td>
 </tr>
 <tr>
 <td>Content behind a declared name changed (repushed image tag, new upstream release, changed remote script)</td>

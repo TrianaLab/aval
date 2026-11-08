@@ -761,6 +761,8 @@
       
         
       
+        
+      
     
     
     
@@ -909,6 +911,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#restore-coverage-and-reports-on-reuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restore coverage and reports on reuse
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#find-undeclared-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Find undeclared inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#read-next" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -943,6 +967,34 @@
     
   
     Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
   
 
     
@@ -2082,6 +2134,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#restore-coverage-and-reports-on-reuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restore coverage and reports on reuse
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#find-undeclared-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Find undeclared inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#read-next" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2198,14 +2272,14 @@ which CI runs:</p>
    when the inputs change.</li>
 <li><strong>Say how to run it.</strong> <code>runner.command</code> is an argv list. Aval does not use
    a shell unless you call one, like the example does.</li>
-<li><strong>List the inputs.</strong> <code>scope.source</code> lists the files the test reads.
-   <code>scope.dependencies</code> lists dependency manifests and lockfiles (<code>go.mod</code>,
-   <code>go.sum</code>). Globs are relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s
-   directory; <code>**</code> matches any number of directories.</li>
+<li><strong>List the inputs.</strong> <code>scope.source</code> lists the files the test reads,
+   <code>scope.dependencies</code> the manifests and lockfiles (<code>go.mod</code>, <code>go.sum</code>).
+   Globs are relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>; <code>**</code> matches any number of
+   directories. A glob that matches nothing means no <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so the
+   test always runs (<code>exclude</code> globs may match nothing).</li>
 <li><strong>Pick a <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class.</strong> It tells Aval and the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> how safe reuse
    is. Tags, ranges and branches block reuse for <code>hermetic</code> and
-   <code>controlled-environment</code>: see
-   <a href="../../pinning/">Pin your dependencies</a>.</li>
+   <code>controlled-environment</code>: <a href="../../pinning/">pin them</a>.</li>
 </ol>
 <table>
 <thead>
@@ -2239,8 +2313,7 @@ which CI runs:</p>
 </tbody>
 </table>
 <h2 id="check-the-scope">Check the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr><a class="headerlink" href="#check-the-scope" title="Anchor link">&para;</a></h2>
-<p><code>--explain</code> lists every input. Not listed means not hashed: if the test reads
-it, add it.</p>
+<p><code>--explain</code> lists every input. Not listed means not hashed: add what is missing.</p>
 <details class="example">
 <summary>What <code>--explain</code> prints</summary>
 <p>One line per input: kind, sha256, <code>x</code> for an executable file, path.</p>
@@ -2273,19 +2346,62 @@ it, add it.</p>
 </span></code></pre></div>
 </details>
 <details class="info">
-<summary>Globs that match nothing</summary>
-<p>Every glob in <code>source</code> and <code>dependencies</code> must match at least one file.
-Otherwise Aval cannot <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, and the test always runs. <code>exclude</code>
-globs may match nothing.</p>
-</details>
-<details class="info">
 <summary>Environment</summary>
-<p>The <code>environment.toolchain</code> values (<code>go: "1.25"</code>) go into the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>
-as written; Aval does not check what is installed. <code>environment.env</code>
-names variables whose values go into the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</p>
+<p><code>environment.toolchain</code> values (<code>go: "1.25"</code>) and the values of the
+variables <code>environment.env</code> names go into the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> as written.
+<a href="../../contract/#probe-the-toolchain"><code>environment.probe</code></a> (<code>go: [go,
+version]</code>) checks what is installed: without <code>1.25</code> in its output,
+<code>aval run</code> runs the test and publishes nothing.</p>
+</details>
+<h2 id="restore-coverage-and-reports-on-reuse">Restore coverage and reports on reuse<a class="headerlink" href="#restore-coverage-and-reports-on-reuse" title="Anchor link">&para;</a></h2>
+<p>A reused result writes no coverage or junit file. List the files later steps
+read under <code>outputs</code> (top level), e.g. <code>outputs: [coverage.xml, junit.xml]</code>:</p>
+<ul>
+<li><code>aval run --push</code> and <code>aval push</code> publish them with the result, signed by
+  digest. <code>aval push</code> reads them from disk: push right after <code>aval run</code>.</li>
+<li><code>aval run</code> writes them back on reuse, after the result verifies.
+  <code>aval verify</code> checks them and writes nothing.</li>
+<li>Keep them out of <code>scope</code>; <a href="../../contract/">caps and rules</a> apply.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Outputs are published</p>
+<p>Anyone who can read the registry repository can read them. On reuse Aval
+writes any file a trusted <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> published under the globs, except this
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s inputs and file. List no secrets and keep the globs narrow:
+<code>**</code> can overwrite files later steps or other contracts read.</p>
+</div>
+<h2 id="find-undeclared-inputs">Find undeclared inputs<a class="headerlink" href="#find-undeclared-inputs" title="Anchor link">&para;</a></h2>
+<p>A file the test reads but <code>scope</code> does not list is a false hit waiting to
+happen; <code>--shadow</code> catches it only after it flips a result
+(<a href="../measure-reuse/">Measure reuse</a>). Compare the files the test opens with
+<code>--explain</code>. Here pytest loads <code>tests/conftest.py</code>, outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s
+<code>src/**</code> and <code>tests/unit/**</code>. On Linux, from the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>strace<span class="w"> </span>-f<span class="w"> </span>-e<span class="w"> </span><span class="nv">trace</span><span class="o">=</span>openat<span class="w"> </span>-o<span class="w"> </span>trace.txt<span class="w"> </span>pytest<span class="w"> </span>tests/unit
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>grep<span class="w"> </span>-v<span class="w"> </span>ENOENT<span class="w"> </span>trace.txt<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-o<span class="w"> </span><span class="s1">'"[^"]*"'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tr<span class="w"> </span>-d<span class="w"> </span><span class="s1">'"'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s2">"s|^</span><span class="nv">$PWD</span><span class="s2">/||"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s1">'^/'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-u<span class="w"> </span>&gt;<span class="w"> </span>read.txt
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>aval<span class="w"> </span>run<span class="w"> </span>--explain<span class="w"> </span>--fingerprint-only<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">'$1 == "source" || $1 == "dependency"'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="s1">' '</span><span class="w"> </span>-f4-<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-u<span class="w"> </span>&gt;<span class="w"> </span>scope.txt
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>comm<span class="w"> </span>-23<span class="w"> </span>read.txt<span class="w"> </span>scope.txt<span class="w">   </span><span class="c1"># prints tests/conftest.py</span>
+</span></code></pre></div>
+<p>Add it to <code>scope.source</code>. Read the list, do not paste it: some lines are
+caches (<code>__pycache__</code>). Check <code>scope.contracts</code> the same way.</p>
+<details class="info">
+<summary>macOS, Windows, or without a tracer</summary>
+<ul>
+<li>macOS: <code>sudo fs_usage -w -f pathname &lt;process name&gt;</code> while it runs.</li>
+<li>Windows: Process Monitor, filtered on the test's process and directory.</li>
+<li>Anywhere: copy only the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> to an empty directory and run the test
+  there; a missing input usually fails the run or changes its result:</li>
+</ul>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">scope</span><span class="o">=</span><span class="k">$(</span>mktemp<span class="w"> </span>-d<span class="k">)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>aval<span class="w"> </span>run<span class="w"> </span>--explain<span class="w"> </span>--fingerprint-only<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">'$1 == "source" || $1 == "dependency"'</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="s1">' '</span><span class="w"> </span>-f4-<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>-cf<span class="w"> </span>-<span class="w"> </span>-T<span class="w"> </span>-<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>-xf<span class="w"> </span>-<span class="w"> </span>-C<span class="w"> </span><span class="s2">"</span><span class="nv">$scope</span><span class="s2">"</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$scope</span><span class="s2">"</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>pytest<span class="w"> </span>tests/unit<span class="o">)</span>
+</span></code></pre></div>
 </details>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
 <ul>
+<li><a href="../shards-and-matrices/">Shards and matrices</a>: one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> per shard</li>
 <li><a href="../trust-policy/">Write a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></a></li>
 <li><a href="../../pinning/">Pin your dependencies</a></li>
 <li><a href="../../contract/">The test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a>: every field and rule</li>

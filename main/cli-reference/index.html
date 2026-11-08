@@ -759,6 +759,8 @@
       
         
       
+        
+      
     
     
     
@@ -847,6 +849,34 @@
     
   
     Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
   
 
     
@@ -2395,8 +2425,9 @@ record's source repository.</p>
 </span></code></pre></div>
 <h2 id="aval-run">aval run<a class="headerlink" href="#aval-run" title="Anchor link">&para;</a></h2>
 <p>run computes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, looks up a signed result and reuses it if the
-trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> accepts it. Otherwise it runs runner.command, records the result
-(--result) and, with --push, signs and publishes it.</p>
+trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> accepts it, restoring the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s outputs. Otherwise it runs
+runner.command, records the result (--result) and, with --push, signs and
+publishes it with its outputs.</p>
 <p>Anything Aval cannot prove runs the test. A verification failure runs the
 test and exits 5: a security event. --shadow runs the test even after a
 verified result and exits 1 if they disagree (a false hit).</p>

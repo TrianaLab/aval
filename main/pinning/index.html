@@ -761,6 +761,8 @@
       
         
       
+        
+      
     
     
     
@@ -852,6 +854,34 @@
     
   
     Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
   
 
     
@@ -2340,6 +2370,17 @@ line names file:line, ecosystem, the reference and the fix.
 <details class="info">
 <summary>What else is checked</summary>
 <ul>
+<li>Images in test code: in <code>*.go</code>, <code>*.py</code>, <code>*.java</code>, <code>*.kt</code>, <code>*.ts</code>,
+  <code>*.js</code> and <code>*.cs</code> files that mention testcontainers, a quoted
+  <code>name:tag</code> without a digest (<code>PostgresContainer("postgres:16")</code>). A
+  <code>localhost</code>, dotted or 4+ digit <code>host:port</code> literal
+  (<code>"localhost:5432"</code>, <code>"127.0.0.1:8080"</code>, <code>"db:5432"</code>), a clock time
+  (<code>"12:30"</code>), a <code>sha256:</code> digest, a literal with a space or a scheme,
+  and a name without a tag are not reported. Any other quoted
+  <code>name:tag</code>, such as <code>"classpath:schema.sql"</code>, is reported and can be
+  accepted in <code>scope.allowMutable</code>; an image whose tag is 4 or more
+  digits without a registry (<code>"app:2024"</code>) is taken for a <code>host:port</code>
+  and not reported.</li>
 <li>Images in <code>docker run</code>, <code>podman run</code>, <code>docker compose</code> and
   <code>kubectl run</code>/<code>create --image</code> commands. A compose file the command uses
   must be in <code>scope.source</code>; it can be YAML or JSON (<code>compose.json</code>).</li>
@@ -2455,6 +2496,13 @@ guarantee is the declared <abbr title="The inputs the contract lists: source fil
   (the <code>ARG</code> default is checked; outside <code>FROM</code> the last value of a name
   wins); the BuildKit pass on a source file named like
   <code>dockerfile_test.go</code>.</li>
+<li>In test code: an image in a variable built from parts, in a constant
+  or helper in a file that does not mention testcontainers, a
+  module's default image (<code>PostgresContainer()</code> without an image), the
+  Ryuk reaper image, source files larger than 1 MiB or unreadable, and
+  source in other languages or extensions (<code>.rs</code>, <code>.mjs</code>, <code>.tsx</code>,
+  <code>.groovy</code>, <code>.scala</code>). Write the image with its digest
+  (<code>"postgres:16@sha256:&lt;digest&gt;"</code>), or declare it in <code>scope.resolve</code>.</li>
 <li>Shell commands are split without a full parser: a quoted <code>;</code> or <code>&gt;</code>
   also splits, which can cause needless misses.</li>
 <li>An option Aval does not know to take a value

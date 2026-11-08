@@ -761,6 +761,8 @@
       
         
       
+        
+      
     
     
     
@@ -852,6 +854,34 @@
     
   
     Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
   
 
     
@@ -2210,7 +2240,8 @@
 
 
 <h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Anchor link">&para;</a></h1>
-<p>Goal: go from an exit code or an error message to its cause and its fix.</p>
+<p>Goal: go from an exit code or an error message to its cause and its fix.
+In the messages below, text in <code>&lt;...&gt;</code> changes per run.</p>
 <pre class="aval-mermaid"><code>flowchart LR
   code{exit code} -- 2 --&gt; u([Flags and files]):::warn
   code -- 1 --&gt; e([Errors]):::warn
@@ -2275,7 +2306,6 @@
 </table>
 <p>A miss (4) is routine. A verification failure (5) means someone published a
 result the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> does not trust; never hide it or retry it away.</p>
-<p>Text in <code>&lt;...&gt;</code> changes per run.</p>
 <h2 id="flags-and-files-exit-2">Flags and files (exit 2)<a class="headerlink" href="#flags-and-files-exit-2" title="Anchor link">&para;</a></h2>
 <details class="failure">
 <summary>Flag errors</summary>
@@ -2313,7 +2343,7 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 </tr>
 <tr>
 <td><code>holds neither an Aval result nor a report</code>, <code>is an input of the test</code></td>
-<td>write <code>--result</code> and <code>--report</code> under <code>.aval/</code></td>
+<td>write <code>--result</code> and <code>--report</code> under <code>.aval/</code>; for <code>output &lt;x&gt; is an input of the test</code>, exclude it from <code>scope</code></td>
 </tr>
 </tbody>
 </table>
@@ -2361,8 +2391,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>pick a <a href="../write-a-contract/#step-by-step">class</a></td>
 </tr>
 <tr>
-<td><code>environment.toolchain: invalid key</code>, <code>invalid variable name</code></td>
-<td>lower case tool names, valid variable names</td>
+<td><code>environment.toolchain: invalid key</code>, <code>invalid variable name</code>, <code>environment.probe.&lt;key&gt;: not a key of environment.toolchain</code>, <code>environment.probe.&lt;key&gt;: must be a non-empty argv list</code>, <code>environment.probe.&lt;key&gt;: environment.toolchain.&lt;key&gt; must not be empty</code></td>
+<td>lower case tool names, valid variable names; probe only declared, non-empty toolchain keys, each with an argv</td>
 </tr>
 <tr>
 <td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code>, <code>file &lt;x&gt; must be a slash-separated path relative to the contract</code></td>
@@ -2384,9 +2414,7 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 </table>
 </details>
 <h2 id="errors-exit-1">Errors (exit 1)<a class="headerlink" href="#errors-exit-1" title="Anchor link">&para;</a></h2>
-<p><code>aval verify</code> exits 1. <code>aval run</code> prints these as <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>, runs the
-test and exits with the test's code. It exits 1 only when the test cannot
-start (<code>running &lt;x&gt;</code>) or the result cannot be published.</p>
+<p><code>aval verify</code> exits 1. <code>aval run</code> prints these as <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>, runs the test and exits with the test's code. It exits 1 only when the test cannot start (<code>running &lt;x&gt;</code>), a probe fails (<code>environment.probe</code>) or the result cannot be published.</p>
 <details class="failure">
 <summary>Fingerprint and trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></summary>
 <table>
@@ -2467,12 +2495,20 @@ start (<code>running &lt;x&gt;</code>) or the result cannot be published.</p>
 <td>push again, or use a registry with OCI 1.1 referrers</td>
 </tr>
 <tr>
-<td><code>running &lt;x&gt;</code></td>
-<td>install the program <code>runner.command</code> starts</td>
+<td><code>running &lt;x&gt;</code>, <code>environment.probe &lt;key&gt; &lt;argv&gt;: declared &lt;x&gt;, observed &lt;y&gt;</code></td>
+<td>install the program <code>runner.command</code> starts, or the declared toolchain version (<a href="../../contract/#probe-the-toolchain">Probe the toolchain</a>)</td>
+</tr>
+<tr>
+<td><code>FALSE HIT: &lt;x&gt;</code> (with <code>--shadow</code>)</td>
+<td>the test reads an input <code>scope</code> does not list: <a href="../write-a-contract/#find-undeclared-inputs">find it</a></td>
 </tr>
 <tr>
 <td><code>writing report: &lt;x&gt;</code>, <code>result not published: &lt;x&gt;</code></td>
 <td>fix the <code>--report</code> path, or the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> error before it</td>
+</tr>
+<tr>
+<td><code>publishing outputs: &lt;x&gt;</code>, <code>more than &lt;n&gt; output files</code>, <code>outputs are capped at</code>, <code>is not a regular file (symlinks are not published)</code>, <code>backslashes and control characters in a path</code>, <code>is the contract</code>, <code>restoring outputs: &lt;x&gt;</code></td>
+<td>keep each output a regular file under the caps and narrow the globs; for <code>restoring outputs</code>, remove the symlink or directory in the way. The test ran instead (<a href="../write-a-contract/#restore-coverage-and-reports-on-reuse">Restore coverage and reports on reuse</a>)</td>
 </tr>
 <tr>
 <td><code>reading the result recorded by 'aval run'</code></td>
@@ -2562,6 +2598,10 @@ on <code>rejected</code> where that must stop a pipeline (<code>.github/aval/sum
 <tr>
 <td><code>cacheability &lt;x&gt; is not reusable under the policy</code>, <code>cacheability &lt;x&gt;, want &lt;y&gt;</code>, <code>tag &lt;x&gt; points at &lt;y&gt;, not the fingerprint anchor</code></td>
 <td>a lie about the result or the tag: find out who pushed</td>
+</tr>
+<tr>
+<td><code>outputs: &lt;x&gt;</code>, <code>the result carries no outputs, the contract declares outputs</code>, <code>is not a declared output of the contract, or is an input</code>, <code>matches no output of the result</code></td>
+<td>the stored outputs do not match the signed list or the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: a forged result, or the registry deleted the outputs. Find out who pushed, delete the result and push again</td>
 </tr>
 <tr>
 <td><code>no signature verifier configured</code>, <code>expected fingerprint and test id are required</code></td>

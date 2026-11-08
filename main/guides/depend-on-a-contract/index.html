@@ -16,7 +16,7 @@
         <link rel="prev" href="../write-a-contract/">
       
       
-        <link rel="next" href="../github-actions/">
+        <link rel="next" href="../shards-and-matrices/">
       
       
         
@@ -761,6 +761,8 @@
       
         
       
+        
+      
     
     
     
@@ -937,6 +939,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#workspaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workspaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#read-next" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -951,6 +964,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2082,6 +2123,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#workspaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workspaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#read-next" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2222,6 +2274,92 @@ end-to-end tests against the real backend.</p>
 backend), list the API file (OpenAPI, <code>.proto</code>) in <code>scope.dependencies</code>
 instead. Only an interface change reruns the test. Globs cannot leave the
 <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory, so keep the file in the frontend's tree.</p>
+<h2 id="workspaces">Workspaces<a class="headerlink" href="#workspaces" title="Anchor link">&para;</a></h2>
+<p>uv, pnpm and cargo workspaces keep one lockfile at the root. A member's
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> cannot list it: globs cannot use <code>..</code>. Two layouts work.</p>
+<p><strong>Contracts at the root</strong>, one per member, named <code>aval.&lt;member&gt;.yaml</code>:</p>
+<div class="language-yaml highlight"><span class="filename">aval.api.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Test</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">metadata</span><span class="p">:</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api-unit</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">runner</span><span class="p">:</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"uv"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"run"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"--package"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"api"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"pytest"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"packages/api/tests"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"packages/api/**"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"pyproject.toml"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"uv.lock"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
+</span></code></pre></div>
+<p><strong>A root <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> owns the lockfile</strong>, and each member names it in
+<code>scope.contracts</code>, which may use <code>..</code>:</p>
+<div class="language-yaml highlight"><span class="filename">aval.lock.yaml</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Test</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">metadata</span><span class="p">:</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">workspace-lock</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nt">runner</span><span class="p">:</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"uv"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"lock"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"--check"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"pyproject.toml"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span><span class="nt">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"uv.lock"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
+</span></code></pre></div>
+<div class="language-yaml highlight"><span class="filename">packages/api/aval.yaml</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Test</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">metadata</span><span class="p">:</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api-unit</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="nt">runner</span><span class="p">:</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"uv"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"run"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"pytest"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"tests"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"src/**"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"tests/**"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"pyproject.toml"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">contracts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"../../aval.lock.yaml"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
+</span></code></pre></div>
+<p>Either way, any lockfile change reruns every member. The same layouts fit
+the other tools:</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Root files to hash</th>
+<th>Lockfile check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>uv</td>
+<td><code>pyproject.toml</code>, <code>uv.lock</code></td>
+<td><code>uv lock --check</code></td>
+</tr>
+<tr>
+<td>pnpm</td>
+<td><code>package.json</code>, <code>pnpm-workspace.yaml</code>, <code>pnpm-lock.yaml</code></td>
+<td><code>pnpm install --frozen-lockfile</code></td>
+</tr>
+<tr>
+<td>cargo</td>
+<td><code>Cargo.toml</code>, <code>Cargo.lock</code></td>
+<td><code>cargo metadata --locked</code></td>
+</tr>
+</tbody>
+</table>
+<p>A member that imports another member lists that member's sources too, or
+names its <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.</p>
+<details class="info">
+<summary>Inputs the workspace graph does not show</summary>
+<p>Check each one against the test, and list the ones it reads:</p>
+<ul>
+<li>shared config at the root: <code>tsconfig.base.json</code>, <code>.npmrc</code>,
+  <code>conftest.py</code>, <code>pytest.ini</code>, <code>.cargo/config.toml</code>, <code>rust-toolchain.toml</code>,
+  <code>.python-version</code>, <code>.nvmrc</code>;</li>
+<li>patches: pnpm <code>patches/</code>, cargo <code>[patch]</code> sources;</li>
+<li>build scripts and generated code: <code>build.rs</code>, codegen inputs;</li>
+<li>shared fixtures or test data outside the member;</li>
+<li>environment variables (<code>environment.env</code>).</li>
+</ul>
+</details>
+<p>There is no <code>aval init</code>: generating <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> from manifests would infer it,
+and choosing the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> is the hard part, not typing the YAML.
+<a href="../write-a-contract/#find-undeclared-inputs">Find undeclared inputs</a> checks
+what you chose.</p>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
 <ul>
 <li><a href="../write-a-contract/">Write a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a></li>
@@ -2281,13 +2419,13 @@ instead. Only an interface change reruns the test. Globs cannot leave the
         
         
           
-          <a href="../github-actions/" class="md-footer__link md-footer__link--next" aria-label="Next: Use GitHub Actions">
+          <a href="../shards-and-matrices/" class="md-footer__link md-footer__link--next" aria-label="Next: Shards and matrices">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Use GitHub Actions
+                Shards and matrices
               </div>
             </div>
             <div class="md-footer__button md-icon">
