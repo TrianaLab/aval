@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/TrianaLab/aval/internal/attest"
+	"github.com/TrianaLab/aval/internal/cliout"
 	"github.com/TrianaLab/aval/internal/contract"
 	"github.com/TrianaLab/aval/internal/fingerprint"
 	"github.com/TrianaLab/aval/internal/policy"
@@ -58,17 +60,18 @@ func (o *initOpts) missing() []string {
 func newInitCmd() *cobra.Command {
 	var o initOpts
 	cmd := &cobra.Command{
-		Use:   "init --name NAME --source GLOB... --cacheability CLASS --key FILE|--keyless [--force] -- <command>",
+		Use:   "init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless [--force] -- <command>",
 		Short: "Write aval.yaml, a signing key and a trust policy for a test",
 		Long: `init writes aval.yaml for one test, validated before it is written. With
---key FILE it also writes the signing key pair (FILE and its .pub, as keygen
-does) and ` + defaultPolicy + ` trusting that key at trust level developer. It adds
+--key NAME it also writes the signing key pair (NAME.key and NAME.pub, as
+keygen does; a trailing .key is dropped) and ` + defaultPolicy + ` trusting that key at trust level developer. It adds
 the key and .aval/ to .gitignore. --keyless writes no key and no policy.
 
 Nothing is inferred: --source and --cacheability have no default, and init
 never traces the test. It lists the files the source globs match and rejects a
 glob that matches nothing. It never replaces aval.yaml, ` + defaultPolicy + ` or the key
-without --force.
+without --force. If a write fails after the key pair was written, init
+removes the key pair again.
 
 When a value is missing and both stdin and stdout are terminals, init asks for
 it. Otherwise it exits 2 and names the missing flags.
@@ -91,7 +94,7 @@ nothing, or init cancelled).`,
 	f.StringVar(&o.name, "name", "", "test name (metadata.name): what the test checks")
 	f.StringArrayVar(&o.sources, "source", nil, "source glob relative to the current directory (scope.source); repeat it for more")
 	f.StringVar(&o.cacheability, "cacheability", "", "hermetic, controlled-environment, external-dependencies or non-deterministic")
-	f.StringVar(&o.key, "key", "", "signing key file to create (with its .pub) and trust in "+defaultPolicy)
+	f.StringVar(&o.key, "key", "", "signing key pair NAME.key and NAME.pub to create and trust in "+defaultPolicy+"; a trailing .key is dropped")
 	f.BoolVar(&o.keyless, "keyless", false, "sign keyless with Sigstore: no key and no policy are written")
 	f.BoolVar(&o.force, "force", false, "replace existing aval.yaml, "+defaultPolicy+" and key files")
 	return cmd
@@ -100,6 +103,9 @@ nothing, or init cancelled).`,
 func runInit(cmd *cobra.Command, o *initOpts) error {
 	if o.key != "" && o.keyless {
 		return usageError{errors.New("--key and --keyless exclude each other")}
+	}
+	if err := checkKeyPath(o.key); err != nil {
+		return usageError{err}
 	}
 	out := cmd.OutOrStdout()
 	if m := o.missing(); len(m) > 0 {
@@ -114,25 +120,39 @@ func runInit(cmd *cobra.Command, o *initOpts) error {
 	if err != nil {
 		return err
 	}
-	styled, _ := outputStyle(isTTY(out), plainFlag(cmd), os.Getenv)
+	styled, color := outputStyle(isTTY(out), plainFlag(cmd), os.Getenv)
 	line := func(glyph, s string) {
 		if styled {
-			s = glyph + " " + s
+			cliout.Step(out, color, glyph, s)
+			return
 		}
 		fmt.Fprintln(out, s)
 	}
-	line(glyphNeutral, previewFiles(files))
+	line(cliout.GlyphNeutral, previewFiles(files))
 	if err := writeInit(o, doc, line); err != nil {
 		return err
 	}
-	next := "next: export AVAL_REGISTRY=<oci repository> AVAL_POLICY=" + defaultPolicy + ", then aval run --push --key " + o.keyName() + ".key"
+	next := "next: export AVAL_REGISTRY=<oci repository> AVAL_POLICY=" + defaultPolicy + ", then aval run --push --key " + cliout.OneLine(o.keyName()) + ".key"
 	if o.keyless {
 		next = "next: write a trust policy for your OIDC identity (docs: guides/trust-policy), export AVAL_REGISTRY=<oci repository> AVAL_POLICY=<policy file>, then aval run --push"
+	}
+	if o.cacheability == string(contract.NonDeterministic) {
+		next += "; non-deterministic results are never reused"
 	}
 	if styled {
 		next = "Wrote the contract for " + o.name + "; " + next + "."
 	}
 	fmt.Fprintln(out, next)
+	return nil
+}
+
+// checkKeyPath rejects a --key outside the current directory: its
+// .gitignore line would ignore nothing and the policy would point outside
+// the repository.
+func checkKeyPath(key string) error {
+	if key != "" && !filepath.IsLocal(key) {
+		return fmt.Errorf("--key %q must be a relative path inside the current directory", key)
+	}
 	return nil
 }
 
@@ -162,55 +182,86 @@ func checkInit(o *initOpts) ([]byte, []string, error) {
 	if !o.keyless {
 		paths = append(paths, defaultPolicy, o.keyName()+".key", o.keyName()+".pub")
 	}
-	for _, p := range paths {
-		if _, err := os.Lstat(p); err == nil && !o.force {
-			return nil, nil, fmt.Errorf("%s already exists; pass --force to replace it", p)
-		}
+	if err := checkAbsent(paths, o.force); err != nil {
+		return nil, nil, err
 	}
 	return doc, files, nil
 }
 
+// checkAbsent fails when one of paths exists and force is not set.
+func checkAbsent(paths []string, force bool) error {
+	for _, p := range paths {
+		_, err := os.Lstat(p)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+		case err != nil:
+			return err
+		case !force:
+			return fmt.Errorf("%s already exists; pass --force to replace it", cliout.OneLine(p))
+		}
+	}
+	return nil
+}
+
+// writeFile writes p as a new file. With force it first removes what is
+// there, and O_EXCL never follows a symlink into another file, as keygen.
+func writeFile(p string, data []byte, force bool) error {
+	if force {
+		if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	return errors.Join(err, f.Close())
+}
+
 // writeInit writes the key pair and policy (unless keyless), the contract
-// and the .gitignore lines, reporting each through line.
-func writeInit(o *initOpts, doc []byte, line func(glyph, s string)) error {
+// and the .gitignore lines, reporting each through line. A failure after the
+// key pair was written removes it, so a rerun needs no --force for it.
+func writeInit(o *initOpts, doc []byte, line func(glyph, s string)) (err error) {
 	ignore := []string{fingerprint.OutputDir + "/"}
 	if !o.keyless {
 		name := o.keyName()
-		kid, err := attest.WriteKeyPair(name, o.force)
-		if err != nil {
+		var kid string
+		if kid, err = attest.WriteKeyPair(name, o.force); err != nil {
 			return err
 		}
-		line(glyphDone, fmt.Sprintf("wrote %[1]s.key (private: keep it secret, do not commit it) and %[1]s.pub, key id %[2]s", name, kid))
+		defer func() {
+			if err != nil {
+				_ = os.Remove(name + ".key")
+				_ = os.Remove(name + ".pub")
+			}
+		}()
+		shown := cliout.OneLine(name)
+		line(cliout.GlyphDone, fmt.Sprintf("wrote %[1]s.key (private: keep it secret, do not commit it) and %[1]s.pub, key id %[2]s", shown, kid))
 		pol := marshalYAML(policyDoc{contract.APIVersion, policy.Kind, "developer", []policyIdentity{{name + ".pub", "developer"}}})
 		_, err = policy.Parse(pol, ".")
 		if err == nil {
-			err = os.WriteFile(defaultPolicy, pol, 0o644)
+			err = writeFile(defaultPolicy, pol, o.force)
 		}
 		if err != nil {
 			return err
 		}
-		line(glyphDone, fmt.Sprintf("wrote %s: trusts %s.pub at trust level developer", defaultPolicy, name))
+		line(cliout.GlyphDone, fmt.Sprintf("wrote %s: trusts %s.pub at trust level developer", defaultPolicy, shown))
 		ignore = append([]string{name + ".key"}, ignore...)
 	}
-	if err := os.WriteFile(contract.DefaultFile, doc, 0o644); err != nil {
+	if err := writeFile(contract.DefaultFile, doc, o.force); err != nil {
 		return err
 	}
-	line(glyphDone, "wrote "+contract.DefaultFile)
+	line(cliout.GlyphDone, "wrote "+contract.DefaultFile)
 	added, err := gitignore(ignore)
 	if err != nil {
 		return err
 	}
 	if len(added) > 0 {
-		line(glyphDone, "added "+strings.Join(added, ", ")+" to .gitignore")
+		line(cliout.GlyphDone, "added "+strings.Join(added, ", ")+" to .gitignore")
 	}
 	return nil
 }
-
-// glyphs of style A for init's styled lines; cliout owns the run ones.
-const (
-	glyphDone    = "✓"
-	glyphNeutral = "·"
-)
 
 // policyDoc is the policy init writes, in this field order.
 type policyDoc struct {
@@ -263,9 +314,14 @@ const maxPreview = 10
 
 // previewFiles is the one-line preview of the matched files.
 func previewFiles(files []string) string {
-	shown, more := files, ""
+	// File names come from the tree: OneLine keeps their escape sequences
+	// out of the terminal.
+	shown, more := slices.Clone(files[:min(len(files), maxPreview)]), ""
 	if len(files) > maxPreview {
-		shown, more = files[:maxPreview], fmt.Sprintf(" and %d more", len(files)-maxPreview)
+		more = fmt.Sprintf(" and %d more", len(files)-maxPreview)
+	}
+	for i, f := range shown {
+		shown[i] = cliout.OneLine(f)
 	}
 	noun := "files"
 	if len(files) == 1 {
@@ -317,7 +373,13 @@ func prompt(in *bufio.Reader, out io.Writer, o *initOpts) error {
 		q      string
 		accept func(string) error
 	}{
-		{o.name == "", "Test name (what it checks, e.g. unit)", func(s string) error { o.name = s; return nil }},
+		{o.name == "", "Test name (what it checks, e.g. unit)", func(s string) error {
+			if err := contract.ValidateName(s); err != nil {
+				return err
+			}
+			o.name = s
+			return nil
+		}},
 		{len(o.command) == 0, "Test command (split on spaces, no shell)", func(s string) error { o.command = strings.Fields(s); return nil }},
 		{len(o.sources) == 0, "Source globs the test reads (space-separated, e.g. src/** go.mod)", func(s string) error {
 			_, err := matched(strings.Fields(s))
@@ -327,18 +389,30 @@ func prompt(in *bufio.Reader, out io.Writer, o *initOpts) error {
 			return err
 		}},
 		{o.cacheability == "", "Cacheability" + classes.String(), func(s string) error {
+			if slices.Contains(cacheabilities, contract.Cacheability(s)) {
+				o.cacheability = s
+				return nil
+			}
 			i, err := strconv.Atoi(s)
 			if err != nil || i < 1 || i > len(cacheabilities) {
-				return fmt.Errorf("answer 1 to %d", len(cacheabilities))
+				return fmt.Errorf("answer 1 to %d or a class name", len(cacheabilities))
 			}
 			o.cacheability = string(cacheabilities[i-1])
 			return nil
 		}},
 		{o.key == "" && !o.keyless, "Signing key file to create (e.g. aval.key), or keyless", func(s string) error {
-			o.keyless = s == "keyless"
-			if !o.keyless {
-				o.key = s
+			if s == "keyless" {
+				o.keyless = true
+				return nil
 			}
+			if err := checkKeyPath(s); err != nil {
+				return err
+			}
+			name := strings.TrimSuffix(s, ".key")
+			if err := checkAbsent([]string{name + ".key", name + ".pub"}, o.force); err != nil {
+				return err
+			}
+			o.key = s
 			return nil
 		}},
 	}
@@ -370,7 +444,7 @@ func ask(in *bufio.Reader, out io.Writer, q string, accept func(string) error) e
 			continue
 		}
 		if err := accept(s); err != nil {
-			fmt.Fprintln(out, "  "+err.Error())
+			fmt.Fprintln(out, "  "+cliout.OneLine(err.Error()))
 			continue
 		}
 		return nil

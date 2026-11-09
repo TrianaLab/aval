@@ -40,6 +40,9 @@ next: export AVAL_REGISTRY=<oci repository> AVAL_POLICY=policy.yaml, then aval r
 
 On a terminal, `aval init` without flags asks for each value.
 
+Skip the export for now: steps 2 and 3 pass `--registry` and `--policy`
+as flags, and the end of step 3 shows the environment form.
+
 ## 2. First run: a miss
 
 ![aval run prints miss, runs the test, which passes, and pushes the signed result to localhost:5001](assets/gifs/miss.gif)

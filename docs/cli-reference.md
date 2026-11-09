@@ -124,14 +124,15 @@ Global Flags:
 ## aval init
 
 init writes aval.yaml for one test, validated before it is written. With
---key FILE it also writes the signing key pair (FILE and its .pub, as keygen
-does) and policy.yaml trusting that key at trust level developer. It adds
+--key NAME it also writes the signing key pair (NAME.key and NAME.pub, as
+keygen does; a trailing .key is dropped) and policy.yaml trusting that key at trust level developer. It adds
 the key and .aval/ to .gitignore. --keyless writes no key and no policy.
 
 Nothing is inferred: --source and --cacheability have no default, and init
 never traces the test. It lists the files the source globs match and rejects a
 glob that matches nothing. It never replaces aval.yaml, policy.yaml or the key
-without --force.
+without --force. If a write fails after the key pair was written, init
+removes the key pair again.
 
 When a value is missing and both stdin and stdout are terminals, init asks for
 it. Otherwise it exits 2 and names the missing flags.
@@ -142,7 +143,7 @@ nothing, or init cancelled).
 
 ```text
 Usage:
-  aval init --name NAME --source GLOB... --cacheability CLASS --key FILE|--keyless [--force] -- <command> [flags]
+  aval init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless [--force] -- <command> [flags]
 
 Examples:
   # Write aval.yaml, aval.key, aval.pub and policy.yaml
@@ -152,7 +153,7 @@ Flags:
       --cacheability string   hermetic, controlled-environment, external-dependencies or non-deterministic
       --force                 replace existing aval.yaml, policy.yaml and key files
   -h, --help                  help for init
-      --key string            signing key file to create (with its .pub) and trust in policy.yaml
+      --key string            signing key pair NAME.key and NAME.pub to create and trust in policy.yaml; a trailing .key is dropped
       --keyless               sign keyless with Sigstore: no key and no policy are written
       --name string           test name (metadata.name): what the test checks
       --source stringArray    source glob relative to the current directory (scope.source); repeat it for more

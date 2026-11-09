@@ -247,8 +247,8 @@ func (c *Contract) Validate() error {
 	if c.Kind != Kind {
 		add("kind: got %q, want %q", c.Kind, Kind)
 	}
-	if !nameRe.MatchString(c.Metadata.Name) {
-		add("metadata.name: %q must be 1-64 chars of [a-z0-9._-], starting and ending alphanumeric", c.Metadata.Name)
+	if err := ValidateName(c.Metadata.Name); err != nil {
+		errs = append(errs, err)
 	}
 	if len(c.Runner.Command) == 0 || strings.TrimSpace(c.Runner.Command[0]) == "" {
 		add("runner.command: must be a non-empty argv list")
@@ -473,6 +473,15 @@ func (e Environment) validate(add func(string, ...any)) {
 			add("environment.env[%d]: invalid variable name %q", i, v)
 		}
 	}
+}
+
+// ValidateName rejects a metadata.name that is not 1-64 chars of
+// [a-z0-9._-], starting and ending alphanumeric.
+func ValidateName(name string) error {
+	if !nameRe.MatchString(name) {
+		return fmt.Errorf("metadata.name: %q must be 1-64 chars of [a-z0-9._-], starting and ending alphanumeric", name)
+	}
+	return nil
 }
 
 // ValidateGlob rejects globs that could escape the contract directory or are

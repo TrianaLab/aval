@@ -125,6 +125,7 @@ func TestInitNoDefaults(t *testing.T) {
 		{"invalid glob", []string{"init", "--name", "u", "--source", "../x", "--cacheability", "hermetic", "--keyless", "--", "true"}, `scope.source[0]: "../x"`},
 		{"invalid class", []string{"init", "--name", "u", "--source", "src/**", "--cacheability", "cached", "--keyless", "--", "true"}, "invalid contract"},
 		{"key and keyless", []string{"init", "--name", "u", "--source", "src/**", "--cacheability", "hermetic", "--key", "k.key", "--keyless", "--", "true"}, "exclude each other"},
+		{"absolute key", []string{"init", "--name", "u", "--source", "src/**", "--cacheability", "hermetic", "--key", "/tmp/k.key", "--", "true"}, "must be a relative path"},
 		{"argument before --", []string{"init", "true"}, `unexpected argument "true"`},
 	}
 	for _, c := range cases {
@@ -200,8 +201,10 @@ func TestInitVariants(t *testing.T) {
 	if _, err := os.Stat("traced"); err == nil {
 		t.Fatal("init ran the test command")
 	}
-	if code != ExitOK || !strings.Contains(out, "source matches 12 files: src/a.txt, src/b, ") || !strings.Contains(out, " and 2 more\n") || !strings.Contains(out, "next: write a trust policy") || strings.Contains(out, ".gitignore") {
-		t.Fatalf("keyless: exit %d\n%s", code, out)
+	for _, want := range []string{"source matches 12 files: src/a.txt, src/b, ", " and 2 more\n", "next: write a trust policy", "; non-deterministic results are never reused\n"} {
+		if code != ExitOK || !strings.Contains(out, want) || strings.Contains(out, ".gitignore") {
+			t.Fatalf("keyless: exit %d, want %q\n%s", code, want, out)
+		}
 	}
 	if _, err := os.Stat(defaultPolicy); err == nil {
 		t.Fatal("keyless wrote a policy")
@@ -218,15 +221,35 @@ func TestInitVariants(t *testing.T) {
 // Write failures are errors (exit 1).
 func TestInitWriteErrors(t *testing.T) {
 	force := append([]string{"init", "--force"}, initArgs[1:]...)
+	// A directory that --force cannot remove fails the write, and the key
+	// pair written before it is removed again.
 	for _, dir := range []string{"aval.yaml", "policy.yaml", ".gitignore"} {
 		initProject(t)
 		terminals(t, false, false)
-		if err := os.Mkdir(dir, 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(dir, "x"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		if code, _, errOut := runInitCLI("", force...); code != ExitError {
 			t.Fatalf("%s is a directory: exit %d, %s", dir, code, errOut)
 		}
+		if _, err := os.Lstat("aval.key"); err == nil {
+			t.Fatalf("%s: aval.key left behind", dir)
+		}
+	}
+	// An unwritable directory fails the contract write.
+	initProject(t)
+	if err := os.Chmod(".", 0o555); err != nil {
+		t.Fatal(err)
+	}
+	code, _, _ := runInitCLI("", "init", "--name", "u", "--source", "src/**", "--cacheability", "hermetic", "--keyless", "--", "true")
+	_ = os.Chmod(".", 0o755)
+	if code != ExitError {
+		t.Fatalf("unwritable directory: exit %d", code)
+	}
+	// A key path that cannot be checked is an error, not "absent".
+	initProject(t)
+	if code, _, errOut := runInitCLI("", "init", "--name", "u", "--source", "src/**", "--cacheability", "hermetic", "--key", "src/a.txt/k", "--", "true"); code != ExitError || !strings.Contains(errOut, "not a directory") {
+		t.Fatalf("key under a file: exit %d, %s", code, errOut)
 	}
 	initProject(t)
 	if code, _, _ := runInitCLI("", "init", "--name", "u", "--source", "src/**", "--cacheability", "hermetic", "--key", "missing/k.key", "--", "true"); code != ExitError {
@@ -246,7 +269,7 @@ func TestInitWriteErrors(t *testing.T) {
 func TestInitPrompts(t *testing.T) {
 	initProject(t)
 	terminals(t, true, true)
-	answers := "unit\ngrep -q a src/a.txt\n\nlib/**\n../x\nsrc/**\n9\n1\naval.key"
+	answers := "Bad Name\nunit\ngrep -q a src/a.txt\n\nlib/**\n../x\nsrc/**\n9\nhermetic\n../k.key\naval.key"
 	code, out, errOut := runInitCLI(answers, "init")
 	if code != ExitOK || errOut != "" {
 		t.Fatalf("exit %d, %s", code, errOut)
@@ -271,10 +294,21 @@ func TestInitPrompts(t *testing.T) {
 		t.Fatalf("name only: exit %d, %s", code, out)
 	}
 
+	// A class by number; an existing key file is refused at the prompt,
+	// before anything is written.
+	initProject(t)
+	terminals(t, true, true)
+	if err := os.WriteFile("aval.pub", nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, _ = runInitCLI("2\naval.key\nk.key\n", "init", "--name", "u", "--source", "src/**", "--", "true"); code != ExitOK || !strings.Contains(out, "aval.pub already exists") {
+		t.Fatalf("existing key: exit %d, %s", code, out)
+	}
+
 	for i := range 5 {
 		initProject(t)
 		terminals(t, true, true)
-		in := strings.Join(strings.Split(answers, "\n")[:[]int{0, 1, 2, 6, 8}[i]], "\n")
+		in := strings.Join(strings.Split(answers, "\n")[:[]int{0, 2, 3, 7, 9}[i]], "\n")
 		code, _, errOut := runInitCLI(in, "init")
 		if code != ExitUsage || !strings.Contains(errOut, "init cancelled: nothing written") {
 			t.Fatalf("cancel at %d: exit %d, %s", i+1, code, errOut)
@@ -282,5 +316,45 @@ func TestInitPrompts(t *testing.T) {
 		if ents, _ := os.ReadDir("."); len(ents) != 1 {
 			t.Fatalf("cancel at %d wrote files: %v", i+1, ents)
 		}
+	}
+}
+
+// --force replaces a symlink at policy.yaml or aval.yaml, never the file it
+// points to.
+func TestInitForceSymlink(t *testing.T) {
+	initProject(t)
+	terminals(t, false, false)
+	for _, f := range []string{"policy.yaml", "aval.yaml"} {
+		if err := os.WriteFile("target-"+f, []byte("mine\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink("target-"+f, f); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if code, _, errOut := runInitCLI("", append([]string{"init", "--force"}, initArgs[1:]...)...); code != ExitOK {
+		t.Fatalf("exit %d, %s", code, errOut)
+	}
+	for _, f := range []string{"policy.yaml", "aval.yaml"} {
+		if b, _ := os.ReadFile("target-" + f); string(b) != "mine\n" {
+			t.Fatalf("%s written through the symlink", f)
+		}
+		if st, err := os.Lstat(f); err != nil || !st.Mode().IsRegular() {
+			t.Fatalf("%s: %v %v", f, st, err)
+		}
+	}
+}
+
+// File names from the tree are escaped in the preview, so an escape
+// sequence in a name never reaches the terminal.
+func TestInitPreviewEscapes(t *testing.T) {
+	initProject(t)
+	terminals(t, false, true)
+	if err := os.WriteFile("src/\x1b[2J", nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, out, _ := runInitCLI("", initArgs...)
+	if code != ExitOK || !strings.Contains(out, `src/\x1b[2J`) || strings.Contains(out, "\x1b[2J") {
+		t.Fatalf("exit %d, %q", code, out)
 	}
 }

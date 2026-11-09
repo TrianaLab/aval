@@ -1,9 +1,11 @@
+1/5 Test name (what it checks, e.g. unit):   metadata.name: "Bad Name" must be 1-64 chars of [a-z0-9._-], starting and ending alphanumeric
 1/5 Test name (what it checks, e.g. unit): 2/5 Test command (split on spaces, no shell): 3/5 Source globs the test reads (space-separated, e.g. src/** go.mod): 3/5 Source globs the test reads (space-separated, e.g. src/** go.mod):   source glob "lib/**" matched no files
 3/5 Source globs the test reads (space-separated, e.g. src/** go.mod):   source glob "../x": empty, '.' or '..' segments are not allowed
-3/5 Source globs the test reads (space-separated, e.g. src/** go.mod): 4/5 Cacheability 1) hermetic 2) controlled-environment 3) external-dependencies 4) non-deterministic:   answer 1 to 4
-4/5 Cacheability 1) hermetic 2) controlled-environment 3) external-dependencies 4) non-deterministic: 5/5 Signing key file to create (e.g. aval.key), or keyless: · source matches 1 file: src/a.txt
-✓ wrote aval.key (private: keep it secret, do not commit it) and aval.pub, key id <kid>
-✓ wrote policy.yaml: trusts aval.pub at trust level developer
-✓ wrote aval.yaml
-✓ added aval.key, .aval/ to .gitignore
+3/5 Source globs the test reads (space-separated, e.g. src/** go.mod): 4/5 Cacheability 1) hermetic 2) controlled-environment 3) external-dependencies 4) non-deterministic:   answer 1 to 4 or a class name
+4/5 Cacheability 1) hermetic 2) controlled-environment 3) external-dependencies 4) non-deterministic: 5/5 Signing key file to create (e.g. aval.key), or keyless:   --key "../k.key" must be a relative path inside the current directory
+5/5 Signing key file to create (e.g. aval.key), or keyless: [2m· source matches 1 file: src/a.txt[0m
+[32m✓ wrote aval.key (private: keep it secret, do not commit it) and aval.pub, key id <kid>[0m
+[32m✓ wrote policy.yaml: trusts aval.pub at trust level developer[0m
+[32m✓ wrote aval.yaml[0m
+[32m✓ added aval.key, .aval/ to .gitignore[0m
 Wrote the contract for unit; next: export AVAL_REGISTRY=<oci repository> AVAL_POLICY=policy.yaml, then aval run --push --key aval.key.
