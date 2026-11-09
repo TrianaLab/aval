@@ -463,7 +463,10 @@ func decide(ctx context.Context, w cliout.Run, c *contract.Contract, fp fingerpr
 	// The deadline bounds the registry, never runner.command.
 	ctx, cancel := context.WithTimeout(ctx, o.registryTimeout)
 	defer cancel()
-	return lookupAndVerify(ctx, w.Err, c, o.file, fp, o.repo, o.policyFile) // announce prints the SECURITY block
+	// The spinner is gone before announce prints and the runner starts.
+	warn, stop := spin(w.Err, w.ErrStyled, "looking up "+o.repo)
+	defer stop()
+	return lookupAndVerify(ctx, warn, c, o.file, fp, o.repo, o.policyFile) // announce prints the SECURITY block
 }
 
 // probeTimeout bounds each environment.probe command.
@@ -584,7 +587,7 @@ func keep(ctx context.Context, w cliout.Run, sum *cliout.Summary, c *contract.Co
 		return []error{fmt.Errorf("result not published: %s", pinErr)}
 	}
 	warnUntrustedKey(w.Err, o.key, o.policyFile)
-	ref, err := signAndPush(ctx, p, c, o.file, o.repo, o.key, token, o.registryTimeout)
+	ref, err := signAndPush(ctx, w, p, c, o.file, o.repo, o.key, token, o.registryTimeout)
 	if err != nil {
 		return []error{err}
 	}
@@ -667,8 +670,9 @@ func writeJSON(path string, v any) error {
 // key, else keyless with the token) and publishes it under its fingerprint,
 // each within timeout. Outputs that break a rule, or a failed login,
 // publish nothing. The login runs only now, after the test, so the
-// short-lived token is fresh and runner.command never had it.
-func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contract, file, repo, key, token string, timeout time.Duration) (string, error) {
+// short-lived token is fresh and runner.command never had it. ui shows the
+// registry wait spinner, never over the login prompt.
+func signAndPush(ctx context.Context, ui cliout.Run, p *evidence.Predicate, c *contract.Contract, file, repo, key, token string, timeout time.Duration) (string, error) {
 	var files []registry.Output
 	var err error
 	if len(c.Outputs) > 0 {
@@ -683,7 +687,9 @@ func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contrac
 	}
 	if len(c.Outputs) > 0 {
 		octx, cancel := context.WithTimeout(ctx, timeout)
+		_, stop := spin(ui.Err, ui.ErrStyled, "pushing outputs to "+repo)
 		o, err := pushOutputs(octx, repo, p.Execution.Fingerprint, files)
+		stop()
 		cancel()
 		if err != nil {
 			return "", fmt.Errorf("publishing outputs: %w", reachError(repo, err))
@@ -702,7 +708,9 @@ func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contrac
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	_, stop := spin(ui.Err, ui.ErrStyled, "pushing to "+repo)
 	d, err := publish(ctx, repo, p.Execution.Fingerprint, registry.Attestation{Envelope: s.Envelope, Bundle: s.Bundle})
+	stop()
 	if err != nil {
 		return "", fmt.Errorf("publishing: %w", reachError(repo, err))
 	}
@@ -750,7 +758,8 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 				return fmt.Errorf("recorded result is for test %q (%s) with fingerprint %s; the contract is %q (%s) with fingerprint %s: run the test again",
 					p.Test.ID, p.Test.Cacheability, p.Execution.Fingerprint, c.Metadata.Name, c.Cacheability, fp.Digest)
 			}
-			ref, err := signAndPush(cmd.Context(), p, c, file, repo, key, token, timeout)
+			ui := runWriter(cmd.OutOrStdout(), cmd.ErrOrStderr(), plainFlag(cmd))
+			ref, err := signAndPush(cmd.Context(), ui, p, c, file, repo, key, token, timeout)
 			if err != nil {
 				return err
 			}

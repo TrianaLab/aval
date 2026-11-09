@@ -70,7 +70,10 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.`,
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
+			ui := runWriter(cmd.OutOrStdout(), cmd.ErrOrStderr(), plainFlag(cmd))
+			_, stop := spin(ui.Err, ui.ErrStyled, "reading run records from "+repo)
 			set, err := readRecords(ctx, repo, ids)
+			stop()
 			if errors.Is(err, context.DeadlineExceeded) {
 				return fmt.Errorf("%w; raise --registry-timeout (records are read one at a time) or prune old run records (docs/artifact-format.md, \"Pruning run records\")", err)
 			}
