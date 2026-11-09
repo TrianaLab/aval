@@ -86,6 +86,8 @@ func newRelease(t *testing.T) *release {
 	mux.HandleFunc("/bad/latest", func(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/TrianaLab/aval/releases/tag/main", http.StatusFound)
 	})
+	mux.HandleFunc("/down/latest", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusGatewayTimeout) })
+	mux.HandleFunc("/noloc/latest", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusFound) })
 	mux.HandleFunc("/download/", func(w http.ResponseWriter, req *http.Request) {
 		b, ok := r.files[strings.TrimPrefix(req.URL.Path, "/download/v9.9.9/")]
 		if !ok {
@@ -242,7 +244,9 @@ func TestUpgradeFailsClosed(t *testing.T) {
 		"bad --version":    {nil, []string{"--version", "latest"}, ExitUsage, "not a release version"},
 		"stray arg":        {nil, []string{"x"}, ExitUsage, "unknown command"},
 		"server down":      {func(_ *testing.T, r *release) { r.srv.Close() }, nil, ExitError, "resolving the latest release"},
-		"no redirect":      {func(_ *testing.T, r *release) { releasesURL += "/download/v9.9.9/checksums.txt#" }, nil, ExitError, "no Location"},
+		"no redirect":      {func(_ *testing.T, r *release) { releasesURL += "/download/v9.9.9/checksums.txt#" }, nil, ExitError, "200 OK, not a redirect"},
+		"latest 504":       {func(_ *testing.T, r *release) { releasesURL += "/down" }, nil, ExitError, "504 Gateway Timeout, not a redirect"},
+		"no Location":      {func(_ *testing.T, r *release) { releasesURL += "/noloc" }, nil, ExitError, "no Location"},
 		"redirect not tag": {func(_ *testing.T, r *release) { releasesURL += "/bad" }, nil, ExitError, "does not name a release version"},
 		"release missing":  {nil, []string{"--version", "v9.9.8"}, ExitError, "404"},
 		"download fails": {func(_ *testing.T, r *release) {

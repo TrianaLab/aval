@@ -173,6 +173,10 @@ func latestTag() (string, error) {
 		return "", err
 	}
 	_ = resp.Body.Close()
+	// A 504 or 200 from GitHub has no Location: say what came back.
+	if resp.StatusCode < 300 || resp.StatusCode > 399 {
+		return "", fmt.Errorf("GET %s/latest: %s, not a redirect to a release", releasesURL, resp.Status)
+	}
 	loc, err := resp.Location()
 	if err != nil {
 		return "", err
