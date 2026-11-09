@@ -9,6 +9,7 @@
     "issuer": "https://token.actions.githubusercontent.com",
     "subjectRegexp": "^https://github.com/acme/orders/\\.github/workflows/ci\\.yaml@refs/heads/main$",
     "trustLevel": 2,
+    "trustLevelName": "runner",
     "subject": "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main",
     "keyId": "q83vEjRWeJCrze8SNFZ4kKvN7xI0VniQq83vEjRWeJA="
   },

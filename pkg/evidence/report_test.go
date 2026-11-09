@@ -225,3 +225,13 @@ func TestReportWithoutRejected(t *testing.T) {
 		t.Fatalf("got %s %v", got, err)
 	}
 }
+
+// A verify-report/v1 document written before signer.trustLevelName still
+// parses, and the name is omitted when unset.
+func TestReportWithoutTrustLevelName(t *testing.T) {
+	old := `{"version":"aval.trianalab.io/verify-report/v1","outcome":"verified","testId":"t","fingerprint":"f","signer":{"issuer":"i","subjectRegexp":"s","trustLevel":2}}`
+	var r Report
+	if err := strictRoundTrip([]byte(old), &r); err != nil || r.Signer.TrustLevel != TrustRunner || r.Signer.TrustLevelName != "" {
+		t.Fatalf("old report: %+v, %v", r, err)
+	}
+}

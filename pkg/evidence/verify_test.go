@@ -280,3 +280,20 @@ func TestPublicKeyID(t *testing.T) {
 		}
 	}
 }
+
+// False hit: Signer.TrustLevelName comes from the policy entry that matched,
+// never from the predicate's runner claim nor from a name set on the entry
+// (invariant 5).
+func TestVerifyTrustLevelNameFromPolicy(t *testing.T) {
+	o := baseOpts()
+	o.MinTrustLevel = TrustDeveloper
+	o.Identities[0].TrustLevel, o.Identities[0].TrustLevelName = TrustDeveloper, "isolated"
+	v, err := Verify(context.Background(), statementEnvelope(t, withPredicate(`"trustLevel": 2`, `"trustLevel": 3`)), o)
+	if err != nil || v.Signer.TrustLevelName != "developer" {
+		t.Fatalf("trustLevelName: %+v, %v", v, err)
+	}
+	v, err = Verify(context.Background(), statementEnvelope(t, nil), baseOpts())
+	if err != nil || v.Signer.TrustLevelName != "runner" {
+		t.Fatalf("trustLevelName: %+v, %v", v, err)
+	}
+}
