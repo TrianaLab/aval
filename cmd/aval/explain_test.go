@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -115,6 +116,7 @@ func normalized(t *testing.T, p string) string {
 // files, same exit code. Its deprecation notice is the only difference, on
 // stderr.
 func TestDeprecatedAliases(t *testing.T) {
+	took := regexp.MustCompile(` in [0-9.]+(ns|µs|ms|s)\b`) // the summary and runner frame time the test
 	fakeRecord(t, nil)
 	fakeCandidates(t, fmt.Errorf("x: %w", evidence.ErrNotFound), nil)
 	c := writeContract(t, "hermetic")
@@ -156,6 +158,7 @@ func TestDeprecatedAliases(t *testing.T) {
 					}
 				}
 				code, stdout, stderr := runCLI(append(args, tc.args...)...)
+				stdout, stderr = took.ReplaceAllString(stdout, " in D"), took.ReplaceAllString(stderr, " in D")
 				r := result{code, stdout, stderr, normalized(t, res), normalized(t, rep), ""}
 				if !tc.restore {
 					r.rec = normalized(t, rec)

@@ -79,7 +79,7 @@ func TestSecurityLineIsLast(t *testing.T) {
 			fakeCandidates(t, nil, tc.cands)
 			fakePublish(t, nil, errors.New("registry gone"))
 			dir := t.TempDir()
-			code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", "true"), "--registry", "reg.example/r", "--policy", "p.yaml", "--push", "--result", filepath.Join(dir, "r.json"))
+			code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", "true"), "--registry", "reg.example/r", "--policy", "p.yaml", "--push", "--result-file", filepath.Join(dir, "r.json"))
 			security := "aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/\n"
 			if code != tc.code || stderr != security+tc.err+security || !strings.HasSuffix(stdout, "; SECURITY\n") {
 				t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
@@ -93,7 +93,7 @@ func TestSecurityLineIsLast(t *testing.T) {
 // and the exit code stays the test's.
 func TestRunFloodIsSecurity(t *testing.T) {
 	fakeCandidates(t, fmt.Errorf("listing referrers: %w", registry.ErrTooManyCandidates), nil)
-	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", "true"), "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(t.TempDir(), "r.json"))
+	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", "true"), "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(t.TempDir(), "r.json"))
 	flood := "aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/\n"
 	if code != ExitOK || stderr != flood+flood || !regexp.MustCompile(`\nsummary: unit ran: passed in [^;]+; SECURITY\n$`).MatchString(stdout) {
 		t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
@@ -107,7 +107,7 @@ func TestFingerprintErrorWarns(t *testing.T) {
 	if err := os.Remove(filepath.Join(filepath.Dir(c), "in.txt")); err != nil {
 		t.Fatal(err)
 	}
-	code, stdout, stderr := runCLI("run", "-f", c, "--result", filepath.Join(t.TempDir(), "r.json"))
+	code, stdout, stderr := runCLI("run", "-f", c, "--result-file", filepath.Join(t.TempDir(), "r.json"))
 	if code != ExitOK || !strings.HasPrefix(stderr, "aval: warning: reuse off: fingerprint: ") || !strings.Contains(stdout, "\nsummary: unit ran: passed in ") || !strings.HasSuffix(stdout, "; reuse was off\n") {
 		t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
 	}
@@ -133,7 +133,7 @@ func plainCase(t *testing.T, got *strings.Builder, oc plainOutcome, push, shadow
 	dir := t.TempDir()
 	report := filepath.Join(dir, "report.json")
 	args := []string{"run", "-f", contractWith(t, oc.class, "sh", "-c", fmt.Sprintf("echo test output; exit %d", exit)),
-		"--registry", "reg.example/r", "--result", filepath.Join(dir, "result.json"), "--report", report}
+		"--registry", "reg.example/r", "--result-file", filepath.Join(dir, "result.json"), "--report-file", report}
 	if oc.name != "reuse-off" {
 		args = append(args, "--policy", "p.yaml")
 	}

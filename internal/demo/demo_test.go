@@ -120,7 +120,7 @@ func TestExplain(t *testing.T) {
 	d = New()
 	out, _ := exec(t, d, "aval explain", exitOK)
 	digest, _ := exec(t, d, "aval explain --digest", exitOK)
-	manifest, _, _ := strings.Cut(run, "test greet fingerprint ")
+	manifest, _, _ := strings.Cut(run, "miss greet ")
 	if want := "fingerprint manifest for greet (aval-fingerprint/v1)\n" + manifest + "fingerprint " + digest; out != want {
 		t.Fatalf("explain %q, want %q", out, want)
 	}
