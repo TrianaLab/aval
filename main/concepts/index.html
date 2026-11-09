@@ -1113,6 +1113,8 @@
       
         
       
+        
+      
     
     
     
@@ -1192,6 +1194,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1230,7 +1260,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1252,14 +1282,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1548,6 +1578,8 @@
       
         
       
+        
+      
     
     
     
@@ -1561,10 +1593,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1582,8 +1614,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1636,6 +1668,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -1981,36 +2041,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#the-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-aval-does-not-do" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What Aval does not do
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -2083,13 +2113,11 @@
 
 
 <h1 id="how-aval-works">How Aval works<a class="headerlink" href="#how-aval-works" title="Anchor link">&para;</a></h1>
-<p>Aval runs a test once, signs the result and stores it in your OCI registry.
-The next job with the same inputs checks that signature and skips the test.</p>
+<p>How does Aval decide to skip a test?</p>
 <pre class="aval-mermaid"><code>flowchart LR
-  run([aval run]) --&gt; fp[fingerprint] --&gt; look[look up] --&gt; verify{trusted?}
-  verify -- yes --&gt; reuse([reuse]):::ok
-  verify -- no --&gt; exec[run the test] --&gt; sign[sign] --&gt; push([push]):::muted</code></pre>
-<h2 id="the-steps">The steps<a class="headerlink" href="#the-steps" title="Anchor link">&para;</a></h2>
+  run([aval run]) --&gt; fp[fingerprint] --&gt; reg[registry] --&gt; pol{policy&lt;br&gt;trusts it?}
+  pol -- yes --&gt; reuse([reuse]):::ok
+  pol -- no --&gt; exec[run the test] --&gt; push([sign and push]):::muted</code></pre>
 <table>
 <thead>
 <tr>
@@ -2100,37 +2128,33 @@ The next job with the same inputs checks that signature and skips the test.</p>
 <tbody>
 <tr>
 <td>Fingerprint</td>
-<td>hash <code>aval.yaml</code> and every input it declares into one <code>sha256</code></td>
+<td>hash <code>aval.yaml</code> and every input it lists into one <code>sha256</code></td>
 </tr>
 <tr>
-<td>Look up</td>
-<td>ask your registry for results under that <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr></td>
+<td>Registry</td>
+<td>look up results stored under that <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr></td>
 </tr>
 <tr>
-<td>Verify</td>
-<td>the signature must come from a <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> your <a href="trust/"><abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></a> trusts</td>
+<td>Policy</td>
+<td>the <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> must be one your <a href="trust/"><abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></a> trusts</td>
 </tr>
 <tr>
 <td>Reuse or run</td>
-<td>verified: the test is skipped. Anything else: it runs (<a href="outcomes/">Outcomes</a>)</td>
+<td>trusted: skip the test. Anything else: run it (<a href="outcomes/">Outcomes</a>)</td>
 </tr>
 <tr>
 <td>Push</td>
-<td>with <code>--push</code>, sign the new result and push it</td>
+<td>with <code>--push</code>, sign the new result and store it</td>
 </tr>
 </tbody>
 </table>
-<p>If Aval cannot prove reuse is safe, the test runs. See it run:
-<a href="../quickstart/">Quickstart</a>.</p>
-<h2 id="what-aval-does-not-do">What Aval does not do<a class="headerlink" href="#what-aval-does-not-do" title="Anchor link">&para;</a></h2>
 <ul>
-<li>It does not guess inputs: a file the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> does not list is invisible to
-  it.</li>
-<li>It runs no server. Results live in an OCI registry you already have.</li>
+<li>No proof, no reuse: the test runs.</li>
+<li>Aval does not guess inputs. A file <code>aval.yaml</code> does not list is invisible.</li>
+<li>No server: results live in an OCI registry you already have.</li>
 </ul>
-<p>Details: <a href="../contract/">the test <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a>,
-<a href="../trust-model/">the trust model</a>,
-<a href="../artifact-format/">the artifact format</a>.</p>
+<p>See it: <a href="../quickstart/">Quickstart</a>. Specs: <a href="../contract/"><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a>,
+<a href="../trust-model/">trust model</a>, <a href="../artifact-format/">artifact format</a>.</p>
 
 
 

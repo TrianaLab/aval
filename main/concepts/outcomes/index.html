@@ -741,17 +741,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-four-outcomes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The four outcomes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#a-miss-is-routine" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -774,10 +763,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#in-a-script" class="md-nav__link">
+  <a href="#read-more" class="md-nav__link">
     <span class="md-ellipsis">
       
-        In a script
+        Read more
       
     </span>
   </a>
@@ -1204,6 +1193,8 @@
       
         
       
+        
+      
     
     
     
@@ -1283,6 +1274,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1321,7 +1340,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1343,14 +1362,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1639,6 +1658,8 @@
       
         
       
+        
+      
     
     
     
@@ -1652,10 +1673,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1673,8 +1694,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1727,6 +1748,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -2079,17 +2128,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-four-outcomes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The four outcomes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#a-miss-is-routine" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2112,10 +2150,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#in-a-script" class="md-nav__link">
+  <a href="#read-more" class="md-nav__link">
     <span class="md-ellipsis">
       
-        In a script
+        Read more
       
     </span>
   </a>
@@ -2196,7 +2234,7 @@
 
 
 <h1 id="outcomes">Outcomes<a class="headerlink" href="#outcomes" title="Anchor link">&para;</a></h1>
-<p>Every lookup ends in one of four outcomes. Only <code>verified</code> skips the test.</p>
+<p>What can a lookup end in? One of four outcomes. Only <code>verified</code> skips the test.</p>
 <pre class="aval-mermaid"><code>flowchart LR
   start([look up]) --&gt; decide{could Aval&lt;br&gt;decide?}
   decide -- no --&gt; error([error&lt;br&gt;exit 1]):::warn
@@ -2205,69 +2243,11 @@
   found -- yes --&gt; valid{verifies?}
   valid -- yes --&gt; verified([verified&lt;br&gt;exit 0]):::ok
   valid -- no --&gt; failed([verification-failed&lt;br&gt;exit 5]):::err</code></pre>
-<p>The exit codes in the diagram are those of <code>aval verify</code>. All of them:</p>
-<table>
-<thead>
-<tr>
-<th>Code</th>
-<th><code>aval run</code></th>
-<th><code>aval verify</code></th>
-<th><code>aval push</code></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>0</td>
-<td>the test passed, or a verified passing result was reused</td>
-<td>a verified result exists (passing or failing)</td>
-<td>pushed</td>
-</tr>
-<tr>
-<td>1</td>
-<td>error (the test still runs when it can), or a false hit in <code>--shadow</code></td>
-<td>error: registry, <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, trusted root or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr></td>
-<td>error: signing, registry or a result that does not match the current inputs</td>
-</tr>
-<tr>
-<td>2</td>
-<td>bad flags or invalid <code>aval.yaml</code></td>
-<td>bad flags or invalid <code>aval.yaml</code></td>
-<td>bad flags or invalid <code>aval.yaml</code></td>
-</tr>
-<tr>
-<td>3</td>
-<td>the test failed, or a verified failing result was reused</td>
-<td>not used</td>
-<td>not used</td>
-</tr>
-<tr>
-<td>4</td>
-<td>not used: a miss runs the test</td>
-<td>miss: no result the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> can reuse</td>
-<td>not used</td>
-</tr>
-<tr>
-<td>5</td>
-<td>verification failed, after running the test: a security event</td>
-<td>verification failed: a security event</td>
-<td>not used</td>
-</tr>
-<tr>
-<td>6</td>
-<td>reserved, never returned</td>
-<td>reserved, never returned</td>
-<td>reserved, never returned</td>
-</tr>
-</tbody>
-</table>
-<p>A miss (4) is routine. A verification failure (5) means someone published a
-result the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> does not trust; never hide it or retry it away.</p>
-<h2 id="the-four-outcomes">The four outcomes<a class="headerlink" href="#the-four-outcomes" title="Anchor link">&para;</a></h2>
 <table>
 <thead>
 <tr>
 <th>Outcome</th>
-<th>What it means</th>
+<th>Means</th>
 <th><code>aval run</code> does</th>
 </tr>
 </thead>
@@ -2279,12 +2259,12 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 </tr>
 <tr>
 <td><code>miss</code></td>
-<td>nothing to reuse: the inputs changed, or nobody ran them yet</td>
+<td>nothing to reuse yet</td>
 <td>runs the test</td>
 </tr>
 <tr>
 <td><code>error</code></td>
-<td>Aval could not decide, such as a registry it cannot reach</td>
+<td>Aval could not decide, such as an unreachable registry</td>
 <td>runs the test</td>
 </tr>
 <tr>
@@ -2294,34 +2274,28 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 </tr>
 </tbody>
 </table>
+<p>The diagram shows <code>aval verify</code> exit codes. All of them:
+<a href="../../cli-reference/#exit-codes">exit codes</a>.</p>
 <h2 id="a-miss-is-routine">A miss is routine<a class="headerlink" href="#a-miss-is-routine" title="Anchor link">&para;</a></h2>
-<p>The normal case for a pull request: you changed an input, so there is nothing
-to reuse yet. Aval also reports a miss when:</p>
+<p>You changed an input, so there is nothing to reuse. Also a miss:</p>
 <ul>
-<li>there is no <code>--policy</code> (or, for <code>aval run</code>, no <code>--registry</code>, or <code>--no-reuse</code>)</li>
-<li>the test is <code>non-deterministic</code>, or <code>external-dependencies</code> and not in the
-  <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>allowedCacheability</code></li>
-<li>the inputs hold a <a href="../../pinning/"><abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr></a> you did not pin or list
-  in <code>scope.allowMutable</code></li>
-<li>the only results are signed below <code>minTrustLevel</code></li>
+<li>no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, or (for <code>aval run</code>) no registry, or <code>--no-reuse</code></li>
+<li>a <code>non-deterministic</code> test, or <code>external-dependencies</code> the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> does not allow</li>
+<li>a <a href="../../pinning/"><abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr></a> you did not pin or accept in
+  <code>scope.allowMutable</code></li>
+<li>only signers below <code>minTrustLevel</code></li>
 </ul>
 <h2 id="a-verification-failure-is-a-security-event">A verification failure is a security event<a class="headerlink" href="#a-verification-failure-is-a-security-event" title="Anchor link">&para;</a></h2>
-<p>A result under your <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> does not verify: a bad signature, a <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> not
-in your <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, or a claim of other inputs. The cause is a wrong <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or an
+<p>A result under your <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> does not verify: a bad signature, an unknown
+<abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr>, or a claim of other inputs. The cause is a wrong <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or an
 attacker. Aval runs the test, prints <code>aval: SECURITY: ...</code> and exits 5. Fail
 the job and investigate; never hide or retry it.</p>
-<h2 id="in-a-script">In a script<a class="headerlink" href="#in-a-script" title="Anchor link">&para;</a></h2>
-<p>Branch on the exit code of <code>aval verify</code>:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>aval<span class="w"> </span>verify<span class="w"> </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REG</span><span class="s2">"</span><span class="w"> </span>--policy<span class="w"> </span>policy.yaml
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">case</span><span class="w"> </span><span class="nv">$?</span><span class="w"> </span><span class="k">in</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="m">0</span><span class="o">)</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"a trusted result exists"</span><span class="w"> </span><span class="p">;;</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="m">4</span><span class="o">)</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"miss: the test must run"</span><span class="w"> </span><span class="p">;;</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="m">5</span><span class="o">)</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"SECURITY: a result failed verification"</span><span class="w"> </span>&gt;<span class="p">&amp;</span><span class="m">2</span><span class="p">;</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="p">;;</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span>*<span class="o">)</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"error: the test must run"</span><span class="w"> </span><span class="p">;;</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="k">esac</span>
-</span></code></pre></div>
-<p>Details: the JSON report in
-<a href="../../artifact-format/#verify-report">the artifact format</a>.</p>
+<h2 id="read-more">Read more<a class="headerlink" href="#read-more" title="Anchor link">&para;</a></h2>
+<ul>
+<li>What <code>aval run</code> prints: <a href="../../output/">CLI output</a></li>
+<li>Branch on exit codes in CI: <a href="../../integrations/">Consume evidence</a></li>
+<li>The JSON report: <a href="../../artifact-format/#verify-report">verify report</a></li>
+</ul>
 
 
 

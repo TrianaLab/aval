@@ -1108,6 +1108,8 @@
       
         
       
+        
+      
     
     
     
@@ -1187,6 +1189,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1225,7 +1255,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1247,14 +1277,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1543,6 +1573,8 @@
       
         
       
+        
+      
     
     
     
@@ -1556,10 +1588,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1577,8 +1609,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1631,6 +1663,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -2240,26 +2300,24 @@
 
 
 <h1 id="vision-and-roadmap">Vision and roadmap<a class="headerlink" href="#vision-and-roadmap" title="Anchor link">&para;</a></h1>
+<p>Why does Aval exist, and where is it going?</p>
 <h2 id="thesis">Thesis<a class="headerlink" href="#thesis" title="Anchor link">&para;</a></h2>
-<p>Aval turns test results into signed, verifiable OCI artifacts. An expensive
-test runs once, locally or in CI. The result is published to an OCI registry
-as a signed <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> bound to a deterministic <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> of the test's
-inputs. Any other environment computes the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, finds the
-<abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>, verifies it, and if the trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> allows it, reuses the result
-instead of running the test again.</p>
-<p>This is not a test cache. A cache optimizes for hit rate and quietly tolerates
-a stale entry now and then. Aval optimizes for being able to justify every
-reuse, and when it can't, it runs the test.</p>
-<p>A signature proves <em>who claims</em> the test passed, not that it ran honestly or
-against the inputs you have now. So reuse needs an explicit <strong>input
-<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></strong> (<code>aval.yaml</code>), so "same inputs" can be checked, and a <strong>trust
-<abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></strong> over <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> identities, so "who ran it" can be accepted or rejected.</p>
+<pre class="aval-mermaid"><code>flowchart LR
+  run([run once]) --&gt; sign[sign] --&gt; reg[registry] --&gt; v{policy trusts it,&lt;br&gt;same fingerprint?}
+  v -- yes --&gt; reuse([reuse]):::ok
+  v -- no --&gt; again([run the test]):::muted</code></pre>
+<ul>
+<li>An expensive test runs once and its result is signed and stored in an OCI registry.</li>
+<li>Any other job with the same inputs verifies it and, if the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> allows, skips the test.</li>
+<li>Not a cache: a cache tolerates a stale entry now and then. Aval must justify
+  every reuse; when it cannot, the test runs.</li>
+<li>A signature proves <em>who claims</em> a pass, not that the inputs match. So reuse
+  needs a declared input <strong><abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></strong> (<code>aval.yaml</code>) and a <strong>trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></strong>.</li>
+</ul>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Anchor link">&para;</a></h2>
-<p>Heavy tests (integration, end-to-end, hardware, long suites) re-run on every
-pipeline, branch and environment even when nothing they depend on changed.
-Teams pay for it in time and compute, or skip tests on informal judgment that
-nobody can audit. Build caches solve this only for teams on a hermetic build
-system.</p>
+<p>Heavy tests (integration, end-to-end, hardware) rerun on every pipeline even
+when nothing they read changed. Teams pay in time, or skip tests on judgment
+nobody can audit. Build caches help only teams on a hermetic build system.</p>
 <h2 id="design-decisions">Design decisions<a class="headerlink" href="#design-decisions" title="Anchor link">&para;</a></h2>
 <table>
 <thead>
@@ -2326,7 +2384,7 @@ system.</p>
 </tr>
 <tr>
 <td>Declaring <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> costs more than it saves</td>
-<td>a small <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (globs, lockfiles, a toolchain map), debuggable with <code>aval run --explain</code></td>
+<td>a small <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (globs, lockfiles, a toolchain map), debuggable with <code>aval explain</code></td>
 <td>contracts drift from the code, or teams give up on wide-<abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> tests</td>
 </tr>
 <tr>
@@ -2356,7 +2414,7 @@ system.</p>
 <td>1</td>
 <td>Fingerprint and <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></td>
 <td>implemented</td>
-<td><code>aval.yaml</code> is validated with unknown fields rejected, and <code>--fingerprint-only</code> / <code>--explain</code> give a deterministic <code>aval-fingerprint/v1</code> digest that fails closed on unprovable inputs</td>
+<td><code>aval.yaml</code> is validated with unknown fields rejected, and <code>aval explain</code> gives a deterministic <code>aval-fingerprint/v1</code> digest that fails closed on unprovable inputs</td>
 </tr>
 <tr>
 <td>2</td>

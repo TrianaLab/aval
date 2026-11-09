@@ -430,18 +430,19 @@
 <pre><span class="c"># REG=localhost:5055/acme/orders</span>
 <span class="c"># first job: nothing signed for these inputs yet</span>
 <span class="pr">$</span> <span class="w">aval run</span> --push --key keys/ci.pem --registry $REG --policy policy.yaml
-<span class="d">test integration fingerprint sha256:7ebde18f…</span>
-<span class="y">miss</span> integration sha256:7ebde18f…
-<span class="d">reason: localhost:5055/acme/orders: no attestation found for fingerprint</span>
-ran integration: <span class="g">passed</span> (exit 0)
-<span class="w">pushed</span> localhost:5055/acme/orders@sha256:0a4a3ac9…
+· miss integration sha256:7ebde18f
+<span class="d">  reason    localhost:5055/acme/orders: no attestation found for fingerprint</span>
+<span class="d">· run integration: go test -tags integration ./...</span>
+<span class="g">✓</span> integration <span class="g">passed</span> (exit 0) in 4m12s
+<span class="g">✓</span> <span class="w">pushed</span> localhost:5055/acme/orders@sha256:0a4a3ac9
+integration passed in 4m12s; published for the next run with these inputs.
 <span class="sep"></span><span class="c"># another job, same inputs</span>
 <span class="pr">$</span> <span class="w">aval run</span> --registry $REG --policy policy.yaml
-<span class="d">test integration fingerprint sha256:7ebde18f…</span>
-<span class="hit"><span class="g">verified</span> integration sha256:7ebde18f…
-<span class="d">signer: key cZ9tHqSn…, trust level runner</span>
-<span class="d">reference: localhost:5055/acme/orders@sha256:0a4a3ac9…</span>
-<span class="w">reused passed result</span></span><span class="pr">$</span> <span class="cur"></span><span class="aval-term__cta" hidden></span></pre>
+<span class="hit"><span class="cy">↺ verified</span> integration sha256:7ebde18f
+<span class="d">  signer    key cZ9tHqSn…, trust level runner</span>
+<span class="d">  reference localhost:5055/acme/orders@sha256:0a4a3ac9</span>
+<span class="cy">↺ reused passed result</span>
+integration: reused a verified passed result, saved 4m12s; nothing ran.</span><span class="pr">$</span> <span class="cur"></span><span class="aval-term__cta" hidden></span></pre>
       <figcaption class="aval-try">Runs in your browser: a simulated test, an in-memory registry, a throwaway key. No keyless signing. <span class="aval-try__status" role="status"></span></figcaption>
     </figure>
     <div class="aval-run__explain">
@@ -1217,6 +1218,8 @@ ran integration: <span class="g">passed</span> (exit 0)
       
         
       
+        
+      
     
     
     
@@ -1296,6 +1299,34 @@ ran integration: <span class="g">passed</span> (exit 0)
   
   
   
+    <li class="md-nav__item">
+      <a href="output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1334,7 +1365,7 @@ ran integration: <span class="g">passed</span> (exit 0)
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1356,14 +1387,14 @@ ran integration: <span class="g">passed</span> (exit 0)
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1652,6 +1683,8 @@ ran integration: <span class="g">passed</span> (exit 0)
       
         
       
+        
+      
     
     
     
@@ -1665,10 +1698,10 @@ ran integration: <span class="g">passed</span> (exit 0)
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1686,8 +1719,8 @@ ran integration: <span class="g">passed</span> (exit 0)
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1740,6 +1773,34 @@ ran integration: <span class="g">passed</span> (exit 0)
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     

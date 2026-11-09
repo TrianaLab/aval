@@ -1226,6 +1226,8 @@
       
         
       
+        
+      
     
     
     
@@ -1305,6 +1307,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1343,7 +1373,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1365,14 +1395,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1661,6 +1691,8 @@
       
         
       
+        
+      
     
     
     
@@ -1674,10 +1706,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1695,8 +1727,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1749,6 +1781,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -2240,111 +2300,123 @@
 
 
 <h1 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Anchor link">&para;</a></h1>
-<p>On your laptop, in five minutes: a miss, a reuse, a changed input and a
-rejected result.</p>
-<p>You need <code>aval</code> (<a href="../install/">Install</a>), Docker and <code>openssl</code>. Run the blocks
-in order in one shell. Each <code>text</code> block is the expected output; <code>...</code> is a
-digest that changes on every run.</p>
+<p>What does Aval do? See it in five minutes on your laptop: a miss, a reuse,
+a changed input and a rejected result.</p>
+<p>You need <code>aval</code> (<a href="../install/">Install</a>) and Docker. Run the blocks in order
+in one shell. <code>text</code> blocks show the output; <code>...</code> changes per run.</p>
 <!-- quickstart:start (tests/acceptance/readme_test.go runs the sh blocks and checks the text blocks) -->
 
 <h2 id="1-set-up">1. Set up<a class="headerlink" href="#1-set-up" title="Anchor link">&para;</a></h2>
-<p>A local OCI registry (port 5001: macOS uses 5000 for AirPlay):</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>aval-registry<span class="w"> </span>-p<span class="w"> </span><span class="m">5001</span>:5000<span class="w"> </span>registry:2
+<p>Start a local registry on port 5001 (macOS keeps 5000 for AirPlay):</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>rm<span class="w"> </span>-f<span class="w"> </span>aval-registry<span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">true</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>aval-registry<span class="w"> </span>-p<span class="w"> </span><span class="m">5001</span>:5000<span class="w"> </span>registry:2
 </span></code></pre></div>
-<p>A project: one input file and <code>aval.yaml</code>, which names the test command and
-the files it reads (<code>scope</code>):</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>mkdir<span class="w"> </span>aval-demo<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>aval-demo
+<p>Make a project with one input file. <code>aval init</code> writes:</p>
+<ul>
+<li><code>aval.yaml</code>: the test command and the files it reads (<code>scope</code>);</li>
+<li>a signing key;</li>
+<li><code>policy.yaml</code>: a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> that trusts that key.</li>
+</ul>
+<p>You declare what the test reads (<code>--source</code>); Aval never guesses:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rm<span class="w"> </span>-rf<span class="w"> </span>aval-demo<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>mkdir<span class="w"> </span>aval-demo<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>aval-demo
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>mkdir<span class="w"> </span>src<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span>hello<span class="w"> </span>&gt;<span class="w"> </span>src/hello.txt
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>aval.yaml<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="s">apiVersion: aval.trianalab.io/v1</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="s">kind: Test</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="s">metadata:</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="s">  name: hello</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="s">runner:</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="s">  command: ["grep", "-q", "hello", "src/hello.txt"]</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="s">scope:</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="s">  source: ["src/**"]</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="s">cacheability: hermetic</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="s">EOF</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>aval<span class="w"> </span>init<span class="w"> </span>--name<span class="w"> </span>hello<span class="w"> </span>--source<span class="w"> </span><span class="s1">'src/**'</span><span class="w"> </span>--cacheability<span class="w"> </span>hermetic<span class="w"> </span>--key<span class="w"> </span>aval.key<span class="w"> </span>--<span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span>hello<span class="w"> </span>src/hello.txt
 </span></code></pre></div>
-<p>A signing key (ECDSA P-256) and a <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> that trusts it:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>openssl<span class="w"> </span>genpkey<span class="w"> </span>-algorithm<span class="w"> </span>EC<span class="w"> </span>-pkeyopt<span class="w"> </span>ec_paramgen_curve:P-256<span class="w"> </span>-out<span class="w"> </span>aval.key
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>openssl<span class="w"> </span>pkey<span class="w"> </span>-in<span class="w"> </span>aval.key<span class="w"> </span>-pubout<span class="w"> </span>-out<span class="w"> </span>aval.pub
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>policy.yaml<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="s">apiVersion: aval.trianalab.io/v1</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="s">kind: Policy</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="s">minTrustLevel: developer</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="s">identities:</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="s">  - publicKey: aval.pub</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="s">    trustLevel: developer</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="s">EOF</span>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>source matches 1 file: src/hello.txt
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>wrote aval.key (private: keep it secret, do not commit it) and aval.pub, key id ...
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>wrote policy.yaml: trusts aval.pub at trust level developer
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>wrote aval.yaml
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>added aval.key, .aval/ to .gitignore
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>next: export AVAL_REGISTRY=&lt;oci repository&gt; AVAL_POLICY=policy.yaml, then aval run --push --key aval.key
+</span></code></pre></div>
+<p>Without flags, <code>aval init</code> asks for each value. Now set the registry and the
+<abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> once for this shell:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AVAL_REGISTRY</span><span class="o">=</span>localhost:5001/demo/hello-aval<span class="w"> </span><span class="nv">AVAL_POLICY</span><span class="o">=</span>policy.yaml
 </span></code></pre></div>
 <h2 id="2-first-run-a-miss">2. First run: a miss<a class="headerlink" href="#2-first-run-a-miss" title="Anchor link">&para;</a></h2>
 <p><img alt="aval run prints miss, runs the test, which passes, and pushes the signed result to localhost:5001" src="../assets/gifs/miss.gif" /></p>
-<p>This run has no <code>--policy</code>, so Aval does not look for a result. It runs the
-test, then <code>--push</code> signs the result with <code>aval.key</code> and pushes it:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--push<span class="w"> </span>--key<span class="w"> </span>aval.key<span class="w"> </span>--registry<span class="w"> </span>localhost:5001/demo/hello-aval
+<p>Nothing is stored for these inputs yet: the test runs, then <code>--push</code> signs
+the result and stores it:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--push<span class="w"> </span>--key<span class="w"> </span>aval.key
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>test hello fingerprint sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>miss hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>reason: no trust policy configured: pass --policy to reuse verified results
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>ran hello: passed (exit 0)
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>pushed localhost:5001/demo/hello-aval@sha256:...
+<p>This is the plain output, as in CI. A terminal shows glyph lines instead.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>miss hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>--- run hello: grep -q hello src/hello.txt
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>--- end hello: passed (exit 0) in ...
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>ran hello: passed (exit 0)
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>pushed localhost:5001/demo/hello-aval@sha256:...
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>summary: hello ran: passed in ...; result pushed
 </span></code></pre></div>
 <h2 id="3-second-run-a-reuse">3. Second run: a reuse<a class="headerlink" href="#3-second-run-a-reuse" title="Anchor link">&para;</a></h2>
 <p><img alt="aval verify prints verified, then aval run prints reused passed result without running the test" src="../assets/gifs/hit.gif" /></p>
-<p>Check that a result you trust exists for these exact inputs:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>aval<span class="w"> </span>verify<span class="w"> </span>--registry<span class="w"> </span>localhost:5001/demo/hello-aval<span class="w"> </span>--policy<span class="w"> </span>policy.yaml
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"exit code: </span><span class="nv">$?</span><span class="s2">"</span>
+<p>Is there a trusted result for these inputs?</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>aval<span class="w"> </span>verify
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"exit code: </span><span class="nv">$?</span><span class="s2">"</span>
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>signer: key ..., trust level developer
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>reference: localhost:5001/demo/hello-aval@sha256:...
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>exit code: 0
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>signer: key ..., trust level developer
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>reference: localhost:5001/demo/hello-aval@sha256:...
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>exit code: 0
 </span></code></pre></div>
-<p>Run again. Aval finds the trusted result and skips the test:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--registry<span class="w"> </span>localhost:5001/demo/hello-aval<span class="w"> </span>--policy<span class="w"> </span>policy.yaml
+<p>Run again. The test is skipped:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>aval<span class="w"> </span>run
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>test hello fingerprint sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>signer: key ..., trust level developer
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>reference: localhost:5001/demo/hello-aval@sha256:...
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>reused passed result
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>signer: key ..., trust level developer
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>reference: localhost:5001/demo/hello-aval@sha256:...
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>reused passed result
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>summary: hello reused: passed; saved ...
 </span></code></pre></div>
 <h2 id="4-change-an-input-a-miss-again">4. Change an input: a miss again<a class="headerlink" href="#4-change-an-input-a-miss-again" title="Anchor link">&para;</a></h2>
-<p><img alt="after editing src/hello.txt, aval run prints a new fingerprint, miss, and runs the test" src="../assets/gifs/changed-input.gif" /></p>
-<p>Edit a file in <code>scope</code>. The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> changes, so nothing matches and the
-test runs:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"hello, world"</span><span class="w"> </span>&gt;<span class="w"> </span>src/hello.txt
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>aval<span class="w"> </span>run<span class="w"> </span>--registry<span class="w"> </span>localhost:5001/demo/hello-aval<span class="w"> </span>--policy<span class="w"> </span>policy.yaml
+<p><img alt="after editing src/hello.txt, aval run prints miss with a new fingerprint and runs the test" src="../assets/gifs/changed-input.gif" /></p>
+<p>Edit a file in <code>scope</code>. New <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, nothing matches, the test runs:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"hello, world"</span><span class="w"> </span>&gt;<span class="w"> </span>src/hello.txt
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>aval<span class="w"> </span>run
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>ran hello: passed (exit 0)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>--- run hello: grep -q hello src/hello.txt
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>--- end hello: passed (exit 0) in ...
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>ran hello: passed (exit 0)
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>summary: hello ran: passed in ...
 </span></code></pre></div>
 <h2 id="5-a-result-from-an-untrusted-signer-exit-5">5. A result from an untrusted <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr>: exit 5<a class="headerlink" href="#5-a-result-from-an-untrusted-signer-exit-5" title="Anchor link">&para;</a></h2>
 <p><img alt="a result signed with a key the policy does not trust, other.key, is pushed; aval run prints SECURITY, verification-failed, runs the test and exits 5" src="../assets/gifs/tampered.gif" /></p>
-<p>Someone who can push to the registry, but with a key your <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> does not
-trust, publishes a result. Aval rejects it, runs the test and exits 5: a
-security event, not a miss. A tampered result ends the same way:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>openssl<span class="w"> </span>genpkey<span class="w"> </span>-algorithm<span class="w"> </span>EC<span class="w"> </span>-pkeyopt<span class="w"> </span>ec_paramgen_curve:P-256<span class="w"> </span>-out<span class="w"> </span>other.key
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>aval<span class="w"> </span>run<span class="w"> </span>--push<span class="w"> </span>--key<span class="w"> </span>other.key<span class="w"> </span>--registry<span class="w"> </span>localhost:5001/demo/hello-aval
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>aval<span class="w"> </span>run<span class="w"> </span>--registry<span class="w"> </span>localhost:5001/demo/hello-aval<span class="w"> </span>--policy<span class="w"> </span>policy.yaml
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"exit code: </span><span class="nv">$?</span><span class="s2">"</span>
+<p>Someone pushes a result signed with a key your <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> does not trust
+(<code>AVAL_POLICY=</code> drops your <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> for that one push). Aval rejects it, runs
+the test and exits 5: a security event, not a miss.</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>aval<span class="w"> </span>keygen<span class="w"> </span>other
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nv">AVAL_POLICY</span><span class="o">=</span><span class="w"> </span>aval<span class="w"> </span>run<span class="w"> </span>--push<span class="w"> </span>--key<span class="w"> </span>other.key
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>aval<span class="w"> </span>run
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"exit code: </span><span class="nv">$?</span><span class="s2">"</span>
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>reason: no trust policy configured: pass --policy to reuse verified results
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>ran hello: passed (exit 0)
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>pushed localhost:5001/demo/hello-aval@sha256:...
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>aval: SECURITY: 1 attestation(s) for hello failed signature or policy verification; treat it as a security event, see https://github.com/TrianaLab/aval/blob/main/docs/trust-model.md
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>verification-failed hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>reference: localhost:5001/demo/hello-aval@sha256:...
-</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>reason: attestation verification failed: signature: signer key id "..." is not in the trust policy (trust policy policy.yaml)
-</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>ran hello: passed (exit 0)
-</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>exit code: 5
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>wrote other.key (private: keep it secret, do not commit it) and other.pub
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>key id: ...
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>next: trust other.pub in your policy (publicKey: other.pub) and sign with --key other.key
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY)
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>reason: reuse off: no trust policy (set AVAL_POLICY or --policy)
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>--- run hello: grep -q hello src/hello.txt
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>--- end hello: passed (exit 0) in ...
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>ran hello: passed (exit 0)
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>pushed localhost:5001/demo/hello-aval@sha256:...
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>summary: hello ran: passed in ...; result pushed; reuse was off
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
+</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>aval: SECURITY: 1 attestation(s) for hello failed signature or policy verification; treat it as a security event, see https://aval.run/.../trust-model/
+</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>verification-failed hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
+</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>reference: localhost:5001/demo/hello-aval@sha256:...
+</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>reason: attestation verification failed: signature: signer key id "..." is not in the trust policy (trust policy policy.yaml)
+</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>--- run hello: grep -q hello src/hello.txt
+</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>--- end hello: passed (exit 0) in ...
+</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>ran hello: passed (exit 0)
+</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>summary: hello ran: passed in ...; SECURITY
+</span><span id="__span-13-21"><a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>aval: SECURITY: 1 attestation(s) for hello failed signature or policy verification; treat it as a security event, see https://aval.run/.../trust-model/
+</span><span id="__span-13-22"><a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>exit code: 5
 </span></code></pre></div>
 <!-- quickstart:end -->
 
@@ -2355,14 +2427,11 @@ security event, not a miss. A tampered result ends the same way:</p>
   look -- no --&gt; miss([miss: run the test&lt;br&gt;steps 2 and 4]):::muted
   look -- "yes, signer in policy.yaml" --&gt; ok([verified: reuse,&lt;br&gt;skip the test&lt;br&gt;step 3]):::ok
   look -- "yes, only untrusted signers" --&gt; bad([verification-failed:&lt;br&gt;run the test, exit 5&lt;br&gt;step 5]):::err</code></pre>
-<p>The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> covers only what <code>scope</code> lists. See
-<a href="../concepts/outcomes/">Outcomes</a> and <a href="../concepts/trust/">Trust</a>.</p>
-<p>Stop the registry when you are done:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>docker<span class="w"> </span>rm<span class="w"> </span>-f<span class="w"> </span>aval-registry
+<p>Stop the registry:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>docker<span class="w"> </span>rm<span class="w"> </span>-f<span class="w"> </span>aval-registry
 </span></code></pre></div>
-<p>Next: <a href="../guides/write-a-contract/">write a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a> for your own test, then
-<a href="../guides/github-actions/">use GitHub Actions</a> and
-<a href="../guides/signing/">sign results</a> without a key.</p>
+<p>Next: <a href="../guides/write-a-contract/">write a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a>, then
+<a href="../guides/github-actions/">use GitHub Actions</a>.</p>
 
 
 

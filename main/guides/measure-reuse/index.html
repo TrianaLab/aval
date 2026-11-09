@@ -1096,17 +1096,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#record-where-you-can-write" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Record where you can write
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#read-the-numbers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1215,6 +1204,8 @@
       
         
       
+        
+      
     
     
     
@@ -1294,6 +1285,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1332,7 +1351,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1354,14 +1373,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1650,6 +1669,8 @@
       
         
       
+        
+      
     
     
     
@@ -1663,10 +1684,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1684,8 +1705,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1738,6 +1759,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -2112,17 +2161,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#record-where-you-can-write" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Record where you can write
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#read-the-numbers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2226,27 +2264,19 @@ have been right, before you let it skip any test.</p>
   same -- yes --&gt; ok([reuse would be correct]):::ok
   same -- no --&gt; fh([FALSE HIT, exit 1]):::err</code></pre>
 <h2 id="estimate-from-history">Estimate from history<a class="headerlink" href="#estimate-from-history" title="Anchor link">&para;</a></h2>
-<p>Before any setup, estimate reuse from past commits.
-<a href="https://github.com/TrianaLab/aval/blob/main/scripts/estimate-reuse.sh"><code>scripts/estimate-reuse.sh</code></a>
-checks out each commit in a scratch <code>git worktree</code>, runs
-<code>aval run --fingerprint-only</code> there, and counts a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> seen on an
-earlier commit as a hit. From the repository root:</p>
+<p><a href="https://github.com/TrianaLab/aval/blob/main/scripts/estimate-reuse.sh"><code>scripts/estimate-reuse.sh</code></a>
+fingerprints past commits and counts repeats as hits:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>scripts/estimate-reuse.sh<span class="w"> </span>services/orders/aval.yaml<span class="w"> </span>--max-count<span class="o">=</span><span class="m">200</span><span class="w"> </span>main
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>&lt;commit&gt; miss sha256:4800...
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>&lt;commit&gt; hit sha256:4800...
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>&lt;commit&gt; miss unacknowledged mutable reference
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>&lt;commit&gt; miss aval: fingerprint: source glob "gone/**" matched no files
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>200 commits, 61 would reuse a result (30%, an upper bound)
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>200 commits, 61 would reuse a result (30%, an upper bound)
 </span></code></pre></div>
-<p>A <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> error or an unacknowledged <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr> is a miss, as
-in CI, and a non-deterministic <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> never reuses. The number is an
-upper bound: it ignores branches, failing tests and trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>. Shadow
-mode measures the real one. There is no <code>aval estimate</code>: reading CI
-history would tie Aval to one CI vendor's API.</p>
+<p>An upper bound: it ignores branches, failing tests and trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>.</p>
 <h2 id="measure-in-shadow-mode">Measure in shadow mode<a class="headerlink" href="#measure-in-shadow-mode" title="Anchor link">&para;</a></h2>
-<p>Run in shadow mode and record every run:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--shadow<span class="w"> </span>--record<span class="w"> </span>--registry<span class="w"> </span>ghcr.io/acme/orders-aval<span class="w"> </span>--policy<span class="w"> </span>policy.yaml
+<p>Verify, run the test anyway, compare, and record the run. With
+<code>AVAL_REGISTRY</code> and <code>AVAL_POLICY</code> set (or <code>--registry</code>/<code>--policy</code>):</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--shadow<span class="w"> </span>--stats
 </span></code></pre></div>
 <table>
 <thead>
@@ -2266,22 +2296,16 @@ history would tie Aval to one CI vendor's API.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="record-where-you-can-write">Record where you can write<a class="headerlink" href="#record-where-you-can-write" title="Anchor link">&para;</a></h2>
-<p><code>--record</code> publishes one run record per run, next to your results. To keep
-records apart, write them to a file and publish them with <code>aval record</code> to a
-registry of your own:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--record-file<span class="w"> </span>record.json<span class="w"> </span>--repository<span class="w"> </span>acme/orders<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--registry<span class="w"> </span>ghcr.io/acme/orders-aval<span class="w"> </span>--policy<span class="w"> </span>policy.yaml
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>aval<span class="w"> </span>record<span class="w"> </span>--record-file<span class="w"> </span>record.json<span class="w"> </span>--registry<span class="w"> </span>ghcr.io/acme/aval-stats
+<p>No write access in the test job? Write the record to a file and publish it
+from another job:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--stats-file<span class="w"> </span>record.json<span class="w"> </span>--source-repo<span class="w"> </span>acme/orders
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>aval<span class="w"> </span>stats<span class="w"> </span>publish<span class="w"> </span>--registry<span class="w"> </span>ghcr.io/acme/aval-stats<span class="w"> </span>record.json
 </span></code></pre></div>
-<p>A test job without write access only writes the file; a job with write
-access, which runs no tests, runs <code>aval record</code>.</p>
 <h2 id="read-the-numbers">Read the numbers<a class="headerlink" href="#read-the-numbers" title="Anchor link">&para;</a></h2>
-<p><code>aval stats</code> reads the records back and sums them per test: hits, misses by
-cause, verification failures, shadow false hits and time saved.</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aval<span class="w"> </span>stats<span class="w"> </span>--registry<span class="w"> </span>ghcr.io/acme/aval-stats<span class="w"> </span>--since<span class="w"> </span>7d
 </span></code></pre></div>
-<p><code>--by repository</code> needs <code>--repository &lt;name&gt;</code> on <code>aval run</code> or <code>aval record</code>.</p>
+<p>It sums hits, misses by cause, verification failures, shadow false hits and
+time saved, per test:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>run records in ghcr.io/acme/aval-stats since 2026-10-31T12:30:00Z
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>orders-unit: 1 runs, 1 reused (hit rate 100.0%), test time 0s, saved 1m30s
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>  not reused: 0 no trusted result, 0 error, 0 verified but run (shadow)
@@ -2290,43 +2314,17 @@ cause, verification failures, shadow false hits and time saved.</p>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  not reused: 0 no trusted result, 0 error, 0 verified but run (shadow)
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  verification failures: 0, shadow false hits: 0
 </span></code></pre></div>
-<p><code>--test</code> limits it to one test, and <code>-o json</code> prints the
-<a href="../../artifact-format/#stats-report-json">stats report</a>. <code>aval stats</code> writes
-nothing and never affects reuse.</p>
-<details class="info">
-<summary>Records are statistics, not evidence</summary>
-<p>Records are unsigned. <code>aval run</code> and <code>aval verify</code> never read them, so a
-forged record cannot cause reuse. Recording is best-effort: a record that
-cannot be published prints <code>aval: warning: run record not published</code> and
-never changes the exit code.</p>
-</details>
-<details class="example">
-<summary>What the fields mean</summary>
-<p><code>reused</code> is true when the test did not run. <code>savedDurationMs</code> is how long
-the reused run took when it was recorded. With <code>--shadow</code>, <code>reused</code> is
-always false. Every field is in
-<a href="../../artifact-format/#record-json">Artifact format: run records</a>.</p>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval.trianalab.io/run-record/v1"</span><span class="p">,</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"testId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-integration"</span><span class="p">,</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">"reused"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">  </span><span class="nt">"verifiedResult"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span><span class="nt">"testDurationMs"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="nt">"savedDurationMs"</span><span class="p">:</span><span class="w"> </span><span class="mi">1184000</span><span class="p">,</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="nt">"avalVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.3.0"</span><span class="p">,</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">  </span><span class="nt">"recordedAt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-11-06T09:00:00Z"</span><span class="p">,</span>
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">  </span><span class="nt">"ciRunUrl"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://ci.example.com/acme/orders/runs/42"</span><span class="p">,</span>
-</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">  </span><span class="nt">"repository"</span><span class="p">:</span><span class="w"> </span><span class="s2">"acme/orders"</span>
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="p">}</span>
-</span></code></pre></div>
-</details>
+<ul>
+<li><code>--test</code> limits it to one test, <code>--by repository</code> groups by <code>--source-repo</code>,
+  <code>-o json</code> prints the <a href="../../artifact-format/#stats-report-json">stats report</a>.</li>
+<li>Records are unsigned statistics. <code>aval run</code> and <code>aval verify</code> never read
+  them, so a forged record cannot cause reuse.</li>
+<li>A record that cannot be published only warns; the exit code stays.
+  Fields: <a href="../../artifact-format/#record-json">run records</a>.</li>
+</ul>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
 <ul>
 <li><a href="../../stats/">Stats</a>: the public numbers</li>
-<li><a href="../../concepts/outcomes/">Outcomes</a></li>
 <li><a href="../troubleshooting/">Troubleshooting</a></li>
 </ul>
 

@@ -16,7 +16,7 @@
         <link rel="prev" href="../contract/">
       
       
-        <link rel="next" href="../artifact-format/">
+        <link rel="next" href="../mutable-references/">
       
       
         
@@ -1110,6 +1110,8 @@
       
         
       
+        
+      
     
     
     
@@ -1192,6 +1194,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1233,7 +1263,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1255,14 +1285,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1553,6 +1583,8 @@
       
         
       
+        
+      
     
     
     
@@ -1569,10 +1601,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="">
             
   
   
@@ -1590,8 +1622,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1848,6 +1880,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2495,7 +2555,7 @@ entries.</p>
 </tbody>
 </table>
 <p>Make a key with
-<code>openssl ecparam -name prime256v1 -genkey -noout -out aval.key</code>. Getting the
+<code>aval keygen</code> (writes <code>aval.key</code> and <code>aval.pub</code>). Getting the
 OIDC token is the caller's job, so no CI vendor or issuer is assumed.</p>
 <p>Signing always uses the Sigstore public-good instance
 (<code>https://fulcio.sigstore.dev</code>, <code>https://rekor.sigstore.dev</code>)
@@ -2624,7 +2684,7 @@ envelope):</p>
 <li><strong>Both:</strong> the envelope must be the exact one the bundle signs; no bundle
   means no verification.</li>
 </ul>
-<p>Without <code>--policy</code> nothing is trusted and nothing is looked up: miss. A <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>
+<p>Without <code>--policy</code> or <code>AVAL_POLICY</code> nothing is trusted and nothing is looked up: miss. A <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>
 or trusted root that cannot load: <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code> (exit 1), and the test runs.</p>
 <h3 id="keyless-verification-needs-the-network-and-a-writable-home">Keyless verification needs the network and a writable HOME<a class="headerlink" href="#keyless-verification-needs-the-network-and-a-writable-home" title="Anchor link">&para;</a></h3>
 <p>Keyless policies without <code>trustedRoot</code> fetch the Sigstore root with TUF
@@ -2651,6 +2711,10 @@ signing identity, sign a passing result for its own inputs, and get a green
 check it wrote itself. Read the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> and the registry from the default
 branch instead. Not from <code>github.base_ref</code>: a PR can target any branch,
 including one its author controls.</p>
+<p><code>AVAL_POLICY</code> and <code>AVAL_REGISTRY</code> count the same as the flags (a flag wins;
+empty is unset). Set them in the step, or from the default branch as below,
+never from a file in the checkout. Aval reads them from no file: there is no
+config file and no <code>aval.yaml</code> field.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pull_request</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">permissions</span><span class="p">:</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
@@ -2707,14 +2771,14 @@ the test runs.</p>
 <ul>
 <li><code>$SIGSTORE_ID_TOKEN</code> is removed from the environment before
   <code>runner.command</code> starts, so the code under test cannot sign as the CI job.</li>
-<li>A <code>--report</code> that cannot be written disables reuse: the test runs, and a
+<li>A <code>--report-file</code> that cannot be written disables reuse: the test runs, and a
   verification failure still exits 5.</li>
 <li>Reasons from attestations are escaped on text output and stderr (<code>\n</code>,
   <code>\x1b</code>, <code>\u2028</code>), so they never start a line of their own; the JSON report
   keeps them as is.</li>
 <li><code>--shadow</code> verifies and runs the test anyway, and exits 1 with
   <code>aval: FALSE HIT: ...</code> when a verified result disagrees with the real run.</li>
-<li><code>--record</code> publishes an unsigned run record for every <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>; it never
+<li><code>--stats</code> publishes an unsigned run record for every <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>; it never
   affects reuse or the exit code
   (<a href="../artifact-format/#run-records">run records</a>).</li>
 <li>Restored outputs are as trustworthy as the <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> that published them: a
@@ -2891,13 +2955,13 @@ copied into the predicate as <code>test.cacheability</code>.</p>
         
         
           
-          <a href="../artifact-format/" class="md-footer__link md-footer__link--next" aria-label="Next: Artifact format">
+          <a href="../mutable-references/" class="md-footer__link md-footer__link--next" aria-label="Next: Mutable reference scan">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Artifact format
+                Mutable reference scan
               </div>
             </div>
             <div class="md-footer__button md-icon">

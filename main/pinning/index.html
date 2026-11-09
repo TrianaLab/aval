@@ -1232,6 +1232,8 @@
       
         
       
+        
+      
     
     
     
@@ -1311,6 +1313,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1349,7 +1379,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1371,14 +1401,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1667,6 +1697,8 @@
       
         
       
+        
+      
     
     
     
@@ -1680,10 +1712,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1701,8 +1733,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1755,6 +1787,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -2253,33 +2313,21 @@
 
 <h1 id="pin-your-dependencies">Pin your dependencies<a class="headerlink" href="#pin-your-dependencies" title="Anchor link">&para;</a></h1>
 <p>Goal: no input that can change behind the same name.</p>
-<p>Aval hashes the text <code>postgres:16</code>, not the image behind it, so a repushed tag
-would not change the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. Aval reports such <strong>mutable</strong> references, in
-the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> and in <code>runner.command</code>, and does not reuse a result that depends on
-one:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>mutable: compose.yaml:3 (container) postgres:16: a tag can be repushed: pin the image by digest (name:tag@sha256:...)
-</span></code></pre></div>
-<p>The fix is the immutable id in the file:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis:7.4-alpine@sha256:c5d34a98396a4775e223c74e929162c35c5a2182901ba26b50ade939941ce14b</span>
-</span></code></pre></div>
 <pre class="aval-mermaid"><code>flowchart LR
-  f([finding]) --&gt; c{cacheability}
+  f([mutable reference]) --&gt; c{cacheability}
   c -- "hermetic,&lt;br&gt;controlled-environment" --&gt; m([miss, nothing published]):::muted
   c -- external-dependencies --&gt; p([printed only])
   c -- non-deterministic --&gt; n([never reused anyway])</code></pre>
-<p><code>aval verify</code> exits 4; <code>aval run --push</code> and <code>aval push</code> publish nothing. The
-line names file:line, ecosystem, the reference and the fix.
-<code>--fingerprint-only</code> prints it on stderr.</p>
-<details class="info">
-<summary>How the scan works</summary>
+<p>Aval hashes the text <code>postgres:16</code>, not the image behind it. A repushed tag
+would not change the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so Aval reports it and does not reuse:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>mutable: compose.yaml:3 (container) postgres:16: a tag can be repushed: pin the image by digest (name:tag@sha256:...)
+</span></code></pre></div>
 <ul>
-<li>It reads files only; it never fetches, resolves or runs anything.</li>
-<li>At most 1 MiB per file. A bigger or unreadable file it should check is a
-  <code>scan</code> finding that cannot be accepted: shrink or split it.</li>
-<li>Lockfiles (<code>pnpm-lock.yaml</code>, <code>go.sum</code>, <code>Cargo.lock</code>, ...) are hashed,
-  not scanned.</li>
+<li>The line names file:line, ecosystem, the reference and the fix.</li>
+<li><code>aval verify</code> exits 4; <code>aval run --push</code> and <code>aval push</code> publish nothing.</li>
+<li><code>aval explain</code> prints it on stderr.</li>
+<li>The scan reads files only. It never fetches or runs anything.</li>
 </ul>
-</details>
 <h2 id="fix-it-by-ecosystem">Fix it by ecosystem<a class="headerlink" href="#fix-it-by-ecosystem" title="Anchor link">&para;</a></h2>
 <table>
 <thead>
@@ -2337,186 +2385,58 @@ line names file:line, ecosystem, the reference and the fix.
 </tr>
 </tbody>
 </table>
-<details class="info">
-<summary>Python details</summary>
-<ul>
-<li>Generate the file: <code>uv pip compile --generate-hashes requirements.in -o
-  requirements.txt</code>, then <code>pip install --require-hashes -r
-  requirements.txt</code>.</li>
-<li>Once one entry of a requirements file has a hash, every entry needs one.</li>
-<li>Any <code>requirements*.txt</code> path is checked, also <code>requirements/dev.txt</code>.</li>
-<li>Poetry needs <code>poetry.lock</code> and Pipenv <code>Pipfile.lock</code> next to the
-  manifest. A <code>pyproject.toml</code> with <code>[project]</code> dependencies needs
-  <code>uv.lock</code>, <code>pdm.lock</code> or <code>poetry.lock</code>, next to it or at the workspace
-  root.</li>
-<li>A file named by <code>pip install -r</code>/<code>-c</code>, or by an include line inside a
-  requirements file (resolved next to that file), must be in the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>,
-  or it is reported.</li>
-</ul>
-</details>
+<p>Python details: <a href="../mutable-references/#python">Python</a>.</p>
 <h3 id="container-images">Container images<a class="headerlink" href="#container-images" title="Anchor link">&para;</a></h3>
 <p>Pin every image by digest. Keep the tag for readers; the digest decides.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># compose.yaml, Kubernetes manifests, rendered Helm charts</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis:7.4-alpine@sha256:c5d34a98396a4775e223c74e929162c35c5a2182901ba26b50ade939941ce14b</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># compose.yaml, Kubernetes manifests, rendered Helm charts</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis:7.4-alpine@sha256:c5d34a98396a4775e223c74e929162c35c5a2182901ba26b50ade939941ce14b</span>
 </span></code></pre></div>
-<div class="language-dockerfile highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c"># syntax=docker/dockerfile:1@sha256:&lt;digest&gt;</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">FROM</span><span class="w"> </span><span class="s">golang:1.25@sha256:&lt;digest&gt;</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">build</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">FROM</span><span class="w"> </span><span class="s">build</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">test</span><span class="w">          </span>#<span class="w"> </span>a<span class="w"> </span>stage<span class="w"> </span>name<span class="w"> </span>is<span class="w"> </span>fine
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>nginx:1.27@sha256:&lt;digest&gt;<span class="w"> </span>/etc/nginx<span class="w"> </span>/etc/nginx
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">ADD</span><span class="w"> </span>--checksum<span class="o">=</span>sha256:&lt;sum&gt;<span class="w"> </span>https://example.com/tool.tgz<span class="w"> </span>/tool.tgz
+<div class="language-dockerfile highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c"># syntax=docker/dockerfile:1@sha256:&lt;digest&gt;</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">FROM</span><span class="w"> </span><span class="s">golang:1.25@sha256:&lt;digest&gt;</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">build</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">FROM</span><span class="w"> </span><span class="s">build</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">test</span><span class="w">          </span>#<span class="w"> </span>a<span class="w"> </span>stage<span class="w"> </span>name<span class="w"> </span>is<span class="w"> </span>fine
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>nginx:1.27@sha256:&lt;digest&gt;<span class="w"> </span>/etc/nginx<span class="w"> </span>/etc/nginx
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">ADD</span><span class="w"> </span>--checksum<span class="o">=</span>sha256:&lt;sum&gt;<span class="w"> </span>https://example.com/tool.tgz<span class="w"> </span>/tool.tgz
 </span></code></pre></div>
-<p>Find the digest with <code>crane digest &lt;image:tag&gt;</code> or
-<code>docker buildx imagetools inspect &lt;image:tag&gt;</code>.</p>
-<details class="info">
-<summary>What else is checked</summary>
-<ul>
-<li>Images in test code: in <code>*.go</code>, <code>*.py</code>, <code>*.java</code>, <code>*.kt</code>, <code>*.ts</code>,
-  <code>*.js</code> and <code>*.cs</code> files that mention testcontainers, a quoted
-  <code>name:tag</code> without a digest (<code>PostgresContainer("postgres:16")</code>). A
-  <code>localhost</code>, dotted or 4+ digit <code>host:port</code> literal
-  (<code>"localhost:5432"</code>, <code>"127.0.0.1:8080"</code>, <code>"db:5432"</code>), a clock time
-  (<code>"12:30"</code>), a <code>sha256:</code> digest, a literal with a space or a scheme,
-  and a name without a tag are not reported. Any other quoted
-  <code>name:tag</code>, such as <code>"classpath:schema.sql"</code>, is reported and can be
-  accepted in <code>scope.allowMutable</code>; an image whose tag is 4 or more
-  digits without a registry (<code>"app:2024"</code>) is taken for a <code>host:port</code>
-  and not reported.</li>
-<li>Images in <code>docker run</code>, <code>podman run</code>, <code>docker compose</code> and
-  <code>kubectl run</code>/<code>create --image</code> commands. A compose file the command uses
-  must be in <code>scope.source</code>; it can be YAML or JSON (<code>compose.json</code>).</li>
-<li>An image from a variable Aval cannot resolve (<code>${DB_IMAGE}</code>), a Helm
-  template (<code>{{ .Values.image }}</code>), a YAML alias, block scalar or tag
-  (<code>image: *img</code>, <code>image: &gt;-</code>, <code>image: !!str ...</code>) is reported: write the
-  reference inline, or render the chart into the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.</li>
-<li><strong>Dockerfiles</strong> are read twice. The line pass reads each line as an
-  instruction (continuations joined with a space, <code>RUN</code> heredocs as
-  scripts). The BuildKit pass splits the file as BuildKit does, for files
-  named <code>Dockerfile</code>, <code>Dockerfile.*</code>, <code>*.dockerfile</code>, <code>Dockerfile</code> plus a
-  name without a dot (<code>Dockerfile-dev</code>), and the same with
-  <code>Containerfile</code>: comment lines stand alone, continuations join with
-  nothing between (<code>FROM db:1\</code> then <code>6</code> is <code>db:16</code>), <code># escape=</code> sets the
-  escape character (continuations and heredoc words), heredoc bodies are
-  kept apart.</li>
-<li>Both passes treat <code>COPY --from=</code> and <code>RUN --mount=...,from=</code> like a
-  <code>FROM</code>: a stage name or index is fine, an image needs a digest. An
-  instruction behind <code>ONBUILD</code> is checked like the same one without it.</li>
-<li>The BuildKit pass also reports a file BuildKit refuses (an invalid
-  <code># escape=</code>, a repeated directive, an unterminated heredoc), a heredoc
-  name with a quote, <code>\</code> or <code>$</code>, or an empty one, and a <code>FROM</code> image with a
-  variable that is not a global <code>ARG</code> with a value (<code>FROM alpine:$V</code>):
-  give the global <code>ARG</code> a default, or write the image.</li>
-<li><strong>Kustomize</strong>: an <code>images:</code> (or <code>imageTags:</code>) entry with <code>newName</code> or
-  <code>newTag</code> needs a <code>digest:</code>. Reported by name and index
-  (<code>resources[2]</code>): a remote or out-of-<abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> <code>resources</code>, <code>components</code> or
-  <code>bases</code> entry (vendor it); a patch or <code>replacements</code> entry that sets an
-  image, or is given by an out-of-<abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> path; a <code>transformers</code> or
-  <code>generators</code> entry with an image transformer or an out-of-<abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> path; a
-  <code>helmCharts</code> entry, unless the chart is local (no <code>repo</code>, <code>Chart.yaml</code> in
-  the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> under <code>helmGlobals.chartHome</code>, default <code>charts</code>, inside the
-  kustomization directory) and no <code>valuesInline</code> sets an image; any
-  <code>tagSuffix</code> (kustomize drops the digest). An undecodable kustomization
-  is reported by its path. The overlay is not built.</li>
-<li><strong>YAML</strong> is read twice: the line pass matches <code>image:</code> on every line,
-  also inside a block scalar a template renders; the parser matches every
-  key that decodes to <code>image</code> (<code>"ima\x67e":</code>, <code>? image</code>, <code>!!binary
-  aW1hZ2U=:</code>). A key with another tag, or one the parser cannot decode in
-  a file it rejects, is reported; in <code>*.tpl</code> files, files under
-  <code>templates/</code> and rejected files, a key a template writes
-  (<code>ima{{ "ge" }}:</code>) is reported by its text, except a <code>range</code> key
-  variable alone (<code>{{ $key | quote }}:</code>) directly under <code>labels:</code> or
-  <code>annotations:</code>. A Compose
-  <code>build.dockerfile_inline</code> is checked as a Dockerfile, and
-  <code>build.additional_contexts</code> values with <code>docker-image://</code> as images.</li>
-<li><strong>JSON</strong> is read the same way, but only in Compose files, files under
-  <code>templates/</code> and files a kustomization in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> lists in <code>resources</code>.</li>
-</ul>
-</details>
+<p>Find the digest with <code>crane digest &lt;image:tag&gt;</code>. Testcontainers, Dockerfiles,
+Kustomize and YAML rules: <a href="../mutable-references/#container-images">Container images</a>.</p>
 <h3 id="scripts-from-the-network">Scripts from the network<a class="headerlink" href="#scripts-from-the-network" title="Anchor link">&para;</a></h3>
-<p><code>curl … | sh</code> (also through <code>tee</code>), <code>bash -c "$(curl …)"</code>,
-<code>python -c "$(curl …)"</code>, <code>eval "$(curl …)"</code>, <code>source &lt;(wget …)</code> and
-<code>releases/latest</code> URLs run or fetch whatever the server sends, also in
-Dockerfile <code>RUN</code> lines and heredocs. Vendor the script into the
-<abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, or download a fixed version and check its sha256 before running it.</p>
-<details class="info">
-<summary>Which files are scanned as scripts</summary>
-<p><code>*.sh</code>, <code>*.bash</code>, <code>*.zsh</code>, <code>*.mk</code>, <code>Makefile</code>, and in-<abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> files without
-an extension whose first line is a <code>sh</code>, <code>bash</code>, <code>zsh</code>, <code>ksh</code> or <code>dash</code>
-shebang (<code>./setup</code>). A script with another extension is hashed but not
-scanned.</p>
-</details>
+<p><code>curl … | sh</code>, <code>eval "$(curl …)"</code> and <code>releases/latest</code> URLs run whatever the
+server sends. Vendor the script into the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, or download a fixed version
+and check its sha256. <a href="../mutable-references/#scripts">All variants and which files are scanned</a>.</p>
 <h2 id="resolve-a-reference-instead">Resolve a reference instead<a class="headerlink" href="#resolve-a-reference-instead" title="Anchor link">&para;</a></h2>
-<p>To follow a tag or branch on purpose, declare it in <code>scope.resolve</code>
-(<a href="../resolve/">Resolve references</a>). That changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> when
-the target moves, but the scanner still reports the reference: pin it or
-accept it below.</p>
+<p>To follow a tag on purpose, declare it in <code>scope.resolve</code>
+(<a href="../resolve/">Resolve references</a>). The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> then changes when
+the target moves; the scan still reports it, so pin or accept it.</p>
 <h2 id="accept-a-reference-on-purpose">Accept a reference on purpose<a class="headerlink" href="#accept-a-reference-on-purpose" title="Anchor link">&para;</a></h2>
-<p>Sometimes a <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr> is acceptable, for example an image your team
-rebuilds and scans every night. Acknowledge it in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, with the
-reason:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Test</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">metadata</span><span class="p">:</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">orders-integration</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nt">runner</span><span class="p">:</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"docker"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"compose"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"run"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"--rm"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"tests"</span><span class="p p-Indicator">]</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nt">scope</span><span class="p">:</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"**/*.go"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"compose.yaml"</span><span class="p p-Indicator">]</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span><span class="nt">allowMutable</span><span class="p">:</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:16</span><span class="w">          </span><span class="c1"># exactly as Aval prints it</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rebuilt and scanned nightly; the tag is ours</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy/kustomization.yaml</span><span class="w">   </span><span class="c1"># only the finding in this file</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">      </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">resources[0]</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vendored upstream base, reviewed on update</span>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">controlled-environment</span>
+<p>Such as an image your team rebuilds and scans every night. Say why in the
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Test</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">metadata</span><span class="p">:</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">orders-integration</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">runner</span><span class="p">:</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"docker"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"compose"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"run"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"--rm"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"tests"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"**/*.go"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"compose.yaml"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">allowMutable</span><span class="p">:</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:16</span><span class="w">          </span><span class="c1"># exactly as Aval prints it</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rebuilt and scanned nightly; the tag is ours</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy/kustomization.yaml</span><span class="w">   </span><span class="c1"># only the finding in this file</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">      </span><span class="nt">ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">resources[0]</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vendored upstream base, reviewed on update</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">controlled-environment</span>
 </span></code></pre></div>
 <ul>
-<li><code>ref</code> is the text Aval prints: for a missing lockfile, the manifest path
-  (<code>go.mod</code>); quotes in shell commands are dropped. A finding Aval reports
-  because it cannot tell (a templated key, <code>resources[2]</code>, a heredoc name, a
-  <code>FROM</code> line) is in the <code>container</code> ecosystem, accepted by its printed <code>ref</code>.</li>
-<li><code>file</code> is the path Aval prints before the line number, relative to the
-  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (<code>runner.command</code> for the command), and limits the entry to that
-  file. Without it, a <code>ref</code> that two files report (<code>resources[0]</code> repeats) is
-  not accepted, and the finding asks for <code>file</code>. With
-  <a href="../guides/depend-on-a-contract/"><code>scope.contracts</code></a>, each <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s entries
-  apply to its own findings.</li>
-<li>It is part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, so it changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and shows in
-  review.</li>
+<li><code>ref</code> is the text Aval prints; <code>file</code> limits the entry to one file.</li>
+<li>It changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and shows in review.</li>
 <li><code>aval run</code> still prints the finding, marked <code>(allowed: &lt;reason&gt;)</code>.</li>
 </ul>
-<details class="warning">
-<summary>Limits</summary>
-<p>The scanner reads text and is a safety net, not a guarantee; the
-guarantee is the declared <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> and the pins you write.</p>
-<ul>
-<li>Not detected: unversioned downloads other than <code>releases/latest</code>
-  (<code>curl -o tool URL</code>, <code>curl URL | tar x</code>); Helm values split into
-  <code>repository</code> and <code>tag</code>, or YAML a template prints; a JSON6902 patch file
-  in the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> named by <code>path:</code>; JSON outside the files above; <code>--build-arg</code> values
-  (the <code>ARG</code> default is checked; outside <code>FROM</code> the last value of a name
-  wins); the BuildKit pass on a source file named like
-  <code>dockerfile_test.go</code>.</li>
-<li>In test code: an image in a variable built from parts, in a constant
-  or helper in a file that does not mention testcontainers, a
-  module's default image (<code>PostgresContainer()</code> without an image), the
-  Ryuk reaper image, source files larger than 1 MiB or unreadable, and
-  source in other languages or extensions (<code>.rs</code>, <code>.mjs</code>, <code>.tsx</code>,
-  <code>.groovy</code>, <code>.scala</code>). Write the image with its digest
-  (<code>"postgres:16@sha256:&lt;digest&gt;"</code>), or declare it in <code>scope.resolve</code>.</li>
-<li>Shell commands are split without a full parser: a quoted <code>;</code> or <code>&gt;</code>
-  also splits, which can cause needless misses.</li>
-<li>An option Aval does not know to take a value
-  (<code>tool --opt value install x</code>) hides the subcommand.</li>
-<li>For the gaps, declare the reference in <code>scope.resolve</code>
-  (<a href="../resolve/urls/"><code>url</code></a>, <a href="../resolve/images/"><code>image</code></a>) and run
-  <code>aval run --shadow</code>.</li>
-</ul>
-</details>
+<p>Fine print: <a href="../mutable-references/#scopeallowmutable"><code>scope.allowMutable</code></a>.
+The scan is a safety net, not a guarantee: <a href="../mutable-references/#limits">Limits</a>.</p>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
 <ul>
 <li><a href="../resolve/">Resolve references</a></li>
 <li><a href="../guides/write-a-contract/">Write a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a></li>
-<li><a href="../guides/measure-reuse/">Measure reuse</a></li>
 </ul>
 
 

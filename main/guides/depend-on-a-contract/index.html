@@ -917,28 +917,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-to-know" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What to know
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-contract-or-an-api-file" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A contract, or an API file?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#workspaces" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1215,6 +1193,8 @@
       
         
       
+        
+      
     
     
     
@@ -1294,6 +1274,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1332,7 +1340,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1354,14 +1362,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1650,6 +1658,8 @@
       
         
       
+        
+      
     
     
     
@@ -1663,10 +1673,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1684,8 +1694,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1738,6 +1748,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -2101,28 +2139,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-to-know" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What to know
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-contract-or-an-api-file" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A contract, or an API file?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#workspaces" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2223,7 +2239,6 @@ change, without copying the backend's globs.</p>
 <pre class="aval-mermaid"><code>flowchart LR
   f[frontend/aval.yaml] -- scope.contracts --&gt; b[backend/aval.yaml]
   b --&gt; bs(["backend scope: api/**"])
-  f --&gt; fs(["frontend scope: src/**, test.sh"])
   bs -. change .-&gt; miss([frontend misses and runs]):::err</code></pre>
 <h2 id="the-example">The example<a class="headerlink" href="#the-example" title="Anchor link">&para;</a></h2>
 <p>The frontend names the backend's <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>:</p>
@@ -2248,36 +2263,27 @@ change, without copying the backend's globs.</p>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"api/**"</span><span class="p p-Indicator">]</span>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
 </span></code></pre></div>
-<p>The frontend's <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> now includes the backend's <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>:</p>
+<p>The frontend's <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> now includes the backend's:</p>
 <ul>
-<li>a change in the backend's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> makes the frontend miss and run;</li>
-<li>a change outside it (a backend README) keeps the reuse;</li>
-<li>if the backend names another <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, that one counts too.</li>
+<li>a change in the backend's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>: the frontend misses and runs;</li>
+<li>a change outside it (a backend README): still reused;</li>
+<li>contracts the backend names count too.</li>
 </ul>
-<p><code>aval run --explain</code> shows the reference:</p>
+<p><code>aval explain</code> shows the link:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>contract ../backend/aval.yaml backend sha256:&lt;backend fingerprint&gt;
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>depends on ../backend/aval.yaml (backend) sha256:&lt;backend fingerprint&gt;
 </span></code></pre></div>
-<h2 id="what-to-know">What to know<a class="headerlink" href="#what-to-know" title="Anchor link">&para;</a></h2>
 <ul>
-<li>Paths are relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and stay inside its git working tree.
-  Only local files: no <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> from another repository.</li>
-<li>If Aval cannot read or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, the test runs.</li>
-<li>A <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr> in the backend blocks the frontend's reuse too. Only
-  the backend's own <code>scope.allowMutable</code> can accept it.</li>
+<li>Paths are relative and stay inside the git working tree. No other repositories.</li>
+<li>If Aval cannot read the other <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, the test runs.</li>
+<li>A <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr> in the backend blocks the frontend too; only the
+  backend's <code>scope.allowMutable</code> accepts it.</li>
 </ul>
-<p>Limits and errors: <a href="../../contract/"><code>scope.contracts</code></a>.</p>
-<h2 id="a-contract-or-an-api-file">A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or an API file?<a class="headerlink" href="#a-contract-or-an-api-file" title="Anchor link">&para;</a></h2>
-<p>Name the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> when the test runs the other part's code, like frontend
-end-to-end tests against the real backend.</p>
-<p>When the test only uses the interface (a generated client, a mocked
-backend), list the API file (OpenAPI, <code>.proto</code>) in <code>scope.dependencies</code>
-instead. Only an interface change reruns the test. Globs cannot leave the
-<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory, so keep the file in the frontend's tree.</p>
+<p>Using only the backend's interface (a generated client)? List the API file
+(OpenAPI, <code>.proto</code>) in <code>scope.dependencies</code> instead.</p>
 <h2 id="workspaces">Workspaces<a class="headerlink" href="#workspaces" title="Anchor link">&para;</a></h2>
-<p>uv, pnpm and cargo workspaces keep one lockfile at the root. A member's
-<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> cannot list it: globs cannot use <code>..</code>. Two layouts work.</p>
-<p><strong>Contracts at the root</strong>, one per member, named <code>aval.&lt;member&gt;.yaml</code>:</p>
+<p>uv, pnpm and cargo keep one lockfile at the root, and globs cannot use <code>..</code>.
+Two layouts work. Either one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> per member at the root:</p>
 <div class="language-yaml highlight"><span class="filename">aval.api.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Test</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">metadata</span><span class="p">:</span>
@@ -2289,8 +2295,8 @@ instead. Only an interface change reruns the test. Globs cannot leave the
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"pyproject.toml"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"uv.lock"</span><span class="p p-Indicator">]</span>
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
 </span></code></pre></div>
-<p><strong>A root <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> owns the lockfile</strong>, and each member names it in
-<code>scope.contracts</code>, which may use <code>..</code>:</p>
+<p>Or a root <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> owns the lockfile, and members name it (<code>scope.contracts</code>
+may use <code>..</code>):</p>
 <div class="language-yaml highlight"><span class="filename">aval.lock.yaml</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Test</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">metadata</span><span class="p">:</span>
@@ -2313,8 +2319,7 @@ instead. Only an interface change reruns the test. Globs cannot leave the
 </span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">contracts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"../../aval.lock.yaml"</span><span class="p p-Indicator">]</span>
 </span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
 </span></code></pre></div>
-<p>Either way, any lockfile change reruns every member. The same layouts fit
-the other tools:</p>
+<p>Any lockfile change reruns every member.</p>
 <table>
 <thead>
 <tr>
@@ -2343,23 +2348,11 @@ the other tools:</p>
 </table>
 <p>A member that imports another member lists that member's sources too, or
 names its <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.</p>
-<details class="info">
-<summary>Inputs the workspace graph does not show</summary>
-<p>Check each one against the test, and list the ones it reads:</p>
-<ul>
-<li>shared config at the root: <code>tsconfig.base.json</code>, <code>.npmrc</code>,
-  <code>conftest.py</code>, <code>pytest.ini</code>, <code>.cargo/config.toml</code>, <code>rust-toolchain.toml</code>,
-  <code>.python-version</code>, <code>.nvmrc</code>;</li>
-<li>patches: pnpm <code>patches/</code>, cargo <code>[patch]</code> sources;</li>
-<li>build scripts and generated code: <code>build.rs</code>, codegen inputs;</li>
-<li>shared fixtures or test data outside the member;</li>
-<li>environment variables (<code>environment.env</code>).</li>
-</ul>
-</details>
-<p>There is no <code>aval init</code>: generating <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> from manifests would infer it,
-and choosing the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> is the hard part, not typing the YAML.
-<a href="../write-a-contract/#find-undeclared-inputs">Find undeclared inputs</a> checks
-what you chose.</p>
+<p>Also check root config (<code>tsconfig.base.json</code>, <code>.npmrc</code>, <code>conftest.py</code>,
+<code>pytest.ini</code>, <code>.cargo/config.toml</code>, <code>rust-toolchain.toml</code>,
+<code>.python-version</code>, <code>.nvmrc</code>), patches, build scripts, shared fixtures and
+environment variables (<code>environment.env</code>):
+<a href="../write-a-contract/#find-undeclared-inputs">find undeclared inputs</a>.</p>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
 <ul>
 <li><a href="../write-a-contract/">Write a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a></li>

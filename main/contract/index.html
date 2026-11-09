@@ -1110,6 +1110,8 @@
       
         
       
+        
+      
     
     
     
@@ -1192,6 +1194,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1233,7 +1263,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1255,14 +1285,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1553,6 +1583,8 @@
       
         
       
+        
+      
     
     
     
@@ -1569,10 +1601,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="">
             
   
   
@@ -1590,8 +1622,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1829,6 +1861,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -2451,10 +2511,13 @@ do not declare is invisible to Aval. Format: <code>aval.trianalab.io/v1</code>, 
 </span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span><span class="w">          </span><span class="c1"># required, see "Cacheability classes"</span>
 </span></code></pre></div>
 <p>Check it locally:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>path/to/aval.yaml<span class="w"> </span>--fingerprint-only<span class="w">   </span><span class="c1"># prints sha256:&lt;hex&gt;</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>path/to/aval.yaml<span class="w"> </span>--explain<span class="w"> </span>--fingerprint-only<span class="w">   </span><span class="c1"># also prints the manifest</span>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>aval<span class="w"> </span>explain<span class="w"> </span>-f<span class="w"> </span>path/to/aval.yaml<span class="w"> </span>--digest<span class="w">   </span><span class="c1"># prints sha256:&lt;hex&gt;</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>aval<span class="w"> </span>explain<span class="w"> </span>-f<span class="w"> </span>path/to/aval.yaml<span class="w">            </span><span class="c1"># the manifest, then the fingerprint</span>
 </span></code></pre></div>
-<p>Diff the <code>--explain</code> output of two machines to see which file, toolchain entry
+<p>It excludes only the default <code>.aval/result.json</code>; a run that writes
+<code>--result-file</code>, <code>--report-file</code> or <code>--stats-file</code> inside the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>
+fingerprints the same only when those paths are under <code>.aval/</code>.</p>
+<p>Diff the <code>aval explain</code> output of two machines to see which file, toolchain entry
 or variable differs. <code>-f</code> takes one path and defaults to <code>./aval.yaml</code>; the
 root is always the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file's directory. A file holds one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: give
 each shard of a split suite its own file
@@ -2647,7 +2710,7 @@ does not accept is a miss, and its result is not published
 (<a href="../pinning/">Pin your dependencies</a>).</p>
 <h2 id="what-goes-into-the-fingerprint">What goes into the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr><a class="headerlink" href="#what-goes-into-the-fingerprint" title="Anchor link">&para;</a></h2>
 <p>The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>sha256:&lt;hex&gt;</code> of a line-oriented manifest (format
-<code>aval-fingerprint/v1</code>). <code>aval run --explain</code> prints the exact text that was
+<code>aval-fingerprint/v1</code>). <code>aval explain</code> prints the exact text that was
 hashed, in this order:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aval-fingerprint/v1
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
@@ -2699,7 +2762,7 @@ hashed, in this order:</p>
 </tr>
 <tr>
 <td><code>contract &lt;path&gt;</code></td>
-<td>one line per <code>scope.contracts</code> entry: the path as written, the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <code>metadata.name</code> and its <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, computed from its own directory and inputs (so references are transitive). <code>--explain</code> also prints the tree, one <code>depends on &lt;path&gt; (&lt;name&gt;) &lt;fingerprint&gt;</code> line per reference</td>
+<td>one line per <code>scope.contracts</code> entry: the path as written, the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <code>metadata.name</code> and its <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, computed from its own directory and inputs (so references are transitive). <code>aval explain</code> also prints the tree, one <code>depends on &lt;path&gt; (&lt;name&gt;) &lt;fingerprint&gt;</code> line per reference</td>
 <td></td>
 </tr>
 </tbody>
@@ -2725,7 +2788,7 @@ executable file fingerprints differently there than on Unix.</p>
 <td>exact name; a regular <code>.git</code> file is hashed</td>
 </tr>
 <tr>
-<td><code>.aval/</code> directories and the command's <code>--result</code>/<code>--report</code> files</td>
+<td><code>.aval/</code> directories and the command's <code>--result-file</code>/<code>--report-file</code> files</td>
 <td>so <code>["**"]</code> stays stable; keep them under <code>.aval/</code>. A path in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> that holds a real input exits 2. In a <code>scope.contracts</code> reference they stay inputs (a miss, never a false hit)</td>
 </tr>
 <tr>
@@ -2758,8 +2821,8 @@ depends on one of these can reuse a result it should not:</p>
 <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class.</p>
 <h3 id="fail-closed-errors">Fail-closed errors<a class="headerlink" href="#fail-closed-errors" title="Anchor link">&para;</a></h3>
 <p>Aval cannot prove the inputs: <code>aval run</code> reports <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>, runs the
-test and records nothing; <code>--fingerprint-only</code>, <code>--explain</code>, <code>aval verify</code> and
-<code>aval push</code> exit 1.</p>
+test and records nothing; <code>aval explain</code>, <code>aval verify</code> and <code>aval push</code> exit 1
+(as do <code>run --fingerprint-only</code> and <code>run --explain</code>, which <code>aval explain --digest</code> and <code>aval explain</code> replace).</p>
 <table>
 <thead>
 <tr>
@@ -2831,9 +2894,9 @@ declared and the observed value), runs the test, records and publishes
 nothing, and exits 1 (3 if the test failed). On a match, the output goes into
 the predicate's <code>execution.environment</code> as <code>probe.&lt;key&gt;</code>.</p>
 <p>Only <code>aval run</code> executes probes. <code>aval verify</code>, <code>aval push</code>,
-<code>--fingerprint-only</code> and the browser demo never do: a consumer never executes
-commands from a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>. <code>--explain</code> prints the manifest before any probe
-runs; when it goes on to run the test, the probe runs as in any run. The probe
+<code>aval explain</code> and the browser demo never do: a consumer never executes
+commands from a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>. <code>aval explain</code> prints the manifest and never runs a
+probe. The probe
 argv is part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, so adding or changing one changes the
 <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; its output is not hashed, since it varies by build and platform.</p>
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Anchor link">&para;</a></h2>

@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://aval.run/main/artifact-format/">
       
       
-        <link rel="prev" href="../trust-model/">
+        <link rel="prev" href="../mutable-references/">
       
       
         <link rel="next" href="../integrations/">
@@ -1110,6 +1110,8 @@
       
         
       
+        
+      
     
     
     
@@ -1192,6 +1194,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1233,7 +1263,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1255,14 +1285,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1553,6 +1583,8 @@
       
         
       
+        
+      
     
     
     
@@ -1569,10 +1601,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="">
             
   
   
@@ -1590,8 +1622,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1644,6 +1676,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -3038,7 +3098,7 @@ the test then runs and rewrites them.</p>
 </ul>
 <h3 id="lookup-and-consumption">Lookup and consumption<a class="headerlink" href="#lookup-and-consumption" title="Anchor link">&para;</a></h3>
 <ol>
-<li>Compute the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> locally (<code>aval run --fingerprint-only</code>).</li>
+<li>Compute the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> locally (<code>aval explain --digest</code>).</li>
 <li>Resolve the tag <code>sha256-&lt;fingerprint hex&gt;</code> in the <code>--registry</code> repository.
    It must point at the anchor digest Aval computes for that <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>;
    anything else is a verification failure (the tag was moved).</li>
@@ -3125,7 +3185,7 @@ Other fingerprints are not affected, so the next input change also ends it.</p>
 does not push after a reuse, but <code>aval run --shadow --push</code> pushes every time.</p>
 <p>To clean up, list the executions and delete the ones you no longer need, for
 example with <a href="https://oras.land">ORAS</a>:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--fingerprint-only<span class="w">            </span><span class="c1"># prints sha256:&lt;hex&gt;</span>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aval<span class="w"> </span>explain<span class="w"> </span>--digest<span class="w">                 </span><span class="c1"># prints sha256:&lt;hex&gt;</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>oras<span class="w"> </span>discover<span class="w"> </span>--artifact-type<span class="w"> </span>application/vnd.trianalab.aval.execution.v2<span class="w"> </span>&lt;repo&gt;:sha256-&lt;hex&gt;
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>oras<span class="w"> </span>manifest<span class="w"> </span>delete<span class="w"> </span>&lt;repo&gt;@sha256:&lt;execution<span class="w"> </span>digest&gt;
 </span></code></pre></div>
@@ -3135,18 +3195,18 @@ versions). Deleting executions is safe: it can make a result stop being
 reusable, never make an untrusted one reusable. Keep any execution that failed
 verification until you have looked into it.</p>
 <h2 id="run-records">Run records<a class="headerlink" href="#run-records" title="Anchor link">&para;</a></h2>
-<p><code>aval run --record</code> publishes one run record per run, for every <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>, so
-reuse can be measured from the registry alone. <code>--record-file &lt;path&gt;</code> writes
-the same record to a file, and <code>aval record --record-file &lt;path&gt;</code> publishes it
+<p><code>aval run --stats</code> publishes one run record per run, for every <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>, so
+reuse can be measured from the registry alone. <code>--stats-file &lt;path&gt;</code> writes
+the same record to a file, and <code>aval stats publish &lt;path&gt;</code> publishes it
 later, for example from a job that has write credentials but runs no tests.</p>
 <p>Records are <strong>statistics, never evidence</strong>: unsigned, and never read by
 <code>aval run</code> or <code>aval verify</code>, so a record, forged or not, cannot cause reuse,
 change an <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> or count toward the 64-candidate cap.</p>
 <p>Recording never changes the exit code: a record that cannot be published or
-written is a warning (<code>aval: warning: run record not ...</code>). <code>--record</code> needs
-<code>--registry</code>. An existing <code>--record-file</code> that is not an Aval file is never
+written is a warning (<code>aval: warning: run record not ...</code>). <code>--stats</code> needs
+<code>--registry</code>. An existing <code>--stats-file</code> that is not an Aval file is never
 overwritten. A run that stops before the lookup (bad flags, an invalid
-<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, <code>--fingerprint-only</code>) publishes no record.</p>
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, <code>aval explain</code>) publishes no record.</p>
 <h3 id="layout">Layout<a class="headerlink" href="#layout" title="Anchor link">&para;</a></h3>
 <p>Per test there is one <strong>stats anchor</strong>, separate from every <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>
 anchor. It is deterministic (its digest depends on the test id alone) and
@@ -3206,7 +3266,7 @@ limit, publishing a record fails with a warning; prune old records (see
 <td><code>reused</code></td>
 <td>bool</td>
 <td>always</td>
-<td><code>true</code> when a verified result was reused and the test did not run. With <code>--shadow</code>, or when <code>--report</code> cannot be written, it is <code>false</code>.</td>
+<td><code>true</code> when a verified result was reused and the test did not run. With <code>--shadow</code>, or when <code>--report-file</code> cannot be written, it is <code>false</code>.</td>
 </tr>
 <tr>
 <td><code>result</code></td>
@@ -3254,7 +3314,7 @@ limit, publishing a record fails with a warning; prune old records (see
 <td><code>repository</code></td>
 <td>string</td>
 <td>when passed</td>
-<td><code>--repository</code> on <code>aval run</code> (or <code>aval record</code>, which overrides the record's), the source repository, e.g. <code>acme/orders</code>. Aval does not derive it from any CI vendor. <code>aval stats --by repository</code> counts records without it (made before it was added, #88) as <code>unknown</code>.</td>
+<td><code>--source-repo</code> on <code>aval run</code> (or <code>aval stats publish</code>, which overrides the record's), the source repository, e.g. <code>acme/orders</code>. Aval does not derive it from any CI vendor. <code>aval stats --by repository</code> counts records without it (made before it was added, #88) as <code>unknown</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -3276,7 +3336,7 @@ limit, publishing a record fails with a warning; prune old records (see
 </span></code></pre></div>
 <p><code>evidence.ParseRunRecord</code> rejects an inconsistent record: <code>reused</code> <code>true</code> with
 an <code>outcome</code> other than <code>verified</code> or a non-zero <code>testDurationMs</code>, and a
-<code>verifiedResult</code> without <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>. <code>aval record</code> refuses it and
+<code>verifiedResult</code> without <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>. <code>aval stats publish</code> refuses it and
 <code>aval stats</code> skips it.</p>
 <h3 id="statistics-aval-stats">Statistics: <code>aval stats</code><a class="headerlink" href="#statistics-aval-stats" title="Anchor link">&para;</a></h3>
 <p><code>aval stats</code> reads the run records of a repository and aggregates them on
@@ -3407,7 +3467,7 @@ the sum of <code>reused</code>, the three <code>misses</code> and <code>verifica
 </tr>
 <tr>
 <td><code>misses.verifiedNotReused</code></td>
-<td>Outcome <code>verified</code> with <code>reused</code> <code>false</code>: <code>--shadow</code>, or the <code>--report</code> file could not be written.</td>
+<td>Outcome <code>verified</code> with <code>reused</code> <code>false</code>: <code>--shadow</code>, or the <code>--report-file</code> file could not be written.</td>
 </tr>
 <tr>
 <td><code>verificationFailures</code></td>
@@ -3671,7 +3731,7 @@ put secrets there: the predicate is published to the registry.</p>
 </span></code></pre></div>
 <h2 id="verify-report">Verify report<a class="headerlink" href="#verify-report" title="Anchor link">&para;</a></h2>
 <p><code>aval verify --output json</code> prints one <code>evidence.Report</code> to stdout, and
-<code>aval run --report &lt;file&gt;</code> writes the same document for its lookup decision.
+<code>aval run --report-file &lt;file&gt;</code> writes the same document for its lookup decision.
 This is the stable machine interface for CI scripts and external tools.</p>
 <table>
 <thead>
@@ -3723,7 +3783,7 @@ This is the stable machine interface for CI scripts and external tools.</p>
 <td><code>signer</code></td>
 <td>object</td>
 <td><code>verified</code> only</td>
-<td>Accepted <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> identity that matched (<code>issuer</code>, <code>subjectRegexp</code>, <code>trustLevel</code>) plus the identity the signature actually carried: <code>subject</code>, the certificate subject (SAN) for keyless signatures, or <code>keyId</code>, <code>base64(sha256(DER public key))</code> for key-based ones. <code>subject</code> and <code>keyId</code> are omitted when empty.</td>
+<td>Accepted <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> identity that matched (<code>issuer</code>, <code>subjectRegexp</code>, <code>trustLevel</code>, and <code>trustLevelName</code>: <code>developer</code>, <code>runner</code> or <code>isolated</code>, derived from the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> entry's level, never from the predicate) plus the identity the signature actually carried: <code>subject</code>, the certificate subject (SAN) for keyless signatures, or <code>keyId</code>, <code>base64(sha256(DER public key))</code> for key-based ones. <code>subject</code> and <code>keyId</code> are omitted when empty.</td>
 </tr>
 <tr>
 <td><code>predicate</code></td>
@@ -3782,9 +3842,9 @@ This is the stable machine interface for CI scripts and external tools.</p>
 with the test result (<a href="../concepts/outcomes/">Outcomes</a>).</p>
 <ul>
 <li>A <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> error: <code>aval verify</code> prints no report and exits 1;
-  <code>aval run --report</code> writes <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code> with an empty <code>fingerprint</code>, then
+  <code>aval run --report-file</code> writes <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code> with an empty <code>fingerprint</code>, then
   runs the test. Bad flags or an invalid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: no report, exit 2.</li>
-<li>No <code>--policy</code>, or a <code>non-deterministic</code> <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: <code>miss</code>, no lookup.</li>
+<li>No <code>--policy</code> (or <code>AVAL_POLICY</code>), or a <code>non-deterministic</code> <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: <code>miss</code>, no lookup.</li>
 <li>A <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, or a trusted root a candidate needs, that cannot load: <code>error</code>.</li>
 </ul>
 <p>Example (<code>verified</code>):</p>
@@ -3799,10 +3859,11 @@ with the test result (<a href="../concepts/outcomes/">Outcomes</a>).</p>
 </span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">"issuer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="p">,</span>
 </span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="nt">"subjectRegexp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"^https://github.com/acme/orders/\\.github/workflows/ci\\.yaml@refs/heads/main$"</span><span class="p">,</span>
 </span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">    </span><span class="nt">"trustLevel"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
-</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">    </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"</span>
-</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">  </span><span class="nt">"predicate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"as in the predicate example"</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="p">}</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">    </span><span class="nt">"trustLevelName"</span><span class="p">:</span><span class="w"> </span><span class="s2">"runner"</span><span class="p">,</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">    </span><span class="nt">"subject"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">  </span><span class="nt">"predicate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"as in the predicate example"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>Example (<code>miss</code>):</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
@@ -3986,7 +4047,7 @@ version adds a new file. The tests that enforce this:
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../trust-model/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Trust model">
+          <a href="../mutable-references/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Mutable reference scan">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3996,7 +4057,7 @@ version adds a new file. The tests that enforce this:
                 Previous
               </span>
               <div class="md-ellipsis">
-                Trust model
+                Mutable reference scan
               </div>
             </div>
           </a>

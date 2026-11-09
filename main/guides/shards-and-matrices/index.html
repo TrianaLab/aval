@@ -1204,6 +1204,8 @@
       
         
       
+        
+      
     
     
     
@@ -1283,6 +1285,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1321,7 +1351,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1343,14 +1373,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1639,6 +1669,8 @@
       
         
       
+        
+      
     
     
     
@@ -1652,10 +1684,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1673,8 +1705,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1727,6 +1759,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -2196,20 +2256,16 @@
 
 
 <h1 id="shards-and-matrices">Shards and matrices<a class="headerlink" href="#shards-and-matrices" title="Anchor link">&para;</a></h1>
-<p>Goal: a test suite split into shards across CI matrix jobs gets one result and
-one <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> per shard, each bound only to what that shard reads.</p>
+<p>Goal: one result and one <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> per CI shard, each bound only to what
+that shard reads.</p>
 <pre class="aval-mermaid"><code>flowchart LR
   m([matrix]) --&gt; s1[shard 1: aval run -f aval.shard-1.yaml] --&gt; r1([result 1]):::muted
   m --&gt; s2[shard 2: aval run -f aval.shard-2.yaml] --&gt; r2([result 2]):::muted
   c[change under packages/app] -. reruns .-&gt; s2</code></pre>
-<p>No new field: shards use <code>-f</code>, <code>scope</code> and <code>environment.env</code>. The example is
-<a href="https://github.com/TrianaLab/aval/tree/main/examples/uv-monorepo"><code>examples/uv-monorepo</code></a>,
-a uv workspace with two packages, which Aval's CI runs.</p>
+<p>No new field: <code>-f</code>, <code>scope</code> and <code>environment.env</code> do it. Example:
+<a href="https://github.com/TrianaLab/aval/tree/main/examples/uv-monorepo"><code>examples/uv-monorepo</code></a>.</p>
 <h2 id="pattern-a-one-contract-per-shard">Pattern A: one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> per shard<a class="headerlink" href="#pattern-a-one-contract-per-shard" title="Anchor link">&para;</a></h2>
-<p>Each shard has its own <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, <code>metadata.name</code> and <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. A file holds one
-<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and <code>-f</code> takes one path, so put the shard contracts side by side,
-each under its own name. Globs cannot contain <code>..</code>: a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> lives in the
-directory that holds all its inputs, here the workspace root.</p>
+<p>Best reuse. Each shard has its own <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, side by side at the root:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Shard 1 of 2: the core package's tests. It lives at the workspace root,</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># beside aval.shard-2.yaml, because globs cannot leave the contract's</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># directory and the uv workspace files are here. Run with</span>
@@ -2229,7 +2285,7 @@ directory that holds all its inputs, here the workspace root.</p>
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="nt">outputs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">coverage-shard-1.xml</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
-<p>Shard 2 tests <code>app</code>, which imports <code>core</code>, so <code>core</code>'s code is in its <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>:</p>
+<p>Shard 2 tests <code>app</code>, which imports <code>core</code>, so <code>core</code> is in its <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Shard 2 of 2: the app package's tests. app imports core, so core's code is</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># in scope here too; app's files are not in shard 1's scope.</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
@@ -2246,13 +2302,10 @@ directory that holds all its inputs, here the workspace root.</p>
 </span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="nt">outputs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">coverage-shard-2.xml</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
-<p>A change under <code>packages/app</code> reruns shard 2 only. A change to <code>core</code> or to
-<code>uv.lock</code> reruns both. If shared code lives outside a directory you want for
-a shard, bind it with <code>scope.contracts</code> instead of widening the globs:
-<a href="../depend-on-a-contract/">Depend on another part of the repo</a>.</p>
+<p>A change under <code>packages/app</code> reruns shard 2 only. A change to <code>core</code> or
+<code>uv.lock</code> reruns both.</p>
 <h2 id="pattern-b-one-contract-shard-variables">Pattern B: one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, shard variables<a class="headerlink" href="#pattern-b-one-contract-shard-variables" title="Anchor link">&para;</a></h2>
-<p>One <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> for every shard, with the shard index and count as declared
-environment variables:</p>
+<p>Simpler, less reuse: a change anywhere reruns every shard.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># One contract for every shard of examples/uv-monorepo. Each matrix job sets</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># SHARD_INDEX and SHARD_TOTAL, so each shard gets its own fingerprint over</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># the whole suite's scope. Splitting by index needs a pytest plugin such as</span>
@@ -2274,18 +2327,13 @@ environment variables:</p>
 </span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">SHARD_INDEX</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">SHARD_TOTAL</span><span class="p p-Indicator">]</span>
 </span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
 </span></code></pre></div>
-<p>Each shard gets its own <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, but over the whole suite's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, so a
-change anywhere reruns every shard. Simpler to set up, less reuse.</p>
 <div class="admonition warning">
 <p class="admonition-title">Declare both variables</p>
 <p>Leave <code>SHARD_INDEX</code> or <code>SHARD_TOTAL</code> out of <code>environment.env</code> and shards
-share a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>: shard 2 reuses shard 1's result without running its
-own tests, a false hit.</p>
+share a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>: shard 2 reuses shard 1's result, a false hit.</p>
 </div>
 <h2 id="the-matrix">The matrix<a class="headerlink" href="#the-matrix" title="Anchor link">&para;</a></h2>
-<p>One job per shard. Shards that share a checkout write different <code>--result</code>
-files, and each declares its own coverage file under <code>outputs</code>, restored
-on reuse:</p>
+<p>One job per shard, each with its own <code>--result-file</code> and coverage <code>outputs</code>:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># A two-shard matrix for this example as its own repository: copy it to</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># .github/workflows/ and set REPO and POLICY. Each job runs one shard</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># contract with its own --result; on main, reuses a verified result or runs</span>
@@ -2325,21 +2373,13 @@ on reuse:</p>
 </span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a><span class="w">          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coverage-shard-${{ matrix.shard }}</span>
 </span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a><span class="w">          </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coverage-shard-${{ matrix.shard }}.xml</span>
 </span></code></pre></div>
-<p>The same job locally, for shard 2:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>aval.shard-2.yaml<span class="w"> </span>--result<span class="w"> </span>.aval/shard-2.json<span class="w"> </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$REPO</span><span class="s2">"</span><span class="w"> </span>--policy<span class="w"> </span><span class="s2">"</span><span class="nv">$POLICY</span><span class="s2">"</span>
+<p>The same job locally, with <code>AVAL_REGISTRY</code> and <code>AVAL_POLICY</code> exported as in
+the workflow:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>aval.shard-2.yaml<span class="w"> </span>--result-file<span class="w"> </span>.aval/shard-2.json
 </span></code></pre></div>
-<p>To publish, add the push step from <a href="../github-actions/">Use GitHub Actions</a>
-to each job. On pull requests, read the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from a protected branch:
-<a href="../../trust-model/#take-the-policy-from-a-protected-branch">Take the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from a protected branch</a>.</p>
-<details class="info">
-<summary>Not built: several contracts in one call, templated contracts</summary>
-<p><code>aval run</code> takes one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and reports one result. Your CI already runs
-the matrix jobs and aggregates their status. A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> with
-placeholders would make the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> computed instead of declared.</p>
-</details>
+<p>To publish, add the push step from <a href="../github-actions/">Use GitHub Actions</a>.</p>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
 <ul>
-<li><a href="../write-a-contract/">Write a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a></li>
 <li><a href="../depend-on-a-contract/">Depend on another part of the repo</a></li>
 <li><a href="../github-actions/">Use GitHub Actions</a></li>
 </ul>

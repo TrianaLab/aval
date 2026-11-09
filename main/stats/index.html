@@ -1106,6 +1106,8 @@
       
         
       
+        
+      
     
     
     
@@ -1185,6 +1187,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1223,7 +1253,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1245,14 +1275,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1541,6 +1571,8 @@
       
         
       
+        
+      
     
     
     
@@ -1554,10 +1586,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1575,8 +1607,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1629,6 +1661,34 @@
     
   
     Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
   
 
     
@@ -2128,22 +2188,18 @@
 
 
 <h1 id="stats">Stats<a class="headerlink" href="#stats" title="Anchor link">&para;</a></h1>
-<p>Live reuse numbers from every repository that records its runs to
-TrianaLab's public stats registry, <code>ghcr.io/trianalab/aval-stats</code>. Aval's own
-CI is one of them.</p>
+<p>How much does Aval reuse in real CI? Live numbers from every repository that
+records runs to <code>ghcr.io/trianalab/aval-stats</code>, Aval's own CI included.</p>
 <p data-aval-stats="page">Live statistics are not available right now: <code>stats.json</code> is missing, malformed
 or more than 6 hours old.</p>
 <p>Run records are unsigned statistics. They never affect reuse.</p>
 <h2 id="where-the-numbers-come-from">Where the numbers come from<a class="headerlink" href="#where-the-numbers-come-from" title="Anchor link">&para;</a></h2>
-<p>Twice an hour, and on every push to <code>main</code>, the docs workflow reads the
-registry anonymously:</p>
+<p>Twice an hour, and on every push to <code>main</code>, the docs workflow runs:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>aval<span class="w"> </span>stats<span class="w"> </span>--registry<span class="w"> </span>ghcr.io/trianalab/aval-stats<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--by<span class="w"> </span>repository<span class="w"> </span>--since<span class="w"> </span>30d<span class="w"> </span>-o<span class="w"> </span>json
 </span></code></pre></div>
-<p>It publishes the <a href="../artifact-format/#stats-report-json">stats report</a>, plus
-<code>generatedAt</code>, as <code>stats.json</code> at the root of this site. This page and the
-home page read that file in your browser. If a refresh fails, the previous
-file stays.</p>
+<p>and publishes the <a href="../artifact-format/#stats-report-json">stats report</a> as
+<code>stats.json</code> at the site root. If a refresh fails, the previous file stays.</p>
 <p>To keep statistics for your own repositories, see
 <a href="../guides/measure-reuse/">Measure reuse</a>. To add a TrianaLab repository to
 these numbers, see
