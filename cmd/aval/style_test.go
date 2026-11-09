@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
@@ -49,9 +50,12 @@ func TestIsTTY(t *testing.T) {
 // the output mode.
 func onTTY(t *testing.T, noColor string) {
 	t.Helper()
-	tty := isTTY
-	t.Cleanup(func() { isTTY = tty })
+	tty, tk := isTTY, spinTicker
+	t.Cleanup(func() { isTTY, spinTicker = tty, tk })
 	isTTY = func(io.Writer) bool { return true }
+	// The spinner never draws here: a slow fake registry call on a loaded
+	// runner would put a frame in the goldens.
+	spinTicker = func() (<-chan time.Time, func()) { return nil, func() {} }
 	t.Setenv("TERM", "xterm-256color")
 	t.Setenv(outputEnv, "")
 	t.Setenv("NO_COLOR", noColor)
