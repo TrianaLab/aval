@@ -18,6 +18,10 @@ import (
 var aval string
 
 func TestMain(m *testing.M) {
+	// The suite itself runs under `aval run` with these set in CI: every
+	// story starts from a clean environment and sets what it tests.
+	_ = os.Unsetenv("AVAL_REGISTRY")
+	_ = os.Unsetenv("AVAL_POLICY")
 	dir, err := os.MkdirTemp("", "aval-acceptance")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

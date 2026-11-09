@@ -24,7 +24,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 ??? failure "Flag errors"
     | Message | Fix |
     |---|---|
-    | `--push requires --registry`, `--record requires --registry`, `--registry is required`, `--registry and --record-file are required` | add the flags it names |
+    | `--push requires --registry`, `--record requires --registry`, `--registry is required`, `--record-file is required` | add the flags it names, or set `AVAL_REGISTRY` |
     | `--shadow and --no-reuse exclude each other` | pick one |
     | `--registry <x> is not an OCI repository` | use `host/name`, no `https://`, tag or digest |
     | `--registry-timeout must be positive`, `--output must be text or json`, `unknown command` | fix the value; see `aval <command> --help` |
@@ -89,7 +89,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
     | Reason | Fix |
     |---|---|
     | `no attestation found for fingerprint` | none: the inputs changed or nobody pushed yet |
-    | `no trust policy configured`, `no registry configured`, `reuse disabled (--no-reuse)` | pass `--policy`, `--registry`, drop `--no-reuse` |
+    | `no trust policy configured`, `no registry configured`, `reuse disabled (--no-reuse)` | pass `--policy`, `--registry` (or set `AVAL_POLICY`, `AVAL_REGISTRY`), drop `--no-reuse` |
     | `cacheability <x> is never reusable`, `is not in allowedCacheability` | by design, or allow the class in the policy |
     | `not reusable under the trust policy`, `signer <x> has trust level <y>, policy requires at least <z>` | raise the signer's `trustLevel` if you trust it |
     | `mutable references in the inputs` | pin each reference the line lists, or acknowledge it with `scope.allowMutable`; for `lists this ref without file:`, add `file:` ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |

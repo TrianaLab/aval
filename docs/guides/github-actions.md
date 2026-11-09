@@ -42,7 +42,8 @@ Trust only this workflow on `main`: see
 ??? info "Pull requests"
     `packages: write` and `id-token: write` are write scopes, so this job runs
     only on push to `main`. A pull request job can still reuse: give it
-    `contents: read`, run `aval run` with `--registry` and `--policy`, and
+    `contents: read`, run `aval run` with `--registry` and `--policy` (or `AVAL_REGISTRY` and
+    `AVAL_POLICY` in the step's environment), and
     leave out the push. GHCR packages that are public can be read without a
     login.
     Read the policy from the default branch, not from the PR:

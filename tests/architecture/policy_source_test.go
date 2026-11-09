@@ -53,6 +53,10 @@ var (
 	// pinnedAval: a policy step is one `aval` command (the pinned release on
 	// PATH) with no other command, substitution or redirect in it.
 	pinnedAval = regexp.MustCompile("^aval\\s(?:[^;&|<>`$\\n]|\\$[{A-Za-z_])*$")
+	// readsTrustEnv: an aval command that reads AVAL_POLICY and
+	// AVAL_REGISTRY from the environment when no flag names them (#163).
+	// Flags before the command count too.
+	readsTrustEnv = regexp.MustCompile(`(?:^|/)aval(?:\s+-\S+(?:\s+[^-\s]\S*)?)*\s+(?:run|verify)\b`)
 	// registryDecl is the sed in trust-from-base.sh.
 	registryDecl = regexp.MustCompile(`(?m)^ *AVAL_REGISTRY: *(.*)$`)
 )
@@ -183,7 +187,9 @@ func jobPolicyProblems(name string, steps []step) []string {
 		switch {
 		case run == trustStep:
 			trusted, chain = true, true
-		case usesPolicy(run):
+		case usesPolicy(run) || trusted && readsTrustEnv.MatchString(run):
+			// After the trust step, aval run and verify use the policy
+			// even without --policy: they read $AVAL_POLICY.
 			problems = append(problems, envProblems(name+": a policy step", s.Env)...)
 			if !chain {
 				problems = append(problems, name+": a policy step does not follow the trust step directly")
@@ -242,46 +248,48 @@ func TestPolicySourceCheckCatchesWorkingTreePolicies(t *testing.T) {
 	const use = "{run: 'aval run --registry \"$AVAL_REGISTRY\" --policy \"$AVAL_POLICY\"'}"
 	pr := func(steps string) string { return "on: pull_request\njobs:\n  a:\n    steps: [" + steps + "]\n" }
 	bad := map[string]string{
-		"literal policy":        pr(pre + ", {run: aval run --policy .github/aval/pr.yaml}"),
-		"policy=":               pr(pre + ", {run: aval run --policy=p.yaml}"),
-		"other variable":        pr(pre + ", {run: 'aval run --policy \"$POLICY\"'}"),
-		"job env policy":        "on: {pull_request: {}}\njobs:\n  a:\n    env: {AVAL_POLICY: .github/aval/pr.yaml}\n    steps: [" + pre + ", " + use + "]\n",
-		"step env registry":     pr(pre + ", {env: {AVAL_REGISTRY: evil.io/x}, run: 'aval run --policy \"$AVAL_POLICY\"'}"),
-		"literal registry":      pr(pre + ", {run: 'aval run --registry evil.io/x --policy \"$AVAL_POLICY\"'}"),
-		"workflow env registry": "on: {pull_request: {}}\nenv: {AVAL_REGISTRY: evil.io/x}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
-		"no trust step":         pr("{run: " + installScript + "}, " + use),
-		"trust step too late":   pr(use + ", " + step(trustStep)),
-		"head's scripts":        pr("{run: " + trustScript + "}, {run: " + installScript + "}, " + use),
-		"bash from PATH":        pr(step(strings.ReplaceAll(trustStep, "/bin/bash", "bash")) + ", " + use),
-		"head copy":             pr(step(strings.ReplaceAll(trustStep, "origin/main:", "HEAD:")) + ", " + use),
-		"other remote action":   pr("{uses: evil/setup@x}, " + step(trustStep) + ", " + use),
-		"lookalike action":      pr("{uses: actions/checkout-evil@x}, " + step(trustStep) + ", " + use),
-		"step after trust":      pr(step(trustStep) + ", {uses: actions/checkout@x}, " + use),
-		"PATH override":         "on: pull_request\njobs:\n  a:\n    env: {PATH: './bin:/usr/bin'}\n    steps: [" + pre + ", " + use + "]\n",
-		"workflow PATH":         "on: pull_request\nenv: {PATH: './bin:/usr/bin'}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
-		"BASH_ENV":              pr(pre + ", {env: {BASH_ENV: ./evil.sh}, run: 'aval run --policy \"$AVAL_POLICY\"'}"),
-		"push or PR job":        "on: [push, pull_request]\njobs:\n  a:\n    if: github.event_name == 'push' || github.event_name == 'pull_request'\n    steps: [{run: aval run --policy p.yaml}]\n",
-		"negated push":          "on: [push, pull_request]\njobs:\n  a:\n    if: \"!(github.event_name == 'push')\"\n    env: {AVAL_POLICY: evil.yaml}\n    steps: [" + pre + ", " + use + "]\n",
-		"not push":              "on: [push, pull_request]\njobs:\n  a:\n    if: github.event_name != 'push'\n    steps: [{run: aval run --policy p.yaml}]\n",
-		"pull_request_target":   "on: pull_request_target\njobs:\n  a:\n    steps: [{run: aval verify --policy p.yaml}]\n",
-		"policy flag, no value": pr(pre + ", {run: aval run --policy}"),
-		"inline assignment":     pr(pre + ", {run: AVAL_POLICY=evil.yaml make ci-e2e}"),
-		"make variable":         pr(pre + ", {run: make ci-e2e AVAL_POLICY=evil.yaml AVAL_REGISTRY=evil.io/x}"),
-		"make ci-e2e":           pr(pre + ", {run: make ci-e2e}"),
-		"make ci":               pr(pre + ", {run: make ci}"),
-		"bin/aval":              pr(pre + ", {run: 'bin/aval run --policy \"$AVAL_POLICY\"'}"),
-		"two commands":          pr(pre + ", {run: 'aval run --policy \"$AVAL_POLICY\"; ./evil'}"),
-		"substitution":          pr(pre + ", {run: 'aval run --policy \"$AVAL_POLICY\" $(./evil)'}"),
-		"GITHUB_ENV write":      pr(pre + ", {run: 'echo AVAL_POLICY=evil.yaml >> \"$GITHUB_ENV\"'}, " + use),
-		"step in between":       pr(pre + ", {run: ./evil.sh}, " + use),
-		"code before trust":     pr("{run: ./evil.sh}, " + pre + ", " + use),
-		"local action":          pr("{uses: ./.github/actions/evil}, " + pre + ", " + use),
-		"custom shell":          pr(pre + ", {shell: 'env AVAL_POLICY=evil.yaml bash -e {0}', run: 'aval run --policy \"$AVAL_POLICY\"'}"),
-		"shell, no variable":    pr(pre + ", {shell: './evil {0}', run: 'aval run --policy \"$AVAL_POLICY\"'}"),
-		"job defaults":          "on: pull_request\njobs:\n  a:\n    defaults: {run: {shell: './evil {0}'}}\n    steps: [" + pre + ", " + use + "]\n",
-		"workflow defaults":     "on: pull_request\ndefaults: {run: {shell: './evil {0}'}}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
-		"make with ci-e2e":      pr(pre + ", {run: make -k ci-e2e test}"),
-		"env, make ci":          "on: pull_request\njobs:\n  a:\n    env: {AVAL_POLICY: evil.yaml}\n    steps: [{run: make test}]\n",
+		"literal policy":         pr(pre + ", {run: aval run --policy .github/aval/pr.yaml}"),
+		"policy=":                pr(pre + ", {run: aval run --policy=p.yaml}"),
+		"other variable":         pr(pre + ", {run: 'aval run --policy \"$POLICY\"'}"),
+		"job env policy":         "on: {pull_request: {}}\njobs:\n  a:\n    env: {AVAL_POLICY: .github/aval/pr.yaml}\n    steps: [" + pre + ", " + use + "]\n",
+		"step env registry":      pr(pre + ", {env: {AVAL_REGISTRY: evil.io/x}, run: 'aval run --policy \"$AVAL_POLICY\"'}"),
+		"literal registry":       pr(pre + ", {run: 'aval run --registry evil.io/x --policy \"$AVAL_POLICY\"'}"),
+		"workflow env registry":  "on: {pull_request: {}}\nenv: {AVAL_REGISTRY: evil.io/x}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
+		"no trust step":          pr("{run: " + installScript + "}, " + use),
+		"trust step too late":    pr(use + ", " + step(trustStep)),
+		"head's scripts":         pr("{run: " + trustScript + "}, {run: " + installScript + "}, " + use),
+		"bash from PATH":         pr(step(strings.ReplaceAll(trustStep, "/bin/bash", "bash")) + ", " + use),
+		"head copy":              pr(step(strings.ReplaceAll(trustStep, "origin/main:", "HEAD:")) + ", " + use),
+		"other remote action":    pr("{uses: evil/setup@x}, " + step(trustStep) + ", " + use),
+		"lookalike action":       pr("{uses: actions/checkout-evil@x}, " + step(trustStep) + ", " + use),
+		"step after trust":       pr(step(trustStep) + ", {uses: actions/checkout@x}, " + use),
+		"PATH override":          "on: pull_request\njobs:\n  a:\n    env: {PATH: './bin:/usr/bin'}\n    steps: [" + pre + ", " + use + "]\n",
+		"workflow PATH":          "on: pull_request\nenv: {PATH: './bin:/usr/bin'}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
+		"BASH_ENV":               pr(pre + ", {env: {BASH_ENV: ./evil.sh}, run: 'aval run --policy \"$AVAL_POLICY\"'}"),
+		"push or PR job":         "on: [push, pull_request]\njobs:\n  a:\n    if: github.event_name == 'push' || github.event_name == 'pull_request'\n    steps: [{run: aval run --policy p.yaml}]\n",
+		"negated push":           "on: [push, pull_request]\njobs:\n  a:\n    if: \"!(github.event_name == 'push')\"\n    env: {AVAL_POLICY: evil.yaml}\n    steps: [" + pre + ", " + use + "]\n",
+		"not push":               "on: [push, pull_request]\njobs:\n  a:\n    if: github.event_name != 'push'\n    steps: [{run: aval run --policy p.yaml}]\n",
+		"pull_request_target":    "on: pull_request_target\njobs:\n  a:\n    steps: [{run: aval verify --policy p.yaml}]\n",
+		"policy flag, no value":  pr(pre + ", {run: aval run --policy}"),
+		"inline assignment":      pr(pre + ", {run: AVAL_POLICY=evil.yaml make ci-e2e}"),
+		"make variable":          pr(pre + ", {run: make ci-e2e AVAL_POLICY=evil.yaml AVAL_REGISTRY=evil.io/x}"),
+		"make ci-e2e":            pr(pre + ", {run: make ci-e2e}"),
+		"make ci":                pr(pre + ", {run: make ci}"),
+		"bin/aval":               pr(pre + ", {run: 'bin/aval run --policy \"$AVAL_POLICY\"'}"),
+		"two commands":           pr(pre + ", {run: 'aval run --policy \"$AVAL_POLICY\"; ./evil'}"),
+		"substitution":           pr(pre + ", {run: 'aval run --policy \"$AVAL_POLICY\" $(./evil)'}"),
+		"GITHUB_ENV write":       pr(pre + ", {run: 'echo AVAL_POLICY=evil.yaml >> \"$GITHUB_ENV\"'}, " + use),
+		"step in between":        pr(pre + ", {run: ./evil.sh}, " + use),
+		"code before trust":      pr("{run: ./evil.sh}, " + pre + ", " + use),
+		"local action":           pr("{uses: ./.github/actions/evil}, " + pre + ", " + use),
+		"custom shell":           pr(pre + ", {shell: 'env AVAL_POLICY=evil.yaml bash -e {0}', run: 'aval run --policy \"$AVAL_POLICY\"'}"),
+		"shell, no variable":     pr(pre + ", {shell: './evil {0}', run: 'aval run --policy \"$AVAL_POLICY\"'}"),
+		"job defaults":           "on: pull_request\njobs:\n  a:\n    defaults: {run: {shell: './evil {0}'}}\n    steps: [" + pre + ", " + use + "]\n",
+		"workflow defaults":      "on: pull_request\ndefaults: {run: {shell: './evil {0}'}}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
+		"make with ci-e2e":       pr(pre + ", {run: make -k ci-e2e test}"),
+		"env policy after code":  pr(pre + ", {run: make test}, {run: aval run}"),
+		"env policy, flag first": pr(pre + ", {run: make test}, {run: aval -f x.yaml run}"),
+		"env, make ci":           "on: pull_request\njobs:\n  a:\n    env: {AVAL_POLICY: evil.yaml}\n    steps: [{run: make test}]\n",
 	}
 	for name, wf := range bad {
 		if p, err := policySourceProblems([]byte(wf)); err != nil || len(p) == 0 {

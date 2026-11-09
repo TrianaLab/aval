@@ -21,7 +21,7 @@ Trust one GitHub Actions workflow on `main`. This is the policy of the
 ```
 
 For a key, see [Sign results](signing.md#the-example). Use it with
-`--policy`:
+`--policy`, or set `AVAL_POLICY` once (a flag wins over the variable):
 
 ```sh
 aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml

@@ -297,8 +297,8 @@ func TestRecordCommand(t *testing.T) {
 		code    int
 		stderr  string
 	}{
-		{"no registry", []string{"--record-file", recFile}, nil, ExitUsage, "are required"},
-		{"no file", []string{"--registry", "registry.example/acme/stats"}, nil, ExitUsage, "are required"},
+		{"no registry", []string{"--record-file", recFile}, nil, ExitUsage, "--registry is required (or set $AVAL_REGISTRY)"},
+		{"no file", []string{"--registry", "registry.example/acme/stats"}, nil, ExitUsage, "--record-file is required"},
 		{"bad registry", []string{"--registry", "r", "--record-file", recFile}, nil, ExitUsage, "not an OCI repository"},
 		{"bad timeout", []string{"--registry", "registry.example/acme/stats", "--record-file", recFile, "--registry-timeout", "0s"}, nil, ExitUsage, "--registry-timeout"},
 		{"missing file", []string{"--registry", "registry.example/acme/stats", "--record-file", filepath.Join(t.TempDir(), "none.json")}, nil, ExitError, "reading run record"},

@@ -53,10 +53,12 @@ type runFlags struct {
 	push, noReuse, shadow, fingerprintOnly, explain     bool
 	record, login                                       bool
 	registryTimeout                                     time.Duration
+	config                                              *globalFlags // prints the config: line; nil prints none
 }
 
 func newRunCmd() *cobra.Command {
 	var o runFlags
+	g := &globalFlags{}
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Reuse a verified result for the current inputs, or run the test",
@@ -72,17 +74,21 @@ verified result and exits 1 if they disagree (a false hit).
 --record publishes a run record for statistics; a failure is only a warning.
 --record-file writes it to a file for 'aval record'.
 
+Without a registry and a trust policy the test always runs. --registry-timeout
+covers lookup and fetch together; --push has its own.
+
 Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
 2 usage. Keyless signing reads $` + idTokenEnv + `; runner.command never sees
-it.
+it, $` + registryEnv + ` or $` + policyEnv + `.
 ` + loginHelp + `.`,
 		Args: noArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error { return runTest(cmd, o) },
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			o.file, o.repo, o.policyFile, o.registryTimeout, o.config = g.file, g.registry, g.policy, g.timeout, g
+			return runTest(cmd, o)
+		},
 	}
+	g.bind(cmd, true, true)
 	f := cmd.Flags()
-	f.StringVarP(&o.file, "contract", "f", contract.DefaultFile, "path to the test contract")
-	f.StringVar(&o.repo, "registry", "", "OCI repository for attestations, e.g. ghcr.io/acme/orders-aval")
-	f.StringVar(&o.policyFile, "policy", "", "trust policy file (required for reuse; without it the test always runs)")
 	f.BoolVar(&o.push, "push", false, "sign and publish the result after running (needs --registry)")
 	f.StringVar(&o.key, "key", "", "signing key path for --push (default: keyless OIDC)")
 	f.BoolVar(&o.login, "login", false, loginFlagHelp)
@@ -96,7 +102,6 @@ it.
 	f.StringVar(&o.recordFile, "record-file", "", "also write the run record to this file, for 'aval record'")
 	f.StringVar(&o.ciRunURL, "ci-run-url", "", "link to the CI run, stored in the run record")
 	f.StringVar(&o.repository, "repository", "", "source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'")
-	registryTimeoutFlag(cmd, &o.registryTimeout, "(lookup and fetch share one; push has its own)")
 	return cmd
 }
 
@@ -224,6 +229,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 			return err
 		}
 	}
+	o.config.printConfig(out)
 	observed, probeErr := probe(ctx, c, filepath.Dir(o.file))
 	r, files, lookupErr := decide(ctx, out, warn, c, fp, cmp.Or(fpErr, probeErr), o)
 	_ = cliout.WriteReport(out, "text", r) // text never fails, like the other lines printed
@@ -428,10 +434,14 @@ func hasVersion(out, want string) bool {
 }
 
 // childEnv is the environment of commands Aval runs, without the signing
-// token: the code under test must not be able to sign results as this
-// workload.
+// token, the registry and the trust policy: the code under test must not be
+// able to sign results as this workload, nor reuse or publish against the
+// operator's trust settings.
 func childEnv() []string {
-	return slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, idTokenEnv+"=") })
+	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		k, _, _ := strings.Cut(kv, "=")
+		return k == idTokenEnv || k == registryEnv || k == policyEnv
+	})
 }
 
 // execute runs runner.command in the contract's directory and returns the
@@ -620,8 +630,8 @@ func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contrac
 }
 
 func newPushCmd() *cobra.Command {
-	var file, repo, key, resultFile string
-	var timeout time.Duration
+	var key, resultFile string
+	g := &globalFlags{}
 	var interactive bool
 	cmd := &cobra.Command{
 		Use:   "push",
@@ -632,11 +642,10 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 ` + loginHelp + `.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if repo == "" {
-				return usageError{errors.New("--registry is required")}
-			}
+			file, repo, timeout := g.file, g.registry, g.timeout
+			g.printConfig(cmd.ErrOrStderr())
 			token := os.Getenv(idTokenEnv)
-			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout), checkSigner(key, token, interactive)); err != nil {
+			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout), checkSigner(key, token, interactive)); err != nil {
 				return err
 			}
 			c, fp, err := loadAndFingerprint(cmd.Context(), file, resultFile)
@@ -666,19 +675,17 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 			return nil
 		},
 	}
+	g.bind(cmd, true, false)
 	f := cmd.Flags()
-	f.StringVarP(&file, "contract", "f", contract.DefaultFile, "path to the test contract")
-	f.StringVar(&repo, "registry", "", "OCI repository for attestations (required)")
 	f.StringVar(&key, "key", "", "signing key path (default: keyless OIDC)")
 	f.BoolVar(&interactive, "login", false, loginFlagHelp)
 	f.StringVar(&resultFile, "result", defaultResult, "result recorded by 'aval run'")
-	registryTimeoutFlag(cmd, &timeout)
 	return cmd
 }
 
 func newRecordCmd() *cobra.Command {
-	var repo, file, repository string
-	var timeout time.Duration
+	var file, repository string
+	g := &globalFlags{}
 	cmd := &cobra.Command{
 		Use:   "record",
 		Short: "Publish a run record written by 'aval run --record-file'",
@@ -689,14 +696,13 @@ unsigned statistics: run and verify never read them. --repository sets the
 record's source repository.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if repo == "" || file == "" {
-				return usageError{errors.New("--registry and --record-file are required")}
-			}
-			if err := checkRegistry(repo); err != nil {
+			repo, timeout := g.registry, g.timeout
+			g.printConfig(cmd.ErrOrStderr())
+			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout)); err != nil {
 				return err
 			}
-			if err := checkTimeout(timeout); err != nil {
-				return err
+			if file == "" {
+				return usageError{errors.New("--record-file is required")}
 			}
 			raw, err := os.ReadFile(file)
 			if err != nil {
@@ -717,10 +723,9 @@ record's source repository.`,
 			return nil
 		},
 	}
+	g.bind(cmd, false, false)
 	f := cmd.Flags()
-	f.StringVar(&repo, "registry", "", "OCI repository for run records (required)")
 	f.StringVar(&file, "record-file", "", "run record written by 'aval run --record-file' (required)")
 	f.StringVar(&repository, "repository", "", "source repository (e.g. acme/orders); default: the one in the record")
-	registryTimeoutFlag(cmd, &timeout)
 	return cmd
 }

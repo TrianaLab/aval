@@ -25,7 +25,11 @@ result the policy does not trust; never hide it or retry it away.
 
 ## aval
 
-Verifiable test execution reuse: signed test results as OCI artifacts
+Verifiable test execution reuse: signed test results as OCI artifacts.
+
+--registry and --policy fall back to $AVAL_REGISTRY and $AVAL_POLICY; a flag
+wins, and an empty value counts as unset (an empty flag too: use --no-reuse
+to turn reuse off). There is no config file.
 
 ```text
 Usage:
@@ -89,7 +93,7 @@ Flags:
   -h, --help                        help for push
       --key string                  signing key path (default: keyless OIDC)
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
-      --registry string             OCI repository for attestations (required)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --result string               result recorded by 'aval run' (default ".aval/result.json")
 ```
@@ -109,7 +113,7 @@ Usage:
 Flags:
   -h, --help                        help for record
       --record-file string          run record written by 'aval run --record-file' (required)
-      --registry string             OCI repository for run records (required)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --repository string           source repository (e.g. acme/orders); default: the one in the record
 ```
@@ -128,9 +132,12 @@ verified result and exits 1 if they disagree (a false hit).
 --record publishes a run record for statistics; a failure is only a warning.
 --record-file writes it to a file for 'aval record'.
 
+Without a registry and a trust policy the test always runs. --registry-timeout
+covers lookup and fetch together; --push has its own.
+
 Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
 2 usage. Keyless signing reads $SIGSTORE_ID_TOKEN; runner.command never sees
-it.
+it, $AVAL_REGISTRY or $AVAL_POLICY.
 Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
 --login) opens the interactive Sigstore login in the browser; no token is
 stored.
@@ -148,12 +155,12 @@ Flags:
       --key string                  signing key path for --push (default: keyless OIDC)
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
       --no-reuse                    always run, never reuse
-      --policy string               trust policy file (required for reuse; without it the test always runs)
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
       --push                        sign and publish the result after running (needs --registry)
       --record                      publish a run record for statistics after the run (needs --registry; best-effort)
       --record-file string          also write the run record to this file, for 'aval record'
-      --registry string             OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
-      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --report string               also write the lookup decision as a verify report (JSON) to this file
       --repository string           source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
       --result string               where to record the result for 'aval push' (default ".aval/result.json")
@@ -187,7 +194,7 @@ Flags:
       --by string                   group by test or repository (the run record's source repository) (default "test")
   -h, --help                        help for stats
   -o, --output string               output format: text or json (default "text")
-      --registry string             OCI repository holding the run records (required)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --since string                only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)
       --test string                 only this test id (metadata.name); default: every test with run records
@@ -217,7 +224,8 @@ Flags:
 ## aval verify
 
 verify computes the fingerprint, looks up the attestation and verifies its
-signature and the trust policy, without running anything.
+signature and the trust policy, without running anything. It needs a
+registry; without a trust policy every lookup is a miss.
 
 Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 1 error (registry, policy or fingerprint), 2 usage or invalid aval.yaml.
@@ -230,8 +238,8 @@ Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
   -h, --help                        help for verify
   -o, --output string               output format: text or json (default "text")
-      --policy string               trust policy file (without it every lookup is a miss)
-      --registry string             OCI repository for attestations (required)
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 ```
 

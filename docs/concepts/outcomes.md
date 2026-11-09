@@ -31,7 +31,8 @@ The exit codes in the diagram are those of `aval verify`. All of them:
 The normal case for a pull request: you changed an input, so there is nothing
 to reuse yet. Aval also reports a miss when:
 
-- there is no `--policy` (or, for `aval run`, no `--registry`, or `--no-reuse`)
+- there is no `--policy` or `AVAL_POLICY` (or, for `aval run`, no registry,
+  or `--no-reuse`)
 - the test is `non-deterministic`, or `external-dependencies` and not in the
   policy's `allowedCacheability`
 - the inputs hold a [mutable reference](../pinning.md) you did not pin or list
