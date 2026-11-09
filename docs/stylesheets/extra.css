@@ -774,6 +774,27 @@
   font-variant-ligatures: none;
   word-break: break-all;
 }
+.aval-install__copy {
+  flex: none;
+  align-self: flex-start;
+  margin-left: 12px;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: var(--c-text-3);
+  cursor: pointer;
+  line-height: 0;
+}
+.aval-install__copy svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.aval-install__copy:hover,
+.aval-install__copy:focus-visible,
+.aval-install__copy[data-copied] {
+  color: var(--c-accent);
+}
 .aval-install__alt {
   margin-top: 8px;
   font-size: 13px;

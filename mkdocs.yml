@@ -166,6 +166,8 @@ extra_javascript:
   # "Try it" in the home page terminal; fetches the WebAssembly build in
   # assets/demo/ (make docs-wasm) only when the visitor clicks.
   - javascripts/try-aval.js
+  # The copy button next to the home page install command.
+  - javascripts/copy.js
 
 # Guides follow the path after the quickstart. Lookup tables (CLI, resolvers,
 # specs) live under Reference. Every page under docs/ has exactly one entry.
