@@ -66,7 +66,7 @@ func TestTextReport(t *testing.T) {
 func TestSecurity(t *testing.T) {
 	var b strings.Builder
 	Security(&b, 2, "unit")
-	if want := "aval: SECURITY: 2 attestation(s) for unit failed signature or policy verification; treat it as a security event, see " + trustModelURL + "\n"; b.String() != want {
+	if want := "aval: SECURITY: 2 attestation(s) for unit failed signature or policy verification; treat it as a security event, see " + TrustModelURL() + "\n"; b.String() != want {
 		t.Fatalf("got %q", b.String())
 	}
 }

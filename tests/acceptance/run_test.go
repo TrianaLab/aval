@@ -211,8 +211,8 @@ func TestWholeTreeScopeSurvivesOwnOutputs(t *testing.T) {
 	result := filepath.Join(dir, "out", "result.json")
 	report := filepath.Join(dir, ".aval", "report.json")
 
-	fingerprint := func(stdout string) string {
-		_, rest, _ := strings.Cut(stdout, " fingerprint ")
+	fingerprint := func(stdout string) string { // from the outcome line
+		_, rest, _ := strings.Cut(stdout, "miss story ")
 		fp, _, _ := strings.Cut(rest, "\n")
 		return fp
 	}

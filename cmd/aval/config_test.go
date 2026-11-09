@@ -59,9 +59,9 @@ func TestRunTakesRegistryAndPolicyFromEnv(t *testing.T) {
 		reason     string
 		config     string
 	}{
-		{"neither: reuse off", nil, nil, "no registry configured", ""},
-		{"empty env is unset", []string{"", ""}, nil, "no registry configured", ""},
-		{"env registry, no policy", []string{"reg.example/env", ""}, nil, "no trust policy configured", "config: registry=reg.example/env (env AVAL_REGISTRY)\n"},
+		{"neither: reuse off", nil, nil, "reuse off: no registry (set AVAL_REGISTRY or --registry)", ""},
+		{"empty env is unset", []string{"", ""}, nil, "reuse off: no registry", ""},
+		{"env registry, no policy", []string{"reg.example/env", ""}, nil, "reuse off: no trust policy (set AVAL_POLICY or --policy)", "config: registry=reg.example/env (env AVAL_REGISTRY)\n"},
 		{"env both", []string{"reg.example/env", "p.yaml"}, nil, "verified", "config: registry=reg.example/env (env AVAL_REGISTRY) policy=p.yaml (env AVAL_POLICY)\n"},
 		{"flag beats env", []string{"bad registry", "missing.yaml"}, []string{"--registry", "reg.example/r", "--policy", "p.yaml"}, "verified", ""},
 		{"flag registry, env policy", []string{"", "p.yaml"}, []string{"--registry", "reg.example/r"}, "verified", "config: registry=reg.example/r (flag) policy=p.yaml (env AVAL_POLICY)\n"},

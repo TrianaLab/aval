@@ -52,8 +52,10 @@ const (
 	DefaultRepo = "registry.example/acme/greet-aval"
 	policyFile  = "policy.yaml"
 	pubFile     = "throwaway.pub"
-	// testOutput is the simulated output of `go test ./...`.
+	// testOutput is the simulated output of `go test ./...`, which takes
+	// testTook.
 	testOutput = "ok  \texample.com/greet\t0.004s\n"
+	testTook   = 4 * time.Millisecond
 )
 
 // Help is what `help` prints.
@@ -303,23 +305,31 @@ func (d *Demo) run(explain bool, out, errw io.Writer) int {
 	if explain {
 		fmt.Fprint(out, fp.Manifest)
 	}
-	fmt.Fprintf(out, "test %s fingerprint %s\n", c.Metadata.Name, fp.Digest)
+	w := cliout.Run{Out: out, Err: errw}
 	r := d.verify(c, fp, errw)
-	_ = cliout.WriteReport(out, "text", r)
+	w.Decision(r, c.Cacheability)
+	sum := cliout.Summary{Test: c.Metadata.Name, Result: evidence.ResultPassed, Security: len(r.Rejected) > 0}
+	code = exitOK
 	if r.Outcome == evidence.OutcomeVerified {
 		// ponytail: the demo only signs passes and tamper breaks the
 		// signature, so a verified result here is always passed.
-		fmt.Fprintf(out, "reused %s result\n", r.Result)
-		return exitOK
+		w.Reused(r.Result)
+		sum.Reused, sum.Saved = true, r.Predicate.FinishedAt.Sub(r.Predicate.StartedAt)
+	} else {
+		w.Start(c.Metadata.Name, c.Runner.Command)
+		fmt.Fprint(out, testOutput)
+		w.End(c.Metadata.Name, evidence.ResultPassed, 0, testTook)
+		w.Pushed(d.push(c, fp, time.Now().UTC()))
+		sum.Took, sum.Pushed = testTook, true
+		if r.Outcome == evidence.OutcomeVerificationFailed {
+			code = exitVerificationFailed
+		}
 	}
-	start := time.Now().UTC()
-	fmt.Fprint(out, testOutput)
-	fmt.Fprintf(out, "ran %s: %s (exit 0)\n", c.Metadata.Name, evidence.ResultPassed)
-	fmt.Fprintf(out, "pushed %s\n", d.push(c, fp, start))
-	if r.Outcome == evidence.OutcomeVerificationFailed {
-		return exitVerificationFailed
+	w.Summary(sum)
+	if sum.Security { // also the last line on stderr, as in the CLI
+		cliout.Security(errw, len(r.Rejected), r.TestID)
 	}
-	return exitOK
+	return code
 }
 
 // verify looks up every attestation for fp and verifies it with
@@ -377,7 +387,7 @@ func (d *Demo) push(c *contract.Contract, fp fingerprint.Fingerprint, start time
 		Execution:     evidence.Execution{Fingerprint: fp.Digest, FingerprintVersion: fingerprint.Version, Environment: env},
 		Runner:        evidence.Runner{Identity: "browser"},
 		StartedAt:     start,
-		FinishedAt:    time.Now().UTC(),
+		FinishedAt:    start.Add(testTook),
 	}
 	// ponytail: plain structs, Marshal cannot fail.
 	raw, _ := json.Marshal(p)

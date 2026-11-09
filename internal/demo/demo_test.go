@@ -40,7 +40,7 @@ func TestStory(t *testing.T) {
 	out, _ := exec(t, d, "aval run", exitOK)
 	mustContain(t, "first run", out, "miss greet sha256:", "reason: "+DefaultRepo+": no attestation found for fingerprint", "ran greet: passed (exit 0)", "pushed "+DefaultRepo+"@sha256:")
 	out, _ = exec(t, d, "aval run", exitOK)
-	mustContain(t, "second run", out, "verified greet", "signer: key ", ", trust level developer", "reused passed result")
+	mustContain(t, "second run", out, "verified greet", "signer: key ", ", trust level developer", "reused passed result\nsummary: greet reused: passed; saved 4ms\n")
 	if strings.Contains(out, "ran greet") {
 		t.Fatal("a verified result must not run the test")
 	}
@@ -54,7 +54,7 @@ func TestStory(t *testing.T) {
 
 	exec(t, d, "edit README.md", exitOK)
 	out, _ = exec(t, d, "aval run --explain", exitOK)
-	mustContain(t, "out of scope edit", out, "aval-fingerprint/v1\n", "source ", " - greet.go\n", "test greet fingerprint "+fp, "reused passed result")
+	mustContain(t, "out of scope edit", out, "aval-fingerprint/v1\n", "source ", " - greet.go\n", "verified greet "+fp, "reused passed result")
 	exec(t, d, "edit aval.yaml", exitOK) // a comment: the canonical contract is the same
 	out, _ = exec(t, d, "aval verify --output=text", exitOK)
 	mustContain(t, "comment in aval.yaml", out, "verified greet "+fp)
@@ -72,8 +72,11 @@ func TestStory(t *testing.T) {
 	out, errw := exec(t, d, "aval verify", exitVerificationFailed)
 	mustContain(t, "verify tampered", out, "verification-failed greet", "reason: attestation verification failed: signature: ", "(trust policy policy.yaml)")
 	mustContain(t, "verify tampered", errw, "aval: SECURITY: 1 attestation(s) for greet failed signature or policy verification")
-	out, _ = exec(t, d, "aval run", exitVerificationFailed)
-	mustContain(t, "run tampered", out, "verification-failed greet", "ran greet: passed (exit 0)", "pushed ")
+	out, errw = exec(t, d, "aval run", exitVerificationFailed)
+	mustContain(t, "run tampered", out, "verification-failed greet", "--- run greet: go test ./...\n", "ran greet: passed (exit 0)", "pushed ", "summary: greet ran: passed in 4ms; result pushed; SECURITY\n")
+	if lines := strings.Split(strings.TrimSpace(errw), "\n"); len(lines) != 2 || lines[0] != lines[1] || !strings.HasPrefix(lines[1], "aval: SECURITY: ") {
+		t.Fatalf("run tampered: stderr %q, want the SECURITY line when found and last", errw)
+	}
 	out, errw = exec(t, d, "aval verify", exitOK)
 	mustContain(t, "verify beside tampered", out, "verified greet", "rejected: "+DefaultRepo+"@sha256:")
 	mustContain(t, "verify beside tampered", errw, "aval: SECURITY: 1 attestation(s)")

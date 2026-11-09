@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var update = flag.Bool("update", false, "rewrite docs/cli-reference.md from the cobra command tree")
+var update = flag.Bool("update", false, "rewrite docs/cli-reference.md from the cobra command tree, and the plain run goldens in internal/cliout/testdata")
 
 var cliReference = filepath.Join("..", "..", "docs", "cli-reference.md")
 

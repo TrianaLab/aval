@@ -86,7 +86,7 @@ func TestRunOutcomes(t *testing.T) {
 		{"miss runs and fails", nil, fmt.Errorf("x: %w", evidence.ErrNotFound), 1, false, ExitTestFailed, true, evidence.OutcomeMiss, "ran unit: failed (exit 1)", ""},
 		{"registry error runs", nil, errors.New("registry down"), 0, false, ExitOK, true, evidence.OutcomeError, "reason: registry down", ""},
 		{"verified pass is reused", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}}, nil, 1, false, ExitOK, false, evidence.OutcomeVerified, "reference: reg.example/r@sha256:aa\nreused passed result\n", ""},
-		{"verified failure is reused as a failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: true}}, nil, 0, false, ExitTestFailed, false, evidence.OutcomeVerified, "reference: reg.example/r@sha256:aa\nreused failed result\n", "reused result failed"},
+		{"verified failure is reused as a failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: true}}, nil, 0, false, ExitTestFailed, false, evidence.OutcomeVerified, "reference: reg.example/r@sha256:aa\nreused failed result\nsummary: unit reused: failed\n", ""},
 		{"verification failure runs and exits 5", map[string]candidate{"sha256:aa": {verifyErr: untrusted}}, nil, 0, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "ran unit: passed", "SECURITY"},
 		{"verification failure outranks a failed test", map[string]candidate{"sha256:aa": {verifyErr: untrusted}}, nil, 1, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "ran unit: failed", "SECURITY"},
 		{"signed cacheability differs from the contract", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, cacheability: "external-dependencies"}}, nil, 0, false, ExitVerificationFailed, true, evidence.OutcomeVerificationFailed, "cacheability", "SECURITY"},
@@ -456,7 +456,8 @@ func TestRunPushThenReuse(t *testing.T) {
 }
 
 // A signer the policy does not list gets a plain reason naming its key id
-// and the policy file, printed once, plus a single SECURITY line.
+// and the policy file, printed once, plus a single SECURITY line, which run
+// repeats as its last stderr line.
 func TestSignerNotInPolicyReason(t *testing.T) {
 	s := pushResult(t)
 	kid, _ := evidence.PublicKeyID(string(s.pub))
@@ -465,10 +466,10 @@ func TestSignerNotInPolicyReason(t *testing.T) {
 		t.Fatal(err)
 	}
 	reason := fmt.Sprintf("signer key id %q is not in the trust policy (trust policy %s)", kid, s.policy)
-	for _, args := range [][]string{{"verify"}, {"run", "--result", filepath.Join(s.dir, "r.json")}} {
+	for i, args := range [][]string{{"verify"}, {"run", "--result", filepath.Join(s.dir, "r.json")}} {
 		code, stdout, stderr := runCLI(append(args, "-f", s.contract, "--registry", "reg.example/r", "--policy", s.policy)...)
 		all := stdout + stderr
-		if code != ExitVerificationFailed || strings.Count(all, reason) != 1 || strings.Count(all, "SECURITY") != 1 || strings.Count(stderr, "\n") != 1 {
+		if code != ExitVerificationFailed || strings.Count(all, reason) != 1 || strings.Count(stderr, "aval: SECURITY:") != i+1 || strings.Count(stderr, "\n") != i+1 {
 			t.Fatalf("%s: exit %d, want the reason %q once and one SECURITY line; stdout %q stderr %q", args[0], code, reason, stdout, stderr)
 		}
 	}
