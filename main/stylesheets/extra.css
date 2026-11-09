@@ -199,6 +199,13 @@
 [dir="ltr"] .md-header__title {
   margin-left: 0;
 }
+/* Below about 430px the version pill runs under the theme toggle. Phones get
+   no version selector; the outdated banner still marks old versions. */
+@media screen and (max-width: 26.99em) {
+  .md-header__topic .md-version {
+    display: none;
+  }
+}
 .md-version__current {
   margin: 0;
   padding: 0.05rem 0.35rem;
