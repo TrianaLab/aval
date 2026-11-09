@@ -16,9 +16,11 @@ import (
 type Run struct{ Out, Err io.Writer }
 
 // Decision writes the lookup decision r for a contract of class: a note on
-// the class unless the reason already names it, then the report lines.
+// the class unless the reason already starts with it, then the report
+// lines. Prefix, not substring: a reason can quote remote text, which must
+// not hide the note.
 func (w Run) Decision(r evidence.Report, class contract.Cacheability) {
-	if !strings.Contains(r.Reason, "cacheability "+string(class)) {
+	if !strings.HasPrefix(r.Reason, "cacheability "+string(class)) {
 		switch class {
 		case contract.NonDeterministic:
 			fmt.Fprintf(w.Out, "cacheability %s: never reusable\n", class)

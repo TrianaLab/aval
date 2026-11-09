@@ -128,7 +128,7 @@ summary: hello reused: passed; saved ...
 
 ## 4. Change an input: a miss again
 
-![after editing src/hello.txt, aval run prints a new fingerprint, miss, and runs the test](assets/gifs/changed-input.gif)
+![after editing src/hello.txt, aval run prints miss with a new fingerprint and runs the test](assets/gifs/changed-input.gif)
 
 Edit a file in `scope`. The fingerprint changes, so nothing matches and the
 test runs:

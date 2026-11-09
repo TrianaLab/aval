@@ -225,6 +225,8 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	observed, probeErr := probe(ctx, c, filepath.Dir(o.file))
 	r, files, lookupErr := decide(ctx, out, warn, c, fp, cmp.Or(fpErr, probeErr), o)
 	sum, security := announce(w, c, r, lookupErr)
+	// Whatever fails below, the SECURITY line verify printed is repeated as
+	// the last stderr line.
 	defer func() { err = securityLast(warn, err, security) }()
 	// No I/O failure may skip the test or hide a verification failure
 	// (invariants 3, 4): errors are collected, never returned early.
@@ -265,12 +267,17 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 // empty when no attestation failed verification.
 func announce(w cliout.Run, c *contract.Contract, r evidence.Report, lookupErr error) (sum cliout.Summary, security string) {
 	w.Decision(r, c.Cacheability)
-	sum = cliout.Summary{Test: c.Metadata.Name, ReuseOff: r.Outcome == evidence.OutcomeError || errors.As(lookupErr, new(reuseOff))}
-	if r.Outcome == evidence.OutcomeError {
+	// Flooding is a security event, not a routine reuse-off cause (#135).
+	flood := errors.Is(lookupErr, registry.ErrTooManyCandidates)
+	sum = cliout.Summary{Test: c.Metadata.Name, ReuseOff: !flood && (r.Outcome == evidence.OutcomeError || errors.As(lookupErr, new(reuseOff)))}
+	if r.Outcome == evidence.OutcomeError && !flood {
 		w.ReuseOff(r.Reason) // the test runs: fail closed (invariant 3)
 	}
 	if n := securityCount(r); n > 0 {
 		sum.Security, security = true, cliout.SecurityLine(n, r.TestID)
+	}
+	if flood {
+		sum.Security, security = true, cliout.FloodLine(registry.ErrTooManyCandidates, r.TestID)
 	}
 	return sum, security
 }

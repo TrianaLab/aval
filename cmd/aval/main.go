@@ -425,7 +425,7 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, file stri
 	// Over the cap nothing was verified, so an untrusted attestation may hide
 	// among them (#135). The outcome stays error: the test runs.
 	if errors.Is(err, registry.ErrTooManyCandidates) {
-		fmt.Fprintf(warn, "aval: SECURITY: %s for %s, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see %s\n", registry.ErrTooManyCandidates, r.TestID, cliout.TrustModelURL())
+		fmt.Fprintln(warn, cliout.FloodLine(registry.ErrTooManyCandidates, r.TestID))
 	}
 	return r, files, err
 }

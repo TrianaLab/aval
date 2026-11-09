@@ -50,17 +50,16 @@ the job and investigate; never hide or retry it.
 
 ```text
 miss hello sha256:d52167b4...
+reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
 --- run hello: grep -q hello src/hello.txt
 --- end hello: passed (exit 0) in 12ms
 ran hello: passed (exit 0)
 summary: hello ran: passed in 12ms
 ```
 
-The test's output sits between `--- run` and `--- end`. `summary:` may add
-`; saved <time>` (display only), `; result pushed`, `; reuse was off` and
-`; SECURITY`; a failed test shows there and in exit code 3. An error that turns
-reuse off warns `aval: warning: reuse off: <cause>` on stderr, and a
-verification failure repeats `aval: SECURITY:` as the last stderr line.
+The test's output sits between `--- run` and `--- end`. `summary:` may add `; saved <time>` (display only), `; result pushed`, `; reuse was off` and `; SECURITY`; a failed test shows there and in exit code 3. The test can print a fake `summary:` line, so a script reads the last line of stdout.
+
+On stderr, an error that turns reuse off warns `aval: warning: reuse off: <cause>`. A verification failure, or a fingerprint flooded with more attestations than Aval lists, repeats `aval: SECURITY:` as the last line. When the command cannot start, stderr says `aval: running "<command>": ...` and no `--- end` or `summary:` follows.
 
 ## In a script
 

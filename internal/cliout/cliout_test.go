@@ -70,3 +70,10 @@ func TestSecurity(t *testing.T) {
 		t.Fatalf("got %q", b.String())
 	}
 }
+
+func TestFloodLine(t *testing.T) {
+	got := FloodLine(errors.New("more than 64 attestations"), "unit")
+	if want := "aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see " + TrustModelURL(); got != want {
+		t.Fatalf("got %q", got)
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TrianaLab/aval/internal/registry"
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
@@ -34,6 +35,7 @@ func TestPlainRunGoldens(t *testing.T) {
 			fakeCandidates(t, nil, map[string]candidate{"sha256:ff": {verifyErr: untrusted}})
 		}},
 		{"non-deterministic", evidence.OutcomeMiss, "non-deterministic", func(t *testing.T, _ bool) { noLookup(t) }},
+		{"reuse-off", evidence.OutcomeMiss, "hermetic", func(t *testing.T, _ bool) { noLookup(t) }}, // plainCase drops --policy
 	}
 	for _, oc := range outcomes {
 		t.Run(oc.name, func(t *testing.T) {
@@ -86,6 +88,18 @@ func TestSecurityLineIsLast(t *testing.T) {
 	}
 }
 
+// Flooding the fingerprint (#135) is a security event in `aval run` too: no
+// reuse-off warning, SECURITY in the summary and as the last stderr line,
+// and the exit code stays the test's.
+func TestRunFloodIsSecurity(t *testing.T) {
+	fakeCandidates(t, fmt.Errorf("listing referrers: %w", registry.ErrTooManyCandidates), nil)
+	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", "true"), "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(t.TempDir(), "r.json"))
+	flood := "aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/\n"
+	if code != ExitOK || stderr != flood+flood || !regexp.MustCompile(`\nsummary: unit ran: passed in [^;]+; SECURITY\n$`).MatchString(stdout) {
+		t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
+	}
+}
+
 // Inputs that cannot be fingerprinted turn reuse off with a warning; the
 // test runs and the exit code stays the test's (invariant 3).
 func TestFingerprintErrorWarns(t *testing.T) {
@@ -119,7 +133,10 @@ func plainCase(t *testing.T, got *strings.Builder, oc plainOutcome, push, shadow
 	dir := t.TempDir()
 	report := filepath.Join(dir, "report.json")
 	args := []string{"run", "-f", contractWith(t, oc.class, "sh", "-c", fmt.Sprintf("echo test output; exit %d", exit)),
-		"--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(dir, "result.json"), "--report", report}
+		"--registry", "reg.example/r", "--result", filepath.Join(dir, "result.json"), "--report", report}
+	if oc.name != "reuse-off" {
+		args = append(args, "--policy", "p.yaml")
+	}
 	if push {
 		args = append(args, "--push")
 	}

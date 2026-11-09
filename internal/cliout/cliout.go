@@ -52,7 +52,7 @@ var Version = "dev"
 // in the docs of Version (latest for a dev build).
 func TrustModelURL() string {
 	v := strings.TrimPrefix(Version, "v")
-	if v == "dev" {
+	if v == "dev" || strings.ContainsAny(v, "-+") { // snapshots and pre-releases have no docs
 		v = "latest"
 	}
 	return "https://aval.run/" + v + "/trust-model/"
@@ -62,6 +62,13 @@ func TrustModelURL() string {
 // failed signature or policy verification (invariant 4).
 func SecurityLine(n int, testID string) string {
 	return fmt.Sprintf("aval: SECURITY: %d attestation(s) for %s failed signature or policy verification; treat it as a security event, see %s", n, testID, TrustModelURL())
+}
+
+// FloodLine is the SECURITY line for a fingerprint holding more attestations
+// than lookup lists (#135): an untrusted one may hide among them. cause
+// names the cap.
+func FloodLine(cause error, testID string) string {
+	return fmt.Sprintf("aval: SECURITY: %s for %s, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see %s", cause, testID, TrustModelURL())
 }
 
 // Security prints SecurityLine.
