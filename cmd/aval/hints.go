@@ -102,8 +102,9 @@ func warnUntrustedKey(w io.Writer, key, policyFile string) {
 	if err != nil {
 		return
 	}
-	der, _ := x509.MarshalPKIXPublicKey(&k.PublicKey) // ponytail: cannot fail for a P-256 key
-	kid, _ := evidence.PublicKeyID(string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}))) // ponytail: cannot fail for the PEM just encoded
+	// ponytail: neither call can fail for a P-256 key and the PEM just encoded.
+	der, _ := x509.MarshalPKIXPublicKey(&k.PublicKey)
+	kid, _ := evidence.PublicKeyID(string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})))
 	for _, id := range pol.Identities {
 		if got, err := evidence.PublicKeyID(id.PublicKey); err == nil && got == kid {
 			return
