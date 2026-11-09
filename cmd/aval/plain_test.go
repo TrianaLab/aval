@@ -51,6 +51,17 @@ func runOutcomes() []plainOutcome {
 		{"verification-failed", evidence.OutcomeVerificationFailed, "hermetic", func(t *testing.T, _ bool) {
 			fakeCandidates(t, nil, map[string]candidate{"sha256:ff": {verifyErr: untrusted}})
 		}},
+		// Verified beside a rejected forged candidate: SECURITY, yet reused.
+		{"verified-with-forged", evidence.OutcomeVerified, "hermetic", func(t *testing.T, failed bool) {
+			fakeCandidates(t, nil, map[string]candidate{
+				"sha256:aa": {trust: evidence.TrustRunner, failed: failed, took: 1500 * time.Millisecond},
+				"sha256:ff": {verifyErr: untrusted},
+			})
+		}},
+		// Flooding (#135): nothing verified, the outcome is error, the test runs.
+		{"flood", evidence.OutcomeError, "hermetic", func(t *testing.T, _ bool) {
+			fakeCandidates(t, fmt.Errorf("listing referrers: %w", registry.ErrTooManyCandidates), nil)
+		}},
 		{"non-deterministic", evidence.OutcomeMiss, "non-deterministic", func(t *testing.T, _ bool) { noLookup(t) }},
 		{"reuse-off", evidence.OutcomeMiss, "hermetic", func(t *testing.T, _ bool) { noLookup(t) }}, // plainCase drops --policy
 	}
@@ -146,9 +157,16 @@ func plainCase(t *testing.T, got *strings.Builder, oc plainOutcome, push, shadow
 		t.Errorf("%s: outcome %q, want %q", name, r.Outcome, oc.outcome)
 	case !strings.Contains("\n"+stdout, fmt.Sprintf("\n%s unit %s\n", r.Outcome, r.Fingerprint)):
 		t.Errorf("%s: no outcome-first line in %q", name, stdout)
-	case oc.outcome == evidence.OutcomeVerificationFailed && (code != ExitVerificationFailed || !strings.HasPrefix(lines[len(lines)-1], "aval: SECURITY: ")):
+	case security(r, stderr) && !strings.HasPrefix(lines[len(lines)-1], "aval: SECURITY: "),
+		r.Outcome == evidence.OutcomeVerificationFailed && code != ExitVerificationFailed:
 		t.Errorf("%s: exit %d, last stderr line %q", name, code, lines[len(lines)-1])
 	}
+}
+
+// security reports whether a run with report r and stderr met a security
+// event: a verification failure, a rejected forged sibling or a flood.
+func security(r evidence.Report, stderr string) bool {
+	return r.Outcome == evidence.OutcomeVerificationFailed || strings.Contains(stderr, "aval: SECURITY: ")
 }
 
 // runOutcome runs one case of the run goldens and appends its output, with

@@ -1,7 +1,7 @@
 === push=false shadow=false failed=false
 exit 0
 --- stdout
-⚠ error unit 77ad8f66
+⚠ error unit sha256:77ad8f66
   reason    registry down
 · run unit: sh -c echo test output; exit 0
 test output
@@ -12,7 +12,7 @@ unit passed in D with reuse off; see the reason above.
 === push=false shadow=false failed=true
 exit 3
 --- stdout
-⚠ error unit 1a818124
+⚠ error unit sha256:1a818124
   reason    registry down
 · run unit: sh -c echo test output; exit 1
 test output
@@ -23,7 +23,7 @@ unit failed in D with reuse off; see the reason above.
 === push=false shadow=true failed=false
 exit 0
 --- stdout
-⚠ error unit 77ad8f66
+⚠ error unit sha256:77ad8f66
   reason    registry down
 · run unit: sh -c echo test output; exit 0
 test output
@@ -34,7 +34,7 @@ unit passed in D with reuse off; see the reason above.
 === push=false shadow=true failed=true
 exit 3
 --- stdout
-⚠ error unit 1a818124
+⚠ error unit sha256:1a818124
   reason    registry down
 · run unit: sh -c echo test output; exit 1
 test output
@@ -45,7 +45,7 @@ unit failed in D with reuse off; see the reason above.
 === push=true shadow=false failed=false
 exit 0
 --- stdout
-⚠ error unit 77ad8f66
+⚠ error unit sha256:77ad8f66
   reason    registry down
 · run unit: sh -c echo test output; exit 0
 test output
@@ -57,7 +57,7 @@ unit passed in D; published for the next run with these inputs.
 === push=true shadow=false failed=true
 exit 3
 --- stdout
-⚠ error unit 1a818124
+⚠ error unit sha256:1a818124
   reason    registry down
 · run unit: sh -c echo test output; exit 1
 test output
@@ -69,7 +69,7 @@ unit failed in D; published for the next run with these inputs.
 === push=true shadow=true failed=false
 exit 0
 --- stdout
-⚠ error unit 77ad8f66
+⚠ error unit sha256:77ad8f66
   reason    registry down
 · run unit: sh -c echo test output; exit 0
 test output
@@ -81,7 +81,7 @@ unit passed in D; published for the next run with these inputs.
 === push=true shadow=true failed=true
 exit 3
 --- stdout
-⚠ error unit 1a818124
+⚠ error unit sha256:1a818124
   reason    registry down
 · run unit: sh -c echo test output; exit 1
 test output

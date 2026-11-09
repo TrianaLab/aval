@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -18,12 +19,12 @@ func TestOutputStyle(t *testing.T) {
 	for _, tty := range []bool{false, true} {
 		for _, term := range []string{"xterm-256color", "dumb", ""} {
 			for _, noColor := range []string{"", "1"} {
-				for _, output := range []string{"", "plain", "auto"} {
+				for _, output := range []string{"", "plain", "PLAIN", "auto"} {
 					for _, plain := range []bool{false, true} {
 						env := map[string]string{"TERM": term, "NO_COLOR": noColor, outputEnv: output}
 						styled, color := outputStyle(tty, plain, func(k string) string { return env[k] })
-						wantStyled := tty && term != "dumb" && output != "plain" && !plain
-						if styled != wantStyled || color != (wantStyled && noColor == "") {
+						wantStyled := tty && term != "dumb" && !strings.EqualFold(output, "plain") && !plain
+						if styled != wantStyled || color != (wantStyled && noColor == "" && runtime.GOOS != "windows") {
 							t.Errorf("tty=%v TERM=%q NO_COLOR=%q %s=%q --plain=%v: styled %v color %v", tty, term, noColor, outputEnv, output, plain, styled, color)
 						}
 					}
@@ -60,9 +61,10 @@ var sgr = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
 // Styled output for every outcome, with colour (raw golden) and with the
 // colour stripped (readable golden). Under NO_COLOR it is that stripped text
-// exactly, without a single ESC byte. In every styled mode a verification
-// failure exits 5, shows SECURITY and ✗, prints nothing green and no ✓, and
-// ends stderr with the plain `aval: SECURITY:` line (invariant 4).
+// exactly, without a single ESC byte. In every styled mode a security event
+// (a verification failure, a rejected forged sibling, a flood) shows
+// SECURITY and ✗, prints nothing green and no ✓, and ends stderr with the
+// plain `aval: SECURITY:` line; a verification failure exits 5 (invariant 4).
 func TestStyledRunGoldens(t *testing.T) {
 	for _, oc := range runOutcomes() {
 		t.Run(oc.name, func(t *testing.T) {
@@ -96,8 +98,9 @@ func styledCase(t *testing.T, got *strings.Builder, oc plainOutcome, push, shado
 		t.Errorf("%s: outcome %q, want %q", name, r.Outcome, oc.outcome)
 	case strings.Contains(stdout, "summary:") || strings.Contains(stdout, "--- run"):
 		t.Errorf("%s: plain lines in styled output %q", name, stdout)
-	case oc.outcome != evidence.OutcomeVerificationFailed:
-	case code != ExitVerificationFailed || !strings.HasPrefix(lines[len(lines)-1], "aval: SECURITY: "):
+	case !security(r, stderr):
+	case !strings.HasPrefix(lines[len(lines)-1], "aval: SECURITY: "),
+		r.Outcome == evidence.OutcomeVerificationFailed && code != ExitVerificationFailed:
 		t.Errorf("%s: exit %d, last stderr line %q", name, code, lines[len(lines)-1])
 	case strings.Contains(stdout+stderr, "\x1b[32m") || strings.Contains(stdout, "✓"):
 		t.Errorf("%s: green or ✓ after a verification failure: %q", name, stdout)

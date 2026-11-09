@@ -65,7 +65,7 @@
 <pre><span class="c"># REG=localhost:5055/acme/orders</span>
 <span class="c"># first job: nothing signed for these inputs yet</span>
 <span class="pr">$</span> <span class="w">aval run</span> --push --key keys/ci.pem --registry $REG --policy policy.yaml
-<span class="d">·</span> <span class="y">miss</span> integration 7ebde18f
+· miss integration sha256:7ebde18f
 <span class="d">  reason    localhost:5055/acme/orders: no attestation found for fingerprint</span>
 <span class="d">· run integration: go test -tags integration ./...</span>
 <span class="g">✓</span> integration <span class="g">passed</span> (exit 0) in 4m12s
@@ -73,10 +73,10 @@
 integration passed in 4m12s; published for the next run with these inputs.
 <span class="sep"></span><span class="c"># another job, same inputs</span>
 <span class="pr">$</span> <span class="w">aval run</span> --registry $REG --policy policy.yaml
-<span class="hit"><span class="g">↺ verified</span> integration 7ebde18f
+<span class="hit"><span class="cy">↺ verified</span> integration sha256:7ebde18f
 <span class="d">  signer    key cZ9tHqSn…, trust level runner</span>
 <span class="d">  reference localhost:5055/acme/orders@sha256:0a4a3ac9</span>
-<span class="w">↺ reused passed result</span>
+<span class="cy">↺ reused passed result</span>
 integration: reused a verified passed result, saved 4m12s; nothing ran.</span><span class="pr">$</span> <span class="cur"></span><span class="aval-term__cta" hidden></span></pre>
       <figcaption class="aval-try">Runs in your browser: a simulated test, an in-memory registry, a throwaway key. No keyless signing. <span class="aval-try__status" role="status"></span></figcaption>
     </figure>

@@ -1,7 +1,7 @@
 === push=false shadow=false failed=false
 exit 0
 --- stdout
-[33m⚠ error unit 77ad8f66[0m
+[33m⚠ error unit sha256:77ad8f66[0m
   [2mreason   [0m registry down
 [2m· run unit: sh -c echo test output; exit 0[0m
 test output
@@ -12,7 +12,7 @@ test output
 === push=false shadow=false failed=true
 exit 3
 --- stdout
-[33m⚠ error unit 1a818124[0m
+[33m⚠ error unit sha256:1a818124[0m
   [2mreason   [0m registry down
 [2m· run unit: sh -c echo test output; exit 1[0m
 test output
@@ -23,7 +23,7 @@ test output
 === push=false shadow=true failed=false
 exit 0
 --- stdout
-[33m⚠ error unit 77ad8f66[0m
+[33m⚠ error unit sha256:77ad8f66[0m
   [2mreason   [0m registry down
 [2m· run unit: sh -c echo test output; exit 0[0m
 test output
@@ -34,7 +34,7 @@ test output
 === push=false shadow=true failed=true
 exit 3
 --- stdout
-[33m⚠ error unit 1a818124[0m
+[33m⚠ error unit sha256:1a818124[0m
   [2mreason   [0m registry down
 [2m· run unit: sh -c echo test output; exit 1[0m
 test output
@@ -45,7 +45,7 @@ test output
 === push=true shadow=false failed=false
 exit 0
 --- stdout
-[33m⚠ error unit 77ad8f66[0m
+[33m⚠ error unit sha256:77ad8f66[0m
   [2mreason   [0m registry down
 [2m· run unit: sh -c echo test output; exit 0[0m
 test output
@@ -57,7 +57,7 @@ test output
 === push=true shadow=false failed=true
 exit 3
 --- stdout
-[33m⚠ error unit 1a818124[0m
+[33m⚠ error unit sha256:1a818124[0m
   [2mreason   [0m registry down
 [2m· run unit: sh -c echo test output; exit 1[0m
 test output
@@ -69,7 +69,7 @@ test output
 === push=true shadow=true failed=false
 exit 0
 --- stdout
-[33m⚠ error unit 77ad8f66[0m
+[33m⚠ error unit sha256:77ad8f66[0m
   [2mreason   [0m registry down
 [2m· run unit: sh -c echo test output; exit 0[0m
 test output
@@ -81,7 +81,7 @@ test output
 === push=true shadow=true failed=true
 exit 3
 --- stdout
-[33m⚠ error unit 1a818124[0m
+[33m⚠ error unit sha256:1a818124[0m
   [2mreason   [0m registry down
 [2m· run unit: sh -c echo test output; exit 1[0m
 test output

@@ -54,7 +54,7 @@ func TestStory(t *testing.T) {
 
 	exec(t, d, "edit README.md", exitOK)
 	out, _ = exec(t, d, "aval run --explain", exitOK)
-	mustContain(t, "out of scope edit", out, "aval-fingerprint/v1\n", "source ", " - greet.go\n", "↺ verified greet "+fp[7:15]+"\n", "↺ reused passed result")
+	mustContain(t, "out of scope edit", out, "aval-fingerprint/v1\n", "source ", " - greet.go\n", "↺ verified greet "+fp[:15]+"\n", "↺ reused passed result")
 	exec(t, d, "edit aval.yaml", exitOK) // a comment: the canonical contract is the same
 	out, _ = exec(t, d, "aval verify --output=text", exitOK)
 	mustContain(t, "comment in aval.yaml", out, "verified greet "+fp)
@@ -150,6 +150,7 @@ func TestUsageErrors(t *testing.T) {
 		"aval stats publish x":   "aval: stats is not in this demo: it keeps no run records",
 		"aval explain --explain": "aval: unknown flag: --explain",
 		"aval run --digest":      "aval: unknown flag: --digest",
+		"aval verify --plain":    "aval: unknown flag: --plain",
 		"aval explain extra":     `aval: unknown command "extra" for "aval explain"`,
 		"aval verify --output=x": `got "x"`,
 	}

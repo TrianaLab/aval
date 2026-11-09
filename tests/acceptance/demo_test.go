@@ -42,9 +42,9 @@ func TestBrowserDemoMatchesCLI(t *testing.T) {
 	t.Cleanup(srv.Close)
 	repo := strings.TrimPrefix(srv.URL, "http://") + "/acme/greet-aval"
 	d := demo.New()
-	// The CLI writes to a pipe here, so it prints plain lines; the demo's
-	// styled form is the same renderer (internal/cliout goldens).
-	d.Repo, d.Plain = repo, true
+	// Both run with --plain, the CLI's pipe form; the demo's styled form is
+	// the same renderer (internal/cliout goldens).
+	d.Repo = repo
 	dir := t.TempDir()
 	sync := func() {
 		for name, body := range d.Files() {
@@ -69,9 +69,9 @@ func TestBrowserDemoMatchesCLI(t *testing.T) {
 		return args
 	}
 	for _, line := range []string{
-		"aval run", "aval run", "aval verify", "aval verify -o json", "aval run --explain", "aval explain", "aval explain --digest",
-		"edit README.md", "aval run", "edit aval.yaml", "aval verify", "edit greet.go", "aval verify", "aval run",
-		"tamper", "aval verify", "aval verify -o json", "aval run", "aval verify",
+		"aval run --plain", "aval run --plain", "aval verify", "aval verify -o json", "aval run --explain --plain", "aval explain", "aval explain --digest",
+		"edit README.md", "aval run --plain", "edit aval.yaml", "aval verify", "edit greet.go", "aval verify", "aval run --plain",
+		"tamper", "aval verify", "aval verify -o json", "aval run --plain", "aval verify",
 	} {
 		var dOut, dErr bytes.Buffer
 		dCode := d.Exec(line, &dOut, &dErr)

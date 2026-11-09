@@ -3,7 +3,10 @@ package main
 import (
 	"io"
 	"os"
+	"runtime"
+	"strings"
 
+	"github.com/TrianaLab/aval/internal/cliout"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -16,8 +19,19 @@ const outputEnv = "AVAL_OUTPUT"
 // AVAL_OUTPUT=plain nor --plain asks for the plain lines CI reads. Colour
 // unless NO_COLOR is set (https://no-color.org); NO_COLOR drops colour only.
 func outputStyle(tty, plain bool, getenv func(string) string) (styled, color bool) {
-	styled = tty && !plain && getenv("TERM") != "dumb" && getenv(outputEnv) != "plain"
-	return styled, styled && getenv("NO_COLOR") == ""
+	styled = tty && !plain && getenv("TERM") != "dumb" && !strings.EqualFold(getenv(outputEnv), "plain")
+	// ponytail: no colour on Windows, where the legacy console prints SGR
+	// codes raw; enable VT with x/sys/windows.SetConsoleMode to add it.
+	return styled, styled && getenv("NO_COLOR") == "" && runtime.GOOS != "windows"
+}
+
+// runWriter is the aval run writer for out and warn. Styled warnings only
+// when warn is a terminal too: stderr to a log keeps its greppable prefixes.
+func runWriter(out, warn io.Writer, plain bool) cliout.Run {
+	w := cliout.Run{Out: out, Err: warn}
+	w.Styled, w.Color = outputStyle(isTTY(out), plain, os.Getenv)
+	w.ErrStyled = w.Styled && isTTY(warn)
+	return w
 }
 
 // isTTY reports whether w is a terminal. ponytail: a seam so tests can

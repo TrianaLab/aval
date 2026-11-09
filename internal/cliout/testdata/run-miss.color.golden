@@ -1,7 +1,7 @@
 === push=false shadow=false failed=false
 exit 0
 --- stdout
-· miss unit 77ad8f66
+· miss unit sha256:77ad8f66
   [2mreason   [0m reg.example/r: no attestation found for fingerprint
 [2m· run unit: sh -c echo test output; exit 0[0m
 test output
@@ -11,7 +11,7 @@ test output
 === push=false shadow=false failed=true
 exit 3
 --- stdout
-· miss unit 1a818124
+· miss unit sha256:1a818124
   [2mreason   [0m reg.example/r: no attestation found for fingerprint
 [2m· run unit: sh -c echo test output; exit 1[0m
 test output
@@ -21,7 +21,7 @@ test output
 === push=false shadow=true failed=false
 exit 0
 --- stdout
-· miss unit 77ad8f66
+· miss unit sha256:77ad8f66
   [2mreason   [0m reg.example/r: no attestation found for fingerprint
 [2m· run unit: sh -c echo test output; exit 0[0m
 test output
@@ -31,7 +31,7 @@ test output
 === push=false shadow=true failed=true
 exit 3
 --- stdout
-· miss unit 1a818124
+· miss unit sha256:1a818124
   [2mreason   [0m reg.example/r: no attestation found for fingerprint
 [2m· run unit: sh -c echo test output; exit 1[0m
 test output
@@ -41,7 +41,7 @@ test output
 === push=true shadow=false failed=false
 exit 0
 --- stdout
-· miss unit 77ad8f66
+· miss unit sha256:77ad8f66
   [2mreason   [0m reg.example/r: no attestation found for fingerprint
 [2m· run unit: sh -c echo test output; exit 0[0m
 test output
@@ -52,7 +52,7 @@ test output
 === push=true shadow=false failed=true
 exit 3
 --- stdout
-· miss unit 1a818124
+· miss unit sha256:1a818124
   [2mreason   [0m reg.example/r: no attestation found for fingerprint
 [2m· run unit: sh -c echo test output; exit 1[0m
 test output
@@ -63,7 +63,7 @@ test output
 === push=true shadow=true failed=false
 exit 0
 --- stdout
-· miss unit 77ad8f66
+· miss unit sha256:77ad8f66
   [2mreason   [0m reg.example/r: no attestation found for fingerprint
 [2m· run unit: sh -c echo test output; exit 0[0m
 test output
@@ -74,7 +74,7 @@ test output
 === push=true shadow=true failed=true
 exit 3
 --- stdout
-· miss unit 1a818124
+· miss unit sha256:1a818124
   [2mreason   [0m reg.example/r: no attestation found for fingerprint
 [2m· run unit: sh -c echo test output; exit 1[0m
 test output

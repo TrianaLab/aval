@@ -16,10 +16,11 @@ import (
 // terminal, style.go): the same steps as glyph lines and a closing sentence.
 // Warnings go to Err.
 type Run struct {
-	Out, Err io.Writer
-	Styled   bool // a human at a terminal
-	Color    bool // styled with ANSI colour (not under NO_COLOR, not in the demo)
-	Security bool // an attestation failed verification: nothing green, no ✓ from here on
+	Out, Err  io.Writer
+	Styled    bool // a human at a terminal
+	ErrStyled bool // styled warnings on Err: Err is a terminal too
+	Color     bool // styled with ANSI colour (not under NO_COLOR, not in the demo)
+	Security  bool // an attestation failed verification: nothing green, no ✓ from here on
 }
 
 // Decision writes the lookup decision r for a contract of class: a note on
@@ -60,10 +61,10 @@ func (w Run) Note(text string) {
 }
 
 // SecurityBlock writes line, a SecurityLine or FloodLine, to Err when the
-// failure is found; styled, behind ✗ in bold red. The command repeats the
+// failure is found; styled (ErrStyled), behind ✗ in bold red. The command repeats the
 // plain line as the last line of stderr in every mode.
 func (w Run) SecurityBlock(line string) {
-	if w.Styled {
+	if w.ErrStyled {
 		line = w.paint(sgrBold+sgrRed, glyphFailed+" "+strings.TrimPrefix(line, "aval: "))
 	}
 	fmt.Fprintln(w.Err, line)
@@ -71,7 +72,7 @@ func (w Run) SecurityBlock(line string) {
 
 // ReuseOff warns that cause turned reuse off. The test still runs.
 func (w Run) ReuseOff(cause string) {
-	if w.Styled {
+	if w.ErrStyled {
 		fmt.Fprintln(w.Err, w.paint(sgrYellow, glyphWarn+" reuse off: "+OneLine(cause)))
 		return
 	}
@@ -134,7 +135,12 @@ type Summary struct {
 	Saved    time.Duration   // the reused run, from its predicate; display only
 	Pushed   bool            // the result was published
 	ReuseOff bool            // no registry or policy, --no-reuse, or an error
-	Security bool            // an attestation failed verification
+	Security bool            // an attestation failed verification, or Flood
+	Flood    bool            // more attestations than lookup lists, none verified
+
+	// Styled only.
+	NeverReusable bool // cacheability non-deterministic
+	Verified      bool // a verified result exists; it was not reused when the test ran (--shadow)
 }
 
 // Summary writes the closing line:
@@ -142,6 +148,9 @@ type Summary struct {
 // Styled, it is one sentence; after a security event it says only that.
 func (w Run) Summary(s Summary) {
 	switch {
+	case w.Styled && s.Flood:
+		w.step(sgrBold+sgrRed, glyphFailed, "SECURITY: more attestations for "+OneLine(s.Test)+" than Aval lists, none verified; possibly a flooding attempt, the test ran.")
+		return
 	case w.Styled && s.Security:
 		w.step(sgrBold+sgrRed, glyphFailed, "SECURITY: an attestation for "+OneLine(s.Test)+" failed verification; treat it as a security event, not a flaky test.")
 		return

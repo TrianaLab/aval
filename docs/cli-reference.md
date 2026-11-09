@@ -56,7 +56,7 @@ Additional Commands:
 
 Flags:
   -h, --help      help for aval
-      --plain     plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain     plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
   -v, --version   version for aval
 
 Use "aval [command] --help" for more information about a command.
@@ -84,7 +84,7 @@ Flags:
   -h, --help   help for completion
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 
 Use "aval completion [command] --help" for more information about a command.
 ```
@@ -117,7 +117,7 @@ Flags:
   -h, --help              help for explain
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval keygen
@@ -144,7 +144,7 @@ Flags:
   -h, --help    help for keygen
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval push
@@ -173,7 +173,7 @@ Flags:
       --result-file string          result recorded by 'aval run' (default ".aval/result.json")
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 Deprecated flags, hidden from help:
@@ -201,7 +201,7 @@ Flags:
       --source-repo string          source repository (e.g. acme/orders); default: the one in the record
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 Deprecated flags, hidden from help:
@@ -253,7 +253,7 @@ Flags:
       --stats-file string           also write the run record to this file, for 'aval stats publish'
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 Deprecated flags, hidden from help:
@@ -304,7 +304,7 @@ Flags:
       --test string                 only this test id (metadata.name); default: every test with run records
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 
 Use "aval stats [command] --help" for more information about a command.
 ```
@@ -331,7 +331,7 @@ Flags:
       --source-repo string          source repository (e.g. acme/orders); default: the one in the record
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval upgrade
@@ -358,7 +358,7 @@ Flags:
       --version string   release to install, e.g. v0.4.0 (default: latest)
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval verify
@@ -386,7 +386,7 @@ Flags:
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval version
@@ -404,5 +404,5 @@ Flags:
   -h, --help   help for version
 
 Global Flags:
-      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```

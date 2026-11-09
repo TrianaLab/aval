@@ -74,14 +74,15 @@ func (w Run) styledReport(r evidence.Report) {
 	case r.Outcome == evidence.OutcomeError, strings.HasPrefix(r.Reason, "reuse off"):
 		glyph, sgr = glyphWarn, sgrYellow
 	}
-	fp := strings.TrimPrefix(short(r.Fingerprint), "sha256:")
-	w.step(sgr, glyph, fmt.Sprintf("%s %s %s", r.Outcome, OneLine(r.TestID), OneLine(fp)))
+	w.step(sgr, glyph, fmt.Sprintf("%s %s %s", r.Outcome, OneLine(r.TestID), short(OneLine(r.Fingerprint))))
 	for _, d := range details(r) {
-		label, sgr := d.label, sgrDim
+		label, sgr, v := d.label, sgrDim, short(OneLine(d.value))
 		if label == "rejected" {
-			label, sgr = "REJECTED", sgrRed
+			// Whole digests: the operator copies the rejected reference into
+			// aval verify or oras, and a short prefix can be ground out.
+			label, sgr, v = "REJECTED", sgrRed, OneLine(d.value)
 		}
-		fmt.Fprintf(w.Out, "  %s %s\n", w.paint(sgr, fmt.Sprintf("%-9s", label)), short(OneLine(d.value)))
+		fmt.Fprintf(w.Out, "  %s %s\n", w.paint(sgr, fmt.Sprintf("%-9s", label)), v)
 	}
 }
 
@@ -97,12 +98,16 @@ func styledSummary(s Summary) string {
 	}
 	b := fmt.Sprintf("%s %s in %s", t, s.Result, duration(s.Took))
 	switch {
+	case s.NeverReusable:
+		return b + "; cacheability non-deterministic is never reused."
 	case s.Pushed:
 		return b + "; published for the next run with these inputs."
 	case s.ReuseOff:
 		return b + " with reuse off; see the reason above."
 	case s.Result != evidence.ResultPassed:
 		return b + "; fix it, then aval run again."
+	case s.Verified:
+		return b + "; a verified result exists, it was not reused."
 	}
 	return b + "; aval push publishes it for the next run."
 }

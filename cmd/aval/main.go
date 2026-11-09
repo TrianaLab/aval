@@ -202,7 +202,7 @@ to turn reuse off). There is no config file.`,
 		SilenceErrors: true,
 	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
-	root.PersistentFlags().Bool("plain", false, "plain output even on a terminal, as in CI (also $"+outputEnv+"=plain or TERM=dumb)")
+	root.PersistentFlags().Bool("plain", false, "plain aval run output even on a terminal, as in CI (also $"+outputEnv+"=plain or TERM=dumb)")
 	root.AddCommand(newRunCmd(), newExplainCmd(), newPushCmd(), newKeygenCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
 	guide(root)
 	return root
@@ -420,15 +420,24 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 // when the fingerprint holds more attestations than lookup lists.
 func verify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
 	r, files, err := lookupAndVerify(ctx, warn, c, file, fp, repo, policyFile)
-	if n := securityCount(r); n > 0 {
-		cliout.Security(warn, n, r.TestID)
-	}
-	// Over the cap nothing was verified, so an untrusted attestation may hide
-	// among them (#135). The outcome stays error: the test runs.
-	if errors.Is(err, registry.ErrTooManyCandidates) {
-		fmt.Fprintln(warn, cliout.FloodLine(registry.ErrTooManyCandidates, r.TestID))
+	if line := securityLineFor(r, err); line != "" {
+		fmt.Fprintln(warn, line)
 	}
 	return r, files, err
+}
+
+// securityLineFor is the SECURITY line for the lookup r and its error, or
+// empty. Over the candidate cap nothing was verified, so an untrusted
+// attestation may hide among them (#135); the outcome stays error and the
+// test runs.
+func securityLineFor(r evidence.Report, err error) string {
+	if errors.Is(err, registry.ErrTooManyCandidates) {
+		return cliout.FloodLine(registry.ErrTooManyCandidates, r.TestID)
+	}
+	if n := securityCount(r); n > 0 {
+		return cliout.SecurityLine(n, r.TestID)
+	}
+	return ""
 }
 
 // securityCount is how many attestations in r failed verification.
