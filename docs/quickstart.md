@@ -71,6 +71,9 @@ aval run --push --key aval.key --registry localhost:5001/demo/hello-aval
 ```
 <!-- --8<-- [end:push] -->
 
+These transcripts are the plain form printed in CI or with `--plain`; on a
+terminal the same steps show as glyph lines.
+
 ```text
 miss hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
 reason: reuse off: no trust policy (set AVAL_POLICY or --policy)

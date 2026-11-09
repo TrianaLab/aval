@@ -145,9 +145,9 @@ try {
     return p.js(termText);
   };
   let out = await type("aval run");
-  check("first aval run misses, runs and pushes", /miss greet[\s\S]*--- run greet: go test \.\/\.\.\.\n[\s\S]*ran greet: passed \(exit 0\)[\s\S]*pushed [\s\S]*summary: greet ran: passed in 4ms; result pushed\n$/.test(out), out);
+  check("first aval run misses, runs and pushes", /· miss greet[\s\S]*· run greet: go test \.\/\.\.\.\n[\s\S]*✓ greet passed \(exit 0\) in 4ms\n✓ pushed [^\n]*\ngreet passed in 4ms; published for the next run with these inputs\.\n$/.test(out), out);
   out = await type("aval run");
-  check("second aval run is verified and reused", /verified greet[\s\S]*reused passed result\nsummary: greet reused: passed; saved 4ms\n$/.test(out), out);
+  check("second aval run is verified and reused", /↺ verified greet[\s\S]*↺ reused passed result\ngreet: reused a verified passed result, saved 4ms; nothing ran\.\n$/.test(out), out);
   await screenshots(p, "after");
   await type("tamper");
   out = await type("aval verify");

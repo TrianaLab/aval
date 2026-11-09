@@ -22,26 +22,39 @@ func WriteReport(w io.Writer, format string, r evidence.Report) error {
 		return enc.Encode(r)
 	}
 	fmt.Fprintf(w, "%s %s %s\n", r.Outcome, r.TestID, r.Fingerprint)
+	for _, d := range details(r) {
+		fmt.Fprintf(w, "%s: %s\n", d.label, d.value)
+	}
+	return nil
+}
+
+// detail is one labelled line under the outcome line of a report.
+type detail struct{ label, value string }
+
+// details are the labelled lines of r, attestation text already through
+// OneLine, for the plain and the styled report alike.
+func details(r evidence.Report) []detail {
+	var ds []detail
 	if s := r.Signer; s != nil {
 		who := "key " + s.KeyID
 		if s.KeyID == "" {
 			who = fmt.Sprintf("%s (issuer %s)", s.Subject, s.Issuer)
 		}
-		fmt.Fprintf(w, "signer: %s, trust level %s\n", OneLine(who), s.TrustLevel)
+		ds = append(ds, detail{"signer", fmt.Sprintf("%s, trust level %s", OneLine(who), s.TrustLevel)})
 	}
 	if r.Reference != "" {
-		fmt.Fprintf(w, "reference: %s\n", r.Reference)
+		ds = append(ds, detail{"reference", r.Reference})
 	}
 	if r.Reason != "" {
-		fmt.Fprintf(w, "reason: %s\n", OneLine(r.Reason))
+		ds = append(ds, detail{"reason", OneLine(r.Reason)})
 	}
 	for _, rj := range r.Rejected {
 		if rj.Reference == r.Reference && rj.Reason == r.Reason {
-			continue // printed above as the reference and reason
+			continue // listed above as the reference and reason
 		}
-		fmt.Fprintf(w, "rejected: %s %s: %s\n", rj.Reference, rj.Outcome, OneLine(rj.Reason))
+		ds = append(ds, detail{"rejected", fmt.Sprintf("%s %s: %s", rj.Reference, rj.Outcome, OneLine(rj.Reason))})
 	}
-	return nil
+	return ds
 }
 
 // Version is the aval version, set by the CLI, so links point at the docs

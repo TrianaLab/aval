@@ -57,7 +57,7 @@ ran hello: passed (exit 0)
 summary: hello ran: passed in 12ms
 ```
 
-The test's output sits between `--- run` and `--- end`. `summary:` may add `; saved <time>` (display only), `; result pushed`, `; reuse was off` and `; SECURITY`; a failed test shows there and in exit code 3. The test can print a fake `summary:` line, so a script reads the last line of stdout.
+The test's output sits between `--- run` and `--- end`. `summary:` may add `; saved <time>` (display only), `; result pushed`, `; reuse was off` and `; SECURITY`; a failed test shows there and in exit code 3. The test can print a fake `summary:` line, so a script reads the last line of stdout. On a terminal the same steps are glyph lines (`✓` done, `↺` reused, `✗` failed or SECURITY, `⚠` reuse off, `·` neutral) with 8-hex digests, ending in one sentence that says what happened; the `REJECTED` line keeps the whole digest; after a verification failure nothing is green. A pipe, `--plain`, `AVAL_OUTPUT=plain` or `TERM=dumb` give the plain lines above; `NO_COLOR` drops colour only, and Windows gets no colour. Styled warnings go to stderr only when stderr is a terminal too.
 
 On stderr, an error that turns reuse off warns `aval: warning: reuse off: <cause>`. A verification failure, or a fingerprint flooded with more attestations than Aval lists, repeats `aval: SECURITY:` as the last line. When the command cannot start, stderr says `aval: running "<command>": ...` and no `--- end` or `summary:` follows.
 

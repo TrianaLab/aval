@@ -38,10 +38,10 @@ func mustContain(t *testing.T, line, got string, want ...string) {
 func TestStory(t *testing.T) {
 	d := New()
 	out, _ := exec(t, d, "aval run", exitOK)
-	mustContain(t, "first run", out, "miss greet sha256:", "reason: "+DefaultRepo+": no attestation found for fingerprint", "ran greet: passed (exit 0)", "pushed "+DefaultRepo+"@sha256:")
+	mustContain(t, "first run", out, "· miss greet ", "  reason    "+DefaultRepo+": no attestation found for fingerprint", "✓ greet passed (exit 0) in 4ms\n", "✓ pushed "+DefaultRepo+"@sha256:", "greet passed in 4ms; published for the next run with these inputs.\n")
 	out, _ = exec(t, d, "aval run", exitOK)
-	mustContain(t, "second run", out, "verified greet", "signer: key ", ", trust level developer", "reused passed result\nsummary: greet reused: passed; saved 4ms\n")
-	if strings.Contains(out, "ran greet") {
+	mustContain(t, "second run", out, "↺ verified greet", "  signer    key ", ", trust level developer", "↺ reused passed result\ngreet: reused a verified passed result, saved 4ms; nothing ran.\n")
+	if strings.Contains(out, "run greet") || strings.ContainsRune(out, '\x1b') {
 		t.Fatal("a verified result must not run the test")
 	}
 
@@ -54,7 +54,7 @@ func TestStory(t *testing.T) {
 
 	exec(t, d, "edit README.md", exitOK)
 	out, _ = exec(t, d, "aval run --explain", exitOK)
-	mustContain(t, "out of scope edit", out, "aval-fingerprint/v1\n", "source ", " - greet.go\n", "verified greet "+fp, "reused passed result")
+	mustContain(t, "out of scope edit", out, "aval-fingerprint/v1\n", "source ", " - greet.go\n", "↺ verified greet "+fp[:15]+"\n", "↺ reused passed result")
 	exec(t, d, "edit aval.yaml", exitOK) // a comment: the canonical contract is the same
 	out, _ = exec(t, d, "aval verify --output=text", exitOK)
 	mustContain(t, "comment in aval.yaml", out, "verified greet "+fp)
@@ -73,8 +73,11 @@ func TestStory(t *testing.T) {
 	mustContain(t, "verify tampered", out, "verification-failed greet", "reason: attestation verification failed: signature: ", "(trust policy policy.yaml)")
 	mustContain(t, "verify tampered", errw, "aval: SECURITY: 1 attestation(s) for greet failed signature or policy verification")
 	out, errw = exec(t, d, "aval run", exitVerificationFailed)
-	mustContain(t, "run tampered", out, "verification-failed greet", "--- run greet: go test ./...\n", "ran greet: passed (exit 0)", "pushed ", "summary: greet ran: passed in 4ms; result pushed; SECURITY\n")
-	if lines := strings.Split(strings.TrimSpace(errw), "\n"); len(lines) != 2 || lines[0] != lines[1] || !strings.HasPrefix(lines[1], "aval: SECURITY: ") {
+	mustContain(t, "run tampered", out, "✗ verification-failed greet", "· run greet: go test ./...\n", "· greet passed (exit 0) in 4ms\n", "· pushed ", "✗ SECURITY: an attestation for greet failed verification")
+	if strings.Contains(out, "✓") {
+		t.Fatalf("run tampered: a success line after a verification failure: %q", out)
+	}
+	if lines := strings.Split(strings.TrimSpace(errw), "\n"); len(lines) != 2 || lines[0] != "✗ "+strings.TrimPrefix(lines[1], "aval: ") || !strings.HasPrefix(lines[1], "aval: SECURITY: ") {
 		t.Fatalf("run tampered: stderr %q, want the SECURITY line when found and last", errw)
 	}
 	out, errw = exec(t, d, "aval verify", exitOK)
@@ -120,7 +123,7 @@ func TestExplain(t *testing.T) {
 	d = New()
 	out, _ := exec(t, d, "aval explain", exitOK)
 	digest, _ := exec(t, d, "aval explain --digest", exitOK)
-	manifest, _, _ := strings.Cut(run, "miss greet ")
+	manifest, _, _ := strings.Cut(run, "· miss greet ")
 	if want := "fingerprint manifest for greet (aval-fingerprint/v1)\n" + manifest + "fingerprint " + digest; out != want {
 		t.Fatalf("explain %q, want %q", out, want)
 	}
@@ -147,6 +150,7 @@ func TestUsageErrors(t *testing.T) {
 		"aval stats publish x":   "aval: stats is not in this demo: it keeps no run records",
 		"aval explain --explain": "aval: unknown flag: --explain",
 		"aval run --digest":      "aval: unknown flag: --digest",
+		"aval verify --plain":    "aval: unknown flag: --plain",
 		"aval explain extra":     `aval: unknown command "extra" for "aval explain"`,
 		"aval verify --output=x": `got "x"`,
 	}

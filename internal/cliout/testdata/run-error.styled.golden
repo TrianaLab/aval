@@ -1,0 +1,92 @@
+=== push=false shadow=false failed=false
+exit 0
+--- stdout
+⚠ error unit sha256:77ad8f66
+  reason    registry down
+· run unit: sh -c echo test output; exit 0
+test output
+✓ unit passed (exit 0) in D
+unit passed in D with reuse off; see the reason above.
+--- stderr
+⚠ reuse off: registry down
+=== push=false shadow=false failed=true
+exit 3
+--- stdout
+⚠ error unit sha256:1a818124
+  reason    registry down
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+unit failed in D with reuse off; see the reason above.
+--- stderr
+⚠ reuse off: registry down
+=== push=false shadow=true failed=false
+exit 0
+--- stdout
+⚠ error unit sha256:77ad8f66
+  reason    registry down
+· run unit: sh -c echo test output; exit 0
+test output
+✓ unit passed (exit 0) in D
+unit passed in D with reuse off; see the reason above.
+--- stderr
+⚠ reuse off: registry down
+=== push=false shadow=true failed=true
+exit 3
+--- stdout
+⚠ error unit sha256:1a818124
+  reason    registry down
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+unit failed in D with reuse off; see the reason above.
+--- stderr
+⚠ reuse off: registry down
+=== push=true shadow=false failed=false
+exit 0
+--- stdout
+⚠ error unit sha256:77ad8f66
+  reason    registry down
+· run unit: sh -c echo test output; exit 0
+test output
+✓ unit passed (exit 0) in D
+✓ pushed reg.example/r@sha256:bb
+unit passed in D; published for the next run with these inputs.
+--- stderr
+⚠ reuse off: registry down
+=== push=true shadow=false failed=true
+exit 3
+--- stdout
+⚠ error unit sha256:1a818124
+  reason    registry down
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+✓ pushed reg.example/r@sha256:bb
+unit failed in D; published for the next run with these inputs.
+--- stderr
+⚠ reuse off: registry down
+=== push=true shadow=true failed=false
+exit 0
+--- stdout
+⚠ error unit sha256:77ad8f66
+  reason    registry down
+· run unit: sh -c echo test output; exit 0
+test output
+✓ unit passed (exit 0) in D
+✓ pushed reg.example/r@sha256:bb
+unit passed in D; published for the next run with these inputs.
+--- stderr
+⚠ reuse off: registry down
+=== push=true shadow=true failed=true
+exit 3
+--- stdout
+⚠ error unit sha256:1a818124
+  reason    registry down
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+✓ pushed reg.example/r@sha256:bb
+unit failed in D; published for the next run with these inputs.
+--- stderr
+⚠ reuse off: registry down

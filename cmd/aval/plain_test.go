@@ -22,8 +22,25 @@ import (
 // verification failure exits 5 with the SECURITY line last on stderr
 // (invariant 4).
 func TestPlainRunGoldens(t *testing.T) {
+	for _, oc := range runOutcomes() {
+		t.Run(oc.name, func(t *testing.T) {
+			var got strings.Builder
+			for _, push := range []bool{false, true} {
+				for _, shadow := range []bool{false, true} {
+					for _, failed := range []bool{false, true} {
+						plainCase(t, &got, oc, push, shadow, failed)
+					}
+				}
+			}
+			checkGolden(t, "run-"+oc.name+".golden", got.String())
+		})
+	}
+}
+
+// runOutcomes are the lookup outcomes of the run goldens, plain and styled.
+func runOutcomes() []plainOutcome {
 	untrusted := &evidence.VerificationError{Reason: "untrusted signer \x1b[31m forged"}
-	outcomes := []plainOutcome{
+	return []plainOutcome{
 		{"verified", evidence.OutcomeVerified, "hermetic", func(t *testing.T, failed bool) {
 			fakeCandidates(t, nil, map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: failed, took: 1500 * time.Millisecond}})
 		}},
@@ -34,30 +51,35 @@ func TestPlainRunGoldens(t *testing.T) {
 		{"verification-failed", evidence.OutcomeVerificationFailed, "hermetic", func(t *testing.T, _ bool) {
 			fakeCandidates(t, nil, map[string]candidate{"sha256:ff": {verifyErr: untrusted}})
 		}},
+		// Verified beside a rejected forged candidate: SECURITY, yet reused.
+		{"verified-with-forged", evidence.OutcomeVerified, "hermetic", func(t *testing.T, failed bool) {
+			fakeCandidates(t, nil, map[string]candidate{
+				"sha256:aa": {trust: evidence.TrustRunner, failed: failed, took: 1500 * time.Millisecond},
+				"sha256:ff": {verifyErr: untrusted},
+			})
+		}},
+		// Flooding (#135): nothing verified, the outcome is error, the test runs.
+		{"flood", evidence.OutcomeError, "hermetic", func(t *testing.T, _ bool) {
+			fakeCandidates(t, fmt.Errorf("listing referrers: %w", registry.ErrTooManyCandidates), nil)
+		}},
 		{"non-deterministic", evidence.OutcomeMiss, "non-deterministic", func(t *testing.T, _ bool) { noLookup(t) }},
 		{"reuse-off", evidence.OutcomeMiss, "hermetic", func(t *testing.T, _ bool) { noLookup(t) }}, // plainCase drops --policy
 	}
-	for _, oc := range outcomes {
-		t.Run(oc.name, func(t *testing.T) {
-			var got strings.Builder
-			for _, push := range []bool{false, true} {
-				for _, shadow := range []bool{false, true} {
-					for _, failed := range []bool{false, true} {
-						plainCase(t, &got, oc, push, shadow, failed)
-					}
-				}
-			}
-			golden := filepath.Join("..", "..", "internal", "cliout", "testdata", "run-"+oc.name+".golden")
-			if *update {
-				if err := os.WriteFile(golden, []byte(got.String()), 0o644); err != nil {
-					t.Fatal(err)
-				}
-			}
-			want, err := os.ReadFile(golden)
-			if err != nil || string(want) != got.String() {
-				t.Fatalf("plain output differs from %s (go test ./cmd/aval -run TestPlainRunGoldens -update); err %v, got:\n%s", golden, err, got.String())
-			}
-		})
+}
+
+// checkGolden compares got with the golden name in internal/cliout/testdata
+// (the renderer's package; -update rewrites it).
+func checkGolden(t *testing.T, name, got string) {
+	t.Helper()
+	golden := filepath.Join("..", "..", "internal", "cliout", "testdata", name)
+	if *update {
+		if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil || string(want) != got {
+		t.Fatalf("output differs from %s (go test ./cmd/aval -run 'RunGoldens' -update); err %v, got:\n%s", golden, err, got)
 	}
 }
 
@@ -126,6 +148,32 @@ type plainOutcome struct {
 // and checks the plain contract.
 func plainCase(t *testing.T, got *strings.Builder, oc plainOutcome, push, shadow, failed bool) {
 	t.Helper()
+	name, code, stdout, stderr, r := runOutcome(t, got, oc, push, shadow, failed)
+	lines := strings.Split(strings.TrimSuffix(stderr, "\n"), "\n")
+	switch {
+	case strings.ContainsRune(stdout+stderr, '\x1b'):
+		t.Errorf("%s: ESC byte in plain output", name)
+	case r.Outcome != oc.outcome:
+		t.Errorf("%s: outcome %q, want %q", name, r.Outcome, oc.outcome)
+	case !strings.Contains("\n"+stdout, fmt.Sprintf("\n%s unit %s\n", r.Outcome, r.Fingerprint)):
+		t.Errorf("%s: no outcome-first line in %q", name, stdout)
+	case security(r, stderr) && !strings.HasPrefix(lines[len(lines)-1], "aval: SECURITY: "),
+		r.Outcome == evidence.OutcomeVerificationFailed && code != ExitVerificationFailed:
+		t.Errorf("%s: exit %d, last stderr line %q", name, code, lines[len(lines)-1])
+	}
+}
+
+// security reports whether a run with report r and stderr met a security
+// event: a verification failure, a rejected forged sibling or a flood.
+func security(r evidence.Report, stderr string) bool {
+	return r.Outcome == evidence.OutcomeVerificationFailed || strings.Contains(stderr, "aval: SECURITY: ")
+}
+
+// runOutcome runs one case of the run goldens and appends its output, with
+// durations as D, to got. It returns the case name, the exit code, stdout,
+// stderr and the report file.
+func runOutcome(t *testing.T, got *strings.Builder, oc plainOutcome, push, shadow, failed bool) (name string, code int, stdout, stderr string, r evidence.Report) {
+	t.Helper()
 	took := regexp.MustCompile(` in [0-9.]+(ns|µs|ms|s)\b`)
 	oc.setup(t, failed)
 	fakePublish(t, nil, nil)
@@ -143,20 +191,8 @@ func plainCase(t *testing.T, got *strings.Builder, oc plainOutcome, push, shadow
 	if shadow {
 		args = append(args, "--shadow")
 	}
-	code, stdout, stderr := runCLI(args...)
-	name := fmt.Sprintf("push=%v shadow=%v failed=%v", push, shadow, failed)
+	code, stdout, stderr = runCLI(args...)
+	name = fmt.Sprintf("push=%v shadow=%v failed=%v", push, shadow, failed)
 	fmt.Fprintf(got, "=== %s\nexit %d\n--- stdout\n%s--- stderr\n%s", name, code, took.ReplaceAllString(stdout, " in D"), stderr)
-
-	r := readReport(t, report)
-	lines := strings.Split(strings.TrimSuffix(stderr, "\n"), "\n")
-	switch {
-	case strings.ContainsRune(stdout+stderr, '\x1b'):
-		t.Errorf("%s: ESC byte in plain output", name)
-	case r.Outcome != oc.outcome:
-		t.Errorf("%s: outcome %q, want %q", name, r.Outcome, oc.outcome)
-	case !strings.Contains("\n"+stdout, fmt.Sprintf("\n%s unit %s\n", r.Outcome, r.Fingerprint)):
-		t.Errorf("%s: no outcome-first line in %q", name, stdout)
-	case oc.outcome == evidence.OutcomeVerificationFailed && (code != ExitVerificationFailed || !strings.HasPrefix(lines[len(lines)-1], "aval: SECURITY: ")):
-		t.Errorf("%s: exit %d, last stderr line %q", name, code, lines[len(lines)-1])
-	}
+	return name, code, stdout, stderr, readReport(t, report)
 }

@@ -254,17 +254,18 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 		return err
 	}
 	ctx, out, warn := cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr()
-	w := cliout.Run{Out: out, Err: warn}
+	w := runWriter(out, warn, plainFlag(cmd))
 	if o.explain || o.fingerprintOnly {
 		if err := printFingerprint(out, warn, fp, fpErr, o); err != nil || o.fingerprintOnly {
 			return err
 		}
 	}
-	o.config.printConfig(out)
+	w.Note(o.config.configLine())
 	observed, probeErr := probe(ctx, c, filepath.Dir(o.file))
-	r, files, lookupErr := decide(ctx, out, warn, c, fp, cmp.Or(fpErr, probeErr), o)
+	r, files, lookupErr := decide(ctx, w, c, fp, cmp.Or(fpErr, probeErr), o)
 	sum, security := announce(w, c, r, lookupErr, o.repo)
-	// Whatever fails below, the SECURITY line verify printed is repeated as
+	w.Security = sum.Security
+	// Whatever fails below, the SECURITY line announce printed is repeated as
 	// the last stderr line.
 	defer func() { err = securityLast(warn, err, security) }()
 	// No I/O failure may skip the test or hide a verification failure
@@ -281,7 +282,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 			return reuse(ctx, w, o, r, sum)
 		}
 	}
-	// A security event: run the test, then exit 5 (invariant 4). verify
+	// A security event: run the test, then exit 5 (invariant 4). announce
 	// printed the SECURITY line and the report the reason.
 	if errors.Is(lookupErr, evidence.ErrVerification) {
 		errs = append(errs, shown{lookupErr})
@@ -296,28 +297,30 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	w.End(c.Metadata.Name, p.Result, p.Execution.ExitCode, sum.Took)
 	kept := keep(ctx, w, &sum, c, p, fpErr, probeErr, mutable(c, fp), token, o)
 	recordRun(ctx, out, warn, o, r, false, p)
-	verdict := judge(out, warn, r, p)
+	verdict := judge(w, r, p)
 	w.Summary(sum)
 	return errors.Join(append(append(errs, kept...), verdict)...)
 }
 
 // announce prints the lookup decision r and starts the summary. security
-// is the SECURITY line verify printed, to repeat as the last stderr line;
+// is the SECURITY line it printed, to repeat as the last stderr line;
 // empty when no attestation failed verification.
 func announce(w cliout.Run, c *contract.Contract, r evidence.Report, lookupErr error, repo string) (sum cliout.Summary, security string) {
-	w.Decision(r, c.Cacheability)
 	// Flooding is a security event, not a routine reuse-off cause (#135).
 	flood := errors.Is(lookupErr, registry.ErrTooManyCandidates)
-	sum = cliout.Summary{Test: c.Metadata.Name, ReuseOff: !flood && (r.Outcome == evidence.OutcomeError || errors.As(lookupErr, new(reuseOff)))}
+	security = securityLineFor(r, lookupErr)
+	sum = cliout.Summary{
+		Test: c.Metadata.Name, ReuseOff: !flood && (r.Outcome == evidence.OutcomeError || errors.As(lookupErr, new(reuseOff))),
+		Security: security != "", Flood: flood,
+		NeverReusable: c.Cacheability == contract.NonDeterministic, Verified: r.Outcome == evidence.OutcomeVerified,
+	}
+	if security != "" {
+		w.SecurityBlock(security) // when found, before the report; securityLast repeats it last
+	}
+	w.Decision(r, c.Cacheability)
 	if r.Outcome == evidence.OutcomeError && !flood {
 		// The test runs: fail closed (invariant 3). The report keeps the raw error.
 		w.ReuseOff(cmp.Or(unreachable(repo, lookupErr), r.Reason))
-	}
-	if n := securityCount(r); n > 0 {
-		sum.Security, security = true, cliout.SecurityLine(n, r.TestID)
-	}
-	if flood {
-		sum.Security, security = true, cliout.FloodLine(registry.ErrTooManyCandidates, r.TestID)
 	}
 	return sum, security
 }
@@ -407,22 +410,27 @@ func printResolveCost(w io.Writer, fp fingerprint.Fingerprint) {
 	}
 }
 
-// printFindings lists every mutable reference, acknowledged or not.
+// printFindings lists every mutable reference, acknowledged or not, on w.
 func printFindings(w io.Writer, fp fingerprint.Fingerprint) {
+	noteFindings(func(s string) { fmt.Fprintln(w, s) }, fp)
+}
+
+// noteFindings writes each mutable reference through note.
+func noteFindings(note func(string), fp fingerprint.Fingerprint) {
 	for _, f := range fp.Findings {
-		fmt.Fprintf(w, "mutable: %s\n", cliout.OneLine(f.String()))
+		note("mutable: " + cliout.OneLine(f.String()))
 	}
 }
 
 // judge turns the real run into the command's verdict. With a verified
 // result (only in --shadow) a disagreement is a false hit.
-func judge(out, warn io.Writer, r evidence.Report, p *evidence.Predicate) error {
+func judge(w cliout.Run, r evidence.Report, p *evidence.Predicate) error {
 	if r.Outcome == evidence.OutcomeVerified {
 		if r.Result != p.Result {
-			fmt.Fprintf(warn, "aval: FALSE HIT: %s reused %s from %s, but the test %s\n", r.TestID, r.Result, r.Reference, p.Result)
+			fmt.Fprintf(w.Err, "aval: FALSE HIT: %s reused %s from %s, but the test %s\n", r.TestID, r.Result, r.Reference, p.Result)
 			return errFalseHit
 		}
-		fmt.Fprintf(out, "shadow: reuse of %s would have been correct (%s)\n", r.Reference, p.Result)
+		w.Note(fmt.Sprintf("shadow: reuse of %s would have been correct (%s)", r.Reference, p.Result))
 	}
 	if p.Result != evidence.ResultPassed {
 		return shown{errTestFailed} // the summary says so
@@ -433,8 +441,8 @@ func judge(out, warn io.Writer, r evidence.Report, p *evidence.Predicate) error 
 // decide looks up and verifies a result unless reuse is impossible or
 // disabled. Every way of not reusing comes back as a report, never silently.
 // A verified result comes with its outputs, checked but not yet written.
-func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, fpErr error, o runFlags) (evidence.Report, []registry.Output, error) {
-	printFindings(out, fp) // the outcome line carries the digest
+func decide(ctx context.Context, w cliout.Run, c *contract.Contract, fp fingerprint.Fingerprint, fpErr error, o runFlags) (evidence.Report, []registry.Output, error) {
+	noteFindings(w.Note, fp) // the outcome line carries the digest
 	var err error
 	switch {
 	case fpErr != nil:
@@ -455,7 +463,7 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 	// The deadline bounds the registry, never runner.command.
 	ctx, cancel := context.WithTimeout(ctx, o.registryTimeout)
 	defer cancel()
-	return verify(ctx, warn, c, o.file, fp, o.repo, o.policyFile)
+	return lookupAndVerify(ctx, w.Err, c, o.file, fp, o.repo, o.policyFile) // announce prints the SECURITY block
 }
 
 // probeTimeout bounds each environment.probe command.
