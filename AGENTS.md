@@ -78,7 +78,7 @@ A change that breaks one of these is wrong, even if tests pass.
 | `make docs-demo-smoke` | `scripts/demo-smoke.mjs`: headless Chrome against `site/` types `aval run` twice (verified), then `tamper` and `aval verify` (exit 5); needs Node and Chrome |
 | `make coverage` | unit tests plus an HTML report in `coverage.html` |
 | `make build` | `bin/aval` |
-| `make docs-demos` | re-records the quickstart GIFs from `docs/assets/tapes/*.tape` with `bin/aval` and a throwaway registry (needs vhs, Docker, openssl) |
+| `make docs-demos` | re-records the quickstart GIFs from `docs/assets/tapes/*.tape` with `bin/aval` and a throwaway registry (needs vhs, Docker) |
 | `make brand` | renders the brand PNGs in `docs/assets/images/` from their SVGs (pinned resvg-js CLI via npx) |
 
 Epic 0 grows `make ci` to Pacto's standard (coverage gate, integration,

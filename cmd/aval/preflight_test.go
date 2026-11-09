@@ -44,9 +44,9 @@ func TestPushPreconditionsFailFast(t *testing.T) {
 		name, key, stderr string
 	}{
 		{"no key and no token", "", "$" + idTokenEnv},
-		{"unreadable key", filepath.Join(dir, "nope.pem"), "openssl ecparam -name prime256v1"},
+		{"unreadable key", filepath.Join(dir, "nope.pem"), "create one with: aval keygen"},
 		{"cosign key", write("cosign.key", block("ENCRYPTED SIGSTORE PRIVATE KEY", []byte("x"))), "P-256 private key in PEM"},
-		{"old cosign key", write("cosign-old.key", block("ENCRYPTED COSIGN PRIVATE KEY", []byte("x"))), "openssl ecparam -name prime256v1"},
+		{"old cosign key", write("cosign-old.key", block("ENCRYPTED COSIGN PRIVATE KEY", []byte("x"))), "create one with: aval keygen"},
 		{"not PEM", write("raw.key", []byte("junk")), "not a PEM file"},
 		{"corrupt PEM", write("bad.key", block("PRIVATE KEY", []byte("x"))), "P-256"},
 		{"P-384 key", write("p384.key", block("PRIVATE KEY", p384DER)), "not an ECDSA P-256 key"},
@@ -57,8 +57,8 @@ func TestPushPreconditionsFailFast(t *testing.T) {
 			c := contractWith(t, "hermetic", argv...)
 			result := filepath.Join(t.TempDir(), "r.json")
 			for _, args := range [][]string{
-				{"run", "-f", c, "--registry", "reg.example/r", "--push", "--result", result},
-				{"push", "-f", c, "--registry", "reg.example/r", "--result", result},
+				{"run", "-f", c, "--registry", "reg.example/r", "--push", "--result-file", result},
+				{"push", "-f", c, "--registry", "reg.example/r", "--result-file", result},
 			} {
 				if tc.key != "" {
 					args = append(args, "--key", tc.key)
@@ -78,10 +78,17 @@ func TestRegistryMustBeARepository(t *testing.T) {
 	noLookup(t)
 	argv, ran := marker(t, 0)
 	c := contractWith(t, "hermetic", argv...)
-	for _, repo := range []string{"https://ghcr.io/acme/orders-aval", "http://localhost:5000/x", "ghcr.io", "localhost:5000", "ghcr.io/acme/orders-aval:v1", "ghcr.io/acme/orders-aval@sha256:" + strings.Repeat("a", 64)} {
+	for _, repo := range []string{"https://ghcr.io/acme/orders-aval", "http://localhost:5000/x", "ghcr.io", "localhost:5000", "ghcr.io/acme/orders-aval:v1", "ghcr.io/acme/orders-aval@sha256:" + strings.Repeat("a", 64), "https://", "https://ghcr.io/acme/orders-aval:v1"} {
 		for _, cmd := range []string{"run", "verify", "push"} {
 			code, _, stderr := runCLI(cmd, "-f", c, "--registry", repo)
-			if code != ExitUsage || ran() || !strings.Contains(stderr, "e.g. ghcr.io/acme/orders-aval") || !strings.Contains(stderr, "is not an OCI repository") {
+			hint := "e.g. ghcr.io/acme/orders-aval"
+			if scheme, rest, ok := strings.Cut(repo, "://"); ok {
+				hint = "drop " + scheme + "://: try --registry " + rest + "\n" // #167
+				if rest == "" || strings.Contains(rest, ":v1") {
+					hint = "drop " + scheme + "://\n" // no repository to suggest
+				}
+			}
+			if code != ExitUsage || ran() || !strings.Contains(stderr, hint) || !strings.Contains(stderr, "is not an OCI repository") {
 				t.Errorf("%s --registry %s: exit %d ran %v, stderr %q", cmd, repo, code, ran(), stderr)
 			}
 		}
@@ -99,10 +106,10 @@ func TestOutputThatIsAnInputIsRejected(t *testing.T) {
 	key, _ := devKey(t, t.TempDir(), "k")
 	in := filepath.Join(filepath.Dir(c), "in.txt") // matched by scope.source
 	for _, args := range [][]string{
-		{"run", "-f", c, "--result", in},
-		{"run", "-f", c, "--report", in},
-		{"run", "-f", c, "--fingerprint-only", "--result", in},
-		{"push", "-f", c, "--registry", "reg.example/r", "--key", key, "--result", in},
+		{"run", "-f", c, "--result-file", in},
+		{"run", "-f", c, "--report-file", in},
+		{"run", "-f", c, "--fingerprint-only", "--result-file", in},
+		{"push", "-f", c, "--registry", "reg.example/r", "--key", key, "--result-file", in},
 	} {
 		code, _, stderr := runCLI(args...)
 		if code != ExitUsage || ran() || !strings.Contains(stderr, "is an input of the test") {
@@ -259,7 +266,7 @@ func TestLookalikeReportStaysAnInput(t *testing.T) {
 			if err := os.WriteFile(in, content, 0o644); err != nil {
 				t.Fatal(err)
 			}
-			code, stdout, _ := runCLI("run", "-f", c, "--fingerprint-only", "--report", in)
+			code, stdout, _ := runCLI("run", "-f", c, "--fingerprint-only", "--report-file", in)
 			if code == ExitUsage {
 				if b, _ := os.ReadFile(in); string(b) != string(content) {
 					t.Fatalf("a refused run changed the input: %q", b)
@@ -289,11 +296,11 @@ func TestAliasedOutputIsNotOverwritten(t *testing.T) {
 	}
 	in := filepath.Join(real, "in.txt")
 	cases := [][]string{
-		{"run", "-f", filepath.Join(link, "aval.yaml"), "--result", in},
-		{"run", "-f", c, "--report", filepath.Join(link, "in.txt")},
+		{"run", "-f", filepath.Join(link, "aval.yaml"), "--result-file", in},
+		{"run", "-f", c, "--report-file", filepath.Join(link, "in.txt")},
 	}
 	if _, err := os.Stat(filepath.Join(real, "IN.TXT")); err == nil {
-		cases = append(cases, []string{"run", "-f", c, "--result", filepath.Join(real, "IN.TXT")})
+		cases = append(cases, []string{"run", "-f", c, "--result-file", filepath.Join(real, "IN.TXT")})
 	} else {
 		t.Log("case-sensitive file system: the different-case alias is not exercised")
 	}
@@ -309,7 +316,7 @@ func TestAliasedOutputIsNotOverwritten(t *testing.T) {
 	// Aval's own result outside the scope is overwritten as before.
 	out := filepath.Join(t.TempDir(), "r.json")
 	for i := range 2 {
-		if code, _, stderr := runCLI("run", "-f", c, "--result", out); code != ExitOK || !ran() {
+		if code, _, stderr := runCLI("run", "-f", c, "--result-file", out); code != ExitOK || !ran() {
 			t.Fatalf("run %d: exit %d, stderr %s", i+1, code, stderr)
 		}
 	}

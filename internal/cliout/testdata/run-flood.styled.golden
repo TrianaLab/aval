@@ -1,0 +1,100 @@
+=== push=false shadow=false failed=false
+exit 0
+--- stdout
+⚠ error unit sha256:77ad8f66
+  reason    listing referrers: more than 64 attestations
+· run unit: sh -c echo test output; exit 0
+test output
+· unit passed (exit 0) in D
+✗ SECURITY: more attestations for unit than Aval lists, none verified; possibly a flooding attempt, the test ran.
+--- stderr
+✗ SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+=== push=false shadow=false failed=true
+exit 3
+--- stdout
+⚠ error unit sha256:1a818124
+  reason    listing referrers: more than 64 attestations
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+✗ SECURITY: more attestations for unit than Aval lists, none verified; possibly a flooding attempt, the test ran.
+--- stderr
+✗ SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+=== push=false shadow=true failed=false
+exit 0
+--- stdout
+⚠ error unit sha256:77ad8f66
+  reason    listing referrers: more than 64 attestations
+· run unit: sh -c echo test output; exit 0
+test output
+· unit passed (exit 0) in D
+✗ SECURITY: more attestations for unit than Aval lists, none verified; possibly a flooding attempt, the test ran.
+--- stderr
+✗ SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+=== push=false shadow=true failed=true
+exit 3
+--- stdout
+⚠ error unit sha256:1a818124
+  reason    listing referrers: more than 64 attestations
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+✗ SECURITY: more attestations for unit than Aval lists, none verified; possibly a flooding attempt, the test ran.
+--- stderr
+✗ SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+=== push=true shadow=false failed=false
+exit 0
+--- stdout
+⚠ error unit sha256:77ad8f66
+  reason    listing referrers: more than 64 attestations
+· run unit: sh -c echo test output; exit 0
+test output
+· unit passed (exit 0) in D
+· pushed reg.example/r@sha256:bb
+✗ SECURITY: more attestations for unit than Aval lists, none verified; possibly a flooding attempt, the test ran.
+--- stderr
+✗ SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+=== push=true shadow=false failed=true
+exit 3
+--- stdout
+⚠ error unit sha256:1a818124
+  reason    listing referrers: more than 64 attestations
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+· pushed reg.example/r@sha256:bb
+✗ SECURITY: more attestations for unit than Aval lists, none verified; possibly a flooding attempt, the test ran.
+--- stderr
+✗ SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+=== push=true shadow=true failed=false
+exit 0
+--- stdout
+⚠ error unit sha256:77ad8f66
+  reason    listing referrers: more than 64 attestations
+· run unit: sh -c echo test output; exit 0
+test output
+· unit passed (exit 0) in D
+· pushed reg.example/r@sha256:bb
+✗ SECURITY: more attestations for unit than Aval lists, none verified; possibly a flooding attempt, the test ran.
+--- stderr
+✗ SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+=== push=true shadow=true failed=true
+exit 3
+--- stdout
+⚠ error unit sha256:1a818124
+  reason    listing referrers: more than 64 attestations
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+· pushed reg.example/r@sha256:bb
+✗ SECURITY: more attestations for unit than Aval lists, none verified; possibly a flooding attempt, the test ran.
+--- stderr
+✗ SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/
+aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/

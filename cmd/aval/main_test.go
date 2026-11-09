@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TrianaLab/aval/internal/cliout"
 	"github.com/TrianaLab/aval/internal/policy"
@@ -99,7 +100,7 @@ func TestLookupVerificationFailureIsASecurityEvent(t *testing.T) {
 // reusable by default, and the policy may allow it.
 func TestCacheabilityNotice(t *testing.T) {
 	for class, want := range map[string]string{"external-dependencies": "not reusable by default (the policy may allow it)", "non-deterministic": "never reusable"} {
-		_, stdout, _ := runCLI("run", "-f", writeContract(t, class), "--result", filepath.Join(t.TempDir(), "r.json"))
+		_, stdout, _ := runCLI("run", "-f", writeContract(t, class), "--result-file", filepath.Join(t.TempDir(), "r.json"))
 		if !strings.Contains(stdout, "cacheability "+class+": "+want+"\n") {
 			t.Errorf("%s: stdout %q", class, stdout)
 		}
@@ -169,15 +170,15 @@ func TestCLI(t *testing.T) {
 		{"bad flag", []string{"--bogus"}, ExitUsage, "", "aval: unknown flag"},
 		{"fingerprint only", []string{"run", "-f", hermetic, "--fingerprint-only"}, ExitOK, "sha256:", ""},
 		{"explain", []string{"run", "-f", hermetic, "--explain", "--fingerprint-only"}, ExitOK, "aval-fingerprint/v1\n", ""},
-		{"explain then run", []string{"run", "-f", hermetic, "--explain", "--result", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "ran unit: passed", ""},
-		{"run without registry runs the test", []string{"run", "-f", hermetic, "--result", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "miss unit sha256:", ""},
-		{"non-deterministic", []string{"run", "-f", nondet, "--result", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "cacheability non-deterministic: never reusable", ""},
+		{"explain then run", []string{"run", "-f", hermetic, "--explain", "--result-file", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "ran unit: passed", ""},
+		{"run without registry runs the test", []string{"run", "-f", hermetic, "--result-file", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "miss unit sha256:", ""},
+		{"non-deterministic", []string{"run", "-f", nondet, "--result-file", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "cacheability non-deterministic: never reusable", ""},
 		{"missing contract", []string{"run", "-f", missing}, ExitUsage, "", "aval:"},
 		{"unprovable inputs", []string{"run", "-f", noSource, "--fingerprint-only"}, ExitError, "", "matched no files"},
 		{"unprovable inputs explained", []string{"run", "-f", noSource, "--explain"}, ExitError, "", "matched no files"},
 		{"push no registry", []string{"push", "-f", hermetic}, ExitUsage, "", "--registry is required"},
 		{"push missing contract", []string{"push", "-f", missing, "--registry", "reg.example/r"}, ExitUsage, "", "aval:"},
-		{"push without a recorded result", []string{"push", "-f", hermetic, "--registry", "reg.example/r", "--key", key, "--result", filepath.Join(t.TempDir(), "none.json")}, ExitError, "", "recorded by 'aval run'"},
+		{"push without a recorded result", []string{"push", "-f", hermetic, "--registry", "reg.example/r", "--key", key, "--result-file", filepath.Join(t.TempDir(), "none.json")}, ExitError, "", "recorded by 'aval run'"},
 		{"verify bad output", []string{"verify", "-o", "yaml"}, ExitUsage, "", "--output must be text or json"},
 		{"verify no registry", []string{"verify", "-f", hermetic}, ExitUsage, "", "--registry is required"},
 		{"verify missing contract", []string{"verify", "-f", missing, "--registry", "reg.example/r"}, ExitUsage, "", "aval:"},
@@ -219,6 +220,7 @@ type candidate struct {
 	failed              bool   // verifies with result failed instead of passed
 	cacheability        string // signed class; default hermetic
 	outputs             *evidence.Outputs
+	took                time.Duration // between the signed startedAt and finishedAt
 }
 
 // fakeCandidates makes lookup return the given candidates, sorted by digest,
@@ -255,6 +257,10 @@ func fakeCandidates(t *testing.T, lookupErr error, cands map[string]candidate) {
 			p.Result = evidence.ResultFailed
 		}
 		p.Execution.Outputs = c.outputs
+		if c.took > 0 {
+			p.StartedAt = time.Unix(0, 0).UTC()
+			p.FinishedAt = p.StartedAt.Add(c.took)
+		}
 		return &evidence.Verification{Predicate: p, Signer: evidence.Identity{Issuer: "https://issuer.example", TrustLevel: c.trust}}, nil
 	}
 }

@@ -1,0 +1,5 @@
+---
+"aval": minor
+---
+
+`aval run` on a terminal prints the styled output of Epic 13 (style A): one line per step behind a glyph (`✓` done, `↺` reused, `✗` failed or SECURITY, `⚠` reuse off, `·` neutral), labelled detail lines, digests as 8 hex characters (whole on the `REJECTED` line), and one closing sentence. A flooded fingerprint and a non-deterministic contract get their own closing sentence. After a verification failure nothing is green and no `✓` appears; the SECURITY block goes to stderr when found, and stderr still ends with the plain `aval: SECURITY:` line. `NO_COLOR` drops the colour only, Windows gets no colour, and stderr is styled only when it is a terminal too. Plain output is unchanged and applies when stdout is not a terminal, with `TERM=dumb`, `AVAL_OUTPUT=plain` (any case) or the new global `--plain` flag. The browser demo accepts `aval run --plain`. Exit codes, `-o json`, the report file and `aval verify` are unchanged. The browser demo uses the styled form without colour.

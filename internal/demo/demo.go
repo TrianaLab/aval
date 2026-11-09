@@ -52,14 +52,19 @@ const (
 	DefaultRepo = "registry.example/acme/greet-aval"
 	policyFile  = "policy.yaml"
 	pubFile     = "throwaway.pub"
-	// testOutput is the simulated output of `go test ./...`.
+	// testOutput is the simulated output of `go test ./...`, which takes
+	// testTook.
 	testOutput = "ok  \texample.com/greet\t0.004s\n"
+	testTook   = 4 * time.Millisecond
 )
 
 // Help is what `help` prints.
 const Help = `This terminal runs Aval compiled to WebAssembly, entirely in your browser.
   aval run              look up a trusted result; on a miss run the test, sign and push
   aval run --explain    the same, printing the fingerprint manifest first
+  aval run --plain      the same, as the plain lines CI prints
+  aval explain          print what the fingerprint covers, digest last (no lookup, no run)
+  aval explain --digest only the fingerprint
   aval verify           look up and verify without running anything
   aval verify -o json   the same, as the JSON verify report
   ls, cat <file>        the demo project
@@ -67,10 +72,10 @@ const Help = `This terminal runs Aval compiled to WebAssembly, entirely in your 
   tamper                alter the signed result in the registry (verify: exit 5)
   reset                 original files, empty registry, new throwaway key
   clear                 clear the screen
-Here aval run means: aval run --registry ` + DefaultRepo + ` --policy policy.yaml --push --key throwaway.key
-and aval verify adds --registry and --policy. The test is simulated, the registry
-is in memory and the key is generated in this tab. Keyless (Sigstore) signing is
-not available in the browser.
+Here AVAL_REGISTRY=` + DefaultRepo + ` and AVAL_POLICY=policy.yaml
+are set for you, and aval run means aval run --push --key throwaway.key.
+The test is simulated, the registry is in memory and the key is generated in
+this tab. Keyless (Sigstore) signing is not available in the browser.
 `
 
 // Demo is one visitor's session: the project files, the registry and the key.
@@ -209,36 +214,44 @@ func (d *Demo) aval(args []string, out, errw io.Writer) int {
 		return exitOK
 	}
 	cmd := args[0]
-	explain, output, err := parseFlags(cmd, args[1:])
+	if cmd == "stats" {
+		return usage("stats is not in this demo: it keeps no run records")
+	}
+	if cmd == "push" || cmd == "record" {
+		return usage("%s is not in this demo: here aval run signs and pushes", cmd)
+	}
+	flag, plain, output, err := parseFlags(cmd, args[1:])
 	if err != nil {
 		return usage("%s", err)
 	}
 	switch cmd {
+	case "explain":
+		return d.explain(flag, out, errw)
 	case "run":
-		return d.run(explain, out, errw)
+		return d.run(flag, plain, out, errw)
 	case "verify":
 		if output != "text" && output != "json" {
 			return usage("--output must be text or json, got %q", output)
 		}
 		return d.verifyCmd(output, out, errw)
-	case "push", "record":
-		return usage("%s is not in this demo: here aval run signs and pushes", cmd)
 	}
 	return usage("unknown command %q", cmd)
 }
 
 // parseFlags parses the flags of cmd the demo knows, with cobra's errors.
-func parseFlags(cmd string, args []string) (explain bool, output string, err error) {
+// flag is run --explain or explain --digest, plain is run --plain.
+func parseFlags(cmd string, args []string) (flag, plain bool, output string, err error) {
 	output = "text"
+	bools := map[string]*bool{"run --explain": &flag, "explain --digest": &flag, "run --plain": &plain}
 	for i := 0; i < len(args); i++ {
 		f := args[i]
 		name, val, hasVal := strings.Cut(f, "=")
 		switch {
-		case cmd == "run" && f == "--explain":
-			explain = true
+		case bools[cmd+" "+f] != nil:
+			*bools[cmd+" "+f] = true
 		case cmd == "verify" && (name == "-o" || name == "--output"):
 			if !hasVal && i+1 == len(args) {
-				return false, "", fmt.Errorf("flag needs an argument: %s", map[string]string{"-o": "'o' in -o", "--output": "--output"}[name])
+				return false, false, "", fmt.Errorf("flag needs an argument: %s", map[string]string{"-o": "'o' in -o", "--output": "--output"}[name])
 			}
 			if !hasVal {
 				i++
@@ -246,21 +259,36 @@ func parseFlags(cmd string, args []string) (explain bool, output string, err err
 			}
 			output = val
 		case strings.HasPrefix(f, "--"):
-			return false, "", fmt.Errorf("unknown flag: %s", name)
+			return false, false, "", fmt.Errorf("unknown flag: %s", name)
 		case strings.HasPrefix(f, "-") && len(f) > 1:
-			return false, "", fmt.Errorf("unknown shorthand flag: '%c' in %s", f[1], f)
+			return false, false, "", fmt.Errorf("unknown shorthand flag: '%c' in %s", f[1], f)
 		default:
-			return false, "", fmt.Errorf("unknown command %q for \"aval %s\"", f, cmd)
+			return false, false, "", fmt.Errorf("unknown command %q for \"aval %s\"", f, cmd)
 		}
 	}
-	return explain, output, nil
+	return flag, plain, output, nil
+}
+
+// explain is `aval explain`: the manifest under a header, the digest last;
+// with digest, only the digest. Nothing is looked up or run.
+func (d *Demo) explain(digest bool, out, errw io.Writer) int {
+	c, fp, code := d.fingerprint(errw)
+	switch {
+	case code != exitOK:
+		return code
+	case digest:
+		fmt.Fprintln(out, fp.Digest)
+	default:
+		fmt.Fprintf(out, "fingerprint manifest for %s (%s)\n%sfingerprint %s\n", c.Metadata.Name, fingerprint.Version, fp.Manifest, fp.Digest)
+	}
+	return exitOK
 }
 
 // fingerprint parses aval.yaml and fingerprints the project.
 func (d *Demo) fingerprint(errw io.Writer) (*contract.Contract, fingerprint.Fingerprint, int) {
 	c, err := contract.Parse(d.files[contract.DefaultFile])
 	if err != nil {
-		fmt.Fprintf(errw, "aval: %s: %s\n", contract.DefaultFile, cliout.OneLine(err.Error()))
+		cliout.Problems(errw, contract.DefaultFile+": invalid contract:", err)
 		return nil, fingerprint.Fingerprint{}, exitUsage
 	}
 	// ponytail: fstest.MapFS is the stdlib's in-memory fs.FS.
@@ -281,7 +309,7 @@ func (d *Demo) verifyCmd(output string, out, errw io.Writer) int {
 	if code != exitOK {
 		return code
 	}
-	r := d.verify(c, fp, errw)
+	r := d.verify(c, fp, cliout.Run{Err: errw})
 	_ = cliout.WriteReport(out, output, r) // ponytail: in-memory writers do not fail
 	switch r.Outcome {
 	case evidence.OutcomeVerified:
@@ -295,7 +323,7 @@ func (d *Demo) verifyCmd(output string, out, errw io.Writer) int {
 // run is `aval run --push`: reuse a verified result, or run the (simulated)
 // test, sign the result and push it. A verification failure runs the test
 // and then exits 5.
-func (d *Demo) run(explain bool, out, errw io.Writer) int {
+func (d *Demo) run(explain, plain bool, out, errw io.Writer) int {
 	c, fp, code := d.fingerprint(errw)
 	if code != exitOK {
 		return code
@@ -303,30 +331,41 @@ func (d *Demo) run(explain bool, out, errw io.Writer) int {
 	if explain {
 		fmt.Fprint(out, fp.Manifest)
 	}
-	fmt.Fprintf(out, "test %s fingerprint %s\n", c.Metadata.Name, fp.Digest)
-	r := d.verify(c, fp, errw)
-	_ = cliout.WriteReport(out, "text", r)
+	// The styled form without colour, as on a NO_COLOR terminal: the page
+	// writes with textContent and cannot parse ANSI.
+	w := cliout.Run{Out: out, Err: errw, Styled: !plain, ErrStyled: !plain}
+	r := d.verify(c, fp, w)
+	w.Decision(r, c.Cacheability)
+	sum := cliout.Summary{Test: c.Metadata.Name, Result: evidence.ResultPassed, Security: len(r.Rejected) > 0}
+	w.Security = sum.Security
+	code = exitOK
 	if r.Outcome == evidence.OutcomeVerified {
 		// ponytail: the demo only signs passes and tamper breaks the
 		// signature, so a verified result here is always passed.
-		fmt.Fprintf(out, "reused %s result\n", r.Result)
-		return exitOK
+		w.Reused(r.Result)
+		sum.Reused, sum.Saved = true, r.Predicate.FinishedAt.Sub(r.Predicate.StartedAt)
+	} else {
+		w.Start(c.Metadata.Name, c.Runner.Command)
+		fmt.Fprint(out, testOutput)
+		w.End(c.Metadata.Name, evidence.ResultPassed, 0, testTook)
+		w.Pushed(d.push(c, fp, time.Now().UTC()))
+		sum.Took, sum.Pushed = testTook, true
+		if r.Outcome == evidence.OutcomeVerificationFailed {
+			code = exitVerificationFailed
+		}
 	}
-	start := time.Now().UTC()
-	fmt.Fprint(out, testOutput)
-	fmt.Fprintf(out, "ran %s: %s (exit 0)\n", c.Metadata.Name, evidence.ResultPassed)
-	fmt.Fprintf(out, "pushed %s\n", d.push(c, fp, start))
-	if r.Outcome == evidence.OutcomeVerificationFailed {
-		return exitVerificationFailed
+	w.Summary(sum)
+	if sum.Security { // also the last line on stderr, as in the CLI
+		cliout.Security(errw, len(r.Rejected), r.TestID)
 	}
-	return exitOK
+	return code
 }
 
 // verify looks up every attestation for fp and verifies it with
 // evidence.Verify against the policy that trusts the throwaway key. As in
 // the CLI, a verified candidate wins and rejected ones are listed, with one
 // SECURITY line.
-func (d *Demo) verify(c *contract.Contract, fp fingerprint.Fingerprint, errw io.Writer) evidence.Report {
+func (d *Demo) verify(c *contract.Contract, fp fingerprint.Fingerprint, w cliout.Run) evidence.Report {
 	r := evidence.Report{Version: evidence.ReportVersion, TestID: c.Metadata.Name, Fingerprint: fp.Digest}
 	atts := d.reg[fp.Digest]
 	if len(atts) == 0 {
@@ -352,7 +391,7 @@ func (d *Demo) verify(c *contract.Contract, fp fingerprint.Fingerprint, errw io.
 		}
 	}
 	if len(r.Rejected) > 0 {
-		cliout.Security(errw, len(r.Rejected), r.TestID)
+		w.SecurityBlock(cliout.SecurityLine(len(r.Rejected), r.TestID))
 	}
 	if best == nil {
 		first := r.Rejected[0]
@@ -377,7 +416,7 @@ func (d *Demo) push(c *contract.Contract, fp fingerprint.Fingerprint, start time
 		Execution:     evidence.Execution{Fingerprint: fp.Digest, FingerprintVersion: fingerprint.Version, Environment: env},
 		Runner:        evidence.Runner{Identity: "browser"},
 		StartedAt:     start,
-		FinishedAt:    time.Now().UTC(),
+		FinishedAt:    start.Add(testTook),
 	}
 	// ponytail: plain structs, Marshal cannot fail.
 	raw, _ := json.Marshal(p)

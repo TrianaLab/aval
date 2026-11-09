@@ -9,9 +9,10 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
-var update = flag.Bool("update", false, "rewrite docs/cli-reference.md from the cobra command tree")
+var update = flag.Bool("update", false, "rewrite docs/cli-reference.md from the cobra command tree, and the plain run goldens in internal/cliout/testdata")
 
 var cliReference = filepath.Join("..", "..", "docs", "cli-reference.md")
 
@@ -61,13 +62,26 @@ func renderCLIReference() []byte {
 			desc = c.Short
 		}
 		b.WriteString("\n## " + c.CommandPath() + "\n\n" + strings.TrimSpace(desc) + "\n\n")
+		if d := c.Annotations["deprecated"]; d != "" {
+			b.WriteString("Deprecated, hidden from help: " + d + ".\n\n")
+		}
 		b.WriteString("```text\n" + strings.TrimSpace(c.UsageString()) + "\n```\n")
+		// Deprecated names are hidden from help but still work: list them.
+		var old []string
+		c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+			if f.Deprecated != "" {
+				old = append(old, "- `--"+f.Name+"`: "+f.Deprecated+"\n")
+			}
+		})
+		if len(old) > 0 {
+			b.WriteString("\nDeprecated flags, hidden from help:\n\n" + strings.Join(old, ""))
+		}
 		// ponytail: completion's per-shell children are cobra boilerplate; its usage block lists them.
 		if c.Name() == "completion" {
 			return
 		}
 		for _, sub := range c.Commands() {
-			if sub.IsAvailableCommand() {
+			if sub.IsAvailableCommand() || sub.Annotations["deprecated"] != "" {
 				walk(sub)
 			}
 		}

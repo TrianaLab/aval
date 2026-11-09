@@ -66,7 +66,26 @@ func TestTextReport(t *testing.T) {
 func TestSecurity(t *testing.T) {
 	var b strings.Builder
 	Security(&b, 2, "unit")
-	if want := "aval: SECURITY: 2 attestation(s) for unit failed signature or policy verification; treat it as a security event, see " + trustModelURL + "\n"; b.String() != want {
+	if want := "aval: SECURITY: 2 attestation(s) for unit failed signature or policy verification; treat it as a security event, see " + TrustModelURL() + "\n"; b.String() != want {
 		t.Fatalf("got %q", b.String())
+	}
+}
+
+func TestFloodLine(t *testing.T) {
+	got := FloodLine(errors.New("more than 64 attestations"), "unit")
+	if want := "aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see " + TrustModelURL(); got != want {
+		t.Fatalf("got %q", got)
+	}
+}
+
+// Each problem gets an indented line of its own, escaped: a value from the
+// file cannot start a line in a log.
+func TestProblems(t *testing.T) {
+	var b strings.Builder
+	Problems(&b, "aval.yaml: invalid contract:", errors.Join(errors.New("line 2: scope.sources: unknown field; did you mean source?"), errors.New("forged\n::error::x \x1b[31m")))
+	Problems(&b, "one:", errors.New("single"))
+	want := "aval: aval.yaml: invalid contract:\n  line 2: scope.sources: unknown field; did you mean source?\n  forged\\n::error::x \\x1b[31m\naval: one:\n  single\n"
+	if b.String() != want {
+		t.Fatalf("got %q, want %q", b.String(), want)
 	}
 }

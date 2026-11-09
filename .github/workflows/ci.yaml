@@ -170,6 +170,11 @@ jobs:
             echo "::warning::main has no .github/aval/trust-from-base.sh: no trust policy, nothing is reused"
           fi
           /bin/bash "$RUNNER_TEMP/install.sh"
+      # TODO(milestone-13): drop --registry and --policy here and in
+      # dogfood-shadow once the pinned release reads AVAL_REGISTRY and
+      # AVAL_POLICY itself (#163), and switch --result/--report/--record-file/
+      # --repository and `aval record` to the new names once the pin is
+      # >= 0.7.0 (#165).
       - name: Heavy suite through the pinned aval release
         run: |
           aval run -f aval.e2e.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \

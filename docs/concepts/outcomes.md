@@ -1,6 +1,6 @@
 # Outcomes
 
-Every lookup ends in one of four outcomes. Only `verified` skips the test.
+What can a lookup end in? One of four outcomes. Only `verified` skips the test.
 
 ```mermaid
 flowchart LR
@@ -13,51 +13,35 @@ flowchart LR
   valid -- no --> failed([verification-failed<br>exit 5]):::err
 ```
 
-The exit codes in the diagram are those of `aval verify`. All of them:
-
---8<-- "docs/cli-reference.md:exit-codes"
-
-## The four outcomes
-
-| Outcome | What it means | `aval run` does |
+| Outcome | Means | `aval run` does |
 |---|---|---|
 | `verified` | a trusted result exists for these exact inputs | reuses it: exit 0 for a pass, 3 for a failure |
-| `miss` | nothing to reuse: the inputs changed, or nobody ran them yet | runs the test |
-| `error` | Aval could not decide, such as a registry it cannot reach | runs the test |
+| `miss` | nothing to reuse yet | runs the test |
+| `error` | Aval could not decide, such as an unreachable registry | runs the test |
 | `verification-failed` | a result exists but does not verify | runs the test, then exits 5 |
+
+The diagram shows `aval verify` exit codes. All of them:
+[exit codes](../cli-reference.md#exit-codes).
 
 ## A miss is routine
 
-The normal case for a pull request: you changed an input, so there is nothing
-to reuse yet. Aval also reports a miss when:
+You changed an input, so there is nothing to reuse. Also a miss:
 
-- there is no `--policy` (or, for `aval run`, no `--registry`, or `--no-reuse`)
-- the test is `non-deterministic`, or `external-dependencies` and not in the
-  policy's `allowedCacheability`
-- the inputs hold a [mutable reference](../pinning.md) you did not pin or list
-  in `scope.allowMutable`
-- the only results are signed below `minTrustLevel`
+- no policy, or (for `aval run`) no registry, or `--no-reuse`
+- a `non-deterministic` test, or `external-dependencies` the policy does not allow
+- a [mutable reference](../pinning.md) you did not pin or accept in
+  `scope.allowMutable`
+- only signers below `minTrustLevel`
 
 ## A verification failure is a security event
 
-A result under your fingerprint does not verify: a bad signature, a signer not
-in your policy, or a claim of other inputs. The cause is a wrong policy or an
+A result under your fingerprint does not verify: a bad signature, an unknown
+signer, or a claim of other inputs. The cause is a wrong policy or an
 attacker. Aval runs the test, prints `aval: SECURITY: ...` and exits 5. Fail
 the job and investigate; never hide or retry it.
 
-## In a script
+## Read more
 
-Branch on the exit code of `aval verify`:
-
-```sh
-aval verify --registry "$REG" --policy policy.yaml
-case $? in
-  0) echo "a trusted result exists" ;;
-  4) echo "miss: the test must run" ;;
-  5) echo "SECURITY: a result failed verification" >&2; exit 1 ;;
-  *) echo "error: the test must run" ;;
-esac
-```
-
-Details: the JSON report in
-[the artifact format](../artifact-format.md#verify-report).
+- What `aval run` prints: [CLI output](../output.md)
+- Branch on exit codes in CI: [Consume evidence](../integrations.md)
+- The JSON report: [verify report](../artifact-format.md#verify-report)

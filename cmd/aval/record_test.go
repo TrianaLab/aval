@@ -84,12 +84,12 @@ func TestRunRecordsEveryOutcome(t *testing.T) {
 				recFile := filepath.Join(dir, "record.json")
 				c := contractWith(t, "hermetic", argv...)
 				args := []string{"run", "-f", c, "--registry", "registry.example/acme/stats", "--policy", "p.yaml",
-					"--result", filepath.Join(dir, "result.json"), "--record", "--record-file", recFile, "--ci-run-url", "https://ci.example/1", "--repository", "acme/orders"}
+					"--result-file", filepath.Join(dir, "result.json"), "--stats", "--stats-file", recFile, "--ci-run-url", "https://ci.example/1", "--source-repo", "acme/orders"}
 				if tc.shadow {
 					args = append(args, "--shadow")
 				}
 				if tc.badReport {
-					args = append(args, "--report", filepath.Join(c, "report.json")) // its directory is a file
+					args = append(args, "--report-file", filepath.Join(c, "report.json")) // its directory is a file
 				}
 				code, stdout, stderr := runCLI(args...)
 				if code != tc.code || ran() != (!tc.reused && !tc.missing) {
@@ -144,10 +144,10 @@ func TestRunRecordDurations(t *testing.T) {
 	}
 	got := fakeRecord(t, nil)
 	c := contractWith(t, "hermetic", "sleep", "0.05")
-	if code, _, stderr := runCLI("run", "-f", c, "--registry", "registry.example/acme/stats", "--policy", "p.yaml", "--record"); code != ExitOK {
+	if code, _, stderr := runCLI("run", "-f", c, "--registry", "registry.example/acme/stats", "--policy", "p.yaml", "--stats"); code != ExitOK {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
-	if code, _, stderr := runCLI("run", "-f", c, "--registry", "registry.example/acme/stats", "--policy", "p.yaml", "--record", "--shadow", "--result", filepath.Join(t.TempDir(), "r.json")); code != ExitOK {
+	if code, _, stderr := runCLI("run", "-f", c, "--registry", "registry.example/acme/stats", "--policy", "p.yaml", "--stats", "--shadow", "--result-file", filepath.Join(t.TempDir(), "r.json")); code != ExitOK {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
 	if r := (*got)[0]; !r.Reused || r.SavedDurationMs != 90_000 || r.TestDurationMs != 0 {
@@ -164,14 +164,14 @@ func TestRunRecordOptions(t *testing.T) {
 	got := fakeRecord(t, nil)
 	c := writeContract(t, "hermetic")
 	result := filepath.Join(t.TempDir(), "r.json")
-	if code, _, _ := runCLI("run", "-f", c, "--result", result); code != ExitOK || len(*got) != 0 {
+	if code, _, _ := runCLI("run", "-f", c, "--result-file", result); code != ExitOK || len(*got) != 0 {
 		t.Fatalf("without --record: exit %d, %d records", code, len(*got))
 	}
-	if code, _, stderr := runCLI("run", "-f", c, "--record"); code != ExitUsage || !strings.Contains(stderr, "--record requires --registry") {
+	if code, _, stderr := runCLI("run", "-f", c, "--stats"); code != ExitUsage || !strings.Contains(stderr, "--stats requires --registry") {
 		t.Fatalf("--record without --registry: exit %d, stderr %q", code, stderr)
 	}
 	under := filepath.Join(result, "x.json") // its directory is a file
-	if code, _, stderr := runCLI("run", "-f", c, "--result", result, "--record-file", under); code != ExitOK || !strings.Contains(stderr, "warning: run record not written") || len(*got) != 0 {
+	if code, _, stderr := runCLI("run", "-f", c, "--result-file", result, "--stats-file", under); code != ExitOK || !strings.Contains(stderr, "warning: run record not written") || len(*got) != 0 {
 		t.Fatalf("unwritable record file: exit %d, stderr %q", code, stderr)
 	}
 }
@@ -183,8 +183,8 @@ func TestRecordFileIsNotResultOrReport(t *testing.T) {
 	dir := t.TempDir()
 	result, report := filepath.Join(dir, "r.json"), filepath.Join(dir, "report.json")
 	for _, rf := range []string{result, dir + "/./report.json"} {
-		code, _, stderr := runCLI("run", "-f", c, "--result", result, "--report", report, "--record-file", rf)
-		if code != ExitOK || !strings.Contains(stderr, "run record not written: --record-file is also --result/--report") {
+		code, _, stderr := runCLI("run", "-f", c, "--result-file", result, "--report-file", report, "--stats-file", rf)
+		if code != ExitOK || !strings.Contains(stderr, "run record not written: --stats-file is also --result-file/--report-file") {
 			t.Fatalf("%s: exit %d, stderr %q", rf, code, stderr)
 		}
 	}
@@ -215,7 +215,7 @@ func TestRecordFileIsNotAnInput(t *testing.T) {
 	recFile := filepath.Join(filepath.Dir(c), "record.txt") // matches scope *.txt
 	var fps []string
 	for range 2 {
-		if code, _, stderr := runCLI("run", "-f", c, "--result", filepath.Join(t.TempDir(), "r.json"), "--record-file", recFile); code != ExitOK {
+		if code, _, stderr := runCLI("run", "-f", c, "--result-file", filepath.Join(t.TempDir(), "r.json"), "--stats-file", recFile); code != ExitOK {
 			t.Fatalf("exit %d, stderr %q", code, stderr)
 		}
 		fps = append(fps, readRecord(t, recFile).Fingerprint)
@@ -246,8 +246,8 @@ func TestRecordFileNeverClobbers(t *testing.T) {
 					t.Fatal(err)
 				}
 				report := filepath.Join(t.TempDir(), "report.json")
-				code, _, stderr := runCLI("run", "-f", c, "--result", filepath.Join(t.TempDir(), "r.json"), "--report", report, "--record-file", recFile)
-				if code != ExitOK || !strings.Contains(stderr, "run record not written: "+recFile+" (--record-file) exists") {
+				code, _, stderr := runCLI("run", "-f", c, "--result-file", filepath.Join(t.TempDir(), "r.json"), "--report-file", report, "--stats-file", recFile)
+				if code != ExitOK || !strings.Contains(stderr, "run record not written: "+recFile+" (--stats-file) exists") {
 					t.Fatalf("exit %d, stderr %q", code, stderr)
 				}
 				if got, _ := os.ReadFile(recFile); string(got) != content {
@@ -267,22 +267,22 @@ func TestRecordFileNeverClobbers(t *testing.T) {
 	}
 }
 
-// aval record publishes the record aval run wrote, unchanged.
-func TestRecordCommand(t *testing.T) {
+// aval stats publish publishes the record aval run wrote, unchanged.
+func TestStatsPublish(t *testing.T) {
 	recFile := filepath.Join(t.TempDir(), "record.json")
-	if code, _, stderr := runCLI("run", "-f", writeContract(t, "hermetic"), "--result", filepath.Join(t.TempDir(), "r.json"), "--record-file", recFile); code != ExitOK {
+	if code, _, stderr := runCLI("run", "-f", writeContract(t, "hermetic"), "--result-file", filepath.Join(t.TempDir(), "r.json"), "--stats-file", recFile); code != ExitOK {
 		t.Fatalf("run: exit %d, stderr %q", code, stderr)
 	}
 	got := fakeRecord(t, nil)
-	code, stdout, stderr := runCLI("record", "--registry", "registry.example/acme/stats", "--record-file", recFile)
+	code, stdout, stderr := runCLI("stats", "publish", "--registry", "registry.example/acme/stats", recFile)
 	if code != ExitOK || !strings.Contains(stdout, "recorded registry.example/acme/stats@sha256:cc") || len(*got) != 1 || (*got)[0] != readRecord(t, recFile) {
 		t.Fatalf("exit %d, stdout %q, stderr %q, records %+v", code, stdout, stderr, *got)
 	}
-	// --repository sets the source repository; the record file keeps none.
+	// --source-repo sets the source repository; the record file keeps none.
 	got = fakeRecord(t, nil)
-	if code, _, stderr := runCLI("record", "--registry", "registry.example/acme/stats", "--record-file", recFile, "--repository", "acme/orders"); code != ExitOK || len(*got) != 1 ||
+	if code, _, stderr := runCLI("stats", "publish", "--registry", "registry.example/acme/stats", recFile, "--source-repo", "acme/orders"); code != ExitOK || len(*got) != 1 ||
 		(*got)[0].Repository != "acme/orders" || readRecord(t, recFile).Repository != "" {
-		t.Fatalf("--repository: exit %d, stderr %q, records %+v", code, stderr, *got)
+		t.Fatalf("--source-repo: exit %d, stderr %q, records %+v", code, stderr, *got)
 	}
 
 	invalid := filepath.Join(t.TempDir(), "invalid.json")
@@ -297,18 +297,20 @@ func TestRecordCommand(t *testing.T) {
 		code    int
 		stderr  string
 	}{
-		{"no registry", []string{"--record-file", recFile}, nil, ExitUsage, "are required"},
-		{"no file", []string{"--registry", "registry.example/acme/stats"}, nil, ExitUsage, "are required"},
-		{"bad registry", []string{"--registry", "r", "--record-file", recFile}, nil, ExitUsage, "not an OCI repository"},
-		{"bad timeout", []string{"--registry", "registry.example/acme/stats", "--record-file", recFile, "--registry-timeout", "0s"}, nil, ExitUsage, "--registry-timeout"},
-		{"missing file", []string{"--registry", "registry.example/acme/stats", "--record-file", filepath.Join(t.TempDir(), "none.json")}, nil, ExitError, "reading run record"},
-		{"invalid record", []string{"--registry", "registry.example/acme/stats", "--record-file", invalid}, nil, ExitError, "version"},
-		{"push error", []string{"--registry", "registry.example/acme/stats", "--record-file", recFile}, errors.New("denied"), ExitError, "publishing run record: denied"},
+		{"no registry", []string{recFile}, nil, ExitUsage, "--registry is required (or set $AVAL_REGISTRY)"},
+		{"no file", []string{"--registry", "registry.example/acme/stats"}, nil, ExitUsage, "accepts 1 arg(s), received 0"},
+		{"two files", []string{"--registry", "registry.example/acme/stats", recFile, recFile}, nil, ExitUsage, "accepts 1 arg(s), received 2"},
+		{"empty file name", []string{"--registry", "registry.example/acme/stats", ""}, nil, ExitUsage, "a run record file is required"},
+		{"bad registry", []string{"--registry", "r", recFile}, nil, ExitUsage, "not an OCI repository"},
+		{"bad timeout", []string{"--registry", "registry.example/acme/stats", recFile, "--registry-timeout", "0s"}, nil, ExitUsage, "--registry-timeout"},
+		{"missing file", []string{"--registry", "registry.example/acme/stats", filepath.Join(t.TempDir(), "none.json")}, nil, ExitError, "reading run record"},
+		{"invalid record", []string{"--registry", "registry.example/acme/stats", invalid}, nil, ExitError, "version"},
+		{"push error", []string{"--registry", "registry.example/acme/stats", recFile}, errors.New("denied"), ExitError, "publishing run record: denied"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			fakeRecord(t, tc.pushErr)
-			if code, _, stderr := runCLI(append([]string{"record"}, tc.args...)...); code != tc.code || !strings.Contains(stderr, tc.stderr) {
+			if code, _, stderr := runCLI(append([]string{"stats", "publish"}, tc.args...)...); code != tc.code || !strings.Contains(stderr, tc.stderr) {
 				t.Fatalf("exit %d, stderr %q", code, stderr)
 			}
 		})

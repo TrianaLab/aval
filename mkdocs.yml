@@ -192,6 +192,7 @@ nav:
       - Troubleshooting: guides/troubleshooting.md
   - Reference:
       - CLI: cli-reference.md
+      - CLI output: output.md
       - Resolve references:
           - resolve/index.md
           - Container images: resolve/images.md
@@ -206,6 +207,7 @@ nav:
       - Specs:
           - The test contract: contract.md
           - Trust model: trust-model.md
+          - Mutable reference scan: mutable-references.md
           - Artifact format: artifact-format.md
           - Consume evidence: integrations.md
   - Project:

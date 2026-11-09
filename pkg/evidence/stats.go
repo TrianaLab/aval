@@ -77,6 +77,6 @@ type MissCauses struct {
 	// Error: outcome error; Aval could not decide.
 	Error int `json:"error"`
 	// VerifiedNotReused: outcome verified, but the test ran (--shadow, or
-	// the --report file could not be written).
+	// the --report-file could not be written).
 	VerifiedNotReused int `json:"verifiedNotReused"`
 }

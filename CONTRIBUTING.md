@@ -237,8 +237,9 @@ Both fail on a verification failure (exit 5), read
 (the `aval verify --output json` format) as artifacts. On `main`,
 `dogfood-publish`, the only job with `id-token: write`, signs keyless and
 pushes the results that were not reused; it runs no tests. Both suites also
-write a run record (`--record-file`), and on `main` `dogfood-record`
-(`packages: write` only, no tests) publishes them with `aval record` to the
+write a run record (`--stats-file`), and on `main` `dogfood-record`
+(`packages: write` only, no tests) publishes them with `aval stats publish`
+(the pinned release in ci.yaml still uses `aval record`) to the
 public stats registry `ghcr.io/trianalab/aval-stats`, whatever the suites'
 outcome; a record that cannot be published is a warning. `dogfood-shadow`
 adds `aval stats --by repository --since 30d` over that registry to its job
@@ -360,6 +361,7 @@ verified aval-e2e sha256:<fingerprint>
 signer: <your email> (issuer https://github.com/login/oauth), trust level developer
 reference: ghcr.io/trianalab/aval-attestations@sha256:<digest>
 reused passed result
+summary: aval-e2e reused: passed; saved <duration>
 ```
 
 `main` and releases never reuse this result. `.github/aval/main.yaml` lists
@@ -374,7 +376,11 @@ the suite:
 miss aval-e2e sha256:<fingerprint>
 reference: ghcr.io/trianalab/aval-attestations@sha256:<digest>
 reason: not reusable under the trust policy: signer "<your email>" has trust level developer, policy requires at least runner
+--- run aval-e2e: make test-integration test-acceptance
+<test output>
+--- end aval-e2e: passed (exit 0) in <duration>
 ran aval-e2e: passed (exit 0)
+summary: aval-e2e ran: passed in <duration>
 ```
 
 `dogfood-publish` then pushes CI's own runner-signed result next to yours, and
@@ -398,11 +404,11 @@ A repository appears on the [Stats](https://aval.run/main/stats/) page once it p
    records the test jobs wrote:
 
     ```sh
-    aval record --record-file record.json --repository "$GITHUB_REPOSITORY" \
-      --registry ghcr.io/trianalab/aval-stats
+    aval stats publish --source-repo "$GITHUB_REPOSITORY" \
+      --registry ghcr.io/trianalab/aval-stats record.json
     ```
 
-    Without `--repository` here or on `aval run`, the repository shows as
+    Without `--source-repo` here or on `aval run`, the repository shows as
     `unknown`. Aval's own `dogfood-record` job in `ci.yaml` does this.
 
 A maintainer can refresh the site's `stats.json` at any time from the Actions
@@ -438,8 +444,8 @@ artifact (kept 7 days). Download it from the run page, unzip it and run
 ### Recordings
 
 The GIFs in `docs/assets/gifs/` are recorded from `docs/assets/tapes/*.tape`.
-After a change to the CLI output or a tape, run `make docs-demos` (needs vhs,
-Docker and openssl) and commit the GIFs.
+After a change to the CLI output or a tape, run `make docs-demos` (needs vhs
+and Docker) and commit the GIFs.
 
 ### Rules
 

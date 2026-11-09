@@ -38,10 +38,10 @@ func mustContain(t *testing.T, line, got string, want ...string) {
 func TestStory(t *testing.T) {
 	d := New()
 	out, _ := exec(t, d, "aval run", exitOK)
-	mustContain(t, "first run", out, "miss greet sha256:", "reason: "+DefaultRepo+": no attestation found for fingerprint", "ran greet: passed (exit 0)", "pushed "+DefaultRepo+"@sha256:")
+	mustContain(t, "first run", out, "· miss greet ", "  reason    "+DefaultRepo+": no attestation found for fingerprint", "✓ greet passed (exit 0) in 4ms\n", "✓ pushed "+DefaultRepo+"@sha256:", "greet passed in 4ms; published for the next run with these inputs.\n")
 	out, _ = exec(t, d, "aval run", exitOK)
-	mustContain(t, "second run", out, "verified greet", "signer: key ", ", trust level developer", "reused passed result")
-	if strings.Contains(out, "ran greet") {
+	mustContain(t, "second run", out, "↺ verified greet", "  signer    key ", ", trust level developer", "↺ reused passed result\ngreet: reused a verified passed result, saved 4ms; nothing ran.\n")
+	if strings.Contains(out, "run greet") || strings.ContainsRune(out, '\x1b') {
 		t.Fatal("a verified result must not run the test")
 	}
 
@@ -54,7 +54,7 @@ func TestStory(t *testing.T) {
 
 	exec(t, d, "edit README.md", exitOK)
 	out, _ = exec(t, d, "aval run --explain", exitOK)
-	mustContain(t, "out of scope edit", out, "aval-fingerprint/v1\n", "source ", " - greet.go\n", "test greet fingerprint "+fp, "reused passed result")
+	mustContain(t, "out of scope edit", out, "aval-fingerprint/v1\n", "source ", " - greet.go\n", "↺ verified greet "+fp[:15]+"\n", "↺ reused passed result")
 	exec(t, d, "edit aval.yaml", exitOK) // a comment: the canonical contract is the same
 	out, _ = exec(t, d, "aval verify --output=text", exitOK)
 	mustContain(t, "comment in aval.yaml", out, "verified greet "+fp)
@@ -72,8 +72,14 @@ func TestStory(t *testing.T) {
 	out, errw := exec(t, d, "aval verify", exitVerificationFailed)
 	mustContain(t, "verify tampered", out, "verification-failed greet", "reason: attestation verification failed: signature: ", "(trust policy policy.yaml)")
 	mustContain(t, "verify tampered", errw, "aval: SECURITY: 1 attestation(s) for greet failed signature or policy verification")
-	out, _ = exec(t, d, "aval run", exitVerificationFailed)
-	mustContain(t, "run tampered", out, "verification-failed greet", "ran greet: passed (exit 0)", "pushed ")
+	out, errw = exec(t, d, "aval run", exitVerificationFailed)
+	mustContain(t, "run tampered", out, "✗ verification-failed greet", "· run greet: go test ./...\n", "· greet passed (exit 0) in 4ms\n", "· pushed ", "✗ SECURITY: an attestation for greet failed verification")
+	if strings.Contains(out, "✓") {
+		t.Fatalf("run tampered: a success line after a verification failure: %q", out)
+	}
+	if lines := strings.Split(strings.TrimSpace(errw), "\n"); len(lines) != 2 || lines[0] != "✗ "+strings.TrimPrefix(lines[1], "aval: ") || !strings.HasPrefix(lines[1], "aval: SECURITY: ") {
+		t.Fatalf("run tampered: stderr %q, want the SECURITY line when found and last", errw)
+	}
 	out, errw = exec(t, d, "aval verify", exitOK)
 	mustContain(t, "verify beside tampered", out, "verified greet", "rejected: "+DefaultRepo+"@sha256:")
 	mustContain(t, "verify beside tampered", errw, "aval: SECURITY: 1 attestation(s)")
@@ -89,7 +95,7 @@ func TestShellCommands(t *testing.T) {
 	exec(t, d, "   ", exitOK)
 	for _, line := range []string{"help", "aval", "aval help", "aval --help", "aval -h"} {
 		out, _ := exec(t, d, line, exitOK)
-		mustContain(t, line, out, "entirely in your browser", "Keyless (Sigstore) signing is\nnot available")
+		mustContain(t, line, out, "entirely in your browser", "AVAL_POLICY=policy.yaml", "are set for you", "Keyless (Sigstore) signing is not available")
 	}
 	out, _ := exec(t, d, "ls", exitOK)
 	mustContain(t, "ls", out, "README.md  aval.yaml  go.mod  greet.go  greet_test.go  policy.yaml  throwaway.pub")
@@ -109,6 +115,26 @@ func TestShellCommands(t *testing.T) {
 	mustContain(t, "rm", errw, "rm: command not found (type help)")
 }
 
+// aval explain prints run --explain's manifest under a header, the digest
+// last, and looks nothing up: the registry stays empty.
+func TestExplain(t *testing.T) {
+	d := New()
+	run, _ := exec(t, d, "aval run --explain", exitOK)
+	d = New()
+	out, _ := exec(t, d, "aval explain", exitOK)
+	digest, _ := exec(t, d, "aval explain --digest", exitOK)
+	manifest, _, _ := strings.Cut(run, "· miss greet ")
+	if want := "fingerprint manifest for greet (aval-fingerprint/v1)\n" + manifest + "fingerprint " + digest; out != want {
+		t.Fatalf("explain %q, want %q", out, want)
+	}
+	if !strings.HasPrefix(digest, "sha256:") || len(d.reg) != 0 {
+		t.Fatalf("digest %q, registry %v", digest, d.reg)
+	}
+	d.files["aval.yaml"] = []byte("kind: Nope\n")
+	_, errw := exec(t, d, "aval explain", exitUsage)
+	mustContain(t, "bad contract", errw, "aval: aval.yaml: ")
+}
+
 // Usage errors carry the CLI's words (cobra's for flags) and exit 2.
 func TestUsageErrors(t *testing.T) {
 	cases := map[string]string{
@@ -121,6 +147,11 @@ func TestUsageErrors(t *testing.T) {
 		"aval verify -o yaml":    `aval: --output must be text or json, got "yaml"`,
 		"aval nope":              `aval: unknown command "nope"`,
 		"aval push":              "aval: push is not in this demo",
+		"aval stats publish x":   "aval: stats is not in this demo: it keeps no run records",
+		"aval explain --explain": "aval: unknown flag: --explain",
+		"aval run --digest":      "aval: unknown flag: --digest",
+		"aval verify --plain":    "aval: unknown flag: --plain",
+		"aval explain extra":     `aval: unknown command "extra" for "aval explain"`,
 		"aval verify --output=x": `got "x"`,
 	}
 	d := New()

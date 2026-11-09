@@ -1,7 +1,7 @@
 # Troubleshooting
 
 Goal: go from an exit code or an error message to its cause and its fix.
-In the messages below, text in `<...>` changes per run.
+Text in `<...>` changes per run.
 
 ```mermaid
 flowchart LR
@@ -13,10 +13,6 @@ flowchart LR
 
 ## Start with the exit code
 
-```sh
-aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit $?"
-```
-
 --8<-- "docs/cli-reference.md:exit-codes"
 
 ## Flags and files (exit 2)
@@ -24,20 +20,20 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 ??? failure "Flag errors"
     | Message | Fix |
     |---|---|
-    | `--push requires --registry`, `--record requires --registry`, `--registry is required`, `--registry and --record-file are required` | add the flags it names |
+    | `--push requires --registry`, `--stats requires --registry`, `--registry is required`, `a run record file is required` | add the flags it names, or set `AVAL_REGISTRY` |
     | `--shadow and --no-reuse exclude each other` | pick one |
-    | `--registry <x> is not an OCI repository` | use `host/name`, no `https://`, tag or digest |
-    | `--registry-timeout must be positive`, `--output must be text or json`, `unknown command` | fix the value; see `aval <command> --help` |
-    | `signing needs --key or, for keyless signing, an OIDC token` | pass `--key`, or set the token ([Signing](signing.md)) |
-    | `not a PEM file`, `PEM type <x> is encrypted`, `not an ECDSA P-256 key` | make an unencrypted P-256 key ([Signing](signing.md)) |
-    | `holds neither an Aval result nor a report`, `is an input of the test` | write `--result` and `--report` under `.aval/`; for `output <x> is an input of the test`, exclude it from `scope` |
+    | `--registry <x> is not an OCI repository`, `drop <scheme>://: try --registry <host/name>` | use `host/name`, no `https://`, tag or digest |
+    | `--registry-timeout must be positive`, `--output must be text or json`, `unknown command`, `unknown flag` | fix the value (the message names the closest command or flag, `did you mean "run"?`); see `aval <command> --help` |
+    | `signing needs one of:` | pass `--key` (`aval keygen` makes one), set `SIGSTORE_ID_TOKEN`, or sign on a terminal or with `--login` ([Signing](signing.md)) |
+    | `not a PEM file`, `PEM type <x> is encrypted`, `not an ECDSA P-256 key`, `is a public key`, `pass the private key` | make an unencrypted P-256 key ([Signing](signing.md)); for a public key, pass `<name>.key`, not `<name>.pub` |
+    | `holds neither an Aval result nor a report`, `is an input of the test` | write `--result-file` and `--report-file` under `.aval/`; for `output <x> is an input of the test`, exclude it from `scope` |
 
 ??? failure "Contract errors"
     | Message | Fix |
     |---|---|
     | `or pass its path with -f` | create `aval.yaml`, or pass `-f path/to/aval.yaml` |
     | `apiVersion: got <x>, want <y>`, `that is the pre-freeze version`, `kind: got <x>, want <y>` | set `apiVersion: aval.trianalab.io/v1`, `kind: Test` |
-    | `decoding contract: <x>`, `multiple YAML documents are not allowed` | fix the YAML or the misspelt field; keep one document |
+    | `invalid contract:` with one indented line per problem (`unknown field`, `did you mean <x>?`, `known fields: <x>`, `got <x>, want <y>`), `decoding contract: <x>`, `multiple YAML documents are not allowed` | fix the field at the YAML path the line names (`line 8: scope.sources`; `want a list` means `["go", "test"]`), or the YAML syntax; keep one document |
     | `metadata.name: <x> must be 1-64 chars` | lower case letters, digits, `.`, `_`, `-` |
     | `runner.command: must be a non-empty argv list` | `command: ["go", "test", "./..."]` |
     | `scope.source: at least one glob is required` | list the files the test reads |
@@ -51,7 +47,9 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 
 ## Errors (exit 1)
 
-`aval verify` exits 1. `aval run` prints these as outcome `error`, runs the test and exits with the test's code. It exits 1 only when the test cannot start (`running <x>`), a probe fails (`environment.probe`) or the result cannot be published.
+- `aval verify` exits 1.
+- `aval run` prints outcome `error`, warns `aval: warning: reuse off: <message>`, runs the test and exits with its code.
+- `aval run` exits 1 only when the test cannot start, a probe fails or the result cannot be published.
 
 ??? failure "Fingerprint and trust policy"
     | Message | Fix |
@@ -70,18 +68,18 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 ??? failure "Registry, push and record"
     | Message | Fix |
     |---|---|
-    | `loading registry credentials: <x>`, `resolving <tag>: <x>`, `listing referrers: <x>`, `fetching manifest <x>`, `fetching layer <x>` | check the address, the network and `docker login` |
+    | `cannot reach <host> (<cause>); is the registry running?`, `loading registry credentials: <x>`, `resolving <tag>: <x>`, `listing referrers: <x>`, `fetching manifest <x>`, `fetching layer <x>` | check the address (`AVAL_REGISTRY`, `--registry`), that the registry runs, the network and `docker login`; a report's `reason` keeps the raw error |
     | `signing: <x>`, `publishing: <x>`, `pushing manifest: <x>`, `tagging anchor: <x>` | check the token or key, and write access |
     | `more than <n> attestations` | delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)); the `aval: SECURITY:` line before it means none was verified, so check who pushed them: it may be a flooding attempt |
     | `is not listed among the referrers of` | push again, or use a registry with OCI 1.1 referrers |
     | `running <x>`, `environment.probe <key> <argv>: declared <x>, observed <y>` | install the program `runner.command` starts, or the declared toolchain version ([Probe the toolchain](../contract.md#probe-the-toolchain)) |
     | `FALSE HIT: <x>` (with `--shadow`) | the test reads an input `scope` does not list: [find it](write-a-contract.md#find-undeclared-inputs) |
-    | `writing report: <x>`, `result not published: <x>` | fix the `--report` path, or the fingerprint error before it |
+    | `writing report: <x>`, `result not published: <x>` | fix the `--report-file` path, or the fingerprint error before it |
     | `publishing outputs: <x>`, `more than <n> output files`, `outputs are capped at`, `is not a regular file (symlinks are not published)`, `backslashes and control characters in a path`, `is the contract`, `restoring outputs: <x>` | keep each output a regular file under the caps and narrow the globs; for `restoring outputs`, remove the symlink or directory in the way. The test ran instead ([Restore coverage and reports on reuse](write-a-contract.md#restore-coverage-and-reports-on-reuse)) |
-    | `reading the result recorded by 'aval run'` | run `aval run` first |
+    | `reading the result recorded by 'aval run'`, `run aval run first, or use aval run --push` | run `aval run` first, or publish from the run with `aval run --push` |
     | `recorded result is for test <x>` | an input changed: run the test again |
-    | `reading run record: <x>`, `run record <file>: <x>` | pass the file that `--record-file` wrote |
-    | `warning: run record not` | a warning only; check write access |
+    | `reading run record: <x>`, `run record <file>: <x>` | pass the file that `--stats-file` wrote |
+    | `warning: run record not`, `warning: key <file> (key id <x>) is not in <policy>` | a warning only; check write access, or trust the key's `.pub` in the policy ([Write a trust policy](trust-policy.md)): the result is still published |
 
 ## Misses (exit 4)
 
@@ -89,7 +87,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
     | Reason | Fix |
     |---|---|
     | `no attestation found for fingerprint` | none: the inputs changed or nobody pushed yet |
-    | `no trust policy configured`, `no registry configured`, `reuse disabled (--no-reuse)` | pass `--policy`, `--registry`, drop `--no-reuse` |
+    | `reuse off: no trust policy`, `no trust policy configured` (`aval verify`), `reuse off: no registry`, `reuse off: --no-reuse` | set `AVAL_POLICY` or `--policy`, `AVAL_REGISTRY` or `--registry`; drop `--no-reuse` |
     | `cacheability <x> is never reusable`, `is not in allowedCacheability` | by design, or allow the class in the policy |
     | `not reusable under the trust policy`, `signer <x> has trust level <y>, policy requires at least <z>` | raise the signer's `trustLevel` if you trust it |
     | `mutable references in the inputs` | pin each reference the line lists, or acknowledge it with `scope.allowMutable`; for `lists this ref without file:`, add `file:` ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
@@ -97,12 +95,11 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 
 ## Verification failures (exit 5)
 
-The `aval: SECURITY:` line comes first and `reason:` says why. Usually a wrong
-policy; possibly an attacker. See
-[Outcomes](../concepts/outcomes.md#a-verification-failure-is-a-security-event).
-
-It also appears beside a verified result (exit 0), listed in `rejected`: gate
-on `rejected` where that must stop a pipeline (`.github/aval/summary.sh`).
+`aval: SECURITY:` comes first (`aval run` repeats it last); `reason:` says
+why. Usually a wrong policy, possibly an attacker
+([Outcomes](../concepts/outcomes.md#a-verification-failure-is-a-security-event)).
+Beside a verified result (exit 0) it shows in `rejected`: gate on it where it
+must stop a pipeline (`.github/aval/summary.sh`).
 
 ??? danger "Reasons"
     | Reason | Fix |

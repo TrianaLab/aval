@@ -619,7 +619,7 @@ func (gitmodules) Detect(in Input) []Finding {
 // testcontainers checks quoted image references, such as the argument of
 // PostgresContainer, in test source that mentions testcontainers.
 // ponytail: literals only; an image built in a variable or a helper file
-// that does not mention testcontainers is not seen (docs/pinning.md Limits).
+// that does not mention testcontainers is not seen (docs/mutable-references.md Limits).
 type testcontainers struct{}
 
 func (testcontainers) Applies(p string) bool {

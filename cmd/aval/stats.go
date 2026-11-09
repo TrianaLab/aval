@@ -22,12 +22,12 @@ import (
 )
 
 func newStatsCmd() *cobra.Command {
-	var repo, test, since, output, by string
-	var timeout time.Duration
+	var test, since, output, by string
+	g := &globalFlags{}
 	cmd := &cobra.Command{
 		Use:   "stats",
 		Short: "Aggregate the run records in the registry: reuse, misses, time saved",
-		Long: `stats reads the run records that 'aval run --record' and 'aval record'
+		Long: `stats reads the run records that 'aval run --stats' and 'aval stats publish'
 published to the registry and aggregates them: runs, hit rate, misses by
 cause, verification failures, shadow false hits, and total and saved test
 time, per test (or per source repository with --by repository) and in total.
@@ -51,10 +51,9 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.`,
 			if by != "test" && by != "repository" {
 				return usageError{fmt.Errorf("--by must be test or repository, got %q", by)}
 			}
-			if repo == "" {
-				return usageError{errors.New("--registry is required")}
-			}
-			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout)); err != nil {
+			repo, timeout := g.registry, g.timeout
+			g.printConfig(cmd.ErrOrStderr()) // stdout may be JSON
+			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout)); err != nil {
 				return err
 			}
 			var from *time.Time
@@ -71,7 +70,10 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.`,
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
+			ui := runWriter(cmd.OutOrStdout(), cmd.ErrOrStderr(), plainFlag(cmd))
+			_, stop := spin(ui.Err, ui.ErrStyled, "reading run records from "+repo)
 			set, err := readRecords(ctx, repo, ids)
+			stop()
 			if errors.Is(err, context.DeadlineExceeded) {
 				return fmt.Errorf("%w; raise --registry-timeout (records are read one at a time) or prune old run records (docs/artifact-format.md, \"Pruning run records\")", err)
 			}
@@ -84,13 +86,13 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.`,
 			return writeStats(cmd.OutOrStdout(), output, aggregate(repo, from, by == "repository", set))
 		},
 	}
+	g.bind(cmd, false, false)
 	f := cmd.Flags()
-	f.StringVar(&repo, "registry", "", "OCI repository holding the run records (required)")
 	f.StringVar(&test, "test", "", "only this test id (metadata.name); default: every test with run records")
 	f.StringVar(&since, "since", "", "only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)")
 	f.StringVarP(&output, "output", "o", "text", "output format: text or json")
 	f.StringVar(&by, "by", "test", "group by test or repository (the run record's source repository)")
-	registryTimeoutFlag(cmd, &timeout)
+	cmd.AddCommand(newStatsPublishCmd())
 	return cmd
 }
 

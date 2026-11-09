@@ -180,8 +180,8 @@ docs-cli:
 
 # Re-record the docs/quickstart.md GIFs from docs/assets/tapes/*.tape with
 # this checkout's bin/aval: real runs against a throwaway registry:2 on
-# localhost:5001 (the port the quickstart uses). Needs vhs, Docker and
-# openssl. The tapes share one project and run in order: miss, hit, changed
+# localhost:5001 (the port the quickstart uses). Needs vhs and
+# Docker. The tapes share one project and run in order: miss, hit, changed
 # input, tampered. Commit the GIFs; tests/architecture keeps each under 1.5 MB.
 DEMO_REGISTRY = aval-docs-demos-registry
 DEMO_TAPES = miss hit changed-input tampered
@@ -189,7 +189,7 @@ DEMO_TAPES = miss hit changed-input tampered
 docs-demos: build
 	@dir=$$(mktemp -d); trap 'docker rm -f $(DEMO_REGISTRY) >/dev/null 2>&1; rm -rf "$$dir"' EXIT; \
 	docker run -d --name $(DEMO_REGISTRY) -p 5001:5000 registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373 >/dev/null && \
-	sh docs/assets/tapes/setup.sh "$$dir" && \
+	PATH="$(CURDIR)/bin:$$PATH" sh docs/assets/tapes/setup.sh "$$dir" && \
 	for t in $(DEMO_TAPES); do \
 		AVAL_DEMO_DIR="$$dir" AVAL_DEMO_BIN=$(CURDIR)/bin vhs docs/assets/tapes/$$t.tape || exit 1; \
 	done
@@ -232,16 +232,15 @@ ci-false-hit:
 	AVAL_GOLDEN_BASE="$${AVAL_GOLDEN_BASE-origin/main}" go test -count=1 ./internal/fingerprint/... ./internal/contract/...
 # Levels 2 and 4, the heavy suite, through `aval run` with the contract
 # aval.e2e.yaml. Locally (no AVAL_REGISTRY, AVAL_POLICY) it always runs. With
-# both set, a verified passing result for the same inputs is reused and
-# anything unproven runs (invariant 3); a verification failure runs the suite
-# and exits 5. The report is in the `aval verify --output json` format. The
+# both set (aval reads them itself), a verified passing result for the same
+# inputs is reused and anything unproven runs (invariant 3); a verification
+# failure runs the suite and exits 5. The report is in the `aval verify --output json` format. The
 # run record (statistics) goes to .aval/e2e-record.json; on main CI publishes
-# it with `aval record` from a job that runs no tests. CI runs the same
+# it with `aval stats publish` from a job that runs no tests. CI runs the same
 # `aval run` with the pinned release, not this target (#134).
 ci-e2e: build
-	bin/aval run -f aval.e2e.yaml --result .aval/e2e-result.json --report .aval/e2e-report.json \
-		--record-file .aval/e2e-record.json $${AVAL_CI_RUN_URL:+--ci-run-url "$$AVAL_CI_RUN_URL"} $${AVAL_REPOSITORY:+--repository "$$AVAL_REPOSITORY"} \
-		$${AVAL_REGISTRY:+--registry "$$AVAL_REGISTRY"} $${AVAL_POLICY:+--policy "$$AVAL_POLICY"}
+	bin/aval run -f aval.e2e.yaml --result-file .aval/e2e-result.json --report-file .aval/e2e-report.json \
+		--stats-file .aval/e2e-record.json $${AVAL_CI_RUN_URL:+--ci-run-url "$$AVAL_CI_RUN_URL"} $${AVAL_REPOSITORY:+--source-repo "$$AVAL_REPOSITORY"}
 ci-release: test-release
 ci-fuzz: fuzz
 ci-security: vuln

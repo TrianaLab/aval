@@ -42,6 +42,8 @@ func TestBrowserDemoMatchesCLI(t *testing.T) {
 	t.Cleanup(srv.Close)
 	repo := strings.TrimPrefix(srv.URL, "http://") + "/acme/greet-aval"
 	d := demo.New()
+	// Both run with --plain, the CLI's pipe form; the demo's styled form is
+	// the same renderer (internal/cliout goldens).
 	d.Repo = repo
 	dir := t.TempDir()
 	sync := func() {
@@ -57,6 +59,9 @@ func TestBrowserDemoMatchesCLI(t *testing.T) {
 	}
 	cli := func(line string) []string {
 		args := strings.Fields(strings.TrimPrefix(line, "aval "))
+		if args[0] == "explain" {
+			return args
+		}
 		args = append(args, "--registry", repo, "--policy", "policy.yaml")
 		if args[0] == "run" {
 			args = append(args, "--push", "--key", "throwaway.key")
@@ -64,9 +69,9 @@ func TestBrowserDemoMatchesCLI(t *testing.T) {
 		return args
 	}
 	for _, line := range []string{
-		"aval run", "aval run", "aval verify", "aval verify -o json", "aval run --explain",
-		"edit README.md", "aval run", "edit aval.yaml", "aval verify", "edit greet.go", "aval verify", "aval run",
-		"tamper", "aval verify", "aval verify -o json", "aval run", "aval verify",
+		"aval run --plain", "aval run --plain", "aval verify", "aval verify -o json", "aval run --explain --plain", "aval explain", "aval explain --digest",
+		"edit README.md", "aval run --plain", "edit aval.yaml", "aval verify", "edit greet.go", "aval verify", "aval run --plain",
+		"tamper", "aval verify", "aval verify -o json", "aval run --plain", "aval verify",
 	} {
 		var dOut, dErr bytes.Buffer
 		dCode := d.Exec(line, &dOut, &dErr)
@@ -120,11 +125,13 @@ var (
 	refDigest = regexp.MustCompile(`@sha256:[0-9a-f]{64}`)
 	goTest    = regexp.MustCompile(`(?m)^ok  \texample\.com/greet\t.*$`)
 	sigReason = regexp.MustCompile(`signature: .*? \(trust policy`)
+	took      = regexp.MustCompile(`(?m)( in|; saved) [0-9][0-9.hmnsµ]*(;|$)`)
 )
 
 func normalize(s string) string {
 	s = refDigest.ReplaceAllString(s, "@sha256:<digest>")
 	s = goTest.ReplaceAllString(s, "ok  example.com/greet")
+	s = took.ReplaceAllString(s, "$1 <time>$2") // the demo's test is simulated
 	return sigReason.ReplaceAllString(s, "signature: <reason> (trust policy")
 }
 

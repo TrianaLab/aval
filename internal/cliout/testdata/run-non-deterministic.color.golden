@@ -1,0 +1,84 @@
+=== push=false shadow=false failed=false
+exit 0
+--- stdout
+· miss unit sha256:18bf449f
+  [2mreason   [0m cacheability non-deterministic is never reusable
+[2m· run unit: sh -c echo test output; exit 0[0m
+test output
+[32m✓ unit passed (exit 0) in D[0m
+[1munit passed in D; cacheability non-deterministic is never reused.[0m
+--- stderr
+=== push=false shadow=false failed=true
+exit 3
+--- stdout
+· miss unit sha256:f9b2e0e9
+  [2mreason   [0m cacheability non-deterministic is never reusable
+[2m· run unit: sh -c echo test output; exit 1[0m
+test output
+[31m✗ unit failed (exit 1) in D[0m
+[1munit failed in D; cacheability non-deterministic is never reused.[0m
+--- stderr
+=== push=false shadow=true failed=false
+exit 0
+--- stdout
+· miss unit sha256:18bf449f
+  [2mreason   [0m cacheability non-deterministic is never reusable
+[2m· run unit: sh -c echo test output; exit 0[0m
+test output
+[32m✓ unit passed (exit 0) in D[0m
+[1munit passed in D; cacheability non-deterministic is never reused.[0m
+--- stderr
+=== push=false shadow=true failed=true
+exit 3
+--- stdout
+· miss unit sha256:f9b2e0e9
+  [2mreason   [0m cacheability non-deterministic is never reusable
+[2m· run unit: sh -c echo test output; exit 1[0m
+test output
+[31m✗ unit failed (exit 1) in D[0m
+[1munit failed in D; cacheability non-deterministic is never reused.[0m
+--- stderr
+=== push=true shadow=false failed=false
+exit 0
+--- stdout
+· miss unit sha256:18bf449f
+  [2mreason   [0m cacheability non-deterministic is never reusable
+[2m· run unit: sh -c echo test output; exit 0[0m
+test output
+[32m✓ unit passed (exit 0) in D[0m
+[32m✓ pushed reg.example/r@sha256:bb[0m
+[1munit passed in D; cacheability non-deterministic is never reused.[0m
+--- stderr
+=== push=true shadow=false failed=true
+exit 3
+--- stdout
+· miss unit sha256:f9b2e0e9
+  [2mreason   [0m cacheability non-deterministic is never reusable
+[2m· run unit: sh -c echo test output; exit 1[0m
+test output
+[31m✗ unit failed (exit 1) in D[0m
+[32m✓ pushed reg.example/r@sha256:bb[0m
+[1munit failed in D; cacheability non-deterministic is never reused.[0m
+--- stderr
+=== push=true shadow=true failed=false
+exit 0
+--- stdout
+· miss unit sha256:18bf449f
+  [2mreason   [0m cacheability non-deterministic is never reusable
+[2m· run unit: sh -c echo test output; exit 0[0m
+test output
+[32m✓ unit passed (exit 0) in D[0m
+[32m✓ pushed reg.example/r@sha256:bb[0m
+[1munit passed in D; cacheability non-deterministic is never reused.[0m
+--- stderr
+=== push=true shadow=true failed=true
+exit 3
+--- stdout
+· miss unit sha256:f9b2e0e9
+  [2mreason   [0m cacheability non-deterministic is never reusable
+[2m· run unit: sh -c echo test output; exit 1[0m
+test output
+[31m✗ unit failed (exit 1) in D[0m
+[32m✓ pushed reg.example/r@sha256:bb[0m
+[1munit failed in D; cacheability non-deterministic is never reused.[0m
+--- stderr

@@ -173,7 +173,7 @@ the test then runs and rewrites them.
 
 ### Lookup and consumption
 
-1. Compute the fingerprint locally (`aval run --fingerprint-only`).
+1. Compute the fingerprint locally (`aval explain --digest`).
 2. Resolve the tag `sha256-<fingerprint hex>` in the `--registry` repository.
    It must point at the anchor digest Aval computes for that fingerprint;
    anything else is a verification failure (the tag was moved).
@@ -243,7 +243,7 @@ To clean up, list the executions and delete the ones you no longer need, for
 example with [ORAS](https://oras.land):
 
 ```sh
-aval run --fingerprint-only            # prints sha256:<hex>
+aval explain --digest                 # prints sha256:<hex>
 oras discover --artifact-type application/vnd.trianalab.aval.execution.v2 <repo>:sha256-<hex>
 oras manifest delete <repo>@sha256:<execution digest>
 ```
@@ -256,9 +256,9 @@ verification until you have looked into it.
 
 ## Run records
 
-`aval run --record` publishes one run record per run, for every outcome, so
-reuse can be measured from the registry alone. `--record-file <path>` writes
-the same record to a file, and `aval record --record-file <path>` publishes it
+`aval run --stats` publishes one run record per run, for every outcome, so
+reuse can be measured from the registry alone. `--stats-file <path>` writes
+the same record to a file, and `aval stats publish <path>` publishes it
 later, for example from a job that has write credentials but runs no tests.
 
 Records are **statistics, never evidence**: unsigned, and never read by
@@ -266,10 +266,10 @@ Records are **statistics, never evidence**: unsigned, and never read by
 change an outcome or count toward the 64-candidate cap.
 
 Recording never changes the exit code: a record that cannot be published or
-written is a warning (`aval: warning: run record not ...`). `--record` needs
-`--registry`. An existing `--record-file` that is not an Aval file is never
+written is a warning (`aval: warning: run record not ...`). `--stats` needs
+`--registry`. An existing `--stats-file` that is not an Aval file is never
 overwritten. A run that stops before the lookup (bad flags, an invalid
-contract, `--fingerprint-only`) publishes no record.
+contract, `aval explain`) publishes no record.
 
 ### Layout
 
@@ -303,7 +303,7 @@ limit, publishing a record fails with a warning; prune old records (see
 | `testId` | string | always | `metadata.name` from the contract. |
 | `fingerprint` | string | always | `sha256:<hex>`; empty when the fingerprint could not be computed. |
 | `outcome` | string | always | The lookup decision, as in the verify report. |
-| `reused` | bool | always | `true` when a verified result was reused and the test did not run. With `--shadow`, or when `--report` cannot be written, it is `false`. |
+| `reused` | bool | always | `true` when a verified result was reused and the test did not run. With `--shadow`, or when `--report-file` cannot be written, it is `false`. |
 | `result` | string | when known | The reused or the real `passed` / `failed`; omitted when `runner.command` could not start. |
 | `verifiedResult` | string | when `outcome` is `verified` | The result of the verified attestation. With `reused` `false` and the test run (`--shadow`), a `verifiedResult` that differs from `result` is a false hit. Records made before it was added (#88) lack it. |
 | `testDurationMs` | integer | always | How long `runner.command` ran, in milliseconds; `0` when it did not run. |
@@ -311,7 +311,7 @@ limit, publishing a record fails with a warning; prune old records (see
 | `avalVersion` | string | always | Version of the `aval` binary that ran. |
 | `recordedAt` | RFC 3339 timestamp | always | When the record was made. |
 | `ciRunUrl` | string | when passed | `--ci-run-url`, a link to the CI run. Aval does not derive it from any CI vendor. |
-| `repository` | string | when passed | `--repository` on `aval run` (or `aval record`, which overrides the record's), the source repository, e.g. `acme/orders`. Aval does not derive it from any CI vendor. `aval stats --by repository` counts records without it (made before it was added, #88) as `unknown`. |
+| `repository` | string | when passed | `--source-repo` on `aval run` (or `aval stats publish`, which overrides the record's), the source repository, e.g. `acme/orders`. Aval does not derive it from any CI vendor. `aval stats --by repository` counts records without it (made before it was added, #88) as `unknown`. |
 
 ```json
 --8<-- "pkg/evidence/testdata/run-record-v1.golden.json"
@@ -319,7 +319,7 @@ limit, publishing a record fails with a warning; prune old records (see
 
 `evidence.ParseRunRecord` rejects an inconsistent record: `reused` `true` with
 an `outcome` other than `verified` or a non-zero `testDurationMs`, and a
-`verifiedResult` without outcome `verified`. `aval record` refuses it and
+`verifiedResult` without outcome `verified`. `aval stats publish` refuses it and
 `aval stats` skips it.
 
 ### Statistics: `aval stats`
@@ -366,7 +366,7 @@ the sum of `reused`, the three `misses` and `verificationFailures`:
 | `hitRate` | `reused / runs`; `0` when `runs` is `0`. |
 | `misses.noTrustedResult` | Outcome `miss`: no trusted attestation, an unacknowledged mutable reference ([Pin your dependencies](pinning.md)) or `--no-reuse`. |
 | `misses.error` | Outcome `error`: Aval could not decide. |
-| `misses.verifiedNotReused` | Outcome `verified` with `reused` `false`: `--shadow`, or the `--report` file could not be written. |
+| `misses.verifiedNotReused` | Outcome `verified` with `reused` `false`: `--shadow`, or the `--report-file` file could not be written. |
 | `verificationFailures` | Outcome `verification-failed`: security events, not misses. |
 | `shadowFalseHits` | Of `verifiedNotReused`, the runs whose `result` differs from `verifiedResult`. Records without both are not counted. |
 | `testDurationMs` | Sum of `testDurationMs`: time spent running tests. |
@@ -518,7 +518,7 @@ put secrets there: the predicate is published to the registry.
 ## Verify report
 
 `aval verify --output json` prints one `evidence.Report` to stdout, and
-`aval run --report <file>` writes the same document for its lookup decision.
+`aval run --report-file <file>` writes the same document for its lookup decision.
 This is the stable machine interface for CI scripts and external tools.
 
 <!-- --8<-- [start:verify-report] -->
@@ -531,7 +531,7 @@ This is the stable machine interface for CI scripts and external tools.
 | `fingerprint` | string | always | Locally computed `sha256:<hex>`. |
 | `reference` | string | when an attestation was found | Immutable `repo@sha256:<manifest digest>`. |
 | `result` | string | `verified` only | `passed` or `failed` from the verified predicate. |
-| `signer` | object | `verified` only | Accepted policy identity that matched (`issuer`, `subjectRegexp`, `trustLevel`) plus the identity the signature actually carried: `subject`, the certificate subject (SAN) for keyless signatures, or `keyId`, `base64(sha256(DER public key))` for key-based ones. `subject` and `keyId` are omitted when empty. |
+| `signer` | object | `verified` only | Accepted policy identity that matched (`issuer`, `subjectRegexp`, `trustLevel`, and `trustLevelName`: `developer`, `runner` or `isolated`, derived from the policy entry's level, never from the predicate) plus the identity the signature actually carried: `subject`, the certificate subject (SAN) for keyless signatures, or `keyId`, `base64(sha256(DER public key))` for key-based ones. `subject` and `keyId` are omitted when empty. |
 | `predicate` | object | `verified` only | Full verified predicate. |
 | `reason` | string | non-`verified` outcomes | Human-readable cause. |
 | `rejected` | array | when a candidate was not used | Each `{reference, outcome, reason}`; `outcome` is `verification-failed`, `error` or `miss`. A `verification-failed` entry is a security event even when `outcome` is `verified`: alert. A `miss` entry is an authentic attestation whose signer the policy lists below `minTrustLevel`: routine non-reuse, no alert. |
@@ -552,9 +552,9 @@ Outcomes:
 with the test result ([Outcomes](concepts/outcomes.md)).
 
 - A fingerprint error: `aval verify` prints no report and exits 1;
-  `aval run --report` writes outcome `error` with an empty `fingerprint`, then
+  `aval run --report-file` writes outcome `error` with an empty `fingerprint`, then
   runs the test. Bad flags or an invalid contract: no report, exit 2.
-- No `--policy`, or a `non-deterministic` contract: `miss`, no lookup.
+- No `--policy` (or `AVAL_POLICY`), or a `non-deterministic` contract: `miss`, no lookup.
 - A policy, or a trusted root a candidate needs, that cannot load: `error`.
 
 Example (`verified`):
@@ -571,6 +571,7 @@ Example (`verified`):
     "issuer": "https://token.actions.githubusercontent.com",
     "subjectRegexp": "^https://github.com/acme/orders/\\.github/workflows/ci\\.yaml@refs/heads/main$",
     "trustLevel": 2,
+    "trustLevelName": "runner",
     "subject": "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"
   },
   "predicate": { "...": "as in the predicate example" }

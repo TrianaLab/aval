@@ -114,7 +114,7 @@ type LookupEnv func(string) (string, bool)
 const OutputDir = ".aval"
 
 // Compute fingerprints the contract c rooted at dir. outputs are files Aval
-// itself writes (the --result and --report paths); the ones inside dir are
+// itself writes (the --result-file and --report-file paths); the ones inside dir are
 // not inputs and are skipped, in c's own scope only. Empty entries are
 // ignored.
 //

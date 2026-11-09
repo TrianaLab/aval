@@ -1,157 +1,168 @@
 # Quickstart
 
-On your laptop, in five minutes: a miss, a reuse, a changed input and a
-rejected result.
+What does Aval do? See it in five minutes on your laptop: a miss, a reuse,
+a changed input and a rejected result.
 
-You need `aval` ([Install](install.md)), Docker and `openssl`. Run the blocks
-in order in one shell. Each `text` block is the expected output; `...` is a
-digest that changes on every run.
+You need `aval` ([Install](install.md)) and Docker. Run the blocks in order
+in one shell. `text` blocks show the output; `...` changes per run.
 
 <!-- quickstart:start (tests/acceptance/readme_test.go runs the sh blocks and checks the text blocks) -->
 
 ## 1. Set up
 
-A local OCI registry (port 5001: macOS uses 5000 for AirPlay):
+Start a local registry on port 5001 (macOS keeps 5000 for AirPlay):
 
 ```sh
+docker rm -f aval-registry 2>/dev/null || true
 docker run -d --name aval-registry -p 5001:5000 registry:2
 ```
 
-A project: one input file and `aval.yaml`, which names the test command and
-the files it reads (`scope`):
+Make a project with one input file. `aval init` writes:
+
+- `aval.yaml`: the test command and the files it reads (`scope`);
+- a signing key;
+- `policy.yaml`: a trust policy that trusts that key.
+
+You declare what the test reads (`--source`); Aval never guesses:
 
 ```sh
-mkdir aval-demo && cd aval-demo
+rm -rf aval-demo && mkdir aval-demo && cd aval-demo
 mkdir src && echo hello > src/hello.txt
-cat > aval.yaml <<'EOF'
-apiVersion: aval.trianalab.io/v1
-kind: Test
-metadata:
-  name: hello
-runner:
-  command: ["grep", "-q", "hello", "src/hello.txt"]
-scope:
-  source: ["src/**"]
-cacheability: hermetic
-EOF
+aval init --name hello --source 'src/**' --cacheability hermetic --key aval.key -- grep -q hello src/hello.txt
 ```
 
-A signing key (ECDSA P-256) and a policy that trusts it:
+```text
+source matches 1 file: src/hello.txt
+wrote aval.key (private: keep it secret, do not commit it) and aval.pub, key id ...
+wrote policy.yaml: trusts aval.pub at trust level developer
+wrote aval.yaml
+added aval.key, .aval/ to .gitignore
+next: export AVAL_REGISTRY=<oci repository> AVAL_POLICY=policy.yaml, then aval run --push --key aval.key
+```
 
-<!-- --8<-- [start:key] (the guides include this block) -->
+Without flags, `aval init` asks for each value. Now set the registry and the
+policy once for this shell:
+
 ```sh
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out aval.key
-openssl pkey -in aval.key -pubout -out aval.pub
-cat > policy.yaml <<'EOF'
-apiVersion: aval.trianalab.io/v1
-kind: Policy
-minTrustLevel: developer
-identities:
-  - publicKey: aval.pub
-    trustLevel: developer
-EOF
+export AVAL_REGISTRY=localhost:5001/demo/hello-aval AVAL_POLICY=policy.yaml
 ```
-<!-- --8<-- [end:key] -->
 
 ## 2. First run: a miss
 
 ![aval run prints miss, runs the test, which passes, and pushes the signed result to localhost:5001](assets/gifs/miss.gif)
 
-This run has no `--policy`, so Aval does not look for a result. It runs the
-test, then `--push` signs the result with `aval.key` and pushes it:
+Nothing is stored for these inputs yet: the test runs, then `--push` signs
+the result and stores it:
 
-<!-- --8<-- [start:push] -->
 ```sh
-aval run --push --key aval.key --registry localhost:5001/demo/hello-aval
+aval run --push --key aval.key
 ```
-<!-- --8<-- [end:push] -->
+
+This is the plain output, as in CI. A terminal shows glyph lines instead.
 
 ```text
-test hello fingerprint sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
 miss hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
-reason: no trust policy configured: pass --policy to reuse verified results
+reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
+--- run hello: grep -q hello src/hello.txt
+--- end hello: passed (exit 0) in ...
 ran hello: passed (exit 0)
 pushed localhost:5001/demo/hello-aval@sha256:...
+summary: hello ran: passed in ...; result pushed
 ```
 
 ## 3. Second run: a reuse
 
 ![aval verify prints verified, then aval run prints reused passed result without running the test](assets/gifs/hit.gif)
 
-Check that a result you trust exists for these exact inputs:
+Is there a trusted result for these inputs?
 
 ```sh
-aval verify --registry localhost:5001/demo/hello-aval --policy policy.yaml
+aval verify
 echo "exit code: $?"
 ```
 
 ```text
+config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
 verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
 signer: key ..., trust level developer
 reference: localhost:5001/demo/hello-aval@sha256:...
 exit code: 0
 ```
 
-Run again. Aval finds the trusted result and skips the test:
+Run again. The test is skipped:
 
 ```sh
-aval run --registry localhost:5001/demo/hello-aval --policy policy.yaml
+aval run
 ```
 
 ```text
-test hello fingerprint sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
 verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
 signer: key ..., trust level developer
 reference: localhost:5001/demo/hello-aval@sha256:...
 reused passed result
+summary: hello reused: passed; saved ...
 ```
 
 ## 4. Change an input: a miss again
 
-![after editing src/hello.txt, aval run prints a new fingerprint, miss, and runs the test](assets/gifs/changed-input.gif)
+![after editing src/hello.txt, aval run prints miss with a new fingerprint and runs the test](assets/gifs/changed-input.gif)
 
-Edit a file in `scope`. The fingerprint changes, so nothing matches and the
-test runs:
+Edit a file in `scope`. New fingerprint, nothing matches, the test runs:
 
 ```sh
 echo "hello, world" > src/hello.txt
-aval run --registry localhost:5001/demo/hello-aval --policy policy.yaml
+aval run
 ```
 
 ```text
-test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
+config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
 miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
 reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
+--- run hello: grep -q hello src/hello.txt
+--- end hello: passed (exit 0) in ...
 ran hello: passed (exit 0)
+summary: hello ran: passed in ...
 ```
 
 ## 5. A result from an untrusted signer: exit 5
 
 ![a result signed with a key the policy does not trust, other.key, is pushed; aval run prints SECURITY, verification-failed, runs the test and exits 5](assets/gifs/tampered.gif)
 
-Someone who can push to the registry, but with a key your policy does not
-trust, publishes a result. Aval rejects it, runs the test and exits 5: a
-security event, not a miss. A tampered result ends the same way:
+Someone pushes a result signed with a key your policy does not trust
+(`AVAL_POLICY=` drops your policy for that one push). Aval rejects it, runs
+the test and exits 5: a security event, not a miss.
 
 ```sh
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out other.key
-aval run --push --key other.key --registry localhost:5001/demo/hello-aval
-aval run --registry localhost:5001/demo/hello-aval --policy policy.yaml
+aval keygen other
+AVAL_POLICY= aval run --push --key other.key
+aval run
 echo "exit code: $?"
 ```
 
 ```text
-test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
+wrote other.key (private: keep it secret, do not commit it) and other.pub
+key id: ...
+next: trust other.pub in your policy (publicKey: other.pub) and sign with --key other.key
+config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY)
 miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-reason: no trust policy configured: pass --policy to reuse verified results
+reason: reuse off: no trust policy (set AVAL_POLICY or --policy)
+--- run hello: grep -q hello src/hello.txt
+--- end hello: passed (exit 0) in ...
 ran hello: passed (exit 0)
 pushed localhost:5001/demo/hello-aval@sha256:...
-test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
-aval: SECURITY: 1 attestation(s) for hello failed signature or policy verification; treat it as a security event, see https://github.com/TrianaLab/aval/blob/main/docs/trust-model.md
+summary: hello ran: passed in ...; result pushed; reuse was off
+config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
+aval: SECURITY: 1 attestation(s) for hello failed signature or policy verification; treat it as a security event, see https://aval.run/.../trust-model/
 verification-failed hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
 reference: localhost:5001/demo/hello-aval@sha256:...
 reason: attestation verification failed: signature: signer key id "..." is not in the trust policy (trust policy policy.yaml)
+--- run hello: grep -q hello src/hello.txt
+--- end hello: passed (exit 0) in ...
 ran hello: passed (exit 0)
+summary: hello ran: passed in ...; SECURITY
+aval: SECURITY: 1 attestation(s) for hello failed signature or policy verification; treat it as a security event, see https://aval.run/.../trust-model/
 exit code: 5
 ```
 
@@ -168,15 +179,11 @@ flowchart LR
   look -- "yes, only untrusted signers" --> bad([verification-failed:<br>run the test, exit 5<br>step 5]):::err
 ```
 
-The fingerprint covers only what `scope` lists. See
-[Outcomes](concepts/outcomes.md) and [Trust](concepts/trust.md).
-
-Stop the registry when you are done:
+Stop the registry:
 
 ```sh
 docker rm -f aval-registry
 ```
 
-Next: [write a contract](guides/write-a-contract.md) for your own test, then
-[use GitHub Actions](guides/github-actions.md) and
-[sign results](guides/signing.md) without a key.
+Next: [write a contract](guides/write-a-contract.md), then
+[use GitHub Actions](guides/github-actions.md).

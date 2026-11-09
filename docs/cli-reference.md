@@ -25,26 +25,39 @@ result the policy does not trust; never hide it or retry it away.
 
 ## aval
 
-Verifiable test execution reuse: signed test results as OCI artifacts
+Verifiable test execution reuse: signed test results as OCI artifacts.
+
+--registry and --policy fall back to $AVAL_REGISTRY and $AVAL_POLICY; a flag
+wins, and an empty value counts as unset (an empty flag too: use --no-reuse
+to turn reuse off). There is no config file.
 
 ```text
 Usage:
   aval [flags]
   aval [command]
 
-Available Commands:
+Core:
+  explain     Print what the execution fingerprint covers, with the digest last
+  init        Write aval.yaml, a signing key and a trust policy for a test
+  run         Reuse a verified result for the current inputs, or run the test
+  verify      Check whether a trusted result exists for the current inputs
+
+Publishing:
+  keygen      Create a signing key: name.key and name.pub (default name: aval)
+  push        Sign and publish a recorded execution result
+
+Statistics:
+  stats       Aggregate the run records in the registry: reuse, misses, time saved
+
+Additional Commands:
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
-  push        Sign and publish a recorded execution result
-  record      Publish a run record written by 'aval run --record-file'
-  run         Reuse a verified result for the current inputs, or run the test
-  stats       Aggregate the run records in the registry: reuse, misses, time saved
   upgrade     Replace this binary with a verified aval release
-  verify      Check whether a trusted result exists for the current inputs
   version     Print the aval version, Go version and platform
 
 Flags:
   -h, --help      help for aval
+      --plain     plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
   -v, --version   version for aval
 
 Use "aval [command] --help" for more information about a command.
@@ -59,6 +72,9 @@ See each sub-command's help for details on how to use the generated script.
 Usage:
   aval completion [command]
 
+Examples:
+  source <(aval completion bash)
+
 Available Commands:
   bash        Generate the autocompletion script for bash
   fish        Generate the autocompletion script for fish
@@ -68,7 +84,109 @@ Available Commands:
 Flags:
   -h, --help   help for completion
 
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+
 Use "aval completion [command] --help" for more information about a command.
+```
+
+## aval explain
+
+explain prints the fingerprint manifest (every input that was hashed) under a
+header, then the fingerprint as the last line. --digest prints only the
+fingerprint. explain never looks up a result and never runs the test; the
+fingerprint is the one 'aval run' computes with its default --result-file and
+without --report-file or --stats-file inside the contract directory.
+
+Exit codes: 0 printed, 1 the fingerprint cannot be computed (unprovable
+inputs), 2 usage or invalid aval.yaml.
+
+```text
+Usage:
+  aval explain [flags]
+
+Examples:
+  # What the fingerprint covers, digest last
+  aval explain
+
+  # Only the digest
+  aval explain --digest
+
+Flags:
+  -f, --contract string   path to the test contract (default "aval.yaml")
+      --digest            print only the fingerprint (sha256:...)
+  -h, --help              help for explain
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+```
+
+## aval init
+
+init writes aval.yaml for one test, validated before it is written. With
+--key NAME it also writes the signing key pair (NAME.key and NAME.pub, as
+keygen does; a trailing .key is dropped) and policy.yaml trusting that key at trust level developer. It adds
+the key and .aval/ to .gitignore. --keyless writes no key and no policy.
+
+Nothing is inferred: --source and --cacheability have no default, and init
+never traces the test. It lists the files the source globs match and rejects a
+glob that matches nothing. It never replaces aval.yaml, policy.yaml or the key
+without --force. If a write fails after the key pair was written, init
+removes the key pair again.
+
+When a value is missing and both stdin and stdout are terminals, init asks for
+it. Otherwise it exits 2 and names the missing flags.
+
+Exit codes: 0 written, 1 error (a file exists without --force, or cannot be
+written), 2 usage (a missing value, an invalid contract, a glob that matches
+nothing, or init cancelled).
+
+```text
+Usage:
+  aval init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless [--force] -- <command> [flags]
+
+Examples:
+  # Write aval.yaml, aval.key, aval.pub and policy.yaml
+  aval init --name unit --source 'src/**' --source go.mod --cacheability hermetic --key aval.key -- go test ./...
+
+Flags:
+      --cacheability string   hermetic, controlled-environment, external-dependencies or non-deterministic
+      --force                 replace existing aval.yaml, policy.yaml and key files
+  -h, --help                  help for init
+      --key string            signing key pair NAME.key and NAME.pub to create and trust in policy.yaml; a trailing .key is dropped
+      --keyless               sign keyless with Sigstore: no key and no policy are written
+      --name string           test name (metadata.name): what the test checks
+      --source stringArray    source glob relative to the current directory (scope.source); repeat it for more
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+```
+
+## aval keygen
+
+keygen writes a new ECDSA P-256 signing key to name.key (unencrypted PKCS#8
+PEM, mode 0600) and its public key to name.pub, the file a policy trusts with
+publicKey. It prints the key id the verify report shows for this signer. It
+refuses to replace either file without --force. A trailing .key in the name is
+dropped, so "aval keygen ci.key" writes ci.key and ci.pub.
+
+Exit codes: 0 written, 1 error (name.key or name.pub exists without --force,
+or cannot be written), 2 usage.
+
+```text
+Usage:
+  aval keygen [name] [flags]
+
+Examples:
+  aval keygen        # aval.key and aval.pub
+  aval keygen ci     # ci.key and ci.pub
+
+Flags:
+      --force   replace name.key and name.pub if they exist
+  -h, --help    help for keygen
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval push
@@ -84,85 +202,113 @@ stored.
 Usage:
   aval push [flags]
 
+Examples:
+  aval push --registry ghcr.io/acme/orders-aval --key aval.key
+
 Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
   -h, --help                        help for push
       --key string                  signing key path (default: keyless OIDC)
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
-      --registry string             OCI repository for attestations (required)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-      --result string               result recorded by 'aval run' (default ".aval/result.json")
+      --result-file string          result recorded by 'aval run' (default ".aval/result.json")
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
+
+Deprecated flags, hidden from help:
+
+- `--result`: use --result-file
 
 ## aval record
 
-record publishes a run record that 'aval run --record-file' wrote, as 'aval
-run --record' would have. Use it to publish, from a job with write credentials
-that runs no tests, the record of a run made without them. Run records are
-unsigned statistics: run and verify never read them. --repository sets the
-record's source repository.
+record is the deprecated form of 'aval stats publish FILE'.
+
+Deprecated, hidden from help: use 'aval stats publish FILE' instead.
 
 ```text
 Usage:
   aval record [flags]
 
+Examples:
+  aval stats publish --registry ghcr.io/acme/orders-aval record.json
+
 Flags:
   -h, --help                        help for record
-      --record-file string          run record written by 'aval run --record-file' (required)
-      --registry string             OCI repository for run records (required)
+      --record-file string          run record written by 'aval run --stats-file' (required)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-      --repository string           source repository (e.g. acme/orders); default: the one in the record
+      --source-repo string          source repository (e.g. acme/orders); default: the one in the record
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
+
+Deprecated flags, hidden from help:
+
+- `--repository`: use --source-repo
 
 ## aval run
 
-run computes the fingerprint, looks up a signed result and reuses it if the
-trust policy accepts it, restoring the contract's outputs. Otherwise it runs
-runner.command, records the result (--result) and, with --push, signs and
-publishes it with its outputs.
+run reuses a verified result for the current inputs when the trust policy
+accepts it, restoring the contract's outputs; otherwise it runs runner.command
+and records the result. Anything Aval cannot prove runs the test.
 
-Anything Aval cannot prove runs the test. A verification failure runs the
-test and exits 5: a security event. --shadow runs the test even after a
-verified result and exits 1 if they disagree (a false hit).
+Without a registry and a trust policy the test always runs. --registry-timeout
+covers lookup and fetch together; --push has its own. runner.command never
+sees $SIGSTORE_ID_TOKEN, $AVAL_REGISTRY or $AVAL_POLICY.
 
---record publishes a run record for statistics; a failure is only a warning.
---record-file writes it to a file for 'aval record'.
-
-Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
-2 usage. Keyless signing reads $SIGSTORE_ID_TOKEN; runner.command never sees
-it.
-Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
---login) opens the interactive Sigstore login in the browser; no token is
-stored.
+Exit codes: 0 pass, 3 fail, 5 verification failed (a security event, after
+running the test), 1 error or false hit (--shadow), 2 usage.
 
 ```text
 Usage:
   aval run [flags]
 
+Examples:
+  # Reuse a trusted result, or run the test
+  aval run --registry ghcr.io/acme/orders-aval --policy policy.yaml
+
+  # Run, then sign and publish the result keyless
+  aval run --registry ghcr.io/acme/orders-aval --push
+
 Flags:
       --ci-run-url string           link to the CI run, stored in the run record
   -f, --contract string             path to the test contract (default "aval.yaml")
-      --explain                     print the fingerprint manifest (what was hashed)
-      --fingerprint-only            print the execution fingerprint and exit
+      --explain                     print the fingerprint manifest (what was hashed) before the run; 'aval explain' prints it alone
+      --fingerprint-only            print the execution fingerprint and exit (same as 'aval explain --digest')
   -h, --help                        help for run
-      --key string                  signing key path for --push (default: keyless OIDC)
+      --key string                  signing key path for --push (default: keyless, from $SIGSTORE_ID_TOKEN or the interactive login; no token is stored and runner.command never sees it)
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
-      --no-reuse                    always run, never reuse
-      --policy string               trust policy file (required for reuse; without it the test always runs)
+      --no-reuse                    always run, never reuse (excludes --shadow)
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
       --push                        sign and publish the result after running (needs --registry)
-      --record                      publish a run record for statistics after the run (needs --registry; best-effort)
-      --record-file string          also write the run record to this file, for 'aval record'
-      --registry string             OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
-      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
-      --report string               also write the lookup decision as a verify report (JSON) to this file
-      --repository string           source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
-      --result string               where to record the result for 'aval push' (default ".aval/result.json")
-      --shadow                      verify, but run the test anyway and fail on a false hit
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+      --report-file string          also write the lookup decision as a verify report (JSON) to this file
+      --result-file string          where to record the result for 'aval push' (default ".aval/result.json")
+      --shadow                      verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)
+      --source-repo string          source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
+      --stats                       publish a run record for statistics after the run (needs --registry; best-effort)
+      --stats-file string           also write the run record to this file, for 'aval stats publish'
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
+
+Deprecated flags, hidden from help:
+
+- `--record`: use --stats
+- `--record-file`: use --stats-file
+- `--report`: use --report-file
+- `--repository`: use --source-repo
+- `--result`: use --result-file
 
 ## aval stats
 
-stats reads the run records that 'aval run --record' and 'aval record'
+stats reads the run records that 'aval run --stats' and 'aval stats publish'
 published to the registry and aggregates them: runs, hit rate, misses by
 cause, verification failures, shadow false hits, and total and saved test
 time, per test (or per source repository with --by repository) and in total.
@@ -182,15 +328,52 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.
 ```text
 Usage:
   aval stats [flags]
+  aval stats [command]
+
+Examples:
+  aval stats --registry ghcr.io/acme/orders-aval --since 30d
+
+Available Commands:
+  publish     Publish a run record written by 'aval run --stats-file'
 
 Flags:
       --by string                   group by test or repository (the run record's source repository) (default "test")
   -h, --help                        help for stats
   -o, --output string               output format: text or json (default "text")
-      --registry string             OCI repository holding the run records (required)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --since string                only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)
       --test string                 only this test id (metadata.name); default: every test with run records
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+
+Use "aval stats [command] --help" for more information about a command.
+```
+
+## aval stats publish
+
+stats publish publishes the run record that 'aval run --stats-file' wrote to
+FILE, as 'aval run --stats' would have. Use it to publish, from a job with
+write credentials that runs no tests, the record of a run made without them.
+Run records are unsigned statistics: run and verify never read them.
+--source-repo sets the record's source repository.
+
+```text
+Usage:
+  aval stats publish FILE [flags]
+
+Examples:
+  aval stats publish --registry ghcr.io/acme/orders-aval record.json
+
+Flags:
+  -h, --help                        help for publish
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+      --source-repo string          source repository (e.g. acme/orders); default: the one in the record
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval upgrade
@@ -208,16 +391,23 @@ checksum, older latest release, replacing the binary), 2 usage.
 Usage:
   aval upgrade [flags]
 
+Examples:
+  aval upgrade --check
+
 Flags:
       --check            print the current and target versions without installing
   -h, --help             help for upgrade
       --version string   release to install, e.g. v0.4.0 (default: latest)
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval verify
 
 verify computes the fingerprint, looks up the attestation and verifies its
-signature and the trust policy, without running anything.
+signature and the trust policy, without running anything. It needs a
+registry; without a trust policy every lookup is a miss.
 
 Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 1 error (registry, policy or fingerprint), 2 usage or invalid aval.yaml.
@@ -226,13 +416,19 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 Usage:
   aval verify [flags]
 
+Examples:
+  aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml -o json
+
 Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
   -h, --help                        help for verify
   -o, --output string               output format: text or json (default "text")
-      --policy string               trust policy file (without it every lookup is a miss)
-      --registry string             OCI repository for attestations (required)
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval version
@@ -243,6 +439,12 @@ Print the aval version, Go version and platform
 Usage:
   aval version [flags]
 
+Examples:
+  aval version
+
 Flags:
   -h, --help   help for version
+
+Global Flags:
+      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```

@@ -1,0 +1,86 @@
+=== push=false shadow=false failed=false
+exit 0
+--- stdout
+↺ verified unit sha256:77ad8f66
+  signer     (issuer https://issuer.example), trust level runner
+  reference reg.example/r@sha256:aa
+↺ reused passed result
+unit: reused a verified passed result, saved 1.5s; nothing ran.
+--- stderr
+=== push=false shadow=false failed=true
+exit 3
+--- stdout
+↺ verified unit sha256:1a818124
+  signer     (issuer https://issuer.example), trust level runner
+  reference reg.example/r@sha256:aa
+✗ reused failed result
+unit: reused a verified failed result, saved 1.5s; nothing ran.
+--- stderr
+=== push=false shadow=true failed=false
+exit 0
+--- stdout
+↺ verified unit sha256:77ad8f66
+  signer     (issuer https://issuer.example), trust level runner
+  reference reg.example/r@sha256:aa
+· run unit: sh -c echo test output; exit 0
+test output
+✓ unit passed (exit 0) in D
+· shadow: reuse of reg.example/r@sha256:aa would have been correct (passed)
+unit passed in D; a verified result exists, it was not reused.
+--- stderr
+=== push=false shadow=true failed=true
+exit 3
+--- stdout
+↺ verified unit sha256:1a818124
+  signer     (issuer https://issuer.example), trust level runner
+  reference reg.example/r@sha256:aa
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+· shadow: reuse of reg.example/r@sha256:aa would have been correct (failed)
+unit failed in D; fix it, then aval run again.
+--- stderr
+=== push=true shadow=false failed=false
+exit 0
+--- stdout
+↺ verified unit sha256:77ad8f66
+  signer     (issuer https://issuer.example), trust level runner
+  reference reg.example/r@sha256:aa
+↺ reused passed result
+unit: reused a verified passed result, saved 1.5s; nothing ran.
+--- stderr
+=== push=true shadow=false failed=true
+exit 3
+--- stdout
+↺ verified unit sha256:1a818124
+  signer     (issuer https://issuer.example), trust level runner
+  reference reg.example/r@sha256:aa
+✗ reused failed result
+unit: reused a verified failed result, saved 1.5s; nothing ran.
+--- stderr
+=== push=true shadow=true failed=false
+exit 0
+--- stdout
+↺ verified unit sha256:77ad8f66
+  signer     (issuer https://issuer.example), trust level runner
+  reference reg.example/r@sha256:aa
+· run unit: sh -c echo test output; exit 0
+test output
+✓ unit passed (exit 0) in D
+✓ pushed reg.example/r@sha256:bb
+· shadow: reuse of reg.example/r@sha256:aa would have been correct (passed)
+unit passed in D; published for the next run with these inputs.
+--- stderr
+=== push=true shadow=true failed=true
+exit 3
+--- stdout
+↺ verified unit sha256:1a818124
+  signer     (issuer https://issuer.example), trust level runner
+  reference reg.example/r@sha256:aa
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+✓ pushed reg.example/r@sha256:bb
+· shadow: reuse of reg.example/r@sha256:aa would have been correct (failed)
+unit failed in D; published for the next run with these inputs.
+--- stderr

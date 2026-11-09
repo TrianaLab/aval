@@ -51,11 +51,15 @@ cacheability: hermetic          # required, see "Cacheability classes"
 Check it locally:
 
 ```sh
-aval run -f path/to/aval.yaml --fingerprint-only   # prints sha256:<hex>
-aval run -f path/to/aval.yaml --explain --fingerprint-only   # also prints the manifest
+aval explain -f path/to/aval.yaml --digest   # prints sha256:<hex>
+aval explain -f path/to/aval.yaml            # the manifest, then the fingerprint
 ```
 
-Diff the `--explain` output of two machines to see which file, toolchain entry
+It excludes only the default `.aval/result.json`; a run that writes
+`--result-file`, `--report-file` or `--stats-file` inside the scope
+fingerprints the same only when those paths are under `.aval/`.
+
+Diff the `aval explain` output of two machines to see which file, toolchain entry
 or variable differs. `-f` takes one path and defaults to `./aval.yaml`; the
 root is always the contract file's directory. A file holds one contract: give
 each shard of a split suite its own file
@@ -129,7 +133,7 @@ does not accept is a miss, and its result is not published
 ## What goes into the fingerprint
 
 The fingerprint is `sha256:<hex>` of a line-oriented manifest (format
-`aval-fingerprint/v1`). `aval run --explain` prints the exact text that was
+`aval-fingerprint/v1`). `aval explain` prints the exact text that was
 hashed, in this order:
 
 ```text
@@ -151,7 +155,7 @@ contract <path> <name> <fingerprint>
 | `toolchain` | `key=value` as written; checked against the installed tools only by `environment.probe` | |
 | `env` | sha256 of the value, or `unset` (empty is not unset); values never appear in clear | |
 | `resolve` | kind, reference, version or `floating`, immutable id; only with `scope.resolve`, and needs the network ([Resolve references](resolve/index.md)) | the registry address |
-| `contract <path>` | one line per `scope.contracts` entry: the path as written, the referenced contract's `metadata.name` and its fingerprint, computed from its own directory and inputs (so references are transitive). `--explain` also prints the tree, one `depends on <path> (<name>) <fingerprint>` line per reference | |
+| `contract <path>` | one line per `scope.contracts` entry: the path as written, the referenced contract's `metadata.name` and its fingerprint, computed from its own directory and inputs (so references are transitive). `aval explain` also prints the tree, one `depends on <path> (<name>) <fingerprint>` line per reference | |
 
 Lines are sorted within each section, so checkout path and walk order do not
 matter. Paths are hashed byte for byte. Windows has no exec bit, so an
@@ -163,7 +167,7 @@ executable file fingerprints differently there than on Unix.
 |---|---|
 | files no `source` or `dependencies` glob matches | the main risk: keep the scope honest |
 | `.git` directories | exact name; a regular `.git` file is hashed |
-| `.aval/` directories and the command's `--result`/`--report` files | so `["**"]` stays stable; keep them under `.aval/`. A path in scope that holds a real input exits 2. In a `scope.contracts` reference they stay inputs (a miss, never a false hit) |
+| `.aval/` directories and the command's `--result-file`/`--report-file` files | so `["**"]` stays stable; keep them under `.aval/`. A path in scope that holds a real input exits 2. In a `scope.contracts` reference they stay inputs (a miss, never a false hit) |
 | commit, branch, VCS metadata | two commits with the same scope share a result |
 | environment variables not in `environment.env` | |
 | the real toolchain, OS and architecture | unless declared; probe output is never hashed |
@@ -187,8 +191,8 @@ cacheability class.
 ### Fail-closed errors
 
 Aval cannot prove the inputs: `aval run` reports outcome `error`, runs the
-test and records nothing; `--fingerprint-only`, `--explain`, `aval verify` and
-`aval push` exit 1.
+test and records nothing; `aval explain`, `aval verify` and `aval push` exit 1
+(as do `run --fingerprint-only` and `run --explain`, which `aval explain --digest` and `aval explain` replace).
 
 | Message | Fix |
 |---|---|
@@ -229,9 +233,9 @@ nothing, and exits 1 (3 if the test failed). On a match, the output goes into
 the predicate's `execution.environment` as `probe.<key>`.
 
 Only `aval run` executes probes. `aval verify`, `aval push`,
-`--fingerprint-only` and the browser demo never do: a consumer never executes
-commands from a contract. `--explain` prints the manifest before any probe
-runs; when it goes on to run the test, the probe runs as in any run. The probe
+`aval explain` and the browser demo never do: a consumer never executes
+commands from a contract. `aval explain` prints the manifest and never runs a
+probe. The probe
 argv is part of the contract, so adding or changing one changes the
 fingerprint; its output is not hashed, since it varies by build and platform.
 

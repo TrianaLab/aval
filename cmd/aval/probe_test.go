@@ -54,7 +54,7 @@ func TestHasVersion(t *testing.T) {
 func TestProbeMatchRecordsObserved(t *testing.T) {
 	c := probeContract(t, `{tool: "3.13", os: plan9, arch: z80}`, []string{"sh", "-c", "echo Python 3.13.1"}, "true")
 	res := filepath.Join(t.TempDir(), "r.json")
-	if code, stdout, stderr := runCLI("run", "-f", c, "--result", res); code != ExitOK {
+	if code, stdout, stderr := runCLI("run", "-f", c, "--result-file", res); code != ExitOK {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	raw, err := os.ReadFile(res)
@@ -97,7 +97,7 @@ func TestProbeFailureRunsAndPublishesNothing(t *testing.T) {
 			c := probeContract(t, `{tool: "3.13"}`, tc.probe, argv...)
 			dir := t.TempDir()
 			res, rep := filepath.Join(dir, "r.json"), filepath.Join(dir, "rep.json")
-			code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result", res, "--report", rep)
+			code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result-file", res, "--report-file", rep)
 			r := readReport(t, rep)
 			if code != ExitError || !ran() || len(*signed) != 0 || r.Outcome != evidence.OutcomeError ||
 				!strings.Contains(r.Reason, "environment.probe tool") || !strings.Contains(r.Reason, tc.want) || !strings.Contains(stderr, "result not recorded") {
@@ -121,7 +121,7 @@ func TestProbeNeverRunsOutsideRun(t *testing.T) {
 		{"run", "-f", c, "--fingerprint-only"},
 		{"run", "-f", c, "--fingerprint-only", "--explain"},
 		{"verify", "-f", c, "--registry", "reg.example/r"},
-		{"push", "-f", c, "--registry", "reg.example/r", "--key", key, "--result", filepath.Join(t.TempDir(), "none.json")},
+		{"push", "-f", c, "--registry", "reg.example/r", "--key", key, "--result-file", filepath.Join(t.TempDir(), "none.json")},
 	} {
 		if code, _, stderr := runCLI(args...); code == ExitUsage {
 			t.Fatalf("%v: usage error %q", args, stderr)
@@ -131,7 +131,7 @@ func TestProbeNeverRunsOutsideRun(t *testing.T) {
 		}
 	}
 	// The marker works: run does execute it.
-	runCLI("run", "-f", c, "--result", filepath.Join(t.TempDir(), "r.json"))
+	runCLI("run", "-f", c, "--result-file", filepath.Join(t.TempDir(), "r.json"))
 	if _, err := os.Stat(m); err != nil {
 		t.Fatalf("run did not probe: %v", err)
 	}

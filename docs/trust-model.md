@@ -30,7 +30,7 @@ entries.
 | key | local | an unencrypted ECDSA P-256 PEM key (PKCS#8 or SEC1); Cosign keys are encrypted and not supported | no | developer |
 
 Make a key with
-`openssl ecparam -name prime256v1 -genkey -noout -out aval.key`. Getting the
+`aval keygen` (writes `aval.key` and `aval.pub`). Getting the
 OIDC token is the caller's job, so no CI vendor or issuer is assumed.
 
 Signing always uses the Sigstore public-good instance
@@ -131,7 +131,7 @@ envelope):
 - **Both:** the envelope must be the exact one the bundle signs; no bundle
   means no verification.
 
-Without `--policy` nothing is trusted and nothing is looked up: miss. A policy
+Without `--policy` or `AVAL_POLICY` nothing is trusted and nothing is looked up: miss. A policy
 or trusted root that cannot load: outcome `error` (exit 1), and the test runs.
 
 ### Keyless verification needs the network and a writable HOME
@@ -163,6 +163,11 @@ signing identity, sign a passing result for its own inputs, and get a green
 check it wrote itself. Read the policy and the registry from the default
 branch instead. Not from `github.base_ref`: a PR can target any branch,
 including one its author controls.
+
+`AVAL_POLICY` and `AVAL_REGISTRY` count the same as the flags (a flag wins;
+empty is unset). Set them in the step, or from the default branch as below,
+never from a file in the checkout. Aval reads them from no file: there is no
+config file and no `aval.yaml` field.
 
 ```yaml
 on: pull_request
@@ -226,14 +231,14 @@ outcome does: [Outcomes](concepts/outcomes.md).
 
 - `$SIGSTORE_ID_TOKEN` is removed from the environment before
   `runner.command` starts, so the code under test cannot sign as the CI job.
-- A `--report` that cannot be written disables reuse: the test runs, and a
+- A `--report-file` that cannot be written disables reuse: the test runs, and a
   verification failure still exits 5.
 - Reasons from attestations are escaped on text output and stderr (`\n`,
   `\x1b`, `\u2028`), so they never start a line of their own; the JSON report
   keeps them as is.
 - `--shadow` verifies and runs the test anyway, and exits 1 with
   `aval: FALSE HIT: ...` when a verified result disagrees with the real run.
-- `--record` publishes an unsigned run record for every outcome; it never
+- `--stats` publishes an unsigned run record for every outcome; it never
   affects reuse or the exit code
   ([run records](artifact-format.md#run-records)).
 - Restored outputs are as trustworthy as the signer that published them: a

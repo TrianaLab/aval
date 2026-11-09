@@ -47,7 +47,7 @@ const (
 // version is set at release build time (-ldflags "-X main.version=...").
 var version = "dev"
 
-func init() { resolve.Version = version }
+func init() { resolve.Version, cliout.Version = version, version }
 
 type usageError struct{ error }
 
@@ -67,6 +67,10 @@ type skipped string
 
 func (s skipped) Error() string      { return string(s) }
 func (skipped) Is(target error) bool { return target == evidence.ErrNotFound }
+
+// reuseOff is a miss because reuse is off: no registry, no trust policy or
+// --no-reuse. run's summary says so.
+type reuseOff struct{ skipped }
 
 // ponytail: package-level seams so tests can drive every outcome without a
 // registry or Sigstore; inject dependencies if the CLI grows a library API.
@@ -120,12 +124,23 @@ func run(args []string, stdout, stderr io.Writer) int {
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	err := root.Execute()
-	if err != nil {
-		for _, p := range errParts(err) {
-			fmt.Fprintln(stderr, "aval:", cliout.OneLine(p))
-		}
-	}
+	printErrors(stderr, err)
 	return exitCode(err)
+}
+
+// printErrors prints one aval: line per part of err not already shown.
+func printErrors(w io.Writer, err error) {
+	if err == nil {
+		return
+	}
+	var l listError
+	if errors.As(err, &l) {
+		cliout.Problems(w, l.head, l.err)
+		return
+	}
+	for _, p := range errParts(err) {
+		fmt.Fprintln(w, "aval:", cliout.OneLine(p))
+	}
 }
 
 // errParts splits err into one message per errors.Join member, each keeping
@@ -180,29 +195,22 @@ func exitCode(err error) int {
 
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "aval",
-		Short:         "Verifiable test execution reuse: signed test results as OCI artifacts",
+		Use:   "aval",
+		Short: "Verifiable test execution reuse: signed test results as OCI artifacts",
+		Long: `Verifiable test execution reuse: signed test results as OCI artifacts.
+
+--registry and --policy fall back to $` + registryEnv + ` and $` + policyEnv + `; a flag
+wins, and an empty value counts as unset (an empty flag too: use --no-reuse
+to turn reuse off). There is no config file.`,
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })
-	root.Args = func(_ *cobra.Command, args []string) error {
-		if len(args) > 0 {
-			return usageError{fmt.Errorf("unknown command %q", args[0])}
-		}
-		return nil
-	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
-	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
+	root.PersistentFlags().Bool("plain", false, "plain aval run output even on a terminal, as in CI (also $"+outputEnv+"=plain or TERM=dumb)")
+	root.AddCommand(newInitCmd(), newRunCmd(), newExplainCmd(), newPushCmd(), newKeygenCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
+	guide(root)
 	return root
-}
-
-// registryTimeoutFlag adds --registry-timeout: the deadline for the registry
-// calls of one command. note, if set, follows the usage text. On expiry the
-// outcome is error, so run still runs the test (invariant 3).
-func registryTimeoutFlag(cmd *cobra.Command, d *time.Duration, note ...string) {
-	cmd.Flags().DurationVar(d, "registry-timeout", time.Minute, strings.Join(append([]string{"deadline for this command's registry calls"}, note...), " "))
 }
 
 // checkTimeout rejects a deadline that would fail every registry call.
@@ -216,9 +224,23 @@ func checkTimeout(d time.Duration) error {
 // repoExample shows the --registry form in usage errors.
 const repoExample = "ghcr.io/acme/orders-aval"
 
+// requireRegistry rejects a missing registry, then checks it.
+func requireRegistry(repo string) error {
+	if repo == "" {
+		return usageError{fmt.Errorf("--registry is required (or set $%s)", registryEnv)}
+	}
+	return checkRegistry(repo)
+}
+
 // checkRegistry rejects a --registry that is not an OCI repository (host and
 // name, no scheme, tag or digest) before anything runs.
 func checkRegistry(repo string) error {
+	if scheme, rest, ok := strings.Cut(repo, "://"); ok {
+		if r, err := orasregistry.ParseReference(rest); err == nil && r.Reference == "" {
+			return usageError{fmt.Errorf("--registry %s is not an OCI repository: drop %s://: try --registry %s", repo, scheme, rest)}
+		}
+		return usageError{fmt.Errorf("--registry %s is not an OCI repository: drop %s://", repo, scheme)}
+	}
 	ref, err := orasregistry.ParseReference(repo)
 	if err == nil && ref.Reference != "" {
 		err = errors.New("a tag or digest is not allowed")
@@ -240,17 +262,21 @@ func noArgs(c *cobra.Command, args []string) error {
 // loadAndFingerprint loads the contract and computes its fingerprint, rooted
 // at the contract's directory. When only the fingerprint fails it still
 // returns the contract, so run can execute the test. outputs are the files
-// the command writes or reads as Aval output (--result, --report,
-// --record-file); inside the contract root they are not inputs.
+// the command writes or reads as Aval output (--result-file, --report-file,
+// --stats-file); inside the contract root they are not inputs.
 func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*contract.Contract, fingerprint.Fingerprint, error) {
 	c, err := contract.Load(file)
+	var fe *contract.FileError
+	if errors.As(err, &fe) {
+		return nil, fingerprint.Fingerprint{}, usageError{listError{fe.File + ": invalid contract:", fe.Err}}
+	}
 	if err != nil {
 		return nil, fingerprint.Fingerprint{}, usageError{err}
 	}
 	for _, o := range outputs {
 		if isInput(filepath.Dir(file), c, o) {
 			// Skipping it would silently drop an input from the fingerprint.
-			return nil, fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result or --report) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract directory", o, fingerprint.OutputDir)}
+			return nil, fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result-file or --report-file) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract directory", o, fingerprint.OutputDir)}
 		}
 	}
 	fp, err := fingerprint.Compute(ctx, filepath.Dir(file), c, os.LookupEnv, outputs...)
@@ -266,7 +292,7 @@ func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*c
 // and p holds something other than Aval's own result, report or run record
 // (a whole-tree scope finds those on the next run, #63).
 // ponytail: an input that is itself a valid Aval result, report or run record (a test
-// fixture) is taken for an output; name such a fixture as --result and the
+// fixture) is taken for an output; name such a fixture as --result-file and the
 // run overwrites it anyway.
 func isInput(dir string, c *contract.Contract, p string) bool {
 	return inScope(dir, c, p) && existsNonAvalOutput(p)
@@ -313,7 +339,7 @@ func isAvalOutput(raw []byte) bool {
 	case evidence.OutcomeVerified, evidence.OutcomeMiss, evidence.OutcomeVerificationFailed:
 		return r.Fingerprint != ""
 	case evidence.OutcomeError:
-		// 'aval run --report' writes an error report without a fingerprint
+		// 'aval run --report-file' writes an error report without a fingerprint
 		// when it could not compute one.
 		return true
 	}
@@ -360,25 +386,25 @@ func inScope(dir string, c *contract.Contract, p string) bool {
 }
 
 func newVerifyCmd() *cobra.Command {
-	var file, repo, policyFile, output string
-	var timeout time.Duration
+	var output string
+	g := &globalFlags{}
 	cmd := &cobra.Command{
 		Use:   "verify",
 		Short: "Check whether a trusted result exists for the current inputs",
 		Long: `verify computes the fingerprint, looks up the attestation and verifies its
-signature and the trust policy, without running anything.
+signature and the trust policy, without running anything. It needs a
+registry; without a trust policy every lookup is a miss.
 
 Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 1 error (registry, policy or fingerprint), 2 usage or invalid aval.yaml.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			file, repo, timeout := g.file, g.registry, g.timeout
+			g.printConfig(cmd.ErrOrStderr()) // stdout stays the frozen report
 			if output != "text" && output != "json" {
 				return usageError{fmt.Errorf("--output must be text or json, got %q", output)}
 			}
-			if repo == "" {
-				return usageError{errors.New("--registry is required")}
-			}
-			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout)); err != nil {
+			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout)); err != nil {
 				return err
 			}
 			c, fp, err := loadAndFingerprint(cmd.Context(), file)
@@ -387,7 +413,10 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
-			report, _, err := verify(ctx, cmd.ErrOrStderr(), c, file, fp, repo, policyFile)
+			report, _, err := verify(ctx, cmd.ErrOrStderr(), c, file, fp, repo, g.policy)
+			if msg := unreachable(repo, err); msg != "" && report.Outcome == evidence.OutcomeError {
+				fmt.Fprintln(cmd.ErrOrStderr(), "aval:", cliout.OneLine(msg)) // the report keeps the raw error
+			}
 			if werr := cliout.WriteReport(cmd.OutOrStdout(), output, report); werr != nil {
 				return werr
 			}
@@ -397,12 +426,8 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			return nil
 		},
 	}
-	f := cmd.Flags()
-	f.StringVarP(&file, "contract", "f", contract.DefaultFile, "path to the test contract")
-	f.StringVar(&repo, "registry", "", "OCI repository for attestations (required)")
-	f.StringVar(&policyFile, "policy", "", "trust policy file (without it every lookup is a miss)")
-	f.StringVarP(&output, "output", "o", "text", "output format: text or json")
-	registryTimeoutFlag(cmd, &timeout)
+	g.bind(cmd, true, true)
+	cmd.Flags().StringVarP(&output, "output", "o", "text", "output format: text or json")
 	return cmd
 }
 
@@ -413,6 +438,28 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 // when the fingerprint holds more attestations than lookup lists.
 func verify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
 	r, files, err := lookupAndVerify(ctx, warn, c, file, fp, repo, policyFile)
+	if line := securityLineFor(r, err); line != "" {
+		fmt.Fprintln(warn, line)
+	}
+	return r, files, err
+}
+
+// securityLineFor is the SECURITY line for the lookup r and its error, or
+// empty. Over the candidate cap nothing was verified, so an untrusted
+// attestation may hide among them (#135); the outcome stays error and the
+// test runs.
+func securityLineFor(r evidence.Report, err error) string {
+	if errors.Is(err, registry.ErrTooManyCandidates) {
+		return cliout.FloodLine(registry.ErrTooManyCandidates, r.TestID)
+	}
+	if n := securityCount(r); n > 0 {
+		return cliout.SecurityLine(n, r.TestID)
+	}
+	return ""
+}
+
+// securityCount is how many attestations in r failed verification.
+func securityCount(r evidence.Report) int {
 	n := 0
 	for _, rj := range r.Rejected {
 		if rj.Outcome == evidence.OutcomeVerificationFailed {
@@ -422,15 +469,7 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, file stri
 	if n == 0 && r.Outcome == evidence.OutcomeVerificationFailed {
 		n = 1 // the lookup itself failed verification (a moved tag)
 	}
-	if n > 0 {
-		cliout.Security(warn, n, r.TestID)
-	}
-	// Over the cap nothing was verified, so an untrusted attestation may hide
-	// among them (#135). The outcome stays error: the test runs.
-	if errors.Is(err, registry.ErrTooManyCandidates) {
-		fmt.Fprintf(warn, "aval: SECURITY: %s for %s, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://github.com/TrianaLab/aval/blob/main/docs/trust-model.md\n", registry.ErrTooManyCandidates, r.TestID)
-	}
-	return r, files, err
+	return n
 }
 
 func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
