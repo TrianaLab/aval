@@ -11,9 +11,9 @@ import (
 
 // docs.yaml: only `deploy` holds write scopes, never on pull_request, and a
 // manual run (workflow_dispatch) gets them only on main or a release tag v*
-// (release.yaml auto-tag), so a dispatch on another branch never deploys that
+// (dispatched by release.yaml), so a dispatch on another branch never deploys that
 // branch's code.
-func TestDocsDeployWriteScopesOnlyOnMain(t *testing.T) {
+func TestDocsDeployWriteScopesOnlyOnMainOrReleaseTag(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "docs.yaml"))
 	if err != nil {
 		t.Fatal(err)

@@ -481,18 +481,27 @@ the version; Aval is not an npm package. To release:
 
 1. Close and reopen the version PR so `ci` runs on it (PRs opened with
    `GITHUB_TOKEN` trigger no workflows), then merge it.
-2. Nothing else. When `ci` on `main` passes for the merge commit (its
+2. Wait for the release. When `ci` on `main` passes for the merge commit (its
    `dogfood-publish` job pushes the e2e result to
    `ghcr.io/trianalab/aval-attestations`), the `auto-tag` job in
    `release.yaml` tags it `v<version from package.json>` and dispatches the
-   `release` job and the docs deploy on that tag. It tags nothing when the tag
-   exists, the commit is no longer on `main`, or a `.changeset/*.md` entry is
-   pending, so a feature merge never releases. The `release` job refuses to
+   `release` job on that tag; once the GitHub Release exists, the `release`
+   job dispatches the docs deploy. `auto-tag` tags the first green commit with
+   no pending changeset, so the tag can point at a commit after the merge. It
+   tags nothing when the tag exists, the version is older than the newest
+   `v*` tag, the commit is no longer on `main`, or a `.changeset/*.md` entry
+   is pending. A feature merge does not change the version, so its tag
+   already exists and nothing is released. The `release` job refuses to
    publish without a verified, passing e2e attestation for that commit
    (`aval verify -f aval.e2e.yaml --registry
    ghcr.io/trianalab/aval-attestations --policy .github/aval/main.yaml`).
    A maintainer can still tag by hand: push the tag, or re-run a failed
-   release with Actions > release > Run workflow on the tag.
+   release with Actions > release > Run workflow on the tag (and Actions >
+   docs > Run workflow on the tag if the docs deploy did not run). If a
+   failed release left a partial GitHub Release, delete it first with `gh
+   release delete <tag> --yes`, which keeps the tag. If no release appears
+   because `ci` for the merge commit failed or was cancelled, re-run that
+   `ci` run (`auto-tag` fires when it passes) or tag the merge commit by hand.
 
 One-time human step, before the first release after v0.1.0: when the first
 `main` run creates the `aval-attestations` package, make it public in its
