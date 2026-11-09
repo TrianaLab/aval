@@ -106,6 +106,24 @@ reference: localhost:5001/demo/hello-aval@sha256:...
 reused passed result
 ```
 
+The flags can come from the environment instead: `AVAL_REGISTRY` and
+`AVAL_POLICY`. Export them once to stop repeating them. A flag still wins
+over the variable, and the run prints a `config:` line naming each value
+that came from the environment:
+
+```sh
+AVAL_REGISTRY=localhost:5001/demo/hello-aval AVAL_POLICY=policy.yaml aval run
+```
+
+```text
+config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
+test hello fingerprint sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+signer: key ..., trust level developer
+reference: localhost:5001/demo/hello-aval@sha256:...
+reused passed result
+```
+
 ## 4. Change an input: a miss again
 
 ![after editing src/hello.txt, aval run prints a new fingerprint, miss, and runs the test](assets/gifs/changed-input.gif)

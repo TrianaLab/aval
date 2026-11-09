@@ -53,6 +53,9 @@ var (
 	// pinnedAval: a policy step is one `aval` command (the pinned release on
 	// PATH) with no other command, substitution or redirect in it.
 	pinnedAval = regexp.MustCompile("^aval\\s(?:[^;&|<>`$\\n]|\\$[{A-Za-z_])*$")
+	// readsTrustEnv: an aval command that reads AVAL_POLICY and
+	// AVAL_REGISTRY from the environment when no flag names them (#163).
+	readsTrustEnv = regexp.MustCompile(`(?:^|/)aval\s+(?:run|verify)\b`)
 	// registryDecl is the sed in trust-from-base.sh.
 	registryDecl = regexp.MustCompile(`(?m)^ *AVAL_REGISTRY: *(.*)$`)
 )
@@ -183,7 +186,9 @@ func jobPolicyProblems(name string, steps []step) []string {
 		switch {
 		case run == trustStep:
 			trusted, chain = true, true
-		case usesPolicy(run):
+		case usesPolicy(run) || trusted && readsTrustEnv.MatchString(run):
+			// After the trust step, aval run and verify use the policy
+			// even without --policy: they read $AVAL_POLICY.
 			problems = append(problems, envProblems(name+": a policy step", s.Env)...)
 			if !chain {
 				problems = append(problems, name+": a policy step does not follow the trust step directly")
@@ -281,6 +286,7 @@ func TestPolicySourceCheckCatchesWorkingTreePolicies(t *testing.T) {
 		"job defaults":          "on: pull_request\njobs:\n  a:\n    defaults: {run: {shell: './evil {0}'}}\n    steps: [" + pre + ", " + use + "]\n",
 		"workflow defaults":     "on: pull_request\ndefaults: {run: {shell: './evil {0}'}}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
 		"make with ci-e2e":      pr(pre + ", {run: make -k ci-e2e test}"),
+		"env policy after code": pr(pre + ", {run: make test}, {run: aval run}"),
 		"env, make ci":          "on: pull_request\njobs:\n  a:\n    env: {AVAL_POLICY: evil.yaml}\n    steps: [{run: make test}]\n",
 	}
 	for name, wf := range bad {

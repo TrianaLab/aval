@@ -180,8 +180,12 @@ func exitCode(err error) int {
 
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "aval",
-		Short:         "Verifiable test execution reuse: signed test results as OCI artifacts",
+		Use:   "aval",
+		Short: "Verifiable test execution reuse: signed test results as OCI artifacts",
+		Long: `Verifiable test execution reuse: signed test results as OCI artifacts.
+
+--registry and --policy fall back to $` + registryEnv + ` and $` + policyEnv + `; a flag
+wins, and an empty value counts as unset. There is no config file.`,
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -194,15 +198,11 @@ func newRootCmd() *cobra.Command {
 		return nil
 	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
-	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
+	g := &globalFlags{}
+	g.bind(root)
+	root.PersistentPreRun = func(*cobra.Command, []string) { g.resolve(os.Getenv) }
+	root.AddCommand(newRunCmd(g), newPushCmd(g), newRecordCmd(g), newStatsCmd(g), newVerifyCmd(g), newVersionCmd(), newUpgradeCmd())
 	return root
-}
-
-// registryTimeoutFlag adds --registry-timeout: the deadline for the registry
-// calls of one command. note, if set, follows the usage text. On expiry the
-// outcome is error, so run still runs the test (invariant 3).
-func registryTimeoutFlag(cmd *cobra.Command, d *time.Duration, note ...string) {
-	cmd.Flags().DurationVar(d, "registry-timeout", time.Minute, strings.Join(append([]string{"deadline for this command's registry calls"}, note...), " "))
 }
 
 // checkTimeout rejects a deadline that would fail every registry call.
@@ -215,6 +215,14 @@ func checkTimeout(d time.Duration) error {
 
 // repoExample shows the --registry form in usage errors.
 const repoExample = "ghcr.io/acme/orders-aval"
+
+// requireRegistry rejects a missing registry, then checks it.
+func requireRegistry(repo string) error {
+	if repo == "" {
+		return usageError{fmt.Errorf("--registry is required (or set $%s)", registryEnv)}
+	}
+	return checkRegistry(repo)
+}
 
 // checkRegistry rejects a --registry that is not an OCI repository (host and
 // name, no scheme, tag or digest) before anything runs.
@@ -359,26 +367,25 @@ func inScope(dir string, c *contract.Contract, p string) bool {
 		match(c.Scope.Dependencies, contract.Glob.Match)
 }
 
-func newVerifyCmd() *cobra.Command {
-	var file, repo, policyFile, output string
-	var timeout time.Duration
+func newVerifyCmd(g *globalFlags) *cobra.Command {
+	var output string
 	cmd := &cobra.Command{
 		Use:   "verify",
 		Short: "Check whether a trusted result exists for the current inputs",
 		Long: `verify computes the fingerprint, looks up the attestation and verifies its
-signature and the trust policy, without running anything.
+signature and the trust policy, without running anything. It needs a
+registry; without a trust policy every lookup is a miss.
 
 Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 1 error (registry, policy or fingerprint), 2 usage or invalid aval.yaml.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			file, repo, timeout := g.file, g.registry, g.timeout
+			g.printConfig(cmd.ErrOrStderr()) // stdout stays the frozen report
 			if output != "text" && output != "json" {
 				return usageError{fmt.Errorf("--output must be text or json, got %q", output)}
 			}
-			if repo == "" {
-				return usageError{errors.New("--registry is required")}
-			}
-			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout)); err != nil {
+			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout)); err != nil {
 				return err
 			}
 			c, fp, err := loadAndFingerprint(cmd.Context(), file)
@@ -387,7 +394,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
-			report, _, err := verify(ctx, cmd.ErrOrStderr(), c, file, fp, repo, policyFile)
+			report, _, err := verify(ctx, cmd.ErrOrStderr(), c, file, fp, repo, g.policy)
 			if werr := cliout.WriteReport(cmd.OutOrStdout(), output, report); werr != nil {
 				return werr
 			}
@@ -397,12 +404,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			return nil
 		},
 	}
-	f := cmd.Flags()
-	f.StringVarP(&file, "contract", "f", contract.DefaultFile, "path to the test contract")
-	f.StringVar(&repo, "registry", "", "OCI repository for attestations (required)")
-	f.StringVar(&policyFile, "policy", "", "trust policy file (without it every lookup is a miss)")
-	f.StringVarP(&output, "output", "o", "text", "output format: text or json")
-	registryTimeoutFlag(cmd, &timeout)
+	cmd.Flags().StringVarP(&output, "output", "o", "text", "output format: text or json")
 	return cmd
 }
 

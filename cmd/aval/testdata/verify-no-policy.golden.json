@@ -1,0 +1,7 @@
+{
+  "version": "aval.trianalab.io/verify-report/v1",
+  "outcome": "miss",
+  "testId": "unit",
+  "fingerprint": "sha256:2e44ae013747cfa4806a8b19cabca9a7eb427b91704772133672a09714c0107c",
+  "reason": "no trust policy configured: pass --policy to reuse verified results"
+}

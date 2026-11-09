@@ -37,7 +37,7 @@ workflow at runner level and Alice's key at developer level:
 --8<-- "docs/trust-model.md:policy-file"
 
 With `minTrustLevel: runner`, a result Alice signed is a miss: the test runs.
-Without `--policy`, nothing is trusted and every test runs.
+Without `--policy` or `AVAL_POLICY`, nothing is trusted and every test runs.
 
 ## What a signature proves
 

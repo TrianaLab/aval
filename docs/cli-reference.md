@@ -25,7 +25,10 @@ result the policy does not trust; never hide it or retry it away.
 
 ## aval
 
-Verifiable test execution reuse: signed test results as OCI artifacts
+Verifiable test execution reuse: signed test results as OCI artifacts.
+
+--registry and --policy fall back to $AVAL_REGISTRY and $AVAL_POLICY; a flag
+wins, and an empty value counts as unset. There is no config file.
 
 ```text
 Usage:
@@ -44,8 +47,12 @@ Available Commands:
   version     Print the aval version, Go version and platform
 
 Flags:
-  -h, --help      help for aval
-  -v, --version   version for aval
+  -f, --contract string             path to the test contract (default "aval.yaml")
+  -h, --help                        help for aval
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+  -v, --version                     version for aval
 
 Use "aval [command] --help" for more information about a command.
 ```
@@ -68,6 +75,12 @@ Available Commands:
 Flags:
   -h, --help   help for completion
 
+Global Flags:
+  -f, --contract string             path to the test contract (default "aval.yaml")
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+
 Use "aval completion [command] --help" for more information about a command.
 ```
 
@@ -85,13 +98,16 @@ Usage:
   aval push [flags]
 
 Flags:
+  -h, --help            help for push
+      --key string      signing key path (default: keyless OIDC)
+      --login           sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
+      --result string   result recorded by 'aval run' (default ".aval/result.json")
+
+Global Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
-  -h, --help                        help for push
-      --key string                  signing key path (default: keyless OIDC)
-      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
-      --registry string             OCI repository for attestations (required)
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-      --result string               result recorded by 'aval run' (default ".aval/result.json")
 ```
 
 ## aval record
@@ -107,11 +123,15 @@ Usage:
   aval record [flags]
 
 Flags:
-  -h, --help                        help for record
-      --record-file string          run record written by 'aval run --record-file' (required)
-      --registry string             OCI repository for run records (required)
+  -h, --help                 help for record
+      --record-file string   run record written by 'aval run --record-file' (required)
+      --repository string    source repository (e.g. acme/orders); default: the one in the record
+
+Global Flags:
+  -f, --contract string             path to the test contract (default "aval.yaml")
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-      --repository string           source repository (e.g. acme/orders); default: the one in the record
 ```
 
 ## aval run
@@ -128,6 +148,9 @@ verified result and exits 1 if they disagree (a false hit).
 --record publishes a run record for statistics; a failure is only a warning.
 --record-file writes it to a file for 'aval record'.
 
+Without a registry and a trust policy the test always runs. --registry-timeout
+covers lookup and fetch together; --push has its own.
+
 Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
 2 usage. Keyless signing reads $SIGSTORE_ID_TOKEN; runner.command never sees
 it.
@@ -140,24 +163,26 @@ Usage:
   aval run [flags]
 
 Flags:
-      --ci-run-url string           link to the CI run, stored in the run record
+      --ci-run-url string    link to the CI run, stored in the run record
+      --explain              print the fingerprint manifest (what was hashed)
+      --fingerprint-only     print the execution fingerprint and exit
+  -h, --help                 help for run
+      --key string           signing key path for --push (default: keyless OIDC)
+      --login                sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
+      --no-reuse             always run, never reuse
+      --push                 sign and publish the result after running (needs --registry)
+      --record               publish a run record for statistics after the run (needs --registry; best-effort)
+      --record-file string   also write the run record to this file, for 'aval record'
+      --report string        also write the lookup decision as a verify report (JSON) to this file
+      --repository string    source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
+      --result string        where to record the result for 'aval push' (default ".aval/result.json")
+      --shadow               verify, but run the test anyway and fail on a false hit
+
+Global Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
-      --explain                     print the fingerprint manifest (what was hashed)
-      --fingerprint-only            print the execution fingerprint and exit
-  -h, --help                        help for run
-      --key string                  signing key path for --push (default: keyless OIDC)
-      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
-      --no-reuse                    always run, never reuse
-      --policy string               trust policy file (required for reuse; without it the test always runs)
-      --push                        sign and publish the result after running (needs --registry)
-      --record                      publish a run record for statistics after the run (needs --registry; best-effort)
-      --record-file string          also write the run record to this file, for 'aval record'
-      --registry string             OCI repository for attestations, e.g. ghcr.io/acme/orders-aval
-      --registry-timeout duration   deadline for this command's registry calls (lookup and fetch share one; push has its own) (default 1m0s)
-      --report string               also write the lookup decision as a verify report (JSON) to this file
-      --repository string           source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
-      --result string               where to record the result for 'aval push' (default ".aval/result.json")
-      --shadow                      verify, but run the test anyway and fail on a false hit
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 ```
 
 ## aval stats
@@ -184,13 +209,17 @@ Usage:
   aval stats [flags]
 
 Flags:
-      --by string                   group by test or repository (the run record's source repository) (default "test")
-  -h, --help                        help for stats
-  -o, --output string               output format: text or json (default "text")
-      --registry string             OCI repository holding the run records (required)
+      --by string       group by test or repository (the run record's source repository) (default "test")
+  -h, --help            help for stats
+  -o, --output string   output format: text or json (default "text")
+      --since string    only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)
+      --test string     only this test id (metadata.name); default: every test with run records
+
+Global Flags:
+  -f, --contract string             path to the test contract (default "aval.yaml")
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-      --since string                only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)
-      --test string                 only this test id (metadata.name); default: every test with run records
 ```
 
 ## aval upgrade
@@ -212,12 +241,19 @@ Flags:
       --check            print the current and target versions without installing
   -h, --help             help for upgrade
       --version string   release to install, e.g. v0.4.0 (default: latest)
+
+Global Flags:
+  -f, --contract string             path to the test contract (default "aval.yaml")
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 ```
 
 ## aval verify
 
 verify computes the fingerprint, looks up the attestation and verifies its
-signature and the trust policy, without running anything.
+signature and the trust policy, without running anything. It needs a
+registry; without a trust policy every lookup is a miss.
 
 Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 1 error (registry, policy or fingerprint), 2 usage or invalid aval.yaml.
@@ -227,11 +263,13 @@ Usage:
   aval verify [flags]
 
 Flags:
+  -h, --help            help for verify
+  -o, --output string   output format: text or json (default "text")
+
+Global Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
-  -h, --help                        help for verify
-  -o, --output string               output format: text or json (default "text")
-      --policy string               trust policy file (without it every lookup is a miss)
-      --registry string             OCI repository for attestations (required)
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 ```
 
@@ -245,4 +283,10 @@ Usage:
 
 Flags:
   -h, --help   help for version
+
+Global Flags:
+  -f, --contract string             path to the test contract (default "aval.yaml")
+      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 ```
