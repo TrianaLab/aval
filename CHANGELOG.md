@@ -1,5 +1,56 @@
 # aval
 
+## 0.7.0
+
+### Minor Changes
+
+- f5c436b: New `aval explain [--digest]`: it prints `fingerprint manifest for <test> (aval-fingerprint/v1)`, the manifest, and `fingerprint sha256:...` as the last line; `--digest` prints only the digest. It never looks up a result and never runs the test; a fingerprint error exits 1 with `aval: fingerprint: ...`, as `run --explain` does. `run --explain` and `run --fingerprint-only` keep their behaviour. New `aval stats publish FILE` publishes a run record and replaces `aval record`. Flags are named for what they hold; the old names keep working, hidden from help, and print a deprecation notice on stderr only (stdout, files and exit codes are unchanged). Deprecated in 0.7.0, removable no earlier than 0.8.0:
+  
+  - `aval run --result` and `aval push --result`: use `--result-file`
+  - `aval run --report`: use `--report-file`
+  - `aval run --record`: use `--stats`
+  - `aval run --record-file`: use `--stats-file`
+  - `aval run --repository` and `aval record --repository`: use `--source-repo`
+  - `aval record --record-file FILE`: use `aval stats publish FILE`
+  
+  Messages that name these flags use the new names (for example `--stats requires --registry`), and `aval record` without a file now says `a run record file is required`. The browser demo accepts `aval explain` and `aval explain --digest`.
+- f5c436b: `--registry` and `--policy` fall back to `AVAL_REGISTRY` and `AVAL_POLICY` (flag > environment > unset; an empty value counts as unset). There is no config file and no `aval.yaml` field: an architecture test keeps the registry and policy out of the contract and out of any file in the tree. When a value comes from the environment, `aval run` prints one `config:` line on stdout, and `verify`, `push`, `stats` and `record` print it on stderr. `runner.command` no longer sees `AVAL_REGISTRY` and `AVAL_POLICY`, like the signing token. `aval record` without `--record-file` now says `--record-file is required`. Exit codes and the verify report are unchanged.
+- f5c436b: Error messages say what to do (#167). Exit codes, outcomes and the verify report are unchanged: a report's `reason` keeps the raw error.
+  
+  - A registry that cannot be dialled or does not answer in time reads `cannot reach <host> (<cause>); is the registry running? check AVAL_REGISTRY or --registry`: in `aval run`'s reuse-off warning, on stderr for `aval verify` (stdout unchanged), and for `push`, `run --push` and `stats publish`.
+  - `--registry` with a scheme says `drop https://: try --registry <host/name>` (exit 2, as before).
+  - A public key passed as `--key` says `<x>.pub is a public key; pass the private key (<x>.key)`.
+  - Signing without a key, a token or a terminal lists the three ways to sign, one indented line each.
+  - `aval push` without a saved result adds `run aval run first, or use aval run --push` (exit 1, as before).
+  - `aval run --push --key` with a policy that does not list the key warns `aval: warning: key <file> (key id <x>) is not in <policy>; consumers with this policy will reject the result`. The result is still published.
+  - Contract errors print as `aval: <file>: invalid contract:` and one indented, escaped line per problem, in YAML terms: `line 8: scope.sources: unknown field; did you mean source?`, `line 6: runner.command: got a string ..., want a list of strings`. The browser demo prints them the same way.
+- f5c436b: `aval --help` groups commands into Core, Publishing and Statistics, and every command has an example. A mistyped command gets a suggestion (`aval rn` and `aval help rn` print `unknown command "rn"; did you mean "run"?` and exit 2; `aval help rn` used to print the root help and exit 0). A mistyped flag gets the closest flag of that command and a pointer to its help (`unknown flag: --registy; did you mean --registry? see aval run --help`). `aval run --help` is shorter. The exit code constants are unchanged; `aval help <typo>` now exits 2 (usage) instead of 0.
+- f5c436b: `aval init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless [--force] -- <command>` writes `aval.yaml` (validated before it is written), with `--key` a signing key pair (`NAME.key` and `NAME.pub`) and `policy.yaml` trusting it at trust level developer, and adds the key and `.aval/` to `.gitignore`. Nothing is inferred: `--source` and `--cacheability` have no default, init lists the files the globs match, rejects a glob that matches nothing and never runs the test. It never replaces a file without `--force` (exit 1); with `--force` it removes the old file and creates a new one, so a symlink is replaced, not written through, and a failed write removes the key pair it wrote. A file name in the preview or an answer is escaped before it reaches the terminal. When a value is missing it asks numbered questions only if stdin and stdout are terminals; otherwise it exits 2 and names the missing flags. The quickstart now starts with `aval init`.
+- f5c436b: `aval keygen [name]` writes a signing key without openssl: `name.key` (unencrypted PKCS#8 ECDSA P-256 PEM, mode 0600) and `name.pub` (PKIX PEM, the file a policy trusts with `publicKey`), with `aval` as the default name (a trailing `.key` is dropped; an empty name is a usage error, exit 2). It prints the key id the verify report shows for this signer and refuses to replace either file without `--force` (exit 1). The key hints of `aval run --push` and `aval push` now point to `aval keygen`, and the quickstart and the uv-monorepo example no longer need openssl.
+- f5c436b: Plain output of `aval run` v2 (CI logs and pipes). Every line CI greps today keeps its shape: `<outcome> <test> <digest>`, `signer:`, `reference:`, `reason:`, `rejected:`, `ran <test>: <result> (exit N)`, `reused <result> result`, `pushed`, `restored`, `recorded`, `config:`. `aval verify` text and `-o json` are unchanged, and so are all exit codes. Changed lines:
+  
+  - Added: `--- run <test>: <command>` before and `--- end <test>: <passed|failed> (exit N) in <time>` after the test's own output, which passes through untouched.
+  - Added: a closing `summary: <test> <ran|reused>: <passed|failed>[ in <time>][; saved <time>][; result pushed][; reuse was off][; SECURITY]`. `saved` is the reused run's signed `finishedAt` minus `startedAt`, for display only.
+  - Added on stderr: `aval: warning: reuse off: <cause>` when an unreadable policy, a registry error or inputs that cannot be fingerprinted turn reuse off. The test still runs.
+  - When the test command cannot start, `--- run` is not closed and no `summary:` follows; stderr says `aval: running "<command>": ...` and the exit code stays 1.
+  - A fingerprint flooded with more attestations than Aval lists (#135) is a security event in `aval run` too: no reuse-off warning, `; SECURITY` in the summary and the flooding SECURITY line repeated last on stderr. The exit code is unchanged.
+  - On a verification failure `aval run` prints the `aval: SECURITY:` line when it finds it and again as the last stderr line, after any other error.
+  - The SECURITY lines link to `https://aval.run/<version>/trust-model/` (`latest` for dev, snapshot and pre-release builds) instead of the GitHub file.
+  - Removed: `test <name> fingerprint <digest>` (the outcome line carries the digest), the `cacheability <class>: ...` note when the reason already names the class, and `aval: test failed` / `aval: reused result failed: test failed` (the summary and exit 3 say it).
+  - Reworded reasons in `aval run`: `no registry configured: pass --registry to reuse verified results` is now `reuse off: no registry (set AVAL_REGISTRY or --registry)`, `reuse disabled (--no-reuse)` is now `reuse off: --no-reuse`, and a missing policy is `reuse off: no trust policy (set AVAL_POLICY or --policy)`. The outcome stays `miss`. `aval verify` keeps `no trust policy configured: pass --policy to reuse verified results`.
+  - The browser demo prints the same lines.
+  - The quickstart GIFs still show the old output until they are re-recorded (#181).
+- f5c436b: `aval run` on a terminal prints the styled output of Epic 13 (style A): one line per step behind a glyph (`✓` done, `↺` reused, `✗` failed or SECURITY, `⚠` reuse off, `·` neutral), labelled detail lines, digests as 8 hex characters (whole on the `REJECTED` line), and one closing sentence. A flooded fingerprint and a non-deterministic contract get their own closing sentence. After a verification failure nothing is green and no `✓` appears; the SECURITY block goes to stderr when found, and stderr still ends with the plain `aval: SECURITY:` line. `NO_COLOR` drops the colour only, Windows gets no colour, and stderr is styled only when it is a terminal too. Plain output is unchanged and applies when stdout is not a terminal, with `TERM=dumb`, `AVAL_OUTPUT=plain` (any case) or the new global `--plain` flag. The browser demo accepts `aval run --plain`. Exit codes, `-o json`, the report file and `aval verify` are unchanged. The browser demo uses the styled form without colour.
+- f5c436b: `aval verify -o json` (verify-report/v1) gains the optional `signer.trustLevelName` (`developer`, `runner` or `isolated`) next to the numeric `signer.trustLevel`. It is derived from the matched trust-policy entry, never from the predicate. Additive: older reports still parse, and in `pkg/evidence` `MatchIdentity` and `MatchSigner` now set `Identity.TrustLevelName`. Older aval binaries (0.4.0 and earlier) do not recognise a report with this field as Aval output, so such a file in scope counts as an ordinary input for them (a miss, never a false hit) until they upgrade.
+
+### Patch Changes
+
+- f5c436b: The quickstart follows the new flow: it removes a leftover registry before starting one, exports `AVAL_REGISTRY` and `AVAL_POLICY` once after `aval init`, and runs `aval run --push`, `aval verify`, `aval run`, a changed input and an untrusted push (`AVAL_POLICY= aval run --push --key other.key`) that ends in exit 5, with no flags repeated. The GIFs are re-recorded in the styled output, and the "Try it" terminal's `help` describes the same setup.
+- f5c436b: On a terminal, Aval shows a spinner on stderr when looking up and fetching a result, pushing one (`aval run --push`, `aval push`) or reading run records (`aval stats`) takes more than 300ms, for example `⠹ looking up localhost:5001… 4s`. It runs only in styled mode with stderr a terminal, is erased before the decision or the test's output prints, erases itself before a warning, and leaves the terminal clean on Ctrl-C. Windows gets no spinner. Plain output, exit codes and `aval verify` are unchanged.
+- 6677ad3: Docs site: the install command on the home page has a copy button.
+- f5c436b: Shorter docs: each page answers one question in its first line and opens with a diagram or a terminal snippet; guides and concept pages use short bullets and tables. Edge cases moved to two new Reference pages: CLI output (plain and terminal output, spinner, stderr lines) and Mutable reference scan (the full scanner rules and limits from Pin your dependencies). No behaviour changes.
+- 58d3f3c: Docs site: on phones narrower than about 430px the version pill no longer overlaps the theme toggle in the header; it is hidden there.
+
 ## 0.6.1
 
 ### Patch Changes
