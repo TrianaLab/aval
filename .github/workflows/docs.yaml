@@ -11,7 +11,7 @@ name: docs
 # Until a maintainer enables that (Settings > Pages > Source: GitHub Actions),
 # the `pages` job reports a notice and `deploy` is skipped, so the workflow
 # stays green. Write scopes only on push to main, a tag, the schedule or a
-# manual run on main, never on pull_request; the PR-side check is `make docs-site` in ci.yaml (ci-docs).
+# manual run on main or a release tag v*, never on pull_request; the PR-side check is `make docs-site` in ci.yaml (ci-docs).
 #
 # Live statistics (#97): twice an hour and on every push, `stats` runs `aval
 # stats` over the public stats registry (anonymous, no write scopes) and
@@ -21,9 +21,12 @@ name: docs
 # stays and the run stays green. The schedule runs only on the default
 # branch, so its write scopes are those of a push to main.
 #
-# A manual run (Actions > docs > Run workflow, workflow_dispatch) behaves like
-# a scheduled one: it refreshes stats.json and rebuilds no page. It deploys
-# only when dispatched on main; on any other branch `deploy` is skipped, so a
+# A manual run on main (Actions > docs > Run workflow, workflow_dispatch)
+# behaves like a scheduled one: it refreshes stats.json and rebuilds no page.
+# A dispatch on a release tag v* (sent by the release job once the release
+# exists, because a tag created with GITHUB_TOKEN triggers no workflow) deploys
+# like a tag push, but only for the newest v* tag, so a dispatch on an old tag
+# never moves `latest` back. On any other ref `deploy` is skipped, so a
 # branch's code never gets write scopes.
 
 on:
@@ -103,9 +106,12 @@ jobs:
   deploy:
     needs: [pages, stats]
     # !cancelled(): a failed stats job never blocks a docs deploy. A manual
-    # run deploys only from main (tests/architecture/docs_workflow_test.go).
-    if: ${{ !cancelled() && needs.pages.outputs.enabled == 'true' && (github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) }}
+    # run deploys only from main or a release tag v* (tests/architecture/docs_workflow_test.go).
+    if: ${{ !cancelled() && needs.pages.outputs.enabled == 'true' && (github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v'))) }}
     runs-on: ubuntu-latest
+    env:
+      # Build and deploy the pages: a push, or a dispatch on a release tag.
+      PAGES: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')) }}
     permissions:
       contents: write # mike pushes the gh-pages branch
       pages: write
@@ -122,27 +128,31 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
       # Go builds the "Try it" WebAssembly (make docs-wasm, run by docs-site
       # and by scripts/deploy-docs.sh).
-      - if: github.event_name == 'push'
+      - if: env.PAGES == 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - if: github.event_name == 'push'
+      - if: env.PAGES == 'true'
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
-      - if: github.event_name == 'push'
+      - if: env.PAGES == 'true'
         run: pip install --require-hashes -r docs/requirements.txt
       # Same strict gate as ci-docs, so nothing that fails it is published.
-      - if: github.event_name == 'push'
+      - if: env.PAGES == 'true'
         run: make docs-site
       - name: Deploy the version with mike
-        if: github.event_name == 'push'
+        if: env.PAGES == 'true'
         env:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         # Also sets the default version and copies the installers to the
         # gh-pages root; scripts/test-deploy-docs.sh (make ci-docs) tests it.
-        run: PUSH=true scripts/deploy-docs.sh "$REF_TYPE" "$REF_NAME"
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$REF_NAME" != "$(git tag -l 'v*' --sort=-v:refname | head -1)" ]; then
+            echo "::error::only the newest release tag can be dispatched"; exit 1
+          fi
+          PUSH=true scripts/deploy-docs.sh "$REF_TYPE" "$REF_NAME"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         continue-on-error: true
         with:
@@ -154,13 +164,13 @@ jobs:
         run: |
           PUSH=true scripts/publish-stats.sh "$RUNNER_TEMP/stats/stats-report.json"
           echo "published=true" >> "$GITHUB_OUTPUT"
-      # A scheduled or manual run deploys only when it published a new stats.json.
-      - if: github.event_name == 'push' || steps.stats.outputs.published == 'true'
+      # A scheduled run, or a manual run on main, deploys only when it published a new stats.json.
+      - if: env.PAGES == 'true' || steps.stats.outputs.published == 'true'
         run: git worktree add "$RUNNER_TEMP/gh-pages" gh-pages
-      - if: github.event_name == 'push' || steps.stats.outputs.published == 'true'
+      - if: env.PAGES == 'true' || steps.stats.outputs.published == 'true'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: ${{ runner.temp }}/gh-pages
       - id: deploy
-        if: github.event_name == 'push' || steps.stats.outputs.published == 'true'
+        if: env.PAGES == 'true' || steps.stats.outputs.published == 'true'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
