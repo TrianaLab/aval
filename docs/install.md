@@ -1,8 +1,8 @@
 # Install
 
-One static binary for Linux, macOS and Windows (amd64, arm64), from
-[GitHub Releases](https://github.com/TrianaLab/aval/releases). The installers
-check the download before they install it.
+How do I get `aval`? One static binary for Linux, macOS and Windows (amd64,
+arm64) from [GitHub Releases](https://github.com/TrianaLab/aval/releases),
+checked before it is installed.
 
 ## Linux and macOS
 
@@ -10,9 +10,8 @@ check the download before they install it.
 curl -fsSL https://aval.run/install.sh | bash
 ```
 
-Installs into `/usr/local/bin`, with `sudo` only if that directory is not
-writable. Needs `curl` or `wget`, and `sha256sum` or `shasum`. Works with the
-bash 3.2 that macOS ships.
+Installs into `/usr/local/bin` (`sudo` only if needed). Needs `curl` or
+`wget`, and `sha256sum` or `shasum`.
 
 | Variable | Flag | Windows | Effect |
 |---|---|---|---|
@@ -36,9 +35,8 @@ In PowerShell 5.1 or 7:
 irm https://aval.run/install.ps1 | iex
 ```
 
-Installs `aval.exe` into `%LOCALAPPDATA%\Programs\aval` and adds it to your
-user `PATH`, without admin rights. Settings: the variables marked Windows
-above.
+Installs into `%LOCALAPPDATA%\Programs\aval` and adds it to your user
+`PATH`, no admin rights. Settings: the variables marked Windows above.
 
 ## What the installers check
 
@@ -58,19 +56,18 @@ aval upgrade --version v0.4.0   # to a given release
 aval upgrade --check            # print the current and target versions, change nothing
 ```
 
-`aval upgrade` replaces the running binary. It needs no `cosign`: it checks
-the Sigstore signature of `checksums.txt` itself (issuer
-`https://token.actions.githubusercontent.com`, signer Aval's release workflow
-at that tag), then the archive's sha256. A failed check replaces nothing and
-exits 1; a bad signature or checksum is a security event, do not retry it
-away. Without `--version` it refuses to move to a release older than the
-running one; a `dev` build is always replaced. If the binary's directory is
-not writable, run it with `sudo` or use the installer again. `aval version` prints the version, Go version and platform.
+- It checks the Sigstore signature of `checksums.txt` itself (signer: Aval's
+  release workflow at that tag), then the sha256. No `cosign` needed.
+- A failed check replaces nothing and exits 1. A bad signature is a security
+  event: do not retry it away.
+- Without `--version` it never downgrades; a `dev` build is always replaced.
+- Directory not writable? Use `sudo` or the installer.
+
+`aval version` prints the version, Go version and platform.
 
 ## By hand
 
-Download the archive, `checksums.txt` and the signatures, check them, then put
-`aval` on your `PATH`:
+Download, check, then put `aval` on your `PATH`:
 
 ```sh
 VERSION=0.2.0

@@ -7,7 +7,6 @@ change, without copying the backend's globs.
 flowchart LR
   f[frontend/aval.yaml] -- scope.contracts --> b[backend/aval.yaml]
   b --> bs(["backend scope: api/**"])
-  f --> fs(["frontend scope: src/**, test.sh"])
   bs -. change .-> miss([frontend misses and runs]):::err
 ```
 
@@ -23,52 +22,38 @@ The frontend names the backend's contract:
 --8<-- "tests/acceptance/testdata/monorepo/backend/aval.yaml"
 ```
 
-The frontend's fingerprint now includes the backend's fingerprint:
+The frontend's fingerprint now includes the backend's:
 
-- a change in the backend's scope makes the frontend miss and run;
-- a change outside it (a backend README) keeps the reuse;
-- if the backend names another contract, that one counts too.
+- a change in the backend's scope: the frontend misses and runs;
+- a change outside it (a backend README): still reused;
+- contracts the backend names count too.
 
-`aval explain` shows the reference:
+`aval explain` shows the link:
 
 ```text
 contract ../backend/aval.yaml backend sha256:<backend fingerprint>
 depends on ../backend/aval.yaml (backend) sha256:<backend fingerprint>
 ```
 
-## What to know
+- Paths are relative and stay inside the git working tree. No other repositories.
+- If Aval cannot read the other contract, the test runs.
+- A mutable reference in the backend blocks the frontend too; only the
+  backend's `scope.allowMutable` accepts it.
 
-- Paths are relative to the contract and stay inside its git working tree.
-  Only local files: no contract from another repository.
-- If Aval cannot read or fingerprint the referenced contract, the test runs.
-- A mutable reference in the backend blocks the frontend's reuse too. Only
-  the backend's own `scope.allowMutable` can accept it.
-
-Limits and errors: [`scope.contracts`](../contract.md).
-
-## A contract, or an API file?
-
-Name the contract when the test runs the other part's code, like frontend
-end-to-end tests against the real backend.
-
-When the test only uses the interface (a generated client, a mocked
-backend), list the API file (OpenAPI, `.proto`) in `scope.dependencies`
-instead. Only an interface change reruns the test. Globs cannot leave the
-contract's directory, so keep the file in the frontend's tree.
+Using only the backend's interface (a generated client)? List the API file
+(OpenAPI, `.proto`) in `scope.dependencies` instead.
 
 ## Workspaces
 
-uv, pnpm and cargo workspaces keep one lockfile at the root. A member's
-contract cannot list it: globs cannot use `..`. Two layouts work.
-
-**Contracts at the root**, one per member, named `aval.<member>.yaml`:
+uv, pnpm and cargo keep one lockfile at the root, and globs cannot use `..`.
+Two layouts work. Either one contract per member at the root:
 
 ```yaml title="aval.api.yaml"
 --8<-- "tests/acceptance/testdata/workspace/aval.api.yaml"
 ```
 
-**A root contract owns the lockfile**, and each member names it in
-`scope.contracts`, which may use `..`:
+Or a root contract owns the lockfile, and members name it (`scope.contracts`
+may use `..`):
 
 ```yaml title="aval.lock.yaml"
 --8<-- "tests/acceptance/testdata/workspace/aval.lock.yaml"
@@ -78,33 +63,17 @@ contract cannot list it: globs cannot use `..`. Two layouts work.
 --8<-- "tests/acceptance/testdata/workspace/packages/api/aval.yaml"
 ```
 
-Either way, any lockfile change reruns every member. The same layouts fit
-the other tools:
+Any lockfile change reruns every member.
 
-| Tool | Root files to hash | Lockfile check |
-|---|---|---|
-| uv | `pyproject.toml`, `uv.lock` | `uv lock --check` |
-| pnpm | `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` | `pnpm install --frozen-lockfile` |
-| cargo | `Cargo.toml`, `Cargo.lock` | `cargo metadata --locked` |
+| Tool | Root files to hash |
+|---|---|
+| uv | `pyproject.toml`, `uv.lock` |
+| pnpm | `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` |
+| cargo | `Cargo.toml`, `Cargo.lock` |
 
-A member that imports another member lists that member's sources too, or
-names its contract.
-
-??? info "Inputs the workspace graph does not show"
-    Check each one against the test, and list the ones it reads:
-
-    - shared config at the root: `tsconfig.base.json`, `.npmrc`,
-      `conftest.py`, `pytest.ini`, `.cargo/config.toml`, `rust-toolchain.toml`,
-      `.python-version`, `.nvmrc`;
-    - patches: pnpm `patches/`, cargo `[patch]` sources;
-    - build scripts and generated code: `build.rs`, codegen inputs;
-    - shared fixtures or test data outside the member;
-    - environment variables (`environment.env`).
-
-There is no `aval init`: generating scope from manifests would infer it,
-and choosing the scope is the hard part, not typing the YAML.
-[Find undeclared inputs](write-a-contract.md#find-undeclared-inputs) checks
-what you chose.
+Also check root config (`tsconfig.base.json`, `conftest.py`,
+`.cargo/config.toml`), patches, build scripts and shared fixtures:
+[find undeclared inputs](write-a-contract.md#find-undeclared-inputs).
 
 ## Read next
 
