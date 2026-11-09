@@ -65,6 +65,9 @@ See each sub-command's help for details on how to use the generated script.
 Usage:
   aval completion [command]
 
+Examples:
+  source <(aval completion bash)
+
 Available Commands:
   bash        Generate the autocompletion script for bash
   fish        Generate the autocompletion script for fish
@@ -140,7 +143,7 @@ Usage:
   aval run [flags]
 
 Examples:
-  # Reuse a verified result for the current inputs, or run the test
+  # Reuse a trusted result, or run the test
   aval run --registry ghcr.io/acme/orders-aval --policy policy.yaml
 
   # Run, then sign and publish the result keyless
@@ -152,7 +155,7 @@ Flags:
       --explain                     print the fingerprint manifest (what was hashed)
       --fingerprint-only            print the execution fingerprint and exit
   -h, --help                        help for run
-      --key string                  signing key path for --push (default: keyless, from $SIGSTORE_ID_TOKEN or the interactive login; runner.command never sees the token)
+      --key string                  signing key path for --push (default: keyless, from $SIGSTORE_ID_TOKEN or the interactive login; no token is stored and runner.command never sees it)
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
       --no-reuse                    always run, never reuse (excludes --shadow)
       --policy string               trust policy file (required for reuse; without it the test always runs)

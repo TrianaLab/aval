@@ -19,18 +19,19 @@ var groups = []*cobra.Group{
 // commandHelp is each command's group (empty: "Additional Commands") and
 // Example, kept in one place so `aval --help` reads as one document.
 var commandHelp = map[string]struct{ group, example string }{
-	"run": {"core", `  # Reuse a verified result for the current inputs, or run the test
+	"run": {"core", `  # Reuse a trusted result, or run the test
   aval run --registry ghcr.io/acme/orders-aval --policy policy.yaml
 
   # Run, then sign and publish the result keyless
   aval run --registry ghcr.io/acme/orders-aval --push`},
-	"verify":  {"core", `  aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml -o json`},
-	"push":    {"publishing", `  aval push --registry ghcr.io/acme/orders-aval --key aval.key`},
-	"record":  {"statistics", `  aval record --registry ghcr.io/acme/orders-aval --record-file record.json`},
-	"stats":   {"statistics", `  aval stats --registry ghcr.io/acme/orders-aval --since 30d`},
-	"version": {"", `  aval version`},
-	"upgrade": {"", `  aval upgrade --check`},
-	"help":    {"", `  aval help run`},
+	"verify":     {"core", `  aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml -o json`},
+	"push":       {"publishing", `  aval push --registry ghcr.io/acme/orders-aval --key aval.key`},
+	"record":     {"statistics", `  aval record --registry ghcr.io/acme/orders-aval --record-file record.json`},
+	"stats":      {"statistics", `  aval stats --registry ghcr.io/acme/orders-aval --since 30d`},
+	"version":    {"", `  aval version`},
+	"upgrade":    {"", `  aval upgrade --check`},
+	"help":       {"", `  aval help run`},
+	"completion": {"", `  source <(aval completion bash)`},
 }
 
 // guide adds the command groups, the examples and did-you-mean suggestions
@@ -46,6 +47,7 @@ func guide(root *cobra.Command) {
 	}
 	root.SetFlagErrorFunc(flagError)
 	root.InitDefaultHelpCmd()
+	root.InitDefaultCompletionCmd()
 	for _, c := range root.Commands() {
 		if c.Name() == "help" {
 			show := c.Run

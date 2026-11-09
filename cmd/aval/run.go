@@ -74,7 +74,7 @@ running the test), 1 error or false hit (--shadow), 2 usage.`,
 	f.StringVar(&o.repo, "registry", "", "OCI repository for attestations, e.g. ghcr.io/acme/orders-aval")
 	f.StringVar(&o.policyFile, "policy", "", "trust policy file (required for reuse; without it the test always runs)")
 	f.BoolVar(&o.push, "push", false, "sign and publish the result after running (needs --registry)")
-	f.StringVar(&o.key, "key", "", "signing key path for --push (default: keyless, from $"+idTokenEnv+" or the interactive login; runner.command never sees the token)")
+	f.StringVar(&o.key, "key", "", "signing key path for --push (default: keyless, from $"+idTokenEnv+" or the interactive login; no token is stored and runner.command never sees it)")
 	f.BoolVar(&o.login, "login", false, loginFlagHelp)
 	f.StringVar(&o.resultFile, "result", defaultResult, "where to record the result for 'aval push'")
 	f.StringVar(&o.reportFile, "report", "", "also write the lookup decision as a verify report (JSON) to this file")

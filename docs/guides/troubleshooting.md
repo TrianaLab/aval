@@ -27,7 +27,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
     | `--push requires --registry`, `--record requires --registry`, `--registry is required`, `--registry and --record-file are required` | add the flags it names |
     | `--shadow and --no-reuse exclude each other` | pick one |
     | `--registry <x> is not an OCI repository` | use `host/name`, no `https://`, tag or digest |
-    | `--registry-timeout must be positive`, `--output must be text or json`, `unknown command` | fix the value; see `aval <command> --help` |
+    | `--registry-timeout must be positive`, `--output must be text or json`, `unknown command`, `unknown flag` | fix the value (the message names the closest command or flag, `did you mean "run"?`); see `aval <command> --help` |
     | `signing needs --key or, for keyless signing, an OIDC token` | pass `--key`, or set the token ([Signing](signing.md)) |
     | `not a PEM file`, `PEM type <x> is encrypted`, `not an ECDSA P-256 key` | make an unencrypted P-256 key ([Signing](signing.md)) |
     | `holds neither an Aval result nor a report`, `is an input of the test` | write `--result` and `--report` under `.aval/`; for `output <x> is an input of the test`, exclude it from `scope` |
