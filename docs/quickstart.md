@@ -3,7 +3,7 @@
 On your laptop, in five minutes: a miss, a reuse, a changed input and a
 rejected result.
 
-You need `aval` ([Install](install.md)), Docker and `openssl`. Run the blocks
+You need `aval` ([Install](install.md)) and Docker. Run the blocks
 in order in one shell. Each `text` block is the expected output; `...` is a
 digest that changes on every run.
 
@@ -40,8 +40,7 @@ A signing key (ECDSA P-256) and a policy that trusts it:
 
 <!-- --8<-- [start:key] (the guides include this block) -->
 ```sh
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out aval.key
-openssl pkey -in aval.key -pubout -out aval.pub
+aval keygen
 cat > policy.yaml <<'EOF'
 apiVersion: aval.trianalab.io/v1
 kind: Policy
@@ -52,6 +51,12 @@ identities:
 EOF
 ```
 <!-- --8<-- [end:key] -->
+
+```text
+wrote aval.key (private, keep it secret) and aval.pub
+key id: ...
+next: trust aval.pub in your policy (publicKey: aval.pub) and sign with --key aval.key
+```
 
 ## 2. First run: a miss
 
@@ -152,13 +157,16 @@ trust, publishes a result. Aval rejects it, runs the test and exits 5: a
 security event, not a miss. A tampered result ends the same way:
 
 ```sh
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out other.key
+aval keygen other
 aval run --push --key other.key --registry localhost:5001/demo/hello-aval
 aval run --registry localhost:5001/demo/hello-aval --policy policy.yaml
 echo "exit code: $?"
 ```
 
 ```text
+wrote other.key (private, keep it secret) and other.pub
+key id: ...
+next: trust other.pub in your policy (publicKey: other.pub) and sign with --key other.key
 test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
 miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
 reason: no trust policy configured: pass --policy to reuse verified results

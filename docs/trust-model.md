@@ -30,7 +30,7 @@ entries.
 | key | local | an unencrypted ECDSA P-256 PEM key (PKCS#8 or SEC1); Cosign keys are encrypted and not supported | no | developer |
 
 Make a key with
-`openssl ecparam -name prime256v1 -genkey -noout -out aval.key`. Getting the
+`aval keygen` (writes `aval.key` and `aval.pub`). Getting the
 OIDC token is the caller's job, so no CI vendor or issuer is assumed.
 
 Signing always uses the Sigstore public-good instance

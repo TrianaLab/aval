@@ -44,9 +44,9 @@ func TestPushPreconditionsFailFast(t *testing.T) {
 		name, key, stderr string
 	}{
 		{"no key and no token", "", "$" + idTokenEnv},
-		{"unreadable key", filepath.Join(dir, "nope.pem"), "openssl ecparam -name prime256v1"},
+		{"unreadable key", filepath.Join(dir, "nope.pem"), "create one with: aval keygen"},
 		{"cosign key", write("cosign.key", block("ENCRYPTED SIGSTORE PRIVATE KEY", []byte("x"))), "P-256 private key in PEM"},
-		{"old cosign key", write("cosign-old.key", block("ENCRYPTED COSIGN PRIVATE KEY", []byte("x"))), "openssl ecparam -name prime256v1"},
+		{"old cosign key", write("cosign-old.key", block("ENCRYPTED COSIGN PRIVATE KEY", []byte("x"))), "create one with: aval keygen"},
 		{"not PEM", write("raw.key", []byte("junk")), "not a PEM file"},
 		{"corrupt PEM", write("bad.key", block("PRIVATE KEY", []byte("x"))), "P-256"},
 		{"P-384 key", write("p384.key", block("PRIVATE KEY", p384DER)), "not an ECDSA P-256 key"},

@@ -44,7 +44,7 @@ func TestEveryCommandHasAnExample(t *testing.T) {
 
 func TestRootHelpGroupsCommands(t *testing.T) {
 	_, stdout, _ := runCLI("--help")
-	for _, g := range []string{"Core:\n  run", "Publishing:\n  push", "Statistics:\n  record"} {
+	for _, g := range []string{"Core:\n  run", "Publishing:\n  keygen      Create a signing key: name.key and name.pub (default name: aval)\n  push", "Statistics:\n  record"} {
 		if !strings.Contains(stdout, g) {
 			t.Errorf("aval --help lacks %q:\n%s", g, stdout)
 		}

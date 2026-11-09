@@ -16,9 +16,8 @@ scope:
   source: ["src/**"]
 cacheability: hermetic
 YAML
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out aval.key 2>/dev/null
-openssl pkey -in aval.key -pubout -out aval.pub
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out other.key 2>/dev/null
+aval keygen >/dev/null
+aval keygen other >/dev/null
 cat > policy.yaml <<'YAML'
 apiVersion: aval.trianalab.io/v1
 kind: Policy

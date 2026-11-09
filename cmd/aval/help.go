@@ -24,8 +24,10 @@ var commandHelp = map[string]struct{ group, example string }{
 
   # Run, then sign and publish the result keyless
   aval run --registry ghcr.io/acme/orders-aval --push`},
-	"verify":     {"core", `  aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml -o json`},
-	"push":       {"publishing", `  aval push --registry ghcr.io/acme/orders-aval --key aval.key`},
+	"verify": {"core", `  aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml -o json`},
+	"push":   {"publishing", `  aval push --registry ghcr.io/acme/orders-aval --key aval.key`},
+	"keygen": {"publishing", `  aval keygen        # aval.key and aval.pub
+  aval keygen ci     # ci.key and ci.pub`},
 	"record":     {"statistics", `  aval record --registry ghcr.io/acme/orders-aval --record-file record.json`},
 	"stats":      {"statistics", `  aval stats --registry ghcr.io/acme/orders-aval --since 30d`},
 	"version":    {"", `  aval version`},
