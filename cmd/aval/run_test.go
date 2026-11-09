@@ -103,7 +103,7 @@ func TestRunOutcomes(t *testing.T) {
 			argv, ran := marker(t, tc.testExit)
 			dir := t.TempDir()
 			report := filepath.Join(dir, "report.json")
-			args := []string{"run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(dir, "result.json"), "--report", report}
+			args := []string{"run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(dir, "result.json"), "--report-file", report}
 			if tc.shadow {
 				args = append(args, "--shadow")
 			}
@@ -130,7 +130,7 @@ func TestRunBelowMinTrust(t *testing.T) {
 	argv, ran := marker(t, 1)
 	dir := t.TempDir()
 	report := filepath.Join(dir, "report.json")
-	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(dir, "result.json"), "--report", report)
+	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(dir, "result.json"), "--report-file", report)
 	if code != ExitTestFailed || !ran() || strings.Contains(stdout, "reused") || strings.Contains(stderr, "SECURITY") {
 		t.Fatalf("exit %d ran %v; stdout %q stderr %q", code, ran(), stdout, stderr)
 	}
@@ -156,7 +156,7 @@ func TestRunWithoutLookup(t *testing.T) {
 			noLookup(t)
 			argv, ran := marker(t, 0)
 			report := filepath.Join(t.TempDir(), "report.json")
-			args := append([]string{"run", "-f", contractWith(t, tc.class, argv...), "--result", filepath.Join(t.TempDir(), "r.json"), "--report", report}, tc.extra...)
+			args := append([]string{"run", "-f", contractWith(t, tc.class, argv...), "--result-file", filepath.Join(t.TempDir(), "r.json"), "--report-file", report}, tc.extra...)
 			if code, stdout, stderr := runCLI(args...); code != ExitOK || !ran() {
 				t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
 			}
@@ -186,7 +186,7 @@ func TestRunFingerprintError(t *testing.T) {
 		t.Fatal(err)
 	}
 	result := filepath.Join(t.TempDir(), "r.json")
-	code, stdout, _ := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result", result)
+	code, stdout, _ := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", result)
 	if code != ExitOK || !ran() || !strings.Contains(stdout, "error unit") || !strings.Contains(stdout, "matched no files") {
 		t.Fatalf("exit %d, stdout %q", code, stdout)
 	}
@@ -194,7 +194,7 @@ func TestRunFingerprintError(t *testing.T) {
 		t.Fatal("result recorded without a fingerprint")
 	}
 	t.Setenv(idTokenEnv, "token")
-	code, _, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result", result)
+	code, _, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result-file", result)
 	if code != ExitError || !strings.Contains(stderr, "result not published") {
 		t.Fatalf("--push: exit %d, stderr %q", code, stderr)
 	}
@@ -215,9 +215,9 @@ func TestRunErrors(t *testing.T) {
 	}{
 		{"push without registry", []string{"run", "-f", hermetic, "--push"}, ExitUsage, "--push requires --registry"},
 		{"shadow and no-reuse", []string{"run", "-f", hermetic, "--shadow", "--no-reuse"}, ExitUsage, "exclude each other"},
-		{"command not found", []string{"run", "-f", contractWith(t, "hermetic", "/nonexistent/aval-test"), "--result", filepath.Join(t.TempDir(), "r.json")}, ExitError, "running"},
-		{"result not writable", []string{"run", "-f", hermetic, "--result", under}, ExitError, "recording result"},
-		{"report not writable", []string{"run", "-f", hermetic, "--report", under}, ExitError, "writing report"},
+		{"command not found", []string{"run", "-f", contractWith(t, "hermetic", "/nonexistent/aval-test"), "--result-file", filepath.Join(t.TempDir(), "r.json")}, ExitError, "running"},
+		{"result not writable", []string{"run", "-f", hermetic, "--result-file", under}, ExitError, "recording result"},
+		{"report not writable", []string{"run", "-f", hermetic, "--report-file", under}, ExitError, "writing report"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -258,7 +258,7 @@ func TestRunReportWriteFailure(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fakeCandidates(t, nil, map[string]candidate{"sha256:aa": tc.cand})
 			argv, ran := marker(t, 0)
-			code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(t.TempDir(), "r.json"), "--report", under)
+			code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(t.TempDir(), "r.json"), "--report-file", under)
 			if code != tc.code || !ran() || !strings.Contains(stderr, tc.stderr) || !strings.Contains(stderr, "writing report") {
 				t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
 			}
@@ -271,7 +271,7 @@ func TestRunReportWriteFailure(t *testing.T) {
 func TestRunWithholdsSigningToken(t *testing.T) {
 	signed := fakePublish(t, nil, nil) // sets the token and checks signing gets it
 	c := contractWith(t, "hermetic", "sh", "-c", `test -z "$`+idTokenEnv+`"`)
-	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result", filepath.Join(t.TempDir(), "r.json"))
+	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result-file", filepath.Join(t.TempDir(), "r.json"))
 	if code != ExitOK || len(*signed) != 1 {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
@@ -331,11 +331,11 @@ func TestRunThenPush(t *testing.T) {
 	signed := fakePublish(t, nil, nil)
 	c := contractWith(t, "hermetic", "false")
 	result := filepath.Join(t.TempDir(), ".aval", "result.json")
-	if code, _, stderr := runCLI("run", "-f", c, "--result", result); code != ExitTestFailed {
+	if code, _, stderr := runCLI("run", "-f", c, "--result-file", result); code != ExitTestFailed {
 		t.Fatalf("run: exit %d, stderr %q", code, stderr)
 	}
 	t.Setenv(idTokenEnv, "token") // run unset it
-	code, stdout, stderr := runCLI("push", "-f", c, "--registry", "reg.example/r", "--result", result)
+	code, stdout, stderr := runCLI("push", "-f", c, "--registry", "reg.example/r", "--result-file", result)
 	if code != ExitOK || !strings.Contains(stdout, "pushed reg.example/r@sha256:bb") || len(*signed) != 1 {
 		t.Fatalf("push: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
@@ -355,12 +355,12 @@ func TestPushRejects(t *testing.T) {
 	fakePublish(t, nil, nil)
 	c := writeContract(t, "hermetic")
 	result := filepath.Join(t.TempDir(), "result.json")
-	if code, _, stderr := runCLI("run", "-f", c, "--result", result); code != ExitOK {
+	if code, _, stderr := runCLI("run", "-f", c, "--result-file", result); code != ExitOK {
 		t.Fatalf("run: exit %d, stderr %q", code, stderr)
 	}
 	// Signing fails: nothing is published.
 	fakePublish(t, errors.New("no key"), nil)
-	if code, _, stderr := runCLI("push", "-f", c, "--registry", "reg.example/r", "--result", result); code != ExitError || !strings.Contains(stderr, "signing: no key") {
+	if code, _, stderr := runCLI("push", "-f", c, "--registry", "reg.example/r", "--result-file", result); code != ExitError || !strings.Contains(stderr, "signing: no key") {
 		t.Fatalf("sign error: exit %d, stderr %q", code, stderr)
 	}
 
@@ -368,14 +368,14 @@ func TestPushRejects(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(filepath.Dir(c), "in.txt"), []byte("changed"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code, _, stderr := runCLI("push", "-f", c, "--registry", "reg.example/r", "--result", result); code != ExitError || !strings.Contains(stderr, "run the test again") {
+	if code, _, stderr := runCLI("push", "-f", c, "--registry", "reg.example/r", "--result-file", result); code != ExitError || !strings.Contains(stderr, "run the test again") {
 		t.Fatalf("stale result: exit %d, stderr %q", code, stderr)
 	}
 	// Not a predicate at all.
 	if err := os.WriteFile(result, []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code, _, stderr := runCLI("push", "-f", c, "--registry", "reg.example/r", "--result", result); code != ExitError || !strings.Contains(stderr, "recorded result") {
+	if code, _, stderr := runCLI("push", "-f", c, "--registry", "reg.example/r", "--result-file", result); code != ExitError || !strings.Contains(stderr, "recorded result") {
 		t.Fatalf("invalid result: exit %d, stderr %q", code, stderr)
 	}
 }
@@ -394,7 +394,7 @@ func TestRunPush(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			fakePublish(t, tc.signErr, tc.pushErr)
-			code, stdout, stderr := runCLI("run", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "--push", "--result", filepath.Join(t.TempDir(), "r.json"))
+			code, stdout, stderr := runCLI("run", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "--push", "--result-file", filepath.Join(t.TempDir(), "r.json"))
 			if code != tc.code || !strings.Contains(stdout+stderr, tc.out) {
 				t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 			}
@@ -431,7 +431,7 @@ func pushResult(t *testing.T) pushed {
 	}
 	argv, ran := marker(t, 0)
 	c := contractWith(t, "hermetic", argv...)
-	if code, _, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--key", keyFile, "--result", filepath.Join(dir, "r.json")); code != ExitOK || !ran() || stored == nil {
+	if code, _, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--key", keyFile, "--result-file", filepath.Join(dir, "r.json")); code != ExitOK || !ran() || stored == nil {
 		t.Fatalf("run --push: exit %d, stderr %q", code, stderr)
 	}
 	serve(t, stored)
@@ -444,7 +444,7 @@ func pushResult(t *testing.T) pushed {
 // signer, its trust level and the reference.
 func TestRunPushThenReuse(t *testing.T) {
 	s := pushResult(t)
-	code, stdout, stderr := runCLI("run", "-f", s.contract, "--registry", "reg.example/r", "--policy", s.policy, "--result", filepath.Join(s.dir, "r.json"))
+	code, stdout, stderr := runCLI("run", "-f", s.contract, "--registry", "reg.example/r", "--policy", s.policy, "--result-file", filepath.Join(s.dir, "r.json"))
 	if code != ExitOK || s.ran() || !strings.Contains(stdout, "reference: reg.example/r@sha256:aa\nreused passed result\n") {
 		t.Fatalf("reuse: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
@@ -465,7 +465,7 @@ func TestSignerNotInPolicyReason(t *testing.T) {
 		t.Fatal(err)
 	}
 	reason := fmt.Sprintf("signer key id %q is not in the trust policy (trust policy %s)", kid, s.policy)
-	for _, args := range [][]string{{"verify"}, {"run", "--result", filepath.Join(s.dir, "r.json")}} {
+	for _, args := range [][]string{{"verify"}, {"run", "--result-file", filepath.Join(s.dir, "r.json")}} {
 		code, stdout, stderr := runCLI(append(args, "-f", s.contract, "--registry", "reg.example/r", "--policy", s.policy)...)
 		all := stdout + stderr
 		if code != ExitVerificationFailed || strings.Count(all, reason) != 1 || strings.Count(all, "SECURITY") != 1 || strings.Count(stderr, "\n") != 1 {
@@ -486,7 +486,7 @@ func TestUntrustedTextCannotStartALine(t *testing.T) {
 	fakeCandidates(t, nil, map[string]candidate{"sha256:aa": {fetchErr: gone}, "sha256:bb": {verifyErr: forged}, "sha256:cc": {verifyErr: forged}})
 	argv, _ := marker(t, 0)
 	dir := t.TempDir()
-	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(dir, "result.json"))
+	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(dir, "result.json"))
 	if code != ExitVerificationFailed {
 		t.Fatalf("exit %d, want %d", code, ExitVerificationFailed)
 	}
@@ -519,7 +519,7 @@ func TestStalledRegistry(t *testing.T) {
 	report := filepath.Join(dir, "report.json")
 	start := time.Now()
 	code, _, stderr := runCLI("run", "-f", c, "--registry", repo, "--policy", pol, "--registry-timeout", "200ms",
-		"--push", "--key", keyFile, "--report", report, "--result", filepath.Join(dir, "result.json"))
+		"--push", "--key", keyFile, "--report-file", report, "--result-file", filepath.Join(dir, "result.json"))
 	if code != ExitError || !ran() || readReport(t, report).Outcome != evidence.OutcomeError || !strings.Contains(stderr, "deadline exceeded") {
 		t.Fatalf("run: exit %d, ran %v, report %+v, stderr %q", code, ran(), readReport(t, report), stderr)
 	}

@@ -49,7 +49,7 @@ func TestMutableReferenceIsAMiss(t *testing.T) {
 			c = mutableContract(t, class, "", argv...)
 			dir := t.TempDir()
 			report := filepath.Join(dir, "report.json")
-			code, stdout, stderr = runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(dir, "r.json"), "--report", report)
+			code, stdout, stderr = runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(dir, "r.json"), "--report-file", report)
 			if code != ExitOK || !ran() || !strings.Contains(stdout, "mutable: "+finding) || readReport(t, report).Outcome != evidence.OutcomeMiss {
 				t.Fatalf("run: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 			}
@@ -61,12 +61,12 @@ func TestMutableReferenceIsNotPublished(t *testing.T) {
 	signed := fakePublish(t, nil, nil)
 	c := mutableContract(t, "hermetic", "", "true")
 	result := filepath.Join(t.TempDir(), "r.json")
-	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result", result)
+	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result-file", result)
 	if code != ExitError || !strings.Contains(stdout, "ran unit: passed") || !strings.Contains(stderr, "result not published: mutable references") || len(*signed) != 0 {
 		t.Fatalf("run --push: exit %d, stdout %q, stderr %q, signed %d", code, stdout, stderr, len(*signed))
 	}
 	t.Setenv(idTokenEnv, "token") // run unset it
-	code, _, stderr = runCLI("push", "-f", c, "--registry", "reg.example/r", "--result", result)
+	code, _, stderr = runCLI("push", "-f", c, "--registry", "reg.example/r", "--result-file", result)
 	if code != ExitError || !strings.Contains(stderr, "result not published: mutable references") || len(*signed) != 0 {
 		t.Fatalf("push: exit %d, stderr %q", code, stderr)
 	}
@@ -77,7 +77,7 @@ func TestMutableReferenceIsNotPublished(t *testing.T) {
 func TestAllowMutableAcknowledges(t *testing.T) {
 	fakeCandidates(t, nil, map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}})
 	c := mutableContract(t, "hermetic", "\n  allowMutable: [{ref: flask, reason: vendored wheel cache}]", "true")
-	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(t.TempDir(), "r.json"))
+	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(t.TempDir(), "r.json"))
 	if code != ExitOK || !strings.Contains(stdout, "mutable: "+finding) || !strings.Contains(stdout, "(allowed: vendored wheel cache)") || !strings.Contains(stdout, "reused passed result") {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
@@ -91,7 +91,7 @@ func TestMutableReferenceInformational(t *testing.T) {
 		return &policy.Policy{AllowedCacheability: []string{"external-dependencies"}}, nil
 	}
 	c := mutableContract(t, "external-dependencies", "", "true")
-	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(t.TempDir(), "r.json"))
+	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(t.TempDir(), "r.json"))
 	if code != ExitOK || !strings.Contains(stdout, "mutable: "+finding) || !strings.Contains(stdout, "reused passed result") {
 		t.Fatalf("external-dependencies: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
@@ -110,7 +110,7 @@ func TestFingerprintOnlyListsFindings(t *testing.T) {
 	if code != ExitOK || strings.Count(stdout, "\n") != 1 || !strings.HasPrefix(stdout, "sha256:") || !strings.Contains(stderr, "mutable: "+finding) {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
-	code, stdout, _ = runCLI("run", "--explain", "-f", c, "--result", filepath.Join(t.TempDir(), "r.json"))
+	code, stdout, _ = runCLI("run", "--explain", "-f", c, "--result-file", filepath.Join(t.TempDir(), "r.json"))
 	if code != ExitOK || !strings.Contains(stdout, "source ") || !strings.Contains(stdout, "mutable: "+finding) {
 		t.Fatalf("explain: exit %d, stdout %q", code, stdout)
 	}

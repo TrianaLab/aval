@@ -55,7 +55,7 @@ change anywhere reruns every shard. Simpler to set up, less reuse.
 
 ## The matrix
 
-One job per shard. Shards that share a checkout write different `--result`
+One job per shard. Shards that share a checkout write different `--result-file`
 files, and each declares its own coverage file under `outputs`, restored
 on reuse:
 
@@ -66,7 +66,7 @@ on reuse:
 The same job locally, for shard 2:
 
 ```sh
-aval run -f aval.shard-2.yaml --result .aval/shard-2.json --registry "$REPO" --policy "$POLICY"
+aval run -f aval.shard-2.yaml --result-file .aval/shard-2.json --registry "$REPO" --policy "$POLICY"
 ```
 
 To publish, add the push step from [Use GitHub Actions](github-actions.md)

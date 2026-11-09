@@ -57,6 +57,9 @@ func TestBrowserDemoMatchesCLI(t *testing.T) {
 	}
 	cli := func(line string) []string {
 		args := strings.Fields(strings.TrimPrefix(line, "aval "))
+		if args[0] == "explain" {
+			return args
+		}
 		args = append(args, "--registry", repo, "--policy", "policy.yaml")
 		if args[0] == "run" {
 			args = append(args, "--push", "--key", "throwaway.key")
@@ -64,7 +67,7 @@ func TestBrowserDemoMatchesCLI(t *testing.T) {
 		return args
 	}
 	for _, line := range []string{
-		"aval run", "aval run", "aval verify", "aval verify -o json", "aval run --explain",
+		"aval run", "aval run", "aval verify", "aval verify -o json", "aval run --explain", "aval explain", "aval explain --digest",
 		"edit README.md", "aval run", "edit aval.yaml", "aval verify", "edit greet.go", "aval verify", "aval run",
 		"tamper", "aval verify", "aval verify -o json", "aval run", "aval verify",
 	} {

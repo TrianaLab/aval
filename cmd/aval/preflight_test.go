@@ -57,8 +57,8 @@ func TestPushPreconditionsFailFast(t *testing.T) {
 			c := contractWith(t, "hermetic", argv...)
 			result := filepath.Join(t.TempDir(), "r.json")
 			for _, args := range [][]string{
-				{"run", "-f", c, "--registry", "reg.example/r", "--push", "--result", result},
-				{"push", "-f", c, "--registry", "reg.example/r", "--result", result},
+				{"run", "-f", c, "--registry", "reg.example/r", "--push", "--result-file", result},
+				{"push", "-f", c, "--registry", "reg.example/r", "--result-file", result},
 			} {
 				if tc.key != "" {
 					args = append(args, "--key", tc.key)
@@ -99,10 +99,10 @@ func TestOutputThatIsAnInputIsRejected(t *testing.T) {
 	key, _ := devKey(t, t.TempDir(), "k")
 	in := filepath.Join(filepath.Dir(c), "in.txt") // matched by scope.source
 	for _, args := range [][]string{
-		{"run", "-f", c, "--result", in},
-		{"run", "-f", c, "--report", in},
-		{"run", "-f", c, "--fingerprint-only", "--result", in},
-		{"push", "-f", c, "--registry", "reg.example/r", "--key", key, "--result", in},
+		{"run", "-f", c, "--result-file", in},
+		{"run", "-f", c, "--report-file", in},
+		{"run", "-f", c, "--fingerprint-only", "--result-file", in},
+		{"push", "-f", c, "--registry", "reg.example/r", "--key", key, "--result-file", in},
 	} {
 		code, _, stderr := runCLI(args...)
 		if code != ExitUsage || ran() || !strings.Contains(stderr, "is an input of the test") {
@@ -259,7 +259,7 @@ func TestLookalikeReportStaysAnInput(t *testing.T) {
 			if err := os.WriteFile(in, content, 0o644); err != nil {
 				t.Fatal(err)
 			}
-			code, stdout, _ := runCLI("run", "-f", c, "--fingerprint-only", "--report", in)
+			code, stdout, _ := runCLI("run", "-f", c, "--fingerprint-only", "--report-file", in)
 			if code == ExitUsage {
 				if b, _ := os.ReadFile(in); string(b) != string(content) {
 					t.Fatalf("a refused run changed the input: %q", b)
@@ -289,11 +289,11 @@ func TestAliasedOutputIsNotOverwritten(t *testing.T) {
 	}
 	in := filepath.Join(real, "in.txt")
 	cases := [][]string{
-		{"run", "-f", filepath.Join(link, "aval.yaml"), "--result", in},
-		{"run", "-f", c, "--report", filepath.Join(link, "in.txt")},
+		{"run", "-f", filepath.Join(link, "aval.yaml"), "--result-file", in},
+		{"run", "-f", c, "--report-file", filepath.Join(link, "in.txt")},
 	}
 	if _, err := os.Stat(filepath.Join(real, "IN.TXT")); err == nil {
-		cases = append(cases, []string{"run", "-f", c, "--result", filepath.Join(real, "IN.TXT")})
+		cases = append(cases, []string{"run", "-f", c, "--result-file", filepath.Join(real, "IN.TXT")})
 	} else {
 		t.Log("case-sensitive file system: the different-case alias is not exercised")
 	}
@@ -309,7 +309,7 @@ func TestAliasedOutputIsNotOverwritten(t *testing.T) {
 	// Aval's own result outside the scope is overwritten as before.
 	out := filepath.Join(t.TempDir(), "r.json")
 	for i := range 2 {
-		if code, _, stderr := runCLI("run", "-f", c, "--result", out); code != ExitOK || !ran() {
+		if code, _, stderr := runCLI("run", "-f", c, "--result-file", out); code != ExitOK || !ran() {
 			t.Fatalf("run %d: exit %d, stderr %s", i+1, code, stderr)
 		}
 	}

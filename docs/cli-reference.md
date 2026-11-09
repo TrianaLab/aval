@@ -37,6 +37,7 @@ Usage:
   aval [command]
 
 Core:
+  explain     Print what the execution fingerprint covers, with the digest last
   run         Reuse a verified result for the current inputs, or run the test
   verify      Check whether a trusted result exists for the current inputs
 
@@ -44,7 +45,6 @@ Publishing:
   push        Sign and publish a recorded execution result
 
 Statistics:
-  record      Publish a run record written by 'aval run --record-file'
   stats       Aggregate the run records in the registry: reuse, misses, time saved
 
 Additional Commands:
@@ -84,6 +84,33 @@ Flags:
 Use "aval completion [command] --help" for more information about a command.
 ```
 
+## aval explain
+
+explain prints the fingerprint manifest (every input that was hashed) under a
+header, then the fingerprint as the last line. --digest prints only the
+fingerprint. explain never looks anything up and never runs the test; the
+fingerprint is the one 'aval run' computes with its default --result-file.
+
+Exit codes: 0 printed, 1 the fingerprint cannot be computed (unprovable
+inputs), 2 usage or invalid aval.yaml.
+
+```text
+Usage:
+  aval explain [flags]
+
+Examples:
+  # What the fingerprint covers, digest last
+  aval explain
+
+  # Only the digest
+  aval explain --digest
+
+Flags:
+  -f, --contract string   path to the test contract (default "aval.yaml")
+      --digest            print only the fingerprint (sha256:...)
+  -h, --help              help for explain
+```
+
 ## aval push
 
 push signs the result recorded by 'aval run' and publishes it. The result
@@ -107,31 +134,37 @@ Flags:
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-      --result string               result recorded by 'aval run' (default ".aval/result.json")
+      --result-file string          result recorded by 'aval run' (default ".aval/result.json")
 ```
+
+Deprecated flags, hidden from help:
+
+- `--result`: use --result-file
 
 ## aval record
 
-record publishes a run record that 'aval run --record-file' wrote, as 'aval
-run --record' would have. Use it to publish, from a job with write credentials
-that runs no tests, the record of a run made without them. Run records are
-unsigned statistics: run and verify never read them. --repository sets the
-record's source repository.
+record is the deprecated form of 'aval stats publish FILE'.
+
+Deprecated, hidden from help: use 'aval stats publish FILE' instead.
 
 ```text
 Usage:
   aval record [flags]
 
 Examples:
-  aval record --registry ghcr.io/acme/orders-aval --record-file record.json
+  aval stats publish --registry ghcr.io/acme/orders-aval record.json
 
 Flags:
   -h, --help                        help for record
-      --record-file string          run record written by 'aval run --record-file' (required)
+      --record-file string          run record written by 'aval run --stats-file' (required)
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-      --repository string           source repository (e.g. acme/orders); default: the one in the record
+      --source-repo string          source repository (e.g. acme/orders); default: the one in the record
 ```
+
+Deprecated flags, hidden from help:
+
+- `--repository`: use --source-repo
 
 ## aval run
 
@@ -160,27 +193,35 @@ Examples:
 Flags:
       --ci-run-url string           link to the CI run, stored in the run record
   -f, --contract string             path to the test contract (default "aval.yaml")
-      --explain                     print the fingerprint manifest (what was hashed)
-      --fingerprint-only            print the execution fingerprint and exit
+      --explain                     print the fingerprint manifest (what was hashed) before the run; 'aval explain' prints it alone
+      --fingerprint-only            print the execution fingerprint and exit (same as 'aval explain --digest')
   -h, --help                        help for run
       --key string                  signing key path for --push (default: keyless, from $SIGSTORE_ID_TOKEN or the interactive login; no token is stored and runner.command never sees it)
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
       --no-reuse                    always run, never reuse (excludes --shadow)
       --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
       --push                        sign and publish the result after running (needs --registry)
-      --record                      publish a run record for statistics after the run (needs --registry; best-effort)
-      --record-file string          also write the run record to this file, for 'aval record'
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-      --report string               also write the lookup decision as a verify report (JSON) to this file
-      --repository string           source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
-      --result string               where to record the result for 'aval push' (default ".aval/result.json")
+      --report-file string          also write the lookup decision as a verify report (JSON) to this file
+      --result-file string          where to record the result for 'aval push' (default ".aval/result.json")
       --shadow                      verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)
+      --source-repo string          source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
+      --stats                       publish a run record for statistics after the run (needs --registry; best-effort)
+      --stats-file string           also write the run record to this file, for 'aval stats publish'
 ```
+
+Deprecated flags, hidden from help:
+
+- `--record`: use --stats
+- `--record-file`: use --stats-file
+- `--report`: use --report-file
+- `--repository`: use --source-repo
+- `--result`: use --result-file
 
 ## aval stats
 
-stats reads the run records that 'aval run --record' and 'aval record'
+stats reads the run records that 'aval run --stats' and 'aval stats publish'
 published to the registry and aggregates them: runs, hit rate, misses by
 cause, verification failures, shadow false hits, and total and saved test
 time, per test (or per source repository with --by repository) and in total.
@@ -200,9 +241,13 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.
 ```text
 Usage:
   aval stats [flags]
+  aval stats [command]
 
 Examples:
   aval stats --registry ghcr.io/acme/orders-aval --since 30d
+
+Available Commands:
+  publish     Publish a run record written by 'aval run --stats-file'
 
 Flags:
       --by string                   group by test or repository (the run record's source repository) (default "test")
@@ -212,6 +257,30 @@ Flags:
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --since string                only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)
       --test string                 only this test id (metadata.name); default: every test with run records
+
+Use "aval stats [command] --help" for more information about a command.
+```
+
+## aval stats publish
+
+stats publish publishes the run record that 'aval run --stats-file' wrote to
+FILE, as 'aval run --stats' would have. Use it to publish, from a job with
+write credentials that runs no tests, the record of a run made without them.
+Run records are unsigned statistics: run and verify never read them.
+--source-repo sets the record's source repository.
+
+```text
+Usage:
+  aval stats publish FILE [flags]
+
+Examples:
+  aval stats publish --registry ghcr.io/acme/orders-aval record.json
+
+Flags:
+  -h, --help                        help for publish
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+      --source-repo string          source repository (e.g. acme/orders); default: the one in the record
 ```
 
 ## aval upgrade

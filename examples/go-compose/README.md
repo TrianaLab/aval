@@ -25,9 +25,9 @@ From the repo root:
 
 ```sh
 go build -o bin/aval ./cmd/aval
-bin/aval run --fingerprint-only -f examples/go-compose/aval.yaml
+bin/aval explain --digest -f examples/go-compose/aval.yaml
 # sha256:<64 hex>
-bin/aval run --explain --fingerprint-only -f examples/go-compose/aval.yaml
+bin/aval explain -f examples/go-compose/aval.yaml
 ```
 
 `--explain` prints the manifest that was hashed: the contract, every file
@@ -38,7 +38,7 @@ an input.
 Editing this README does not change the fingerprint; editing a `.go` file does:
 
 ```sh
-fp() { bin/aval run --fingerprint-only -f examples/go-compose/aval.yaml; }
+fp() { bin/aval explain --digest -f examples/go-compose/aval.yaml; }
 a=$(fp); echo >> examples/go-compose/README.md;     b=$(fp); [ "$a" = "$b" ] && echo "README: same"
 echo >> examples/go-compose/counter/counter.go;     c=$(fp); [ "$b" != "$c" ] && echo ".go: changed"
 ```

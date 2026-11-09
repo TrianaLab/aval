@@ -82,7 +82,7 @@ func TestRunTakesRegistryAndPolicyFromEnv(t *testing.T) {
 			}
 			argv, _ := marker(t, 0)
 			report := filepath.Join(t.TempDir(), "report.json")
-			args := append([]string{"run", "-f", contractWith(t, "hermetic", argv...), "--result", filepath.Join(t.TempDir(), "r.json"), "--report", report}, tc.flags...)
+			args := append([]string{"run", "-f", contractWith(t, "hermetic", argv...), "--result-file", filepath.Join(t.TempDir(), "r.json"), "--report-file", report}, tc.flags...)
 			code, stdout, stderr := runCLI(args...)
 			r := readReport(t, report)
 			if code != ExitOK || !strings.Contains(string(r.Outcome)+" "+r.Reason, tc.reason) {
@@ -122,7 +122,7 @@ func TestUnreadableEnvPolicyNeverReuses(t *testing.T) {
 		loadPolicy = policy.Load // the real loader: the file cannot be read
 		argv, ran := marker(t, 0)
 		report := filepath.Join(t.TempDir(), "report.json")
-		args := []string{"run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--result", filepath.Join(t.TempDir(), "r.json"), "--report", report}
+		args := []string{"run", "-f", contractWith(t, "hermetic", argv...), "--registry", "reg.example/r", "--result-file", filepath.Join(t.TempDir(), "r.json"), "--report-file", report}
 		if env {
 			t.Setenv(policyEnv, missing)
 		} else {

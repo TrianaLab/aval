@@ -192,7 +192,7 @@ to turn reuse off). There is no config file.`,
 		SilenceErrors: true,
 	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
-	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
+	root.AddCommand(newRunCmd(), newExplainCmd(), newPushCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
 	guide(root)
 	return root
 }
@@ -240,8 +240,8 @@ func noArgs(c *cobra.Command, args []string) error {
 // loadAndFingerprint loads the contract and computes its fingerprint, rooted
 // at the contract's directory. When only the fingerprint fails it still
 // returns the contract, so run can execute the test. outputs are the files
-// the command writes or reads as Aval output (--result, --report,
-// --record-file); inside the contract root they are not inputs.
+// the command writes or reads as Aval output (--result-file, --report-file,
+// --stats-file); inside the contract root they are not inputs.
 func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*contract.Contract, fingerprint.Fingerprint, error) {
 	c, err := contract.Load(file)
 	if err != nil {
@@ -250,7 +250,7 @@ func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*c
 	for _, o := range outputs {
 		if isInput(filepath.Dir(file), c, o) {
 			// Skipping it would silently drop an input from the fingerprint.
-			return nil, fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result or --report) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract directory", o, fingerprint.OutputDir)}
+			return nil, fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result-file or --report-file) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract directory", o, fingerprint.OutputDir)}
 		}
 	}
 	fp, err := fingerprint.Compute(ctx, filepath.Dir(file), c, os.LookupEnv, outputs...)
@@ -266,7 +266,7 @@ func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*c
 // and p holds something other than Aval's own result, report or run record
 // (a whole-tree scope finds those on the next run, #63).
 // ponytail: an input that is itself a valid Aval result, report or run record (a test
-// fixture) is taken for an output; name such a fixture as --result and the
+// fixture) is taken for an output; name such a fixture as --result-file and the
 // run overwrites it anyway.
 func isInput(dir string, c *contract.Contract, p string) bool {
 	return inScope(dir, c, p) && existsNonAvalOutput(p)
@@ -313,7 +313,7 @@ func isAvalOutput(raw []byte) bool {
 	case evidence.OutcomeVerified, evidence.OutcomeMiss, evidence.OutcomeVerificationFailed:
 		return r.Fingerprint != ""
 	case evidence.OutcomeError:
-		// 'aval run --report' writes an error report without a fingerprint
+		// 'aval run --report-file' writes an error report without a fingerprint
 		// when it could not compute one.
 		return true
 	}

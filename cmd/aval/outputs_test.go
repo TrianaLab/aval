@@ -180,7 +180,7 @@ func TestRunPushOutputs(t *testing.T) {
 	pushed := fakeOutputs(t, nil, nil)
 	c := outputsContract(t, "[coverage.xml]", "sh", "-c", "printf cov > coverage.xml")
 	result := filepath.Join(t.TempDir(), "r.json")
-	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result", result)
+	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result-file", result)
 	if code != ExitOK || !strings.Contains(stdout, "pushed reg.example/r@sha256:bb") || len(*signed) != 1 || fmt.Sprint(*pushed) != fmt.Sprint([]registry.Output{{Path: "coverage.xml", Data: []byte("cov")}}) {
 		t.Fatalf("exit %d, stdout %q, stderr %q, pushed %v", code, stdout, stderr, *pushed)
 	}
@@ -201,7 +201,7 @@ func TestRunPushOutputs(t *testing.T) {
 			signed := fakePublish(t, nil, nil)
 			pushed := fakeOutputs(t, tc.pushErr, nil)
 			c := outputsContract(t, "[coverage.xml]", tc.argv...)
-			code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result", result)
+			code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result-file", result)
 			if code != ExitError || !strings.Contains(stderr, tc.want) || len(*signed) != 0 || (tc.pushErr == nil) != (*pushed == nil) || !strings.Contains(stdout, "ran unit: passed") {
 				t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 			}
@@ -218,7 +218,7 @@ func TestRunPushOutputsLoginFirst(t *testing.T) {
 	fakeLogin(t, true, "", errors.New("closed"))
 	t.Setenv(idTokenEnv, "")
 	c := outputsContract(t, "[coverage.xml]", "sh", "-c", "printf cov > coverage.xml")
-	if code, _, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result", filepath.Join(t.TempDir(), "r.json")); code != ExitError || !strings.Contains(stderr, "interactive Sigstore login: closed") || *pushed != nil {
+	if code, _, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result-file", filepath.Join(t.TempDir(), "r.json")); code != ExitError || !strings.Contains(stderr, "interactive Sigstore login: closed") || *pushed != nil {
 		t.Fatalf("failed login: exit %d, stderr %q, pushed %v", code, stderr, *pushed)
 	}
 }
@@ -238,7 +238,7 @@ func TestReuseRestoresOutputs(t *testing.T) {
 	}
 
 	write(t, dir, "coverage.xml", "stale")
-	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(dir, ".aval", "r.json"))
+	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(dir, ".aval", "r.json"))
 	if code != ExitOK || ran() || !strings.Contains(stdout, "restored coverage.xml\nrestored reports/junit.xml\nreused passed result\n") {
 		t.Fatalf("run: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
@@ -283,7 +283,7 @@ func TestOutputsVerificationFailures(t *testing.T) {
 				c = outputsContract(t, tc.contractOutputs, argv...)
 			}
 			report := filepath.Join(t.TempDir(), "report.json")
-			code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(t.TempDir(), "r.json"), "--report", report)
+			code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(t.TempDir(), "r.json"), "--report-file", report)
 			if r := readReport(t, report); code != ExitVerificationFailed || !ran() || r.Outcome != evidence.OutcomeVerificationFailed || !strings.Contains(stderr, "SECURITY") || strings.Contains(stdout, "restored") {
 				t.Fatalf("exit %d, report %+v, stdout %q, stderr %q", code, r, stdout, stderr)
 			}
@@ -296,7 +296,7 @@ func TestOutputsVerificationFailures(t *testing.T) {
 		"sha256:bb": {trust: evidence.TrustRunner, outputs: listed("coverage.xml")},
 	})
 	c := outputsContract(t, "[coverage.xml]")
-	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(t.TempDir(), "r.json"))
+	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(t.TempDir(), "r.json"))
 	if code != ExitOK || !strings.Contains(stdout, "restored coverage.xml") || !strings.Contains(stderr, "SECURITY: 1 attestation(s)") {
 		t.Fatalf("sibling: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
@@ -341,7 +341,7 @@ func TestRestoreRefuses(t *testing.T) {
 			if tc.setup != nil {
 				tc.setup(t, filepath.Dir(c))
 			}
-			code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(t.TempDir(), "r.json"))
+			code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(t.TempDir(), "r.json"))
 			if code != ExitError || !ran() || !strings.Contains(stderr, "restoring outputs: ") || !strings.Contains(stderr, tc.want) || strings.Contains(stdout, "reused") {
 				t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 			}

@@ -27,7 +27,7 @@ flowchart LR
 
 `aval verify` exits 4; `aval run --push` and `aval push` publish nothing. The
 line names file:line, ecosystem, the reference and the fix.
-`--fingerprint-only` prints it on stderr.
+`aval explain` prints it on stderr.
 
 ??? info "How the scan works"
     - It reads files only; it never fetches, resolves or runs anything.

@@ -109,6 +109,26 @@ func TestShellCommands(t *testing.T) {
 	mustContain(t, "rm", errw, "rm: command not found (type help)")
 }
 
+// aval explain prints run --explain's manifest under a header, the digest
+// last, and looks nothing up: the registry stays empty.
+func TestExplain(t *testing.T) {
+	d := New()
+	run, _ := exec(t, d, "aval run --explain", exitOK)
+	d = New()
+	out, _ := exec(t, d, "aval explain", exitOK)
+	digest, _ := exec(t, d, "aval explain --digest", exitOK)
+	manifest, _, _ := strings.Cut(run, "test greet fingerprint ")
+	if want := "fingerprint manifest for greet (aval-fingerprint/v1)\n" + manifest + "fingerprint " + digest; out != want {
+		t.Fatalf("explain %q, want %q", out, want)
+	}
+	if !strings.HasPrefix(digest, "sha256:") || len(d.reg) != 0 {
+		t.Fatalf("digest %q, registry %v", digest, d.reg)
+	}
+	d.files["aval.yaml"] = []byte("kind: Nope\n")
+	_, errw := exec(t, d, "aval explain", exitUsage)
+	mustContain(t, "bad contract", errw, "aval: aval.yaml: ")
+}
+
 // Usage errors carry the CLI's words (cobra's for flags) and exit 2.
 func TestUsageErrors(t *testing.T) {
 	cases := map[string]string{
@@ -121,6 +141,10 @@ func TestUsageErrors(t *testing.T) {
 		"aval verify -o yaml":    `aval: --output must be text or json, got "yaml"`,
 		"aval nope":              `aval: unknown command "nope"`,
 		"aval push":              "aval: push is not in this demo",
+		"aval stats publish x":   "aval: stats is not in this demo",
+		"aval explain --explain": "aval: unknown flag: --explain",
+		"aval run --digest":      "aval: unknown flag: --digest",
+		"aval explain extra":     `aval: unknown command "extra" for "aval explain"`,
 		"aval verify --output=x": `got "x"`,
 	}
 	d := New()

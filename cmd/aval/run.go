@@ -22,6 +22,7 @@ import (
 
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/TrianaLab/aval/internal/attest"
 	"github.com/TrianaLab/aval/internal/cliout"
@@ -83,18 +84,40 @@ running the test), 1 error or false hit (--shadow), 2 usage.`,
 	f.BoolVar(&o.push, "push", false, "sign and publish the result after running (needs --registry)")
 	f.StringVar(&o.key, "key", "", "signing key path for --push (default: keyless, from $"+idTokenEnv+" or the interactive login; no token is stored and runner.command never sees it)")
 	f.BoolVar(&o.login, "login", false, loginFlagHelp)
-	f.StringVar(&o.resultFile, "result", defaultResult, "where to record the result for 'aval push'")
-	f.StringVar(&o.reportFile, "report", "", "also write the lookup decision as a verify report (JSON) to this file")
+	f.StringVar(&o.resultFile, "result-file", defaultResult, "where to record the result for 'aval push'")
+	f.StringVar(&o.reportFile, "report-file", "", "also write the lookup decision as a verify report (JSON) to this file")
 	f.BoolVar(&o.noReuse, "no-reuse", false, "always run, never reuse (excludes --shadow)")
 	f.BoolVar(&o.shadow, "shadow", false, "verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)")
-	f.BoolVar(&o.fingerprintOnly, "fingerprint-only", false, "print the execution fingerprint and exit")
-	f.BoolVar(&o.explain, "explain", false, "print the fingerprint manifest (what was hashed)")
-	f.BoolVar(&o.record, "record", false, "publish a run record for statistics after the run (needs --registry; best-effort)")
-	f.StringVar(&o.recordFile, "record-file", "", "also write the run record to this file, for 'aval record'")
+	f.BoolVar(&o.fingerprintOnly, "fingerprint-only", false, "print the execution fingerprint and exit (same as 'aval explain --digest')")
+	f.BoolVar(&o.explain, "explain", false, "print the fingerprint manifest (what was hashed) before the run; 'aval explain' prints it alone")
+	f.BoolVar(&o.record, "stats", false, "publish a run record for statistics after the run (needs --registry; best-effort)")
+	f.StringVar(&o.recordFile, "stats-file", "", "also write the run record to this file, for 'aval stats publish'")
 	f.StringVar(&o.ciRunURL, "ci-run-url", "", "link to the CI run, stored in the run record")
-	f.StringVar(&o.repository, "repository", "", "source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'")
+	f.StringVar(&o.repository, "source-repo", "", "source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'")
+	// TODO(milestone-5): remove these aliases (deprecated in 0.7.0, #165), not before 0.8.0.
+	alias(cmd, "result-file", "result")
+	alias(cmd, "report-file", "report")
+	alias(cmd, "stats", "record")
+	alias(cmd, "stats-file", "record-file")
+	alias(cmd, "source-repo", "repository")
 	return cmd
 }
+
+// alias adds old to cmd as a hidden, deprecated name of the flag name, bound
+// to the same value. Using old prints pflag's deprecation notice on stderr.
+func alias(cmd *cobra.Command, name, old string) {
+	f := cmd.Flags()
+	n := f.Lookup(name)
+	f.AddFlag(&pflag.Flag{Name: old, Usage: n.Usage, Value: n.Value, DefValue: n.DefValue, NoOptDefVal: n.NoOptDefVal})
+	_ = f.MarkDeprecated(old, "use --"+name) // ponytail: old was just added, cannot fail
+	// cobra prints pflag's notices with Print, on stdout once SetOut is used.
+	f.SetOutput(stderrOf{cmd})
+}
+
+// stderrOf writes to the command's stderr, resolved at write time.
+type stderrOf struct{ c *cobra.Command }
+
+func (w stderrOf) Write(p []byte) (int, error) { return w.c.ErrOrStderr().Write(p) }
 
 // validate rejects bad flags before anything runs. token is the keyless
 // signing token, checked only with --push.
@@ -103,7 +126,7 @@ func (o runFlags) validate(token string) error {
 	case o.push && o.repo == "":
 		return usageError{errors.New("--push requires --registry")}
 	case o.record && o.repo == "":
-		return usageError{errors.New("--record requires --registry")}
+		return usageError{errors.New("--stats requires --registry")}
 	case o.shadow && o.noReuse:
 		return usageError{errors.New("--shadow and --no-reuse exclude each other")}
 	case o.login && !o.push:
@@ -175,20 +198,20 @@ func loadsAsP256(path string) error {
 	return nil
 }
 
-// checkOutputs refuses to overwrite an existing file at --result or
-// --report that is not an Aval output, wherever it lies: the scope check
+// checkOutputs refuses to overwrite an existing file at --result-file or
+// --report-file that is not an Aval output, wherever it lies: the scope check
 // cannot see through aliases (a symlinked root, a case-insensitive file
 // system). --fingerprint-only writes nothing.
 func (o runFlags) checkOutputs() error {
 	for _, p := range []string{o.resultFile, o.reportFile} {
 		if !o.fingerprintOnly && existsNonAvalOutput(p) {
-			return usageError{fmt.Errorf("output %s (--result or --report) exists and holds neither an Aval result nor a report; Aval does not overwrite it: choose another path or remove the file", p)}
+			return usageError{fmt.Errorf("output %s (--result-file or --report-file) exists and holds neither an Aval result nor a report; Aval does not overwrite it: choose another path or remove the file", p)}
 		}
 	}
 	return nil
 }
 
-// outputs are the files run writes as Aval output. A file at --record-file
+// outputs are the files run writes as Aval output. A file at --stats-file
 // that Aval did not write is left out, so it stays what it is (an input, if
 // in scope): recordRun does not overwrite it, and a statistics flag never
 // stops the test from running (#86).
@@ -504,9 +527,9 @@ func keep(ctx context.Context, out io.Writer, c *contract.Contract, p *evidence.
 	return nil
 }
 
-// recordRun writes the run record (--record-file) and publishes it
-// (--record). reused is true only when the verified result was reused
-// (not in --shadow, not after a failed --report write): a verified lookup
+// recordRun writes the run record (--stats-file) and publishes it
+// (--stats). reused is true only when the verified result was reused
+// (not in --shadow, not after a failed --report-file write): a verified lookup
 // alone is no reuse. ran is the real run, nil when the test did not run:
 // reused, or runner.command could not start. Best effort: a failure is a warning and
 // never changes the exit code, and a record is statistics, never evidence.
@@ -532,9 +555,9 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 	rf := filepath.Clean(o.recordFile)
 	switch {
 	case o.recordFile != "" && (rf == filepath.Clean(o.resultFile) || o.reportFile != "" && rf == filepath.Clean(o.reportFile)):
-		fmt.Fprintln(warn, "aval: warning: run record not written: --record-file is also --result/--report")
+		fmt.Fprintln(warn, "aval: warning: run record not written: --stats-file is also --result-file/--report-file")
 	case existsNonAvalOutput(o.recordFile):
-		fmt.Fprintf(warn, "aval: warning: run record not written: %s (--record-file) exists and holds no Aval output; Aval does not overwrite it\n", o.recordFile)
+		fmt.Fprintf(warn, "aval: warning: run record not written: %s (--stats-file) exists and holds no Aval output; Aval does not overwrite it\n", o.recordFile)
 	case o.recordFile != "":
 		if err := writeJSON(o.recordFile, rec); err != nil {
 			fmt.Fprintf(warn, "aval: warning: run record not written: %s\n", cliout.OneLine(err.Error()))
@@ -553,7 +576,7 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 	fmt.Fprintf(out, "recorded %s\n", d.Reference())
 }
 
-// writeReportFile writes r to path, unless no --report was asked for.
+// writeReportFile writes r to path, unless no --report-file was asked for.
 func writeReportFile(path string, r evidence.Report) error {
 	if path == "" {
 		return nil
@@ -670,53 +693,94 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 	f := cmd.Flags()
 	f.StringVar(&key, "key", "", "signing key path (default: keyless OIDC)")
 	f.BoolVar(&interactive, "login", false, loginFlagHelp)
-	f.StringVar(&resultFile, "result", defaultResult, "result recorded by 'aval run'")
+	f.StringVar(&resultFile, "result-file", defaultResult, "result recorded by 'aval run'")
+	alias(cmd, "result-file", "result") // TODO(milestone-5): remove (deprecated in 0.7.0, #165), not before 0.8.0.
 	return cmd
 }
 
+// recordDeprecated is the notice `aval record` prints on stderr, in cobra's
+// words for a deprecated command (cobra's own notice would go to stdout).
+// TODO(milestone-5): remove `aval record` (deprecated in 0.7.0, #165), not before 0.8.0.
+const recordDeprecated = "use 'aval stats publish FILE' instead"
+
+// newRecordCmd is the deprecated `aval record --record-file FILE`, hidden
+// from help: `aval stats publish FILE`.
 func newRecordCmd() *cobra.Command {
-	var file, repository string
+	var file, sourceRepo string
 	g := &globalFlags{}
 	cmd := &cobra.Command{
-		Use:   "record",
-		Short: "Publish a run record written by 'aval run --record-file'",
-		Long: `record publishes a run record that 'aval run --record-file' wrote, as 'aval
-run --record' would have. Use it to publish, from a job with write credentials
-that runs no tests, the record of a run made without them. Run records are
-unsigned statistics: run and verify never read them. --repository sets the
-record's source repository.`,
-		Args: noArgs,
+		Use:         "record",
+		Short:       "Publish a run record written by 'aval run --stats-file'",
+		Long:        "record is the deprecated form of 'aval stats publish FILE'.",
+		Hidden:      true,
+		Annotations: map[string]string{"deprecated": recordDeprecated},
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			repo, timeout := g.registry, g.timeout
-			g.printConfig(cmd.ErrOrStderr())
-			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout)); err != nil {
-				return err
-			}
-			if file == "" {
-				return usageError{errors.New("--record-file is required")}
-			}
-			raw, err := os.ReadFile(file)
-			if err != nil {
-				return fmt.Errorf("reading run record: %w", err)
-			}
-			rec, err := evidence.ParseRunRecord(raw)
-			if err != nil {
-				return fmt.Errorf("run record %s: %w", file, err)
-			}
-			rec.Repository = cmp.Or(repository, rec.Repository)
-			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
-			defer cancel()
-			d, err := pushRecord(ctx, repo, *rec)
-			if err != nil {
-				return fmt.Errorf("publishing run record: %w", err)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "recorded %s\n", d.Reference())
-			return nil
+			fmt.Fprintf(cmd.ErrOrStderr(), "Command %q is deprecated, %s\n", cmd.Name(), recordDeprecated)
+			return publishRecord(cmd, g, file, sourceRepo)
 		},
 	}
 	g.bind(cmd, false, false)
 	f := cmd.Flags()
-	f.StringVar(&file, "record-file", "", "run record written by 'aval run --record-file' (required)")
-	f.StringVar(&repository, "repository", "", "source repository (e.g. acme/orders); default: the one in the record")
+	f.StringVar(&file, "record-file", "", "run record written by 'aval run --stats-file' (required)")
+	f.StringVar(&sourceRepo, "source-repo", "", "source repository (e.g. acme/orders); default: the one in the record")
+	alias(cmd, "source-repo", "repository")
 	return cmd
+}
+
+func newStatsPublishCmd() *cobra.Command {
+	var sourceRepo string
+	g := &globalFlags{}
+	cmd := &cobra.Command{
+		Use:   "publish FILE",
+		Short: "Publish a run record written by 'aval run --stats-file'",
+		Long: `stats publish publishes the run record that 'aval run --stats-file' wrote to
+FILE, as 'aval run --stats' would have. Use it to publish, from a job with
+write credentials that runs no tests, the record of a run made without them.
+Run records are unsigned statistics: run and verify never read them.
+--source-repo sets the record's source repository.`,
+		Example: `  aval stats publish --registry ghcr.io/acme/orders-aval record.json`,
+		Args: func(c *cobra.Command, args []string) error {
+			if err := cobra.ExactArgs(1)(c, args); err != nil {
+				return usageError{err}
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return publishRecord(cmd, g, args[0], sourceRepo)
+		},
+	}
+	g.bind(cmd, false, false)
+	cmd.Flags().StringVar(&sourceRepo, "source-repo", "", "source repository (e.g. acme/orders); default: the one in the record")
+	return cmd
+}
+
+// publishRecord publishes the run record in file to the registry, with
+// sourceRepo as its source repository when set.
+func publishRecord(cmd *cobra.Command, g *globalFlags, file, sourceRepo string) error {
+	repo, timeout := g.registry, g.timeout
+	g.printConfig(cmd.ErrOrStderr())
+	if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout)); err != nil {
+		return err
+	}
+	if file == "" {
+		return usageError{errors.New("a run record file is required")}
+	}
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return fmt.Errorf("reading run record: %w", err)
+	}
+	rec, err := evidence.ParseRunRecord(raw)
+	if err != nil {
+		return fmt.Errorf("run record %s: %w", file, err)
+	}
+	rec.Repository = cmp.Or(sourceRepo, rec.Repository)
+	ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
+	defer cancel()
+	d, err := pushRecord(ctx, repo, *rec)
+	if err != nil {
+		return fmt.Errorf("publishing run record: %w", err)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "recorded %s\n", d.Reference())
+	return nil
 }

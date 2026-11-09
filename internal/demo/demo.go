@@ -60,6 +60,8 @@ const (
 const Help = `This terminal runs Aval compiled to WebAssembly, entirely in your browser.
   aval run              look up a trusted result; on a miss run the test, sign and push
   aval run --explain    the same, printing the fingerprint manifest first
+  aval explain          print what the fingerprint covers, digest last (no lookup, no run)
+  aval explain --digest only the fingerprint
   aval verify           look up and verify without running anything
   aval verify -o json   the same, as the JSON verify report
   ls, cat <file>        the demo project
@@ -209,11 +211,16 @@ func (d *Demo) aval(args []string, out, errw io.Writer) int {
 		return exitOK
 	}
 	cmd := args[0]
+	if cmd == "push" || cmd == "record" || cmd == "stats" {
+		return usage("%s is not in this demo: here aval run signs and pushes", cmd)
+	}
 	explain, output, err := parseFlags(cmd, args[1:])
 	if err != nil {
 		return usage("%s", err)
 	}
 	switch cmd {
+	case "explain":
+		return d.explain(explain, out, errw)
 	case "run":
 		return d.run(explain, out, errw)
 	case "verify":
@@ -221,20 +228,19 @@ func (d *Demo) aval(args []string, out, errw io.Writer) int {
 			return usage("--output must be text or json, got %q", output)
 		}
 		return d.verifyCmd(output, out, errw)
-	case "push", "record":
-		return usage("%s is not in this demo: here aval run signs and pushes", cmd)
 	}
 	return usage("unknown command %q", cmd)
 }
 
 // parseFlags parses the flags of cmd the demo knows, with cobra's errors.
+// explain is run --explain or explain --digest.
 func parseFlags(cmd string, args []string) (explain bool, output string, err error) {
 	output = "text"
 	for i := 0; i < len(args); i++ {
 		f := args[i]
 		name, val, hasVal := strings.Cut(f, "=")
 		switch {
-		case cmd == "run" && f == "--explain":
+		case cmd == "run" && f == "--explain", cmd == "explain" && f == "--digest":
 			explain = true
 		case cmd == "verify" && (name == "-o" || name == "--output"):
 			if !hasVal && i+1 == len(args) {
@@ -254,6 +260,21 @@ func parseFlags(cmd string, args []string) (explain bool, output string, err err
 		}
 	}
 	return explain, output, nil
+}
+
+// explain is `aval explain`: the manifest under a header, the digest last;
+// with digest, only the digest. Nothing is looked up or run.
+func (d *Demo) explain(digest bool, out, errw io.Writer) int {
+	c, fp, code := d.fingerprint(errw)
+	switch {
+	case code != exitOK:
+		return code
+	case digest:
+		fmt.Fprintln(out, fp.Digest)
+	default:
+		fmt.Fprintf(out, "fingerprint manifest for %s (%s)\n%sfingerprint %s\n", c.Metadata.Name, fingerprint.Version, fp.Manifest, fp.Digest)
+	}
+	return exitOK
 }
 
 // fingerprint parses aval.yaml and fingerprints the project.

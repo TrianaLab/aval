@@ -29,7 +29,7 @@ The frontend's fingerprint now includes the backend's fingerprint:
 - a change outside it (a backend README) keeps the reuse;
 - if the backend names another contract, that one counts too.
 
-`aval run --explain` shows the reference:
+`aval explain` shows the reference:
 
 ```text
 contract ../backend/aval.yaml backend sha256:<backend fingerprint>

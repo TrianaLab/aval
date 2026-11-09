@@ -231,14 +231,14 @@ outcome does: [Outcomes](concepts/outcomes.md).
 
 - `$SIGSTORE_ID_TOKEN` is removed from the environment before
   `runner.command` starts, so the code under test cannot sign as the CI job.
-- A `--report` that cannot be written disables reuse: the test runs, and a
+- A `--report-file` that cannot be written disables reuse: the test runs, and a
   verification failure still exits 5.
 - Reasons from attestations are escaped on text output and stderr (`\n`,
   `\x1b`, `\u2028`), so they never start a line of their own; the JSON report
   keeps them as is.
 - `--shadow` verifies and runs the test anyway, and exits 1 with
   `aval: FALSE HIT: ...` when a verified result disagrees with the real run.
-- `--record` publishes an unsigned run record for every outcome; it never
+- `--stats` publishes an unsigned run record for every outcome; it never
   affects reuse or the exit code
   ([run records](artifact-format.md#run-records)).
 - Restored outputs are as trustworthy as the signer that published them: a

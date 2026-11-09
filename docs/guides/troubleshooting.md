@@ -24,13 +24,13 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 ??? failure "Flag errors"
     | Message | Fix |
     |---|---|
-    | `--push requires --registry`, `--record requires --registry`, `--registry is required`, `--record-file is required` | add the flags it names, or set `AVAL_REGISTRY` |
+    | `--push requires --registry`, `--stats requires --registry`, `--registry is required`, `a run record file is required` | add the flags it names, or set `AVAL_REGISTRY` |
     | `--shadow and --no-reuse exclude each other` | pick one |
     | `--registry <x> is not an OCI repository` | use `host/name`, no `https://`, tag or digest |
     | `--registry-timeout must be positive`, `--output must be text or json`, `unknown command`, `unknown flag` | fix the value (the message names the closest command or flag, `did you mean "run"?`); see `aval <command> --help` |
     | `signing needs --key or, for keyless signing, an OIDC token` | pass `--key`, or set the token ([Signing](signing.md)) |
     | `not a PEM file`, `PEM type <x> is encrypted`, `not an ECDSA P-256 key` | make an unencrypted P-256 key ([Signing](signing.md)) |
-    | `holds neither an Aval result nor a report`, `is an input of the test` | write `--result` and `--report` under `.aval/`; for `output <x> is an input of the test`, exclude it from `scope` |
+    | `holds neither an Aval result nor a report`, `is an input of the test` | write `--result-file` and `--report-file` under `.aval/`; for `output <x> is an input of the test`, exclude it from `scope` |
 
 ??? failure "Contract errors"
     | Message | Fix |
@@ -76,11 +76,11 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
     | `is not listed among the referrers of` | push again, or use a registry with OCI 1.1 referrers |
     | `running <x>`, `environment.probe <key> <argv>: declared <x>, observed <y>` | install the program `runner.command` starts, or the declared toolchain version ([Probe the toolchain](../contract.md#probe-the-toolchain)) |
     | `FALSE HIT: <x>` (with `--shadow`) | the test reads an input `scope` does not list: [find it](write-a-contract.md#find-undeclared-inputs) |
-    | `writing report: <x>`, `result not published: <x>` | fix the `--report` path, or the fingerprint error before it |
+    | `writing report: <x>`, `result not published: <x>` | fix the `--report-file` path, or the fingerprint error before it |
     | `publishing outputs: <x>`, `more than <n> output files`, `outputs are capped at`, `is not a regular file (symlinks are not published)`, `backslashes and control characters in a path`, `is the contract`, `restoring outputs: <x>` | keep each output a regular file under the caps and narrow the globs; for `restoring outputs`, remove the symlink or directory in the way. The test ran instead ([Restore coverage and reports on reuse](write-a-contract.md#restore-coverage-and-reports-on-reuse)) |
     | `reading the result recorded by 'aval run'` | run `aval run` first |
     | `recorded result is for test <x>` | an input changed: run the test again |
-    | `reading run record: <x>`, `run record <file>: <x>` | pass the file that `--record-file` wrote |
+    | `reading run record: <x>`, `run record <file>: <x>` | pass the file that `--stats-file` wrote |
     | `warning: run record not` | a warning only; check write access |
 
 ## Misses (exit 4)
