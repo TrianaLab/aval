@@ -1,0 +1,162 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/TrianaLab/aval/internal/registry"
+	"github.com/TrianaLab/aval/pkg/evidence"
+)
+
+// The plain output of aval run for every outcome, with and without --push
+// and --shadow, for a passing and a failing test, against goldens in
+// internal/cliout/testdata (the renderer's package; -update rewrites them).
+// Whatever the golden says, every case also holds the plain contract: no
+// ESC byte, the outcome-first line, an error never reported as a miss, and a
+// verification failure exits 5 with the SECURITY line last on stderr
+// (invariant 4).
+func TestPlainRunGoldens(t *testing.T) {
+	untrusted := &evidence.VerificationError{Reason: "untrusted signer \x1b[31m forged"}
+	outcomes := []plainOutcome{
+		{"verified", evidence.OutcomeVerified, "hermetic", func(t *testing.T, failed bool) {
+			fakeCandidates(t, nil, map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner, failed: failed, took: 1500 * time.Millisecond}})
+		}},
+		{"miss", evidence.OutcomeMiss, "hermetic", func(t *testing.T, _ bool) {
+			fakeCandidates(t, fmt.Errorf("reg.example/r: %w", evidence.ErrNotFound), nil)
+		}},
+		{"error", evidence.OutcomeError, "hermetic", func(t *testing.T, _ bool) { fakeCandidates(t, errors.New("registry down"), nil) }},
+		{"verification-failed", evidence.OutcomeVerificationFailed, "hermetic", func(t *testing.T, _ bool) {
+			fakeCandidates(t, nil, map[string]candidate{"sha256:ff": {verifyErr: untrusted}})
+		}},
+		{"non-deterministic", evidence.OutcomeMiss, "non-deterministic", func(t *testing.T, _ bool) { noLookup(t) }},
+		{"reuse-off", evidence.OutcomeMiss, "hermetic", func(t *testing.T, _ bool) { noLookup(t) }}, // plainCase drops --policy
+	}
+	for _, oc := range outcomes {
+		t.Run(oc.name, func(t *testing.T) {
+			var got strings.Builder
+			for _, push := range []bool{false, true} {
+				for _, shadow := range []bool{false, true} {
+					for _, failed := range []bool{false, true} {
+						plainCase(t, &got, oc, push, shadow, failed)
+					}
+				}
+			}
+			golden := filepath.Join("..", "..", "internal", "cliout", "testdata", "run-"+oc.name+".golden")
+			if *update {
+				if err := os.WriteFile(golden, []byte(got.String()), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			want, err := os.ReadFile(golden)
+			if err != nil || string(want) != got.String() {
+				t.Fatalf("plain output differs from %s (go test ./cmd/aval -run TestPlainRunGoldens -update); err %v, got:\n%s", golden, err, got.String())
+			}
+		})
+	}
+}
+
+// The SECURITY line is the last stderr line whatever else failed after it
+// (here the push), and also when a verified sibling is reused (exit 0).
+func TestSecurityLineIsLast(t *testing.T) {
+	untrusted := &evidence.VerificationError{Reason: "untrusted signer"}
+	cases := []struct {
+		name  string
+		cands map[string]candidate
+		code  int
+		err   string
+	}{
+		{"push fails after a verification failure", map[string]candidate{"sha256:ff": {verifyErr: untrusted}}, ExitVerificationFailed, "aval: publishing: registry gone\n"},
+		{"reused beside an untrusted sibling", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, ExitOK, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeCandidates(t, nil, tc.cands)
+			fakePublish(t, nil, errors.New("registry gone"))
+			dir := t.TempDir()
+			code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", "true"), "--registry", "reg.example/r", "--policy", "p.yaml", "--push", "--result", filepath.Join(dir, "r.json"))
+			security := "aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/\n"
+			if code != tc.code || stderr != security+tc.err+security || !strings.HasSuffix(stdout, "; SECURITY\n") {
+				t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
+			}
+		})
+	}
+}
+
+// Flooding the fingerprint (#135) is a security event in `aval run` too: no
+// reuse-off warning, SECURITY in the summary and as the last stderr line,
+// and the exit code stays the test's.
+func TestRunFloodIsSecurity(t *testing.T) {
+	fakeCandidates(t, fmt.Errorf("listing referrers: %w", registry.ErrTooManyCandidates), nil)
+	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", "true"), "--registry", "reg.example/r", "--policy", "p.yaml", "--result", filepath.Join(t.TempDir(), "r.json"))
+	flood := "aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/\n"
+	if code != ExitOK || stderr != flood+flood || !regexp.MustCompile(`\nsummary: unit ran: passed in [^;]+; SECURITY\n$`).MatchString(stdout) {
+		t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
+	}
+}
+
+// Inputs that cannot be fingerprinted turn reuse off with a warning; the
+// test runs and the exit code stays the test's (invariant 3).
+func TestFingerprintErrorWarns(t *testing.T) {
+	c := writeContract(t, "hermetic")
+	if err := os.Remove(filepath.Join(filepath.Dir(c), "in.txt")); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := runCLI("run", "-f", c, "--result", filepath.Join(t.TempDir(), "r.json"))
+	if code != ExitOK || !strings.HasPrefix(stderr, "aval: warning: reuse off: fingerprint: ") || !strings.Contains(stdout, "\nsummary: unit ran: passed in ") || !strings.HasSuffix(stdout, "; reuse was off\n") {
+		t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
+	}
+}
+
+// plainOutcome is a lookup outcome of TestPlainRunGoldens: setup fakes the
+// registry for a passing or failing result.
+type plainOutcome struct {
+	name    string
+	outcome evidence.Outcome
+	class   string
+	setup   func(t *testing.T, failed bool)
+}
+
+// plainCase runs one case of TestPlainRunGoldens, appends its output to got
+// and checks the plain contract.
+func plainCase(t *testing.T, got *strings.Builder, oc plainOutcome, push, shadow, failed bool) {
+	t.Helper()
+	took := regexp.MustCompile(` in [0-9.]+(ns|µs|ms|s)\b`)
+	oc.setup(t, failed)
+	fakePublish(t, nil, nil)
+	exit := map[bool]int{false: 0, true: 1}[failed]
+	dir := t.TempDir()
+	report := filepath.Join(dir, "report.json")
+	args := []string{"run", "-f", contractWith(t, oc.class, "sh", "-c", fmt.Sprintf("echo test output; exit %d", exit)),
+		"--registry", "reg.example/r", "--result", filepath.Join(dir, "result.json"), "--report", report}
+	if oc.name != "reuse-off" {
+		args = append(args, "--policy", "p.yaml")
+	}
+	if push {
+		args = append(args, "--push")
+	}
+	if shadow {
+		args = append(args, "--shadow")
+	}
+	code, stdout, stderr := runCLI(args...)
+	name := fmt.Sprintf("push=%v shadow=%v failed=%v", push, shadow, failed)
+	fmt.Fprintf(got, "=== %s\nexit %d\n--- stdout\n%s--- stderr\n%s", name, code, took.ReplaceAllString(stdout, " in D"), stderr)
+
+	r := readReport(t, report)
+	lines := strings.Split(strings.TrimSuffix(stderr, "\n"), "\n")
+	switch {
+	case strings.ContainsRune(stdout+stderr, '\x1b'):
+		t.Errorf("%s: ESC byte in plain output", name)
+	case r.Outcome != oc.outcome:
+		t.Errorf("%s: outcome %q, want %q", name, r.Outcome, oc.outcome)
+	case !strings.Contains("\n"+stdout, fmt.Sprintf("\n%s unit %s\n", r.Outcome, r.Fingerprint)):
+		t.Errorf("%s: no outcome-first line in %q", name, stdout)
+	case oc.outcome == evidence.OutcomeVerificationFailed && (code != ExitVerificationFailed || !strings.HasPrefix(lines[len(lines)-1], "aval: SECURITY: ")):
+		t.Errorf("%s: exit %d, last stderr line %q", name, code, lines[len(lines)-1])
+	}
+}

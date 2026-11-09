@@ -1,0 +1,92 @@
+=== push=false shadow=false failed=false
+exit 0
+--- stdout
+miss unit sha256:18bf449fd11756acaf9df1ad743b8a8c66e3f71323a3992eaf2ee92eeacf98c5
+reason: cacheability non-deterministic is never reusable
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+summary: unit ran: passed in D
+--- stderr
+=== push=false shadow=false failed=true
+exit 3
+--- stdout
+miss unit sha256:f9b2e0e993345cf2d2dbaef91605c56ea671060b967a572a4f942d0c0b58447e
+reason: cacheability non-deterministic is never reusable
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+summary: unit ran: failed in D
+--- stderr
+=== push=false shadow=true failed=false
+exit 0
+--- stdout
+miss unit sha256:18bf449fd11756acaf9df1ad743b8a8c66e3f71323a3992eaf2ee92eeacf98c5
+reason: cacheability non-deterministic is never reusable
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+summary: unit ran: passed in D
+--- stderr
+=== push=false shadow=true failed=true
+exit 3
+--- stdout
+miss unit sha256:f9b2e0e993345cf2d2dbaef91605c56ea671060b967a572a4f942d0c0b58447e
+reason: cacheability non-deterministic is never reusable
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+summary: unit ran: failed in D
+--- stderr
+=== push=true shadow=false failed=false
+exit 0
+--- stdout
+miss unit sha256:18bf449fd11756acaf9df1ad743b8a8c66e3f71323a3992eaf2ee92eeacf98c5
+reason: cacheability non-deterministic is never reusable
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+pushed reg.example/r@sha256:bb
+summary: unit ran: passed in D; result pushed
+--- stderr
+=== push=true shadow=false failed=true
+exit 3
+--- stdout
+miss unit sha256:f9b2e0e993345cf2d2dbaef91605c56ea671060b967a572a4f942d0c0b58447e
+reason: cacheability non-deterministic is never reusable
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+pushed reg.example/r@sha256:bb
+summary: unit ran: failed in D; result pushed
+--- stderr
+=== push=true shadow=true failed=false
+exit 0
+--- stdout
+miss unit sha256:18bf449fd11756acaf9df1ad743b8a8c66e3f71323a3992eaf2ee92eeacf98c5
+reason: cacheability non-deterministic is never reusable
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+pushed reg.example/r@sha256:bb
+summary: unit ran: passed in D; result pushed
+--- stderr
+=== push=true shadow=true failed=true
+exit 3
+--- stdout
+miss unit sha256:f9b2e0e993345cf2d2dbaef91605c56ea671060b967a572a4f942d0c0b58447e
+reason: cacheability non-deterministic is never reusable
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+pushed reg.example/r@sha256:bb
+summary: unit ran: failed in D; result pushed
+--- stderr

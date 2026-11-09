@@ -199,7 +199,7 @@ func (o runFlags) outputs() []string {
 	return []string{o.resultFile, o.reportFile, o.recordFile}
 }
 
-func runTest(cmd *cobra.Command, o runFlags) error {
+func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	// Read the signing token once, before validation needs it, and keep it
 	// out of the environment of anything that runs later.
 	token := os.Getenv(idTokenEnv)
@@ -215,6 +215,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 		return err
 	}
 	ctx, out, warn := cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr()
+	w := cliout.Run{Out: out, Err: warn}
 	if o.explain || o.fingerprintOnly {
 		if err := printFingerprint(out, warn, fp, fpErr, o); err != nil || o.fingerprintOnly {
 			return err
@@ -223,7 +224,10 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	o.config.printConfig(out)
 	observed, probeErr := probe(ctx, c, filepath.Dir(o.file))
 	r, files, lookupErr := decide(ctx, out, warn, c, fp, cmp.Or(fpErr, probeErr), o)
-	_ = cliout.WriteReport(out, "text", r) // text never fails, like the other lines printed
+	sum, security := announce(w, c, r, lookupErr)
+	// Whatever fails below, the SECURITY line verify printed is repeated as
+	// the last stderr line.
+	defer func() { err = securityLast(warn, err, security) }()
 	// No I/O failure may skip the test or hide a verification failure
 	// (invariants 3, 4): errors are collected, never returned early.
 	var errs []error
@@ -235,7 +239,7 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 		if err := restore(out, filepath.Dir(o.file), files); err != nil {
 			errs = append(errs, fmt.Errorf("restoring outputs: %w", err))
 		} else {
-			return reuse(ctx, out, warn, o, r)
+			return reuse(ctx, w, o, r, sum)
 		}
 	}
 	// A security event: run the test, then exit 5 (invariant 4). verify
@@ -243,23 +247,65 @@ func runTest(cmd *cobra.Command, o runFlags) error {
 	if errors.Is(lookupErr, evidence.ErrVerification) {
 		errs = append(errs, shown{lookupErr})
 	}
+	w.Start(c.Metadata.Name, c.Runner.Command)
 	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), fp, observed)
 	if err != nil {
 		recordRun(ctx, out, warn, o, r, false, nil)
 		return errors.Join(append(errs, err)...)
 	}
-	fmt.Fprintf(out, "ran %s: %s (exit %d)\n", c.Metadata.Name, p.Result, p.Execution.ExitCode)
-	errs = append(errs, keep(ctx, out, c, p, fpErr, probeErr, mutable(c, fp), token, o)...)
+	sum.Result, sum.Took = p.Result, p.FinishedAt.Sub(p.StartedAt)
+	w.End(c.Metadata.Name, p.Result, p.Execution.ExitCode, sum.Took)
+	kept := keep(ctx, w, &sum, c, p, fpErr, probeErr, mutable(c, fp), token, o)
 	recordRun(ctx, out, warn, o, r, false, p)
-	return errors.Join(append(errs, judge(out, warn, r, p))...)
+	verdict := judge(out, warn, r, p)
+	w.Summary(sum)
+	return errors.Join(append(append(errs, kept...), verdict)...)
 }
 
-// reuse reports the reused verified result r; a failing one exits 3.
-func reuse(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.Report) error {
-	fmt.Fprintf(out, "reused %s result\n", r.Result) // WriteReport printed the reference
-	recordRun(ctx, out, warn, o, r, true, nil)
+// announce prints the lookup decision r and starts the summary. security
+// is the SECURITY line verify printed, to repeat as the last stderr line;
+// empty when no attestation failed verification.
+func announce(w cliout.Run, c *contract.Contract, r evidence.Report, lookupErr error) (sum cliout.Summary, security string) {
+	w.Decision(r, c.Cacheability)
+	// Flooding is a security event, not a routine reuse-off cause (#135).
+	flood := errors.Is(lookupErr, registry.ErrTooManyCandidates)
+	sum = cliout.Summary{Test: c.Metadata.Name, ReuseOff: !flood && (r.Outcome == evidence.OutcomeError || errors.As(lookupErr, new(reuseOff)))}
+	if r.Outcome == evidence.OutcomeError && !flood {
+		w.ReuseOff(r.Reason) // the test runs: fail closed (invariant 3)
+	}
+	if n := securityCount(r); n > 0 {
+		sum.Security, security = true, cliout.SecurityLine(n, r.TestID)
+	}
+	if flood {
+		sum.Security, security = true, cliout.FloodLine(registry.ErrTooManyCandidates, r.TestID)
+	}
+	return sum, security
+}
+
+// securityLast prints what err says, then line, so the SECURITY line is the
+// last on stderr whatever else failed. err comes back marked shown. Without
+// a line it returns err as it is.
+func securityLast(warn io.Writer, err error, line string) error {
+	if line == "" {
+		return err
+	}
+	printErrors(warn, err)
+	if err != nil {
+		err = shown{err}
+	}
+	fmt.Fprintln(warn, line)
+	return err
+}
+
+// reuse reports the reused verified result r; a failing one exits 3, which
+// the summary shows.
+func reuse(ctx context.Context, w cliout.Run, o runFlags, r evidence.Report, sum cliout.Summary) error {
+	w.Reused(r.Result) // the report printed the reference
+	recordRun(ctx, w.Out, w.Err, o, r, true, nil)
+	sum.Reused, sum.Result, sum.Saved = true, r.Result, r.Predicate.FinishedAt.Sub(r.Predicate.StartedAt)
+	w.Summary(sum)
 	if r.Result != evidence.ResultPassed {
-		return fmt.Errorf("reused result %s: %w", r.Result, errTestFailed)
+		return shown{errTestFailed}
 	}
 	return nil
 }
@@ -339,7 +385,7 @@ func judge(out, warn io.Writer, r evidence.Report, p *evidence.Predicate) error 
 		fmt.Fprintf(out, "shadow: reuse of %s would have been correct (%s)\n", r.Reference, p.Result)
 	}
 	if p.Result != evidence.ResultPassed {
-		return errTestFailed
+		return shown{errTestFailed} // the summary says so
 	}
 	return nil
 }
@@ -348,16 +394,7 @@ func judge(out, warn io.Writer, r evidence.Report, p *evidence.Predicate) error 
 // disabled. Every way of not reusing comes back as a report, never silently.
 // A verified result comes with its outputs, checked but not yet written.
 func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp fingerprint.Fingerprint, fpErr error, o runFlags) (evidence.Report, []registry.Output, error) {
-	if fpErr == nil {
-		fmt.Fprintf(out, "test %s fingerprint %s\n", c.Metadata.Name, fp.Digest)
-		printFindings(out, fp)
-	}
-	switch c.Cacheability {
-	case contract.NonDeterministic:
-		fmt.Fprintf(out, "cacheability %s: never reusable\n", c.Cacheability)
-	case contract.ExternalDependencies:
-		fmt.Fprintf(out, "cacheability %s: not reusable by default (the policy may allow it)\n", c.Cacheability)
-	}
+	printFindings(out, fp) // the outcome line carries the digest
 	var err error
 	switch {
 	case fpErr != nil:
@@ -365,9 +402,11 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 	case mutable(c, fp) != nil:
 		err = mutable(c, fp)
 	case o.noReuse:
-		err = skipped("reuse disabled (--no-reuse)")
+		err = reuseOff{"reuse off: --no-reuse"}
 	case o.repo == "":
-		err = skipped("no registry configured: pass --registry to reuse verified results")
+		err = reuseOff{"reuse off: no registry (set " + registryEnv + " or --registry)"}
+	case o.policyFile == "" && c.Cacheability != contract.NonDeterministic: // verify names the class first
+		err = reuseOff{"reuse off: no trust policy (set " + policyEnv + " or --policy)"}
 	}
 	if err != nil {
 		r, err := failReport(newReport(c, fp), err)
@@ -472,12 +511,12 @@ func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract
 	}, nil
 }
 
-// keep records the result and, with --push, publishes it. Without a
+// keep records the result and, with --push, publishes it and marks sum. Without a
 // fingerprint there is nothing a result could be reused for; with
 // unacknowledged mutable references (pinErr) nothing may reuse it, so it is
 // recorded but not published. After a failed probe it is not even recorded,
 // so 'aval push' cannot publish it.
-func keep(ctx context.Context, out io.Writer, c *contract.Contract, p *evidence.Predicate, fpErr, probeErr, pinErr error, token string, o runFlags) []error {
+func keep(ctx context.Context, w cliout.Run, sum *cliout.Summary, c *contract.Contract, p *evidence.Predicate, fpErr, probeErr, pinErr error, token string, o runFlags) []error {
 	if probeErr != nil {
 		return []error{fmt.Errorf("result not recorded: %w", probeErr)}
 	}
@@ -500,7 +539,8 @@ func keep(ctx context.Context, out io.Writer, c *contract.Contract, p *evidence.
 	if err != nil {
 		return []error{err}
 	}
-	fmt.Fprintf(out, "pushed %s\n", ref)
+	w.Pushed(ref)
+	sum.Pushed = true
 	return nil
 }
 

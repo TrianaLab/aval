@@ -1,0 +1,116 @@
+=== push=false shadow=false failed=false
+exit 5
+--- stdout
+verification-failed unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+reference: reg.example/r@sha256:ff
+reason: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+summary: unit ran: passed in D; SECURITY
+--- stderr
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=false shadow=false failed=true
+exit 5
+--- stdout
+verification-failed unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+reference: reg.example/r@sha256:ff
+reason: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+summary: unit ran: failed in D; SECURITY
+--- stderr
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=false shadow=true failed=false
+exit 5
+--- stdout
+verification-failed unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+reference: reg.example/r@sha256:ff
+reason: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+summary: unit ran: passed in D; SECURITY
+--- stderr
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=false shadow=true failed=true
+exit 5
+--- stdout
+verification-failed unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+reference: reg.example/r@sha256:ff
+reason: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+summary: unit ran: failed in D; SECURITY
+--- stderr
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=true shadow=false failed=false
+exit 5
+--- stdout
+verification-failed unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+reference: reg.example/r@sha256:ff
+reason: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+pushed reg.example/r@sha256:bb
+summary: unit ran: passed in D; result pushed; SECURITY
+--- stderr
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=true shadow=false failed=true
+exit 5
+--- stdout
+verification-failed unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+reference: reg.example/r@sha256:ff
+reason: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+pushed reg.example/r@sha256:bb
+summary: unit ran: failed in D; result pushed; SECURITY
+--- stderr
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=true shadow=true failed=false
+exit 5
+--- stdout
+verification-failed unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+reference: reg.example/r@sha256:ff
+reason: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+pushed reg.example/r@sha256:bb
+summary: unit ran: passed in D; result pushed; SECURITY
+--- stderr
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=true shadow=true failed=true
+exit 5
+--- stdout
+verification-failed unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+reference: reg.example/r@sha256:ff
+reason: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+pushed reg.example/r@sha256:bb
+summary: unit ran: failed in D; result pushed; SECURITY
+--- stderr
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/

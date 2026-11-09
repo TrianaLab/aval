@@ -51,7 +51,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 
 ## Errors (exit 1)
 
-`aval verify` exits 1. `aval run` prints these as outcome `error`, runs the test and exits with the test's code. It exits 1 only when the test cannot start (`running <x>`), a probe fails (`environment.probe`) or the result cannot be published.
+`aval verify` exits 1. `aval run` prints these as outcome `error`, warns `aval: warning: reuse off: <message>` on stderr, runs the test and exits with the test's code; its `summary:` line ends in `; reuse was off`. It exits 1 only when the test cannot start (`running <x>`), a probe fails (`environment.probe`) or the result cannot be published.
 
 ??? failure "Fingerprint and trust policy"
     | Message | Fix |
@@ -89,7 +89,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
     | Reason | Fix |
     |---|---|
     | `no attestation found for fingerprint` | none: the inputs changed or nobody pushed yet |
-    | `no trust policy configured`, `no registry configured`, `reuse disabled (--no-reuse)` | pass `--policy`, `--registry` (or set `AVAL_POLICY`, `AVAL_REGISTRY`), drop `--no-reuse` |
+    | `reuse off: no trust policy`, `no trust policy configured` (`aval verify`), `reuse off: no registry`, `reuse off: --no-reuse` | set `AVAL_POLICY` or `--policy`, `AVAL_REGISTRY` or `--registry`; drop `--no-reuse` |
     | `cacheability <x> is never reusable`, `is not in allowedCacheability` | by design, or allow the class in the policy |
     | `not reusable under the trust policy`, `signer <x> has trust level <y>, policy requires at least <z>` | raise the signer's `trustLevel` if you trust it |
     | `mutable references in the inputs` | pin each reference the line lists, or acknowledge it with `scope.allowMutable`; for `lists this ref without file:`, add `file:` ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
@@ -97,8 +97,8 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 
 ## Verification failures (exit 5)
 
-The `aval: SECURITY:` line comes first and `reason:` says why. Usually a wrong
-policy; possibly an attacker. See
+The `aval: SECURITY:` line comes first (`aval run` repeats it last) and
+`reason:` says why. Usually a wrong policy; possibly an attacker. See
 [Outcomes](../concepts/outcomes.md#a-verification-failure-is-a-security-event).
 
 It also appears beside a verified result (exit 0), listed in `rejected`: gate

@@ -44,14 +44,35 @@ func WriteReport(w io.Writer, format string, r evidence.Report) error {
 	return nil
 }
 
-// trustModelURL explains verification failures and how to respond to them.
-const trustModelURL = "https://github.com/TrianaLab/aval/blob/main/docs/trust-model.md"
+// Version is the aval version, set by the CLI, so links point at the docs
+// of the version that printed them.
+var Version = "dev"
 
-// Security prints the SECURITY line for n attestations of testID that
-// failed signature or policy verification (invariant 4).
-func Security(w io.Writer, n int, testID string) {
-	fmt.Fprintf(w, "aval: SECURITY: %d attestation(s) for %s failed signature or policy verification; treat it as a security event, see %s\n", n, testID, trustModelURL)
+// TrustModelURL explains verification failures and how to respond to them,
+// in the docs of Version (latest for a dev build).
+func TrustModelURL() string {
+	v := strings.TrimPrefix(Version, "v")
+	if v == "dev" || strings.ContainsAny(v, "-+") { // snapshots and pre-releases have no docs
+		v = "latest"
+	}
+	return "https://aval.run/" + v + "/trust-model/"
 }
+
+// SecurityLine is the SECURITY line for n attestations of testID that
+// failed signature or policy verification (invariant 4).
+func SecurityLine(n int, testID string) string {
+	return fmt.Sprintf("aval: SECURITY: %d attestation(s) for %s failed signature or policy verification; treat it as a security event, see %s", n, testID, TrustModelURL())
+}
+
+// FloodLine is the SECURITY line for a fingerprint holding more attestations
+// than lookup lists (#135): an untrusted one may hide among them. cause
+// names the cap.
+func FloodLine(cause error, testID string) string {
+	return fmt.Sprintf("aval: SECURITY: %s for %s, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see %s", cause, testID, TrustModelURL())
+}
+
+// Security prints SecurityLine.
+func Security(w io.Writer, n int, testID string) { fmt.Fprintln(w, SecurityLine(n, testID)) }
 
 // OneLine replaces newlines, control and other non-printable characters,
 // and invalid UTF-8, with Go escapes (\n, \x1b, \u2028); everything else,

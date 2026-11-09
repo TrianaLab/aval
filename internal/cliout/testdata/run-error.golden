@@ -1,0 +1,100 @@
+=== push=false shadow=false failed=false
+exit 0
+--- stdout
+error unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+reason: registry down
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+summary: unit ran: passed in D; reuse was off
+--- stderr
+aval: warning: reuse off: registry down
+=== push=false shadow=false failed=true
+exit 3
+--- stdout
+error unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+reason: registry down
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+summary: unit ran: failed in D; reuse was off
+--- stderr
+aval: warning: reuse off: registry down
+=== push=false shadow=true failed=false
+exit 0
+--- stdout
+error unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+reason: registry down
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+summary: unit ran: passed in D; reuse was off
+--- stderr
+aval: warning: reuse off: registry down
+=== push=false shadow=true failed=true
+exit 3
+--- stdout
+error unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+reason: registry down
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+summary: unit ran: failed in D; reuse was off
+--- stderr
+aval: warning: reuse off: registry down
+=== push=true shadow=false failed=false
+exit 0
+--- stdout
+error unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+reason: registry down
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+pushed reg.example/r@sha256:bb
+summary: unit ran: passed in D; result pushed; reuse was off
+--- stderr
+aval: warning: reuse off: registry down
+=== push=true shadow=false failed=true
+exit 3
+--- stdout
+error unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+reason: registry down
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+pushed reg.example/r@sha256:bb
+summary: unit ran: failed in D; result pushed; reuse was off
+--- stderr
+aval: warning: reuse off: registry down
+=== push=true shadow=true failed=false
+exit 0
+--- stdout
+error unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+reason: registry down
+--- run unit: sh -c echo test output; exit 0
+test output
+--- end unit: passed (exit 0) in D
+ran unit: passed (exit 0)
+pushed reg.example/r@sha256:bb
+summary: unit ran: passed in D; result pushed; reuse was off
+--- stderr
+aval: warning: reuse off: registry down
+=== push=true shadow=true failed=true
+exit 3
+--- stdout
+error unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+reason: registry down
+--- run unit: sh -c echo test output; exit 1
+test output
+--- end unit: failed (exit 1) in D
+ran unit: failed (exit 1)
+pushed reg.example/r@sha256:bb
+summary: unit ran: failed in D; result pushed; reuse was off
+--- stderr
+aval: warning: reuse off: registry down

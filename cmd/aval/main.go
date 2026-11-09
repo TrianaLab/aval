@@ -47,7 +47,7 @@ const (
 // version is set at release build time (-ldflags "-X main.version=...").
 var version = "dev"
 
-func init() { resolve.Version = version }
+func init() { resolve.Version, cliout.Version = version, version }
 
 type usageError struct{ error }
 
@@ -67,6 +67,10 @@ type skipped string
 
 func (s skipped) Error() string      { return string(s) }
 func (skipped) Is(target error) bool { return target == evidence.ErrNotFound }
+
+// reuseOff is a miss because reuse is off: no registry, no trust policy or
+// --no-reuse. run's summary says so.
+type reuseOff struct{ skipped }
 
 // ponytail: package-level seams so tests can drive every outcome without a
 // registry or Sigstore; inject dependencies if the CLI grows a library API.
@@ -120,12 +124,18 @@ func run(args []string, stdout, stderr io.Writer) int {
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	err := root.Execute()
-	if err != nil {
-		for _, p := range errParts(err) {
-			fmt.Fprintln(stderr, "aval:", cliout.OneLine(p))
-		}
-	}
+	printErrors(stderr, err)
 	return exitCode(err)
+}
+
+// printErrors prints one aval: line per part of err not already shown.
+func printErrors(w io.Writer, err error) {
+	if err == nil {
+		return
+	}
+	for _, p := range errParts(err) {
+		fmt.Fprintln(w, "aval:", cliout.OneLine(p))
+	}
 }
 
 // errParts splits err into one message per errors.Join member, each keeping
@@ -409,6 +419,19 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 // when the fingerprint holds more attestations than lookup lists.
 func verify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
 	r, files, err := lookupAndVerify(ctx, warn, c, file, fp, repo, policyFile)
+	if n := securityCount(r); n > 0 {
+		cliout.Security(warn, n, r.TestID)
+	}
+	// Over the cap nothing was verified, so an untrusted attestation may hide
+	// among them (#135). The outcome stays error: the test runs.
+	if errors.Is(err, registry.ErrTooManyCandidates) {
+		fmt.Fprintln(warn, cliout.FloodLine(registry.ErrTooManyCandidates, r.TestID))
+	}
+	return r, files, err
+}
+
+// securityCount is how many attestations in r failed verification.
+func securityCount(r evidence.Report) int {
 	n := 0
 	for _, rj := range r.Rejected {
 		if rj.Outcome == evidence.OutcomeVerificationFailed {
@@ -418,15 +441,7 @@ func verify(ctx context.Context, warn io.Writer, c *contract.Contract, file stri
 	if n == 0 && r.Outcome == evidence.OutcomeVerificationFailed {
 		n = 1 // the lookup itself failed verification (a moved tag)
 	}
-	if n > 0 {
-		cliout.Security(warn, n, r.TestID)
-	}
-	// Over the cap nothing was verified, so an untrusted attestation may hide
-	// among them (#135). The outcome stays error: the test runs.
-	if errors.Is(err, registry.ErrTooManyCandidates) {
-		fmt.Fprintf(warn, "aval: SECURITY: %s for %s, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://github.com/TrianaLab/aval/blob/main/docs/trust-model.md\n", registry.ErrTooManyCandidates, r.TestID)
-	}
-	return r, files, err
+	return n
 }
 
 func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {

@@ -360,6 +360,7 @@ verified aval-e2e sha256:<fingerprint>
 signer: <your email> (issuer https://github.com/login/oauth), trust level developer
 reference: ghcr.io/trianalab/aval-attestations@sha256:<digest>
 reused passed result
+summary: aval-e2e reused: passed; saved <duration>
 ```
 
 `main` and releases never reuse this result. `.github/aval/main.yaml` lists
@@ -374,7 +375,11 @@ the suite:
 miss aval-e2e sha256:<fingerprint>
 reference: ghcr.io/trianalab/aval-attestations@sha256:<digest>
 reason: not reusable under the trust policy: signer "<your email>" has trust level developer, policy requires at least runner
+--- run aval-e2e: make test-integration test-acceptance
+<test output>
+--- end aval-e2e: passed (exit 0) in <duration>
 ran aval-e2e: passed (exit 0)
+summary: aval-e2e ran: passed in <duration>
 ```
 
 `dogfood-publish` then pushes CI's own runner-signed result next to yours, and

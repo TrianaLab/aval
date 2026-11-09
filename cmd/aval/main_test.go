@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TrianaLab/aval/internal/cliout"
 	"github.com/TrianaLab/aval/internal/policy"
@@ -219,6 +220,7 @@ type candidate struct {
 	failed              bool   // verifies with result failed instead of passed
 	cacheability        string // signed class; default hermetic
 	outputs             *evidence.Outputs
+	took                time.Duration // between the signed startedAt and finishedAt
 }
 
 // fakeCandidates makes lookup return the given candidates, sorted by digest,
@@ -255,6 +257,10 @@ func fakeCandidates(t *testing.T, lookupErr error, cands map[string]candidate) {
 			p.Result = evidence.ResultFailed
 		}
 		p.Execution.Outputs = c.outputs
+		if c.took > 0 {
+			p.StartedAt = time.Unix(0, 0).UTC()
+			p.FinishedAt = p.StartedAt.Add(c.took)
+		}
 		return &evidence.Verification{Predicate: p, Signer: evidence.Identity{Issuer: "https://issuer.example", TrustLevel: c.trust}}, nil
 	}
 }

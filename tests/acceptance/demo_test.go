@@ -120,11 +120,13 @@ var (
 	refDigest = regexp.MustCompile(`@sha256:[0-9a-f]{64}`)
 	goTest    = regexp.MustCompile(`(?m)^ok  \texample\.com/greet\t.*$`)
 	sigReason = regexp.MustCompile(`signature: .*? \(trust policy`)
+	took      = regexp.MustCompile(`(?m)( in|; saved) [0-9][0-9.hmnsµ]*(;|$)`)
 )
 
 func normalize(s string) string {
 	s = refDigest.ReplaceAllString(s, "@sha256:<digest>")
 	s = goTest.ReplaceAllString(s, "ok  example.com/greet")
+	s = took.ReplaceAllString(s, "$1 <time>$2") // the demo's test is simulated
 	return sigReason.ReplaceAllString(s, "signature: <reason> (trust policy")
 }
 

@@ -66,7 +66,14 @@ func TestTextReport(t *testing.T) {
 func TestSecurity(t *testing.T) {
 	var b strings.Builder
 	Security(&b, 2, "unit")
-	if want := "aval: SECURITY: 2 attestation(s) for unit failed signature or policy verification; treat it as a security event, see " + trustModelURL + "\n"; b.String() != want {
+	if want := "aval: SECURITY: 2 attestation(s) for unit failed signature or policy verification; treat it as a security event, see " + TrustModelURL() + "\n"; b.String() != want {
 		t.Fatalf("got %q", b.String())
+	}
+}
+
+func TestFloodLine(t *testing.T) {
+	got := FloodLine(errors.New("more than 64 attestations"), "unit")
+	if want := "aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see " + TrustModelURL(); got != want {
+		t.Fatalf("got %q", got)
 	}
 }
