@@ -22,15 +22,14 @@ in-process registry in Aval's CI.
 
 ## Run it locally
 
-You need uv, Docker, `openssl` and `aval` 0.5.0 or later (`outputs`). Work
+You need uv, Docker and `aval` 0.7.0 or later (`keygen`). Work
 in a copy, so the virtual environment uv creates stays out of the Aval
 checkout:
 
 ```sh
 cp -R examples/uv-monorepo /tmp/uv-monorepo && cd /tmp/uv-monorepo
 docker run -d --name aval-registry -p 5001:5000 registry:2
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out aval.key
-openssl pkey -in aval.key -pubout -out aval.pub
+aval keygen
 printf 'apiVersion: aval.trianalab.io/v1\nkind: Policy\nminTrustLevel: developer\nidentities:\n  - publicKey: aval.pub\n    trustLevel: developer\n' > policy.yaml
 REPO=localhost:5001/demo/uv-monorepo-aval
 ```

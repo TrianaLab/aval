@@ -42,6 +42,7 @@ Core:
   verify      Check whether a trusted result exists for the current inputs
 
 Publishing:
+  keygen      Create a signing key: name.key and name.pub (default name: aval)
   push        Sign and publish a recorded execution result
 
 Statistics:
@@ -110,6 +111,30 @@ Flags:
   -f, --contract string   path to the test contract (default "aval.yaml")
       --digest            print only the fingerprint (sha256:...)
   -h, --help              help for explain
+```
+
+## aval keygen
+
+keygen writes a new ECDSA P-256 signing key to name.key (unencrypted PKCS#8
+PEM, mode 0600) and its public key to name.pub, the file a policy trusts with
+publicKey. It prints the key id the verify report shows for this signer. It
+refuses to replace either file without --force. A trailing .key in the name is
+dropped, so "aval keygen ci.key" writes ci.key and ci.pub.
+
+Exit codes: 0 written, 1 error (name.key or name.pub exists without --force,
+or cannot be written), 2 usage.
+
+```text
+Usage:
+  aval keygen [name] [flags]
+
+Examples:
+  aval keygen        # aval.key and aval.pub
+  aval keygen ci     # ci.key and ci.pub
+
+Flags:
+      --force   replace name.key and name.pub if they exist
+  -h, --help    help for keygen
 ```
 
 ## aval push

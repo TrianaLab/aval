@@ -202,7 +202,7 @@ to turn reuse off). There is no config file.`,
 		SilenceErrors: true,
 	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
-	root.AddCommand(newRunCmd(), newExplainCmd(), newPushCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
+	root.AddCommand(newRunCmd(), newExplainCmd(), newPushCmd(), newKeygenCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
 	guide(root)
 	return root
 }

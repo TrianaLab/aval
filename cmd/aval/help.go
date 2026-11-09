@@ -31,6 +31,8 @@ var commandHelp = map[string]struct{ group, example string }{
 
   # Only the digest
   aval explain --digest`},
+	"keygen": {"publishing", `  aval keygen        # aval.key and aval.pub
+  aval keygen ci     # ci.key and ci.pub`},
 	"record":     {"", `  aval stats publish --registry ghcr.io/acme/orders-aval record.json`},
 	"stats":      {"statistics", `  aval stats --registry ghcr.io/acme/orders-aval --since 30d`},
 	"version":    {"", `  aval version`},

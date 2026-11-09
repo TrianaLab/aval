@@ -56,7 +56,8 @@ flowchart LR
 ??? info "Which keys work"
     An unencrypted ECDSA P-256 key in PEM (PKCS#8 or SEC1). Cosign keys are
     encrypted and do not work. Make one with
-    `openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out aval.key`.
+    `aval keygen`: it writes `aval.key` (mode 0600) and `aval.pub` and prints
+    the key id.
 
 ??? info "Sign later with aval push"
     `aval run` records the result in `.aval/result.json`. `aval push` signs and

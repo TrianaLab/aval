@@ -69,7 +69,7 @@ func quickstartSteps(t *testing.T, doc string) []quickstartStep {
 // runQuickstart runs the steps in order in one shell, against an in-process
 // registry that stands in for localhost:5001, and returns each step's
 // combined output. A failing step does not stop the shell; each step's exit
-// code is in codes. openssl must be on PATH.
+// code is in codes.
 func runQuickstart(t *testing.T, steps []quickstartStep) (outs []string, codes []int, host string) {
 	t.Helper()
 	srv := httptest.NewServer(ggcr.New(ggcr.Logger(log.New(io.Discard, "", 0))))

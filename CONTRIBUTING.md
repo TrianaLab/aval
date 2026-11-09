@@ -444,8 +444,8 @@ artifact (kept 7 days). Download it from the run page, unzip it and run
 ### Recordings
 
 The GIFs in `docs/assets/gifs/` are recorded from `docs/assets/tapes/*.tape`.
-After a change to the CLI output or a tape, run `make docs-demos` (needs vhs,
-Docker and openssl) and commit the GIFs.
+After a change to the CLI output or a tape, run `make docs-demos` (needs vhs
+and Docker) and commit the GIFs.
 
 ### Rules
 

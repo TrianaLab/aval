@@ -44,7 +44,7 @@ func TestEveryCommandHasAnExample(t *testing.T) {
 
 func TestRootHelpGroupsCommands(t *testing.T) {
 	_, stdout, _ := runCLI("--help")
-	for _, g := range []string{"Core:\n  explain", "Publishing:\n  push", "Statistics:\n  stats"} {
+	for _, g := range []string{"Core:\n  explain", "Publishing:\n  keygen ", "\n  push ", "Statistics:\n  stats"} {
 		if !strings.Contains(stdout, g) {
 			t.Errorf("aval --help lacks %q:\n%s", g, stdout)
 		}

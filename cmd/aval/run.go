@@ -143,7 +143,7 @@ func (o runFlags) validate(token string) error {
 }
 
 // keyHint is how to create a key aval can sign with.
-const keyHint = "aval signs with an unencrypted ECDSA P-256 private key in PEM (PKCS#8 or SEC1); cosign keys are encrypted and not supported; create one with: openssl ecparam -name prime256v1 -genkey -noout -out aval.key"
+const keyHint = "aval signs with an unencrypted ECDSA P-256 private key in PEM (PKCS#8 or SEC1); cosign keys are encrypted and not supported; create one with: aval keygen"
 
 // loginHelp and loginFlagHelp describe the interactive keyless login.
 const (
@@ -160,7 +160,7 @@ func checkSigner(key, token string, login bool) error {
 			return usageError{fmt.Errorf("--login and $%s exclude each other", idTokenEnv)}
 		}
 		if token == "" && !login && !isTerminal() {
-			return usageError{fmt.Errorf("signing needs --key or, for keyless signing, an OIDC token in $%s or a terminal for the interactive Sigstore login (--login)", idTokenEnv)}
+			return usageError{fmt.Errorf("signing needs --key or, for keyless signing, an OIDC token in $%s or a terminal for the interactive Sigstore login (--login); create a key with: aval keygen", idTokenEnv)}
 		}
 		return nil
 	}
