@@ -26,8 +26,8 @@ permissions:
 # Jobs that test the PR's code build from source (CONTRIBUTING.md "Which aval
 # a CI job runs").
 env:
-  AVAL_VERSION: 0.6.0
-  AVAL_SHA256: 5da9e5b8cae8c9303a8f2015d13746df307094c903ca3ca9b2417cac3750f5ae
+  AVAL_VERSION: 0.7.0
+  AVAL_SHA256: ca69a546f50902f12a7b22f65f520f3b9ed6ec296bdc576085aff35aa94102d8
   # The public stats registry (#97): dogfood-record publishes run records
   # there and docs.yaml (which names it too) builds the site's stats.json.
   AVAL_STATS_REGISTRY: ghcr.io/trianalab/aval-stats
@@ -170,16 +170,14 @@ jobs:
             echo "::warning::main has no .github/aval/trust-from-base.sh: no trust policy, nothing is reused"
           fi
           /bin/bash "$RUNNER_TEMP/install.sh"
-      # TODO(milestone-13): drop --registry and --policy here and in
-      # dogfood-shadow once the pinned release reads AVAL_REGISTRY and
-      # AVAL_POLICY itself (#163), and switch --result/--report/--record-file/
-      # --repository and `aval record` to the new names once the pin is
-      # >= 0.7.0 (#165).
+      # --registry and --policy stay explicit even though aval reads
+      # AVAL_REGISTRY and AVAL_POLICY: the trust source stays visible in the
+      # command (#134).
       - name: Heavy suite through the pinned aval release
         run: |
           aval run -f aval.e2e.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
-            --result .aval/e2e-result.json --report .aval/e2e-report.json \
-            --record-file .aval/e2e-record.json --ci-run-url "$AVAL_CI_RUN_URL" --repository "$AVAL_REPOSITORY"
+            --result-file .aval/e2e-result.json --report-file .aval/e2e-report.json \
+            --stats-file .aval/e2e-record.json --ci-run-url "$AVAL_CI_RUN_URL" --source-repo "$AVAL_REPOSITORY"
       - name: Summary
         if: always()
         run: .github/aval/summary.sh aval-e2e .aval/e2e-report.json
@@ -374,7 +372,7 @@ jobs:
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
       - name: Publish (runs and pushes unless a verified result exists)
         run: |
-          aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report publish.json
+          aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report-file publish.json
           if [ "$(jq -r .outcome publish.json)" != "verified" ]; then
             # The Actions OIDC token for Fulcio, fetched after the test so a
             # slow test cannot outlive it. aval push reads SIGSTORE_ID_TOKEN.
@@ -387,14 +385,14 @@ jobs:
       # --8<-- [end:gha-steps]
       - name: Unchanged scope reuses (hit)
         run: |
-          aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report hit.json
+          aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report-file hit.json
           jq -e '.outcome == "verified"' hit.json
           echo "| unchanged scope | \`$(jq -r .outcome hit.json)\` (reused, test not run) |" >> "$GITHUB_STEP_SUMMARY"
       - name: Changed scope re-runs (miss)
         run: |
           # Unique per run, so this fingerprint was never published.
           echo "// demo change $GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$SCOPED"
-          aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report miss.json
+          aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report-file miss.json
           git checkout -- "$SCOPED"
           jq -e '.outcome == "miss"' miss.json
           echo "| changed scope | \`$(jq -r .outcome miss.json)\` (test ran) |" >> "$GITHUB_STEP_SUMMARY"
@@ -453,11 +451,11 @@ jobs:
           mkdir -p "$(dirname "$other")" && cp -R . "$other"
           : > fingerprint.txt
           for f in aval.yaml aval.e2e.yaml; do
-            a=$(./bin/aval run --fingerprint-only -f "$f")
-            b=$(./bin/aval run --fingerprint-only -f "$other/$f")
+            a=$(./bin/aval explain --digest -f "$f")
+            b=$(./bin/aval explain --digest -f "$other/$f")
             test "$a" = "$b" || { echo "::error::$f: fingerprint depends on checkout path: $a vs $b"; exit 1; }
             echo "$f $a" >> fingerprint.txt
-            { echo "### $f on $OS: \`$a\`"; echo '```'; ./bin/aval run --explain --fingerprint-only -f "$f" | sed '$d'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            { echo "### $f on $OS: \`$a\`"; echo '```'; ./bin/aval explain -f "$f" | sed '$d'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -522,8 +520,8 @@ jobs:
       - name: Shadow run of the engine unit suite
         run: |
           aval run --shadow -f aval.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
-            --result .aval/engine-result.json --report .aval/engine-report.json \
-            --record-file .aval/engine-record.json --ci-run-url "$AVAL_CI_RUN_URL" --repository "$AVAL_REPOSITORY"
+            --result-file .aval/engine-result.json --report-file .aval/engine-report.json \
+            --stats-file .aval/engine-record.json --ci-run-url "$AVAL_CI_RUN_URL" --source-repo "$AVAL_REPOSITORY"
       - name: Summary
         if: always()
         run: .github/aval/summary.sh aval-engine .aval/engine-report.json
@@ -602,7 +600,7 @@ jobs:
             SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
               "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
             export SIGSTORE_ID_TOKEN
-            aval push -f "$contract" --registry "$AVAL_REGISTRY" --result "results/$name-result.json"
+            aval push -f "$contract" --registry "$AVAL_REGISTRY" --result-file "results/$name-result.json"
           done
 
   # Story 8.8 (#90): the one-line installers (scripts/get-aval.sh,
@@ -649,7 +647,7 @@ jobs:
   # dogfood-shadow wrote, whatever their outcome (always(), so failed runs
   # count too). The suites run without credentials and write the record to a
   # file; this job has `packages: write` only, runs no tests, and publishes
-  # with `aval record` to the public stats registry (#97), a package of its
+  # with `aval stats publish` to the public stats registry (#97), a package of its
   # own so other repositories can be given write access to it without access
   # to the attestations; docs.yaml turns it into the site's stats.json.
   # Best-effort: a record that cannot be published is a warning. Records are
@@ -695,7 +693,7 @@ jobs:
               echo "::warning title=aval run record::$name: no run record to publish"
               continue
             fi
-            aval record --registry "$AVAL_STATS_REGISTRY" --record-file "$f" \
+            aval stats publish --registry "$AVAL_STATS_REGISTRY" "$f" \
               || echo "::warning title=aval run record::$name: run record not published"
           done
 
