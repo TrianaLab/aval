@@ -198,10 +198,20 @@ func Load(file string) (*Contract, error) {
 	}
 	c, err := Parse(data)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", file, err)
+		return nil, &FileError{File: file, Err: err}
 	}
 	return c, nil
 }
+
+// FileError is a contract file that does not decode or validate. Err holds
+// the problems, joined: one per errors.Join member.
+type FileError struct {
+	File string
+	Err  error
+}
+
+func (e *FileError) Error() string { return e.File + ": " + e.Err.Error() }
+func (e *FileError) Unwrap() error { return e.Err }
 
 // Parse decodes and validates contract bytes. Unknown fields are rejected so
 // that typos never silently shrink the declared scope.
@@ -210,6 +220,10 @@ func Parse(data []byte) (*Contract, error) {
 	dec.KnownFields(true)
 	var c Contract
 	if err := dec.Decode(&c); err != nil {
+		var te *yaml.TypeError
+		if errors.As(err, &te) {
+			return nil, typeErrors(data, te)
+		}
 		return nil, fmt.Errorf("decoding contract: %w", err)
 	}
 	var extra yaml.Node

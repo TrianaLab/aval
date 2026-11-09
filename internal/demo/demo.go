@@ -286,7 +286,7 @@ func (d *Demo) explain(digest bool, out, errw io.Writer) int {
 func (d *Demo) fingerprint(errw io.Writer) (*contract.Contract, fingerprint.Fingerprint, int) {
 	c, err := contract.Parse(d.files[contract.DefaultFile])
 	if err != nil {
-		fmt.Fprintf(errw, "aval: %s: %s\n", contract.DefaultFile, cliout.OneLine(err.Error()))
+		cliout.Problems(errw, contract.DefaultFile+": invalid contract:", err)
 		return nil, fingerprint.Fingerprint{}, exitUsage
 	}
 	// ponytail: fstest.MapFS is the stdlib's in-memory fs.FS.

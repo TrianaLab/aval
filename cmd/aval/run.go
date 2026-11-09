@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"os/exec"
@@ -160,42 +161,57 @@ func checkSigner(key, token string, login bool) error {
 			return usageError{fmt.Errorf("--login and $%s exclude each other", idTokenEnv)}
 		}
 		if token == "" && !login && !isTerminal() {
-			return usageError{fmt.Errorf("signing needs --key or, for keyless signing, an OIDC token in $%s or a terminal for the interactive Sigstore login (--login); create a key with: aval keygen", idTokenEnv)}
+			return signingNeeds()
 		}
 		return nil
 	}
 	if login {
 		return usageError{errors.New("--key and --login exclude each other")}
 	}
-	if err := loadsAsP256(key); err != nil {
+	_, err := loadP256(key)
+	if errors.Is(err, errPublicKey) {
+		fix := "pass the private key"
+		if base, ok := strings.CutSuffix(key, ".pub"); ok {
+			fix += " (" + base + ".key)"
+		}
+		return usageError{fmt.Errorf("--key %s is a public key; %s", key, fix)}
+	}
+	if err != nil {
 		return usageError{fmt.Errorf("--key %s: %w; %s", key, err, keyHint)}
 	}
 	return nil
 }
 
-// loadsAsP256 checks what attest.Sign will require of the key file.
+// errPublicKey: the --key file holds a public key, such as name.pub from
+// 'aval keygen'.
+var errPublicKey = errors.New("a public key")
+
+// loadP256 loads the key file as attest.Sign will require it.
 // ponytail: mirrors attest's key loading so a bad key fails before the test
 // runs; signing loads it again and stays the authority.
-func loadsAsP256(path string) error {
+func loadP256(path string) (*ecdsa.PrivateKey, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	b, _ := pem.Decode(data)
 	switch {
 	case b == nil:
-		return errors.New("not a PEM file")
+		return nil, errors.New("not a PEM file")
+	case b.Type == "PUBLIC KEY":
+		return nil, errPublicKey
 	case strings.Contains(b.Type, "ENCRYPTED"):
-		return fmt.Errorf("PEM type %s is encrypted", b.Type)
+		return nil, fmt.Errorf("PEM type %s is encrypted", b.Type)
 	}
 	k, err := cryptoutils.UnmarshalPEMToPrivateKey(data, cryptoutils.SkipPassword)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if ec, ok := k.(*ecdsa.PrivateKey); !ok || ec.Curve != elliptic.P256() {
-		return errors.New("not an ECDSA P-256 key")
+	ec, ok := k.(*ecdsa.PrivateKey)
+	if !ok || ec.Curve != elliptic.P256() {
+		return nil, errors.New("not an ECDSA P-256 key")
 	}
-	return nil
+	return ec, nil
 }
 
 // checkOutputs refuses to overwrite an existing file at --result-file or
@@ -247,7 +263,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	o.config.printConfig(out)
 	observed, probeErr := probe(ctx, c, filepath.Dir(o.file))
 	r, files, lookupErr := decide(ctx, out, warn, c, fp, cmp.Or(fpErr, probeErr), o)
-	sum, security := announce(w, c, r, lookupErr)
+	sum, security := announce(w, c, r, lookupErr, o.repo)
 	// Whatever fails below, the SECURITY line verify printed is repeated as
 	// the last stderr line.
 	defer func() { err = securityLast(warn, err, security) }()
@@ -288,13 +304,14 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 // announce prints the lookup decision r and starts the summary. security
 // is the SECURITY line verify printed, to repeat as the last stderr line;
 // empty when no attestation failed verification.
-func announce(w cliout.Run, c *contract.Contract, r evidence.Report, lookupErr error) (sum cliout.Summary, security string) {
+func announce(w cliout.Run, c *contract.Contract, r evidence.Report, lookupErr error, repo string) (sum cliout.Summary, security string) {
 	w.Decision(r, c.Cacheability)
 	// Flooding is a security event, not a routine reuse-off cause (#135).
 	flood := errors.Is(lookupErr, registry.ErrTooManyCandidates)
 	sum = cliout.Summary{Test: c.Metadata.Name, ReuseOff: !flood && (r.Outcome == evidence.OutcomeError || errors.As(lookupErr, new(reuseOff)))}
 	if r.Outcome == evidence.OutcomeError && !flood {
-		w.ReuseOff(r.Reason) // the test runs: fail closed (invariant 3)
+		// The test runs: fail closed (invariant 3). The report keeps the raw error.
+		w.ReuseOff(cmp.Or(unreachable(repo, lookupErr), r.Reason))
 	}
 	if n := securityCount(r); n > 0 {
 		sum.Security, security = true, cliout.SecurityLine(n, r.TestID)
@@ -558,6 +575,7 @@ func keep(ctx context.Context, w cliout.Run, sum *cliout.Summary, c *contract.Co
 	if pinErr != nil {
 		return []error{fmt.Errorf("result not published: %s", pinErr)}
 	}
+	warnUntrustedKey(w.Err, o.key, o.policyFile)
 	ref, err := signAndPush(ctx, p, c, o.file, o.repo, o.key, token, o.registryTimeout)
 	if err != nil {
 		return []error{err}
@@ -660,7 +678,7 @@ func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contrac
 		o, err := pushOutputs(octx, repo, p.Execution.Fingerprint, files)
 		cancel()
 		if err != nil {
-			return "", fmt.Errorf("publishing outputs: %w", err)
+			return "", fmt.Errorf("publishing outputs: %w", reachError(repo, err))
 		}
 		q := *p
 		q.Execution.Outputs = o
@@ -678,7 +696,7 @@ func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contrac
 	defer cancel()
 	d, err := publish(ctx, repo, p.Execution.Fingerprint, registry.Attestation{Envelope: s.Envelope, Bundle: s.Bundle})
 	if err != nil {
-		return "", fmt.Errorf("publishing: %w", err)
+		return "", fmt.Errorf("publishing: %w", reachError(repo, err))
 	}
 	return d.Reference(), nil
 }
@@ -710,6 +728,9 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 				return fmt.Errorf("result not published: %s", err)
 			}
 			raw, err := os.ReadFile(resultFile)
+			if errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("reading the result recorded by 'aval run': %w; run aval run first, or use aval run --push", err)
+			}
 			if err != nil {
 				return fmt.Errorf("reading the result recorded by 'aval run': %w", err)
 			}
@@ -819,7 +840,7 @@ func publishRecord(cmd *cobra.Command, g *globalFlags, file, sourceRepo string) 
 	defer cancel()
 	d, err := pushRecord(ctx, repo, *rec)
 	if err != nil {
-		return fmt.Errorf("publishing run record: %w", err)
+		return fmt.Errorf("publishing run record: %w", reachError(repo, err))
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "recorded %s\n", d.Reference())
 	return nil

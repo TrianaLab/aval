@@ -133,6 +133,11 @@ func printErrors(w io.Writer, err error) {
 	if err == nil {
 		return
 	}
+	var l listError
+	if errors.As(err, &l) {
+		cliout.Problems(w, l.head, l.err)
+		return
+	}
 	for _, p := range errParts(err) {
 		fmt.Fprintln(w, "aval:", cliout.OneLine(p))
 	}
@@ -229,6 +234,12 @@ func requireRegistry(repo string) error {
 // checkRegistry rejects a --registry that is not an OCI repository (host and
 // name, no scheme, tag or digest) before anything runs.
 func checkRegistry(repo string) error {
+	if scheme, rest, ok := strings.Cut(repo, "://"); ok {
+		if r, err := orasregistry.ParseReference(rest); err == nil && r.Reference == "" {
+			return usageError{fmt.Errorf("--registry %s is not an OCI repository: drop %s://: try --registry %s", repo, scheme, rest)}
+		}
+		return usageError{fmt.Errorf("--registry %s is not an OCI repository: drop %s://", repo, scheme)}
+	}
 	ref, err := orasregistry.ParseReference(repo)
 	if err == nil && ref.Reference != "" {
 		err = errors.New("a tag or digest is not allowed")
@@ -254,6 +265,10 @@ func noArgs(c *cobra.Command, args []string) error {
 // --stats-file); inside the contract root they are not inputs.
 func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*contract.Contract, fingerprint.Fingerprint, error) {
 	c, err := contract.Load(file)
+	var fe *contract.FileError
+	if errors.As(err, &fe) {
+		return nil, fingerprint.Fingerprint{}, usageError{listError{fe.File + ": invalid contract:", fe.Err}}
+	}
 	if err != nil {
 		return nil, fingerprint.Fingerprint{}, usageError{err}
 	}
@@ -398,6 +413,9 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
 			report, _, err := verify(ctx, cmd.ErrOrStderr(), c, file, fp, repo, g.policy)
+			if msg := unreachable(repo, err); msg != "" && report.Outcome == evidence.OutcomeError {
+				fmt.Fprintln(cmd.ErrOrStderr(), "aval:", cliout.OneLine(msg)) // the report keeps the raw error
+			}
 			if werr := cliout.WriteReport(cmd.OutOrStdout(), output, report); werr != nil {
 				return werr
 			}

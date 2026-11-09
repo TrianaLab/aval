@@ -74,6 +74,19 @@ func FloodLine(cause error, testID string) string {
 // Security prints SecurityLine.
 func Security(w io.Writer, n int, testID string) { fmt.Fprintln(w, SecurityLine(n, testID)) }
 
+// Problems writes head on an aval: line, then each problem in err (one per
+// errors.Join member) on an indented line of its own, each escaped.
+func Problems(w io.Writer, head string, err error) {
+	fmt.Fprintf(w, "aval: %s\n", OneLine(head))
+	items := []error{err}
+	if j, ok := err.(interface{ Unwrap() []error }); ok {
+		items = j.Unwrap()
+	}
+	for _, e := range items {
+		fmt.Fprintf(w, "  %s\n", OneLine(e.Error()))
+	}
+}
+
 // OneLine replaces newlines, control and other non-printable characters,
 // and invalid UTF-8, with Go escapes (\n, \x1b, \u2028); everything else,
 // quotes and backslashes included, stays as is. Reasons can carry text from
