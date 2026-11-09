@@ -29,14 +29,16 @@ You changed an input, so there is nothing to reuse. Also a miss:
 
 - no policy, or (for `aval run`) no registry, or `--no-reuse`
 - a `non-deterministic` test, or `external-dependencies` the policy does not allow
-- an unpinned [mutable reference](../pinning.md) in the inputs
+- a [mutable reference](../pinning.md) you did not pin or accept in
+  `scope.allowMutable`
 - only signers below `minTrustLevel`
 
 ## A verification failure is a security event
 
 A result under your fingerprint does not verify: a bad signature, an unknown
-signer, or a claim of other inputs. A wrong policy or an attacker. Aval runs
-the test, prints `aval: SECURITY: ...` and exits 5. Fail the job and look.
+signer, or a claim of other inputs. The cause is a wrong policy or an
+attacker. Aval runs the test, prints `aval: SECURITY: ...` and exits 5. Fail
+the job and investigate; never hide or retry it.
 
 ## Read more
 

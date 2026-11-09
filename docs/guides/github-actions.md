@@ -40,6 +40,7 @@ Write scopes mean the job above runs only on `main`. A PR job can still reuse:
 
 - `contents: read`, no push step;
 - set `AVAL_REGISTRY` and `AVAL_POLICY` (or the flags);
+- public GHCR packages can be read without a login;
 - read the policy from the default branch, not the PR:
   [protected branch](../trust-model.md#take-the-policy-from-a-protected-branch).
 

@@ -90,9 +90,16 @@ behind [Pin your dependencies](pinning.md).
 
 ## Scripts
 
-`*.sh`, `*.bash`, `*.zsh`, `*.mk`, `Makefile`, and in-scope files without
-an extension whose first line is a `sh`, `bash`, `zsh`, `ksh` or `dash`
-shebang (`./setup`). A script with another extension is hashed but not
+Reported, also in Dockerfile `RUN` lines and heredocs:
+
+- `curl … | sh`, also through `tee`;
+- `bash -c "$(curl …)"`, `python -c "$(curl …)"`, `eval "$(curl …)"`;
+- `source <(wget …)`;
+- `releases/latest` URLs.
+
+Files scanned as scripts: `*.sh`, `*.bash`, `*.zsh`, `*.mk`, `Makefile`,
+and in-scope files without an extension whose first line is a `sh`,
+`bash`, `zsh`, `ksh` or `dash` shebang (`./setup`). A script with another extension is hashed but not
 scanned.
 
 ## `scope.allowMutable`

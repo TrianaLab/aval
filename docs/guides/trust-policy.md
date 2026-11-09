@@ -22,7 +22,7 @@ For a key: [Sign results](signing.md#the-example). Pass it with `--policy`,
 or set `AVAL_POLICY` once (the flag wins):
 
 ```sh
-aval verify --policy policy.yaml
+aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml
 ```
 
 ## The fields
@@ -36,7 +36,8 @@ aval verify --policy policy.yaml
 - Give developer keys `developer`. Keep `minTrustLevel: runner` in CI, so CI
   never reuses laptop results.
 - `subjectRegexp` must match the whole subject. Escape dots: `github\.com`.
-- Keyless checks fetch the Sigstore root once; offline the test runs. Pin
+- Keyless checks fetch the Sigstore root on first use and cache it under
+  `$HOME/.sigstore`; offline the test runs. Pin
   `trustedRoot` to avoid it ([details](../trust-model.md#keyless-verification-needs-the-network-and-a-writable-home)).
 
 ## Read next

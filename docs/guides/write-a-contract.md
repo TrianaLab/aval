@@ -29,7 +29,7 @@ A Go test against Redis from Docker Compose,
 3. **List the inputs.** `scope.source` for files the test reads,
    `scope.dependencies` for manifests and lockfiles. Globs are relative to the
    contract; `**` is any depth. A glob that matches nothing means no
-   fingerprint: the test always runs.
+   fingerprint: the test always runs (`exclude` globs may match nothing).
 4. **Pick a cacheability class.** How safe reuse is. Tags and ranges block
    reuse for `hermetic` and `controlled-environment`: [pin them](../pinning.md).
 

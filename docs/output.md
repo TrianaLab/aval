@@ -4,7 +4,7 @@ What exactly does `aval run` print, and where?
 
 ## Plain output
 
-CI, a pipe, `--plain`, `AVAL_OUTPUT=plain` or `TERM=dumb` give plain lines:
+Output that is not a terminal (CI logs, a pipe), `--plain`, `AVAL_OUTPUT=plain` or `TERM=dumb` give plain lines:
 
 ```text
 miss hello sha256:d52167b4...
@@ -16,7 +16,8 @@ summary: hello ran: passed in 12ms
 ```
 
 - The first line is `<outcome> <test> <digest>`.
-- A `config:` line names each value that came from `AVAL_REGISTRY` or `AVAL_POLICY`.
+- When a value came from `AVAL_REGISTRY` or `AVAL_POLICY`, a `config:` line shows
+  the registry and policy in use and where each came from.
 - The test's own output sits between `--- run` and `--- end`, untouched.
 - `summary:` may add `; saved <time>` (display only), `; result pushed`,
   `; reuse was off` and `; SECURITY`.

@@ -155,7 +155,7 @@ contract <path> <name> <fingerprint>
 | `toolchain` | `key=value` as written; checked against the installed tools only by `environment.probe` | |
 | `env` | sha256 of the value, or `unset` (empty is not unset); values never appear in clear | |
 | `resolve` | kind, reference, version or `floating`, immutable id; only with `scope.resolve`, and needs the network ([Resolve references](resolve/index.md)) | the registry address |
-| `contract <path>` | one line per `scope.contracts` entry: the path as written, the referenced contract's `metadata.name` and its fingerprint, computed from its own directory and inputs (so references are transitive). `--explain` also prints the tree, one `depends on <path> (<name>) <fingerprint>` line per reference | |
+| `contract <path>` | one line per `scope.contracts` entry: the path as written, the referenced contract's `metadata.name` and its fingerprint, computed from its own directory and inputs (so references are transitive). `aval explain` also prints the tree, one `depends on <path> (<name>) <fingerprint>` line per reference | |
 
 Lines are sorted within each section, so checkout path and walk order do not
 matter. Paths are hashed byte for byte. Windows has no exec bit, so an
@@ -234,8 +234,8 @@ the predicate's `execution.environment` as `probe.<key>`.
 
 Only `aval run` executes probes. `aval verify`, `aval push`,
 `aval explain` and the browser demo never do: a consumer never executes
-commands from a contract. `--explain` prints the manifest before any probe
-runs; when it goes on to run the test, the probe runs as in any run. The probe
+commands from a contract. `aval explain` prints the manifest and never runs a
+probe. The probe
 argv is part of the contract, so adding or changing one changes the
 fingerprint; its output is not hashed, since it varies by build and platform.
 

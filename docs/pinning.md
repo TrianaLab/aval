@@ -48,7 +48,11 @@ image: redis:7.4-alpine@sha256:c5d34a98396a4775e223c74e929162c35c5a2182901ba26b5
 ```
 
 ```dockerfile
+# syntax=docker/dockerfile:1@sha256:<digest>
 FROM golang:1.25@sha256:<digest> AS build
+FROM build AS test          # a stage name is fine
+COPY --from=nginx:1.27@sha256:<digest> /etc/nginx /etc/nginx
+ADD --checksum=sha256:<sum> https://example.com/tool.tgz /tool.tgz
 ```
 
 Find the digest with `crane digest <image:tag>`. Testcontainers, Dockerfiles,
@@ -58,7 +62,7 @@ Kustomize and YAML rules: [Container images](mutable-references.md#container-ima
 
 `curl … | sh`, `eval "$(curl …)"` and `releases/latest` URLs run whatever the
 server sends. Vendor the script into the scope, or download a fixed version
-and check its sha256. [Which files are scanned](mutable-references.md#scripts).
+and check its sha256. [All variants and which files are scanned](mutable-references.md#scripts).
 
 ## Resolve a reference instead
 

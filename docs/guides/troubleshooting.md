@@ -99,7 +99,7 @@ flowchart LR
 why. Usually a wrong policy, possibly an attacker
 ([Outcomes](../concepts/outcomes.md#a-verification-failure-is-a-security-event)).
 Beside a verified result (exit 0) it shows in `rejected`: gate on it where it
-must stop a pipeline.
+must stop a pipeline (`.github/aval/summary.sh`).
 
 ??? danger "Reasons"
     | Reason | Fix |

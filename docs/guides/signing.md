@@ -44,6 +44,11 @@ flowchart LR
     GitHub email. The token is used once, never stored. Give such an identity
     `developer`.
 
+    The identity is your verified GitHub email, issuer
+    `https://github.com/login/oauth`. In CI set `$SIGSTORE_ID_TOKEN` or use
+    `--key`: a terminal without a browser prints the login URL and waits for
+    a pasted code.
+
 ## Which one
 
 | | Key | Keyless |

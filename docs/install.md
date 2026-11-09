@@ -56,8 +56,9 @@ aval upgrade --version v0.4.0   # to a given release
 aval upgrade --check            # print the current and target versions, change nothing
 ```
 
-- It checks the Sigstore signature of `checksums.txt` itself (signer: Aval's
-  release workflow at that tag), then the sha256. No `cosign` needed.
+- It checks the Sigstore signature of `checksums.txt` itself (issuer
+  `https://token.actions.githubusercontent.com`, signer: Aval's release
+  workflow at that tag), then the sha256. No `cosign` needed.
 - A failed check replaces nothing and exits 1. A bad signature is a security
   event: do not retry it away.
 - Without `--version` it never downgrades; a `dev` build is always replaced.

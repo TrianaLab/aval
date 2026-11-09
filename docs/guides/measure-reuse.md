@@ -30,7 +30,8 @@ An upper bound: it ignores branches, failing tests and trust policy.
 
 ## Measure in shadow mode
 
-Verify, run the test anyway, compare, and record the run:
+Verify, run the test anyway, compare, and record the run. With
+`AVAL_REGISTRY` and `AVAL_POLICY` set (or `--registry`/`--policy`):
 
 ```sh
 aval run --shadow --stats
@@ -56,7 +57,17 @@ aval stats --registry ghcr.io/acme/aval-stats --since 7d
 ```
 
 It sums hits, misses by cause, verification failures, shadow false hits and
-time saved, per test.
+time saved, per test:
+
+```text
+run records in ghcr.io/acme/aval-stats since 2026-10-31T12:30:00Z
+orders-unit: 1 runs, 1 reused (hit rate 100.0%), test time 0s, saved 1m30s
+  not reused: 0 no trusted result, 0 error, 0 verified but run (shadow)
+  verification failures: 0, shadow false hits: 0
+total: 1 runs, 1 reused (hit rate 100.0%), test time 0s, saved 1m30s
+  not reused: 0 no trusted result, 0 error, 0 verified but run (shadow)
+  verification failures: 0, shadow false hits: 0
+```
 
 - `--test` limits it to one test, `--by repository` groups by `--source-repo`,
   `-o json` prints the [stats report](../artifact-format.md#stats-report-json).

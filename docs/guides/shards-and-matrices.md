@@ -50,7 +50,8 @@ One job per shard, each with its own `--result-file` and coverage `outputs`:
 --8<-- "examples/uv-monorepo/workflow.yaml"
 ```
 
-The same job locally:
+The same job locally, with `AVAL_REGISTRY` and `AVAL_POLICY` exported as in
+the workflow:
 
 ```sh
 aval run -f aval.shard-2.yaml --result-file .aval/shard-2.json

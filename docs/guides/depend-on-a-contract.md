@@ -65,14 +65,19 @@ may use `..`):
 
 Any lockfile change reruns every member.
 
-| Tool | Root files to hash |
-|---|---|
-| uv | `pyproject.toml`, `uv.lock` |
-| pnpm | `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` |
-| cargo | `Cargo.toml`, `Cargo.lock` |
+| Tool | Root files to hash | Lockfile check |
+|---|---|---|
+| uv | `pyproject.toml`, `uv.lock` | `uv lock --check` |
+| pnpm | `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` | `pnpm install --frozen-lockfile` |
+| cargo | `Cargo.toml`, `Cargo.lock` | `cargo metadata --locked` |
 
-Also check root config (`tsconfig.base.json`, `conftest.py`,
-`.cargo/config.toml`), patches, build scripts and shared fixtures:
+A member that imports another member lists that member's sources too, or
+names its contract.
+
+Also check root config (`tsconfig.base.json`, `.npmrc`, `conftest.py`,
+`pytest.ini`, `.cargo/config.toml`, `rust-toolchain.toml`,
+`.python-version`, `.nvmrc`), patches, build scripts, shared fixtures and
+environment variables (`environment.env`):
 [find undeclared inputs](write-a-contract.md#find-undeclared-inputs).
 
 ## Read next
