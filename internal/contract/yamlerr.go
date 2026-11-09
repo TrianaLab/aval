@@ -153,7 +153,7 @@ func want(goType string) string {
 }
 
 // levenshtein is the edit distance between a and b.
-// ponytail: same as cmd/aval's flag suggestions; share it if a third copy appears.
+// ponytail: same as levenshtein in cmd/aval/help.go; share it if a third copy appears.
 func levenshtein(a, b string) int {
 	prev := make([]int, len(b)+1)
 	for j := range prev {

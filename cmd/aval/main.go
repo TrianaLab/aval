@@ -133,12 +133,10 @@ func printErrors(w io.Writer, err error) {
 	if err == nil {
 		return
 	}
-	var ue usageError
-	if errors.As(err, &ue) {
-		if l, ok := ue.error.(listError); ok {
-			cliout.Problems(w, l.head, l.err)
-			return
-		}
+	var l listError
+	if errors.As(err, &l) {
+		cliout.Problems(w, l.head, l.err)
+		return
 	}
 	for _, p := range errParts(err) {
 		fmt.Fprintln(w, "aval:", cliout.OneLine(p))
@@ -237,7 +235,10 @@ func requireRegistry(repo string) error {
 // name, no scheme, tag or digest) before anything runs.
 func checkRegistry(repo string) error {
 	if scheme, rest, ok := strings.Cut(repo, "://"); ok {
-		return usageError{fmt.Errorf("--registry %s is not an OCI repository: drop %s://: try --registry %s", repo, scheme, rest)}
+		if r, err := orasregistry.ParseReference(rest); err == nil && r.Reference == "" {
+			return usageError{fmt.Errorf("--registry %s is not an OCI repository: drop %s://: try --registry %s", repo, scheme, rest)}
+		}
+		return usageError{fmt.Errorf("--registry %s is not an OCI repository: drop %s://", repo, scheme)}
 	}
 	ref, err := orasregistry.ParseReference(repo)
 	if err == nil && ref.Reference != "" {

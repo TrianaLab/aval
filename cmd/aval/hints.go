@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 
@@ -27,8 +28,19 @@ func (l listError) Unwrap() error { return l.err }
 
 // unreachable says what to do about a registry that cannot be dialled or
 // did not answer in time: "cannot reach HOST (cause); ...". It is empty for
-// any other error. Only messages use it: a report keeps the raw error.
+// any other error, and for a request to another host (a scope.resolve
+// lookup, a Sigstore trusted root): the hint would blame the wrong one.
+// Only messages use it: a report keeps the raw error.
+// ponytail: a timeout without a *url.Error (mid-body) gets no hint; the raw error still prints.
 func unreachable(repo string, err error) string {
+	host, _, _ := strings.Cut(repo, "/")
+	var ue *url.Error
+	if host == "" || !errors.As(err, &ue) {
+		return ""
+	}
+	if u, perr := url.Parse(ue.URL); perr != nil || u.Host != host {
+		return ""
+	}
 	var dns *net.DNSError
 	var op *net.OpError
 	cause := ""
@@ -42,7 +54,6 @@ func unreachable(repo string, err error) string {
 	default:
 		return ""
 	}
-	host, _, _ := strings.Cut(repo, "/")
 	return fmt.Sprintf("cannot reach %s (%s); is the registry running? check %s or --registry", host, cause, registryEnv)
 }
 
@@ -92,7 +103,7 @@ func warnUntrustedKey(w io.Writer, key, policyFile string) {
 		return
 	}
 	der, _ := x509.MarshalPKIXPublicKey(&k.PublicKey) // ponytail: cannot fail for a P-256 key
-	kid, _ := evidence.PublicKeyID(string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})))
+	kid, _ := evidence.PublicKeyID(string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}))) // ponytail: cannot fail for the PEM just encoded
 	for _, id := range pol.Identities {
 		if got, err := evidence.PublicKeyID(id.PublicKey); err == nil && got == kid {
 			return

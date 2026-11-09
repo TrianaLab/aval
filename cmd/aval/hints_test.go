@@ -2,14 +2,18 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TrianaLab/aval/internal/cliout"
 	"github.com/TrianaLab/aval/internal/policy"
@@ -19,22 +23,33 @@ import (
 const reachHint = "; is the registry running? check AVAL_REGISTRY or --registry"
 
 func TestUnreachable(t *testing.T) {
-	dial := &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connect: connection refused")}
+	at := func(u string, err error) error { return &url.Error{Op: "Get", URL: u, Err: err} }
+	reg := "https://localhost:5000/v2/acme/r/manifests/x"
+	dial := at(reg, &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connect: connection refused")})
+	dns := &net.DNSError{Err: "no such host", Name: "localhost"}
 	cases := []struct {
+		repo string
 		err  error
 		want string
 	}{
-		{fmt.Errorf("resolving: %w", dial), "cannot reach localhost:5000 (connect: connection refused)" + reachHint},
-		{&net.OpError{Op: "dial", Err: &net.DNSError{Err: "no such host", Name: "localhost"}}, "cannot reach localhost:5000 (no such host)" + reachHint},
-		{fmt.Errorf("x: %w", context.DeadlineExceeded), "cannot reach localhost:5000 (timed out; see --registry-timeout)" + reachHint},
-		{os.ErrDeadlineExceeded, "cannot reach localhost:5000 (timed out; see --registry-timeout)" + reachHint},
-		{&net.OpError{Op: "read", Err: errors.New("reset")}, ""},
-		{errors.New("401 unauthorized"), ""},
-		{nil, ""},
+		{"localhost:5000/acme/r", fmt.Errorf("resolving: %w", dial), "cannot reach localhost:5000 (connect: connection refused)" + reachHint},
+		{"localhost:5000/acme/r", at(reg, &net.OpError{Op: "dial", Err: dns}), "cannot reach localhost:5000 (no such host)" + reachHint},
+		{"localhost:5000/acme/r", fmt.Errorf("x: %w", at(reg, context.DeadlineExceeded)), "cannot reach localhost:5000 (timed out; see --registry-timeout)" + reachHint},
+		{"localhost:5000/acme/r", at(reg, os.ErrDeadlineExceeded), "cannot reach localhost:5000 (timed out; see --registry-timeout)" + reachHint},
+		{"localhost:5000/acme/r", at(reg, &net.OpError{Op: "read", Err: errors.New("reset")}), ""},
+		{"localhost:5000/acme/r", errors.New("401 unauthorized"), ""},
+		{"localhost:5000/acme/r", nil, ""},
+		// Not aimed at the registry: a scope.resolve or Sigstore request
+		// that failed must not blame AVAL_REGISTRY.
+		{"localhost:5000/r", fmt.Errorf("GET: %w", at("https://registry.npmjs.org/x", dns)), ""},
+		{"localhost:5000/r", at("https://tuf-repo-cdn.sigstore.dev/root.json", context.DeadlineExceeded), ""},
+		{"localhost:5000/r", &net.OpError{Op: "dial", Err: dns}, ""},
+		{"localhost:5000/r", at("%zz", dns), ""},
+		{"", at(reg, dns), ""},
 	}
 	for _, tc := range cases {
-		if got := unreachable("localhost:5000/acme/r", tc.err); got != tc.want {
-			t.Errorf("unreachable(%v) = %q, want %q", tc.err, got, tc.want)
+		if got := unreachable(tc.repo, tc.err); got != tc.want {
+			t.Errorf("unreachable(%q, %v) = %q, want %q", tc.repo, tc.err, got, tc.want)
 		}
 	}
 	err := reachError("localhost:5000/r", dial)
@@ -50,7 +65,7 @@ func TestUnreachable(t *testing.T) {
 // verify text and JSON reports and the run report keep the raw error, and
 // exit codes and outcomes stay what they were.
 func TestUnreachableKeepsTheReason(t *testing.T) {
-	dial := fmt.Errorf("reg.example/r: resolving: %w", &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connect: connection refused")})
+	dial := fmt.Errorf("reg.example/r: resolving: %w", &url.Error{Op: "Get", URL: "https://reg.example/v2/r/tags/list", Err: &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connect: connection refused")}})
 	fakeVerify(t, dial, nil, nil)
 	hint := "cannot reach reg.example (connect: connection refused)" + reachHint
 	c := writeContract(t, "hermetic")
@@ -169,7 +184,8 @@ func TestUntrustedKeyWarning(t *testing.T) {
 	took := regexp.MustCompile(` in [0-9.]+(ns|µs|ms|s)\b`)
 	norm := func(s string) string { return took.ReplaceAllString(s, " in D") }
 	if codeT != ExitOK || codeU != codeT || norm(outU) != norm(outT) || strings.Contains(outU, "warning") ||
-		strings.Contains(errT, "is not in") || !strings.Contains(errU, warning) || len(signedT) != 1 || len(signedU) != 1 {
+		strings.Contains(errT, "is not in") || !strings.Contains(errU, warning) || len(signedT) != 1 || len(signedU) != 1 ||
+		!reflect.DeepEqual(stable(t, signedT[0]), stable(t, signedU[0])) {
 		t.Fatalf("trusted: exit %d stderr %q; untrusted: exit %d stdout %q stderr %q", codeT, errT, codeU, outU, errU)
 	}
 
@@ -183,6 +199,18 @@ func TestUntrustedKeyWarning(t *testing.T) {
 	if b.Len() != 0 {
 		t.Fatalf("warned %q", b.String())
 	}
+}
+
+// stable is the predicate of s without its timestamps, which differ between
+// any two runs.
+func stable(t *testing.T, s *evidence.Statement) evidence.Predicate {
+	t.Helper()
+	var p evidence.Predicate
+	if err := json.Unmarshal(s.Predicate, &p); err != nil {
+		t.Fatal(err)
+	}
+	p.StartedAt, p.FinishedAt = time.Time{}, time.Time{}
+	return p
 }
 
 // Contract errors print one indented line per problem under one aval: line,
