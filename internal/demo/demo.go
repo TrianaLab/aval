@@ -61,6 +61,7 @@ const (
 // Help is what `help` prints.
 const Help = `This terminal runs Aval compiled to WebAssembly, entirely in your browser.
   aval run              look up a trusted result; on a miss run the test, sign and push
+  aval run --explain    the same, printing the fingerprint manifest first
   aval run --plain      the same, as the plain lines CI prints
   aval explain          print what the fingerprint covers, digest last (no lookup, no run)
   aval explain --digest only the fingerprint
@@ -72,7 +73,7 @@ const Help = `This terminal runs Aval compiled to WebAssembly, entirely in your 
   reset                 original files, empty registry, new throwaway key
   clear                 clear the screen
 Here AVAL_REGISTRY=` + DefaultRepo + ` and AVAL_POLICY=policy.yaml
-are as if exported, and aval run means aval run --push --key throwaway.key.
+are set for you, and aval run means aval run --push --key throwaway.key.
 The test is simulated, the registry is in memory and the key is generated in
 this tab. Keyless (Sigstore) signing is not available in the browser.
 `

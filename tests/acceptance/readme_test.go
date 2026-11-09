@@ -28,8 +28,9 @@ type quickstartStep struct {
 var fenceRE = regexp.MustCompile("(?s)```(sh|text)\n(.*?)```")
 
 // quickstartSteps reads the blocks between the quickstart markers of a
-// Markdown file under the repository root. `docker` lines (registry:2 and its
-// cleanup before and after) are dropped: the test serves an in-process registry instead.
+// Markdown file under the repository root. `docker` lines (registry:2 and
+// its cleanup before and after) are dropped: the test serves an in-process
+// registry instead.
 func quickstartSteps(t *testing.T, doc string) []quickstartStep {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", doc))

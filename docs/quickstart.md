@@ -5,28 +5,30 @@ rejected result.
 
 You need `aval` ([Install](install.md)) and Docker. Run the blocks
 in order in one shell. Each `text` block is the expected output; `...`
-stands for a digest, key id or duration that changes on every run.
+stands for a digest, key id, duration or docs version that changes between
+runs.
 
 <!-- quickstart:start (tests/acceptance/readme_test.go runs the sh blocks and checks the text blocks) -->
 
 ## 1. Set up
 
 A local OCI registry (port 5001: macOS uses 5000 for AirPlay). The first
-line removes one left over from an earlier try:
+line removes a registry left from an earlier try (silent if there is none):
 
 ```sh
-docker rm -f aval-registry
+docker rm -f aval-registry 2>/dev/null || true
 docker run -d --name aval-registry -p 5001:5000 registry:2
 ```
 
-A project with one input file. `aval init` writes `aval.yaml`, which names
+A project with one input file; the first line removes the project left from
+an earlier try. `aval init` writes `aval.yaml`, which names
 the test command and the files it reads (`scope`), a signing key (ECDSA
 P-256) and `policy.yaml`, a trust policy that trusts the key. `--source` and
 `--cacheability` have no default: you declare what the test reads, and init
 lists the files it matches:
 
 ```sh
-mkdir aval-demo && cd aval-demo
+rm -rf aval-demo && mkdir aval-demo && cd aval-demo
 mkdir src && echo hello > src/hello.txt
 aval init --name hello --source 'src/**' --cacheability hermetic --key aval.key -- grep -q hello src/hello.txt
 ```
@@ -136,8 +138,8 @@ summary: hello ran: passed in ...
 ![a result signed with a key the policy does not trust, other.key, is pushed; aval run prints SECURITY, verification-failed, runs the test and exits 5](assets/gifs/tampered.gif)
 
 Someone who can push to the registry, but with a key your policy does not
-trust, publishes a result. `AVAL_POLICY=` (empty) turns the lookup off for
-that one push, as an attacker would. Aval rejects the result, runs the test
+trust, publishes a result. `AVAL_POLICY=` (empty) runs that one push without
+your policy, as an attacker's would. Aval rejects the result, runs the test
 and exits 5: a security event, not a miss. A tampered result ends the same
 way:
 

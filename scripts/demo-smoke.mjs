@@ -146,7 +146,7 @@ try {
     return p.js(termText);
   };
   let out = await type("help");
-  check("help describes the quickstart setup", /AVAL_REGISTRY=[^\n]* and AVAL_POLICY=policy\.yaml\nare as if exported/.test(out), out);
+  check("help describes the quickstart setup", /AVAL_REGISTRY=\S+ and AVAL_POLICY=policy\.yaml/.test(out), out);
   out = await type("aval run");
   check("first aval run misses, runs and pushes", /· miss greet[\s\S]*· run greet: go test \.\/\.\.\.\n[\s\S]*✓ greet passed \(exit 0\) in 4ms\n✓ pushed [^\n]*\ngreet passed in 4ms; published for the next run with these inputs\.\n$/.test(out), out);
   out = await type("aval run");
