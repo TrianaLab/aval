@@ -60,22 +60,12 @@ func newRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Reuse a verified result for the current inputs, or run the test",
-		Long: `run computes the fingerprint, looks up a signed result and reuses it if the
-trust policy accepts it, restoring the contract's outputs. Otherwise it runs
-runner.command, records the result (--result) and, with --push, signs and
-publishes it with its outputs.
+		Long: `run reuses a verified result for the current inputs when the trust policy
+accepts it, restoring the contract's outputs; otherwise it runs runner.command
+and records the result. Anything Aval cannot prove runs the test.
 
-Anything Aval cannot prove runs the test. A verification failure runs the
-test and exits 5: a security event. --shadow runs the test even after a
-verified result and exits 1 if they disagree (a false hit).
-
---record publishes a run record for statistics; a failure is only a warning.
---record-file writes it to a file for 'aval record'.
-
-Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
-2 usage. Keyless signing reads $` + idTokenEnv + `; runner.command never sees
-it.
-` + loginHelp + `.`,
+Exit codes: 0 pass, 3 fail, 5 verification failed (a security event, after
+running the test), 1 error or false hit (--shadow), 2 usage.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runTest(cmd, o) },
 	}
@@ -84,12 +74,12 @@ it.
 	f.StringVar(&o.repo, "registry", "", "OCI repository for attestations, e.g. ghcr.io/acme/orders-aval")
 	f.StringVar(&o.policyFile, "policy", "", "trust policy file (required for reuse; without it the test always runs)")
 	f.BoolVar(&o.push, "push", false, "sign and publish the result after running (needs --registry)")
-	f.StringVar(&o.key, "key", "", "signing key path for --push (default: keyless OIDC)")
+	f.StringVar(&o.key, "key", "", "signing key path for --push (default: keyless, from $"+idTokenEnv+" or the interactive login; runner.command never sees the token)")
 	f.BoolVar(&o.login, "login", false, loginFlagHelp)
 	f.StringVar(&o.resultFile, "result", defaultResult, "where to record the result for 'aval push'")
 	f.StringVar(&o.reportFile, "report", "", "also write the lookup decision as a verify report (JSON) to this file")
-	f.BoolVar(&o.noReuse, "no-reuse", false, "always run, never reuse")
-	f.BoolVar(&o.shadow, "shadow", false, "verify, but run the test anyway and fail on a false hit")
+	f.BoolVar(&o.noReuse, "no-reuse", false, "always run, never reuse (excludes --shadow)")
+	f.BoolVar(&o.shadow, "shadow", false, "verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)")
 	f.BoolVar(&o.fingerprintOnly, "fingerprint-only", false, "print the execution fingerprint and exit")
 	f.BoolVar(&o.explain, "explain", false, "print the fingerprint manifest (what was hashed)")
 	f.BoolVar(&o.record, "record", false, "publish a run record for statistics after the run (needs --registry; best-effort)")

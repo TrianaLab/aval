@@ -186,15 +186,9 @@ func newRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })
-	root.Args = func(_ *cobra.Command, args []string) error {
-		if len(args) > 0 {
-			return usageError{fmt.Errorf("unknown command %q", args[0])}
-		}
-		return nil
-	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
 	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
+	guide(root)
 	return root
 }
 

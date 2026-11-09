@@ -32,15 +32,21 @@ Usage:
   aval [flags]
   aval [command]
 
-Available Commands:
+Core:
+  run         Reuse a verified result for the current inputs, or run the test
+  verify      Check whether a trusted result exists for the current inputs
+
+Publishing:
+  push        Sign and publish a recorded execution result
+
+Statistics:
+  record      Publish a run record written by 'aval run --record-file'
+  stats       Aggregate the run records in the registry: reuse, misses, time saved
+
+Additional Commands:
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
-  push        Sign and publish a recorded execution result
-  record      Publish a run record written by 'aval run --record-file'
-  run         Reuse a verified result for the current inputs, or run the test
-  stats       Aggregate the run records in the registry: reuse, misses, time saved
   upgrade     Replace this binary with a verified aval release
-  verify      Check whether a trusted result exists for the current inputs
   version     Print the aval version, Go version and platform
 
 Flags:
@@ -84,6 +90,9 @@ stored.
 Usage:
   aval push [flags]
 
+Examples:
+  aval push --registry ghcr.io/acme/orders-aval --key aval.key
+
 Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
   -h, --help                        help for push
@@ -106,6 +115,9 @@ record's source repository.
 Usage:
   aval record [flags]
 
+Examples:
+  aval record --registry ghcr.io/acme/orders-aval --record-file record.json
+
 Flags:
   -h, --help                        help for record
       --record-file string          run record written by 'aval run --record-file' (required)
@@ -116,28 +128,23 @@ Flags:
 
 ## aval run
 
-run computes the fingerprint, looks up a signed result and reuses it if the
-trust policy accepts it, restoring the contract's outputs. Otherwise it runs
-runner.command, records the result (--result) and, with --push, signs and
-publishes it with its outputs.
+run reuses a verified result for the current inputs when the trust policy
+accepts it, restoring the contract's outputs; otherwise it runs runner.command
+and records the result. Anything Aval cannot prove runs the test.
 
-Anything Aval cannot prove runs the test. A verification failure runs the
-test and exits 5: a security event. --shadow runs the test even after a
-verified result and exits 1 if they disagree (a false hit).
-
---record publishes a run record for statistics; a failure is only a warning.
---record-file writes it to a file for 'aval record'.
-
-Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
-2 usage. Keyless signing reads $SIGSTORE_ID_TOKEN; runner.command never sees
-it.
-Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
---login) opens the interactive Sigstore login in the browser; no token is
-stored.
+Exit codes: 0 pass, 3 fail, 5 verification failed (a security event, after
+running the test), 1 error or false hit (--shadow), 2 usage.
 
 ```text
 Usage:
   aval run [flags]
+
+Examples:
+  # Reuse a verified result for the current inputs, or run the test
+  aval run --registry ghcr.io/acme/orders-aval --policy policy.yaml
+
+  # Run, then sign and publish the result keyless
+  aval run --registry ghcr.io/acme/orders-aval --push
 
 Flags:
       --ci-run-url string           link to the CI run, stored in the run record
@@ -145,9 +152,9 @@ Flags:
       --explain                     print the fingerprint manifest (what was hashed)
       --fingerprint-only            print the execution fingerprint and exit
   -h, --help                        help for run
-      --key string                  signing key path for --push (default: keyless OIDC)
+      --key string                  signing key path for --push (default: keyless, from $SIGSTORE_ID_TOKEN or the interactive login; runner.command never sees the token)
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
-      --no-reuse                    always run, never reuse
+      --no-reuse                    always run, never reuse (excludes --shadow)
       --policy string               trust policy file (required for reuse; without it the test always runs)
       --push                        sign and publish the result after running (needs --registry)
       --record                      publish a run record for statistics after the run (needs --registry; best-effort)
@@ -157,7 +164,7 @@ Flags:
       --report string               also write the lookup decision as a verify report (JSON) to this file
       --repository string           source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
       --result string               where to record the result for 'aval push' (default ".aval/result.json")
-      --shadow                      verify, but run the test anyway and fail on a false hit
+      --shadow                      verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)
 ```
 
 ## aval stats
@@ -182,6 +189,9 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.
 ```text
 Usage:
   aval stats [flags]
+
+Examples:
+  aval stats --registry ghcr.io/acme/orders-aval --since 30d
 
 Flags:
       --by string                   group by test or repository (the run record's source repository) (default "test")
@@ -208,6 +218,9 @@ checksum, older latest release, replacing the binary), 2 usage.
 Usage:
   aval upgrade [flags]
 
+Examples:
+  aval upgrade --check
+
 Flags:
       --check            print the current and target versions without installing
   -h, --help             help for upgrade
@@ -226,6 +239,9 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 Usage:
   aval verify [flags]
 
+Examples:
+  aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml -o json
+
 Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
   -h, --help                        help for verify
@@ -242,6 +258,9 @@ Print the aval version, Go version and platform
 ```text
 Usage:
   aval version [flags]
+
+Examples:
+  aval version
 
 Flags:
   -h, --help   help for version
