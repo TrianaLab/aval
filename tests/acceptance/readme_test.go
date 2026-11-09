@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -27,8 +28,9 @@ type quickstartStep struct {
 var fenceRE = regexp.MustCompile("(?s)```(sh|text)\n(.*?)```")
 
 // quickstartSteps reads the blocks between the quickstart markers of a
-// Markdown file under the repository root. `docker` lines (registry:2 and its
-// cleanup) are dropped: the test serves an in-process registry instead.
+// Markdown file under the repository root. `docker` lines (registry:2 and
+// its cleanup before and after) are dropped: the test serves an in-process
+// registry instead.
 func quickstartSteps(t *testing.T, doc string) []quickstartStep {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", doc))
@@ -60,7 +62,7 @@ func quickstartSteps(t *testing.T, doc string) []quickstartStep {
 		}
 		steps = append(steps, quickstartStep{script: strings.Join(kept, "\n")})
 	}
-	if len(dropped) == 0 || !strings.Contains(dropped[0], "registry:2") {
+	if !slices.ContainsFunc(dropped, func(l string) bool { return strings.Contains(l, "registry:2") }) {
 		t.Fatalf("%s: quickstart must start a local registry:2, dropped %q", doc, dropped)
 	}
 	return steps

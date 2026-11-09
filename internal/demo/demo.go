@@ -72,10 +72,10 @@ const Help = `This terminal runs Aval compiled to WebAssembly, entirely in your 
   tamper                alter the signed result in the registry (verify: exit 5)
   reset                 original files, empty registry, new throwaway key
   clear                 clear the screen
-Here aval run means: aval run --registry ` + DefaultRepo + ` --policy policy.yaml --push --key throwaway.key
-and aval verify adds --registry and --policy. The test is simulated, the registry
-is in memory and the key is generated in this tab. Keyless (Sigstore) signing is
-not available in the browser.
+Here AVAL_REGISTRY=` + DefaultRepo + ` and AVAL_POLICY=policy.yaml
+are set for you, and aval run means aval run --push --key throwaway.key.
+The test is simulated, the registry is in memory and the key is generated in
+this tab. Keyless (Sigstore) signing is not available in the browser.
 `
 
 // Demo is one visitor's session: the project files, the registry and the key.
