@@ -17,46 +17,31 @@ A local OCI registry (port 5001: macOS uses 5000 for AirPlay):
 docker run -d --name aval-registry -p 5001:5000 registry:2
 ```
 
-A project: one input file and `aval.yaml`, which names the test command and
-the files it reads (`scope`):
+A project with one input file. `aval init` writes `aval.yaml`, which names
+the test command and the files it reads (`scope`), a signing key (ECDSA
+P-256) and `policy.yaml`, a trust policy that trusts the key. `--source` and
+`--cacheability` have no default: you declare what the test reads, and init
+lists the files it matches:
 
 ```sh
 mkdir aval-demo && cd aval-demo
 mkdir src && echo hello > src/hello.txt
-cat > aval.yaml <<'EOF'
-apiVersion: aval.trianalab.io/v1
-kind: Test
-metadata:
-  name: hello
-runner:
-  command: ["grep", "-q", "hello", "src/hello.txt"]
-scope:
-  source: ["src/**"]
-cacheability: hermetic
-EOF
+aval init --name hello --source 'src/**' --cacheability hermetic --key aval.key -- grep -q hello src/hello.txt
 ```
-
-A signing key (ECDSA P-256) and a policy that trusts it:
-
-<!-- --8<-- [start:key] (the guides include this block) -->
-```sh
-aval keygen
-cat > policy.yaml <<'EOF'
-apiVersion: aval.trianalab.io/v1
-kind: Policy
-minTrustLevel: developer
-identities:
-  - publicKey: aval.pub
-    trustLevel: developer
-EOF
-```
-<!-- --8<-- [end:key] -->
 
 ```text
-wrote aval.key (private: keep it secret, do not commit it) and aval.pub
-key id: ...
-next: trust aval.pub in your policy (publicKey: aval.pub) and sign with --key aval.key
+source matches 1 file: src/hello.txt
+wrote aval.key (private: keep it secret, do not commit it) and aval.pub, key id ...
+wrote policy.yaml: trusts aval.pub at trust level developer
+wrote aval.yaml
+added aval.key, .aval/ to .gitignore
+next: export AVAL_REGISTRY=<oci repository> AVAL_POLICY=policy.yaml, then aval run --push --key aval.key
 ```
+
+On a terminal, `aval init` without flags asks for each value.
+
+Skip the export for now: steps 2 and 3 pass `--registry` and `--policy`
+as flags, and the end of step 3 shows the environment form.
 
 ## 2. First run: a miss
 

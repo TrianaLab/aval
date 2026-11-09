@@ -15,7 +15,19 @@ flowchart LR
 
     Make a P-256 key and a policy that trusts it:
 
-    --8<-- "docs/quickstart.md:key"
+    ```sh
+    aval keygen
+    cat > policy.yaml <<'EOF'
+    apiVersion: aval.trianalab.io/v1
+    kind: Policy
+    minTrustLevel: developer
+    identities:
+      - publicKey: aval.pub
+        trustLevel: developer
+    EOF
+    ```
+
+    `aval init --key aval.key` writes both for a new project.
 
     Run the test, then sign and push the result:
 

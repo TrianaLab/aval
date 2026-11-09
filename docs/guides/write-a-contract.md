@@ -20,7 +20,8 @@ which CI runs:
 --8<-- "examples/go-compose/aval.yaml"
 ```
 
-Put it next to your test and check what it hashes:
+For a new test, `aval init` ([Quickstart](../quickstart.md)) writes one.
+Put the contract next to your test and check what it hashes:
 
 ```sh
 aval explain

@@ -19,6 +19,8 @@ var groups = []*cobra.Group{
 // commandHelp is each command's group (empty: "Additional Commands") and
 // Example, kept in one place so `aval --help` reads as one document.
 var commandHelp = map[string]struct{ group, example string }{
+	"init": {"core", `  # Write aval.yaml, aval.key, aval.pub and policy.yaml
+  aval init --name unit --source 'src/**' --source go.mod --cacheability hermetic --key aval.key -- go test ./...`},
 	"run": {"core", `  # Reuse a trusted result, or run the test
   aval run --registry ghcr.io/acme/orders-aval --policy policy.yaml
 
