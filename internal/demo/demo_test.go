@@ -141,7 +141,7 @@ func TestUsageErrors(t *testing.T) {
 		"aval verify -o yaml":    `aval: --output must be text or json, got "yaml"`,
 		"aval nope":              `aval: unknown command "nope"`,
 		"aval push":              "aval: push is not in this demo",
-		"aval stats publish x":   "aval: stats is not in this demo",
+		"aval stats publish x":   "aval: stats is not in this demo: it keeps no run records",
 		"aval explain --explain": "aval: unknown flag: --explain",
 		"aval run --digest":      "aval: unknown flag: --digest",
 		"aval explain extra":     `aval: unknown command "extra" for "aval explain"`,

@@ -2,7 +2,7 @@
 "aval": minor
 ---
 
-New `aval explain [--digest]`: it prints `fingerprint manifest for <test> (aval-fingerprint/v1)`, the manifest, and `fingerprint sha256:...` as the last line; `--digest` prints only the digest. It never looks anything up and never runs the test; a fingerprint error exits 1 with `aval: fingerprint: ...`, as `run --explain` does. `run --explain` and `run --fingerprint-only` keep their behaviour. New `aval stats publish FILE` publishes a run record and replaces `aval record`. Flags are named for what they hold; the old names keep working, hidden from help, and print a deprecation notice on stderr only (stdout, files and exit codes are unchanged). Deprecated in 0.7.0, removable no earlier than 0.8.0:
+New `aval explain [--digest]`: it prints `fingerprint manifest for <test> (aval-fingerprint/v1)`, the manifest, and `fingerprint sha256:...` as the last line; `--digest` prints only the digest. It never looks up a result and never runs the test; a fingerprint error exits 1 with `aval: fingerprint: ...`, as `run --explain` does. `run --explain` and `run --fingerprint-only` keep their behaviour. New `aval stats publish FILE` publishes a run record and replaces `aval record`. Flags are named for what they hold; the old names keep working, hidden from help, and print a deprecation notice on stderr only (stdout, files and exit codes are unchanged). Deprecated in 0.7.0, removable no earlier than 0.8.0:
 
 - `aval run --result` and `aval push --result`: use `--result-file`
 - `aval run --report`: use `--report-file`

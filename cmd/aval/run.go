@@ -94,7 +94,7 @@ running the test), 1 error or false hit (--shadow), 2 usage.`,
 	f.StringVar(&o.recordFile, "stats-file", "", "also write the run record to this file, for 'aval stats publish'")
 	f.StringVar(&o.ciRunURL, "ci-run-url", "", "link to the CI run, stored in the run record")
 	f.StringVar(&o.repository, "source-repo", "", "source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'")
-	// TODO(milestone-5): remove these aliases (deprecated in 0.7.0, #165), not before 0.8.0.
+	// TODO(milestone-13): remove these aliases (deprecated in 0.7.0, #165), not before 0.8.0.
 	alias(cmd, "result-file", "result")
 	alias(cmd, "report-file", "report")
 	alias(cmd, "stats", "record")
@@ -694,13 +694,13 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 	f.StringVar(&key, "key", "", "signing key path (default: keyless OIDC)")
 	f.BoolVar(&interactive, "login", false, loginFlagHelp)
 	f.StringVar(&resultFile, "result-file", defaultResult, "result recorded by 'aval run'")
-	alias(cmd, "result-file", "result") // TODO(milestone-5): remove (deprecated in 0.7.0, #165), not before 0.8.0.
+	alias(cmd, "result-file", "result") // TODO(milestone-13): remove (deprecated in 0.7.0, #165), not before 0.8.0.
 	return cmd
 }
 
 // recordDeprecated is the notice `aval record` prints on stderr, in cobra's
 // words for a deprecated command (cobra's own notice would go to stdout).
-// TODO(milestone-5): remove `aval record` (deprecated in 0.7.0, #165), not before 0.8.0.
+// TODO(milestone-13): remove `aval record` (deprecated in 0.7.0, #165), not before 0.8.0.
 const recordDeprecated = "use 'aval stats publish FILE' instead"
 
 // newRecordCmd is the deprecated `aval record --record-file FILE`, hidden

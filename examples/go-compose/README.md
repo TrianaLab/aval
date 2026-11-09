@@ -30,7 +30,7 @@ bin/aval explain --digest -f examples/go-compose/aval.yaml
 bin/aval explain -f examples/go-compose/aval.yaml
 ```
 
-`--explain` prints the manifest that was hashed: the contract, every file
+`aval explain` prints the manifest that was hashed: the contract, every file
 matched by `scope.source` (`**/*.go`, `compose.yaml`), `go.mod` as a
 dependency, and the declared toolchain. Anything else in the directory is not
 an input.

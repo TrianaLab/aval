@@ -211,18 +211,21 @@ func (d *Demo) aval(args []string, out, errw io.Writer) int {
 		return exitOK
 	}
 	cmd := args[0]
-	if cmd == "push" || cmd == "record" || cmd == "stats" {
+	if cmd == "stats" {
+		return usage("stats is not in this demo: it keeps no run records")
+	}
+	if cmd == "push" || cmd == "record" {
 		return usage("%s is not in this demo: here aval run signs and pushes", cmd)
 	}
-	explain, output, err := parseFlags(cmd, args[1:])
+	flag, output, err := parseFlags(cmd, args[1:])
 	if err != nil {
 		return usage("%s", err)
 	}
 	switch cmd {
 	case "explain":
-		return d.explain(explain, out, errw)
+		return d.explain(flag, out, errw)
 	case "run":
-		return d.run(explain, out, errw)
+		return d.run(flag, out, errw)
 	case "verify":
 		if output != "text" && output != "json" {
 			return usage("--output must be text or json, got %q", output)
@@ -233,15 +236,15 @@ func (d *Demo) aval(args []string, out, errw io.Writer) int {
 }
 
 // parseFlags parses the flags of cmd the demo knows, with cobra's errors.
-// explain is run --explain or explain --digest.
-func parseFlags(cmd string, args []string) (explain bool, output string, err error) {
+// flag is run --explain or explain --digest.
+func parseFlags(cmd string, args []string) (flag bool, output string, err error) {
 	output = "text"
 	for i := 0; i < len(args); i++ {
 		f := args[i]
 		name, val, hasVal := strings.Cut(f, "=")
 		switch {
 		case cmd == "run" && f == "--explain", cmd == "explain" && f == "--digest":
-			explain = true
+			flag = true
 		case cmd == "verify" && (name == "-o" || name == "--output"):
 			if !hasVal && i+1 == len(args) {
 				return false, "", fmt.Errorf("flag needs an argument: %s", map[string]string{"-o": "'o' in -o", "--output": "--output"}[name])
@@ -259,7 +262,7 @@ func parseFlags(cmd string, args []string) (explain bool, output string, err err
 			return false, "", fmt.Errorf("unknown command %q for \"aval %s\"", f, cmd)
 		}
 	}
-	return explain, output, nil
+	return flag, output, nil
 }
 
 // explain is `aval explain`: the manifest under a header, the digest last;

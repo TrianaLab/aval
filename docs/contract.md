@@ -55,6 +55,10 @@ aval explain -f path/to/aval.yaml --digest   # prints sha256:<hex>
 aval explain -f path/to/aval.yaml            # the manifest, then the fingerprint
 ```
 
+It excludes only the default `.aval/result.json`; a run that writes
+`--result-file`, `--report-file` or `--stats-file` inside the scope
+fingerprints the same only when those paths are under `.aval/`.
+
 Diff the `aval explain` output of two machines to see which file, toolchain entry
 or variable differs. `-f` takes one path and defaults to `./aval.yaml`; the
 root is always the contract file's directory. A file holds one contract: give
@@ -188,7 +192,7 @@ cacheability class.
 
 Aval cannot prove the inputs: `aval run` reports outcome `error`, runs the
 test and records nothing; `aval explain`, `aval verify` and `aval push` exit 1
-(as do the deprecated `run --fingerprint-only` and `run --explain`).
+(as do `run --fingerprint-only` and `run --explain`, which `aval explain --digest` and `aval explain` replace).
 
 | Message | Fix |
 |---|---|
