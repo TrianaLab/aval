@@ -31,7 +31,9 @@ flowchart LR
 
     Run the test, then sign and push the result:
 
-    --8<-- "docs/quickstart.md:push"
+    ```sh
+    aval run --push --key aval.key --registry ghcr.io/acme/orders-aval
+    ```
 
 === "Keyless"
 

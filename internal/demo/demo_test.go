@@ -95,7 +95,7 @@ func TestShellCommands(t *testing.T) {
 	exec(t, d, "   ", exitOK)
 	for _, line := range []string{"help", "aval", "aval help", "aval --help", "aval -h"} {
 		out, _ := exec(t, d, line, exitOK)
-		mustContain(t, line, out, "entirely in your browser", "Keyless (Sigstore) signing is\nnot available")
+		mustContain(t, line, out, "entirely in your browser", "AVAL_POLICY=policy.yaml\nare as if exported", "Keyless (Sigstore) signing is not available")
 	}
 	out, _ := exec(t, d, "ls", exitOK)
 	mustContain(t, "ls", out, "README.md  aval.yaml  go.mod  greet.go  greet_test.go  policy.yaml  throwaway.pub")

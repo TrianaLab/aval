@@ -6,7 +6,8 @@
 // It serves the directory on 127.0.0.1, drives headless Chrome over the
 // DevTools protocol (a pipe, so no dependency) and checks that nothing is
 // fetched before the visitor starts the demo by clicking the terminal body,
-// that typing `aval run` twice ends in `verified`, that `tamper` then
+// that `help` names the exported AVAL_REGISTRY and AVAL_POLICY, that typing
+// `aval run` twice ends in `verified`, that `tamper` then
 // `aval verify` exits 5, and that without WebAssembly (started from the
 // keyboard: focus the terminal, press Enter) the transcript stays and the
 // page says why.
@@ -144,7 +145,9 @@ try {
     await enter(p);
     return p.js(termText);
   };
-  let out = await type("aval run");
+  let out = await type("help");
+  check("help describes the quickstart setup", /AVAL_REGISTRY=[^\n]* and AVAL_POLICY=policy\.yaml\nare as if exported/.test(out), out);
+  out = await type("aval run");
   check("first aval run misses, runs and pushes", /· miss greet[\s\S]*· run greet: go test \.\/\.\.\.\n[\s\S]*✓ greet passed \(exit 0\) in 4ms\n✓ pushed [^\n]*\ngreet passed in 4ms; published for the next run with these inputs\.\n$/.test(out), out);
   out = await type("aval run");
   check("second aval run is verified and reused", /↺ verified greet[\s\S]*↺ reused passed result\ngreet: reused a verified passed result, saved 4ms; nothing ran\.\n$/.test(out), out);
