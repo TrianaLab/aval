@@ -239,15 +239,17 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	}
 	ctx, out, warn := cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr()
 	w := cliout.Run{Out: out, Err: warn}
+	w.Styled, w.Color = outputStyle(isTTY(out), plainFlag(cmd), os.Getenv)
 	if o.explain || o.fingerprintOnly {
 		if err := printFingerprint(out, warn, fp, fpErr, o); err != nil || o.fingerprintOnly {
 			return err
 		}
 	}
-	o.config.printConfig(out)
+	w.Note(o.config.configLine())
 	observed, probeErr := probe(ctx, c, filepath.Dir(o.file))
 	r, files, lookupErr := decide(ctx, out, warn, c, fp, cmp.Or(fpErr, probeErr), o)
 	sum, security := announce(w, c, r, lookupErr)
+	w.Security = sum.Security
 	// Whatever fails below, the SECURITY line verify printed is repeated as
 	// the last stderr line.
 	defer func() { err = securityLast(warn, err, security) }()
@@ -289,18 +291,21 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 // is the SECURITY line verify printed, to repeat as the last stderr line;
 // empty when no attestation failed verification.
 func announce(w cliout.Run, c *contract.Contract, r evidence.Report, lookupErr error) (sum cliout.Summary, security string) {
-	w.Decision(r, c.Cacheability)
 	// Flooding is a security event, not a routine reuse-off cause (#135).
 	flood := errors.Is(lookupErr, registry.ErrTooManyCandidates)
 	sum = cliout.Summary{Test: c.Metadata.Name, ReuseOff: !flood && (r.Outcome == evidence.OutcomeError || errors.As(lookupErr, new(reuseOff)))}
-	if r.Outcome == evidence.OutcomeError && !flood {
-		w.ReuseOff(r.Reason) // the test runs: fail closed (invariant 3)
-	}
 	if n := securityCount(r); n > 0 {
 		sum.Security, security = true, cliout.SecurityLine(n, r.TestID)
 	}
 	if flood {
 		sum.Security, security = true, cliout.FloodLine(registry.ErrTooManyCandidates, r.TestID)
+	}
+	if security != "" {
+		w.SecurityBlock(security) // when found, before the report; securityLast repeats it last
+	}
+	w.Decision(r, c.Cacheability)
+	if r.Outcome == evidence.OutcomeError && !flood {
+		w.ReuseOff(r.Reason) // the test runs: fail closed (invariant 3)
 	}
 	return sum, security
 }
@@ -438,7 +443,7 @@ func decide(ctx context.Context, out, warn io.Writer, c *contract.Contract, fp f
 	// The deadline bounds the registry, never runner.command.
 	ctx, cancel := context.WithTimeout(ctx, o.registryTimeout)
 	defer cancel()
-	return verify(ctx, warn, c, o.file, fp, o.repo, o.policyFile)
+	return lookupAndVerify(ctx, warn, c, o.file, fp, o.repo, o.policyFile) // announce prints the SECURITY block
 }
 
 // probeTimeout bounds each environment.probe command.

@@ -42,7 +42,9 @@ func TestBrowserDemoMatchesCLI(t *testing.T) {
 	t.Cleanup(srv.Close)
 	repo := strings.TrimPrefix(srv.URL, "http://") + "/acme/greet-aval"
 	d := demo.New()
-	d.Repo = repo
+	// The CLI writes to a pipe here, so it prints plain lines; the demo's
+	// styled form is the same renderer (internal/cliout goldens).
+	d.Repo, d.Plain = repo, true
 	dir := t.TempDir()
 	sync := func() {
 		for name, body := range d.Files() {

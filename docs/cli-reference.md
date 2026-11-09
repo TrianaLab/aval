@@ -56,6 +56,7 @@ Additional Commands:
 
 Flags:
   -h, --help      help for aval
+      --plain     plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
   -v, --version   version for aval
 
 Use "aval [command] --help" for more information about a command.
@@ -81,6 +82,9 @@ Available Commands:
 
 Flags:
   -h, --help   help for completion
+
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 
 Use "aval completion [command] --help" for more information about a command.
 ```
@@ -111,6 +115,9 @@ Flags:
   -f, --contract string   path to the test contract (default "aval.yaml")
       --digest            print only the fingerprint (sha256:...)
   -h, --help              help for explain
+
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval keygen
@@ -135,6 +142,9 @@ Examples:
 Flags:
       --force   replace name.key and name.pub if they exist
   -h, --help    help for keygen
+
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval push
@@ -161,6 +171,9 @@ Flags:
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --result-file string          result recorded by 'aval run' (default ".aval/result.json")
+
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 Deprecated flags, hidden from help:
@@ -186,6 +199,9 @@ Flags:
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --source-repo string          source repository (e.g. acme/orders); default: the one in the record
+
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 Deprecated flags, hidden from help:
@@ -235,6 +251,9 @@ Flags:
       --source-repo string          source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
       --stats                       publish a run record for statistics after the run (needs --registry; best-effort)
       --stats-file string           also write the run record to this file, for 'aval stats publish'
+
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 Deprecated flags, hidden from help:
@@ -284,6 +303,9 @@ Flags:
       --since string                only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)
       --test string                 only this test id (metadata.name); default: every test with run records
 
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+
 Use "aval stats [command] --help" for more information about a command.
 ```
 
@@ -307,6 +329,9 @@ Flags:
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --source-repo string          source repository (e.g. acme/orders); default: the one in the record
+
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval upgrade
@@ -331,6 +356,9 @@ Flags:
       --check            print the current and target versions without installing
   -h, --help             help for upgrade
       --version string   release to install, e.g. v0.4.0 (default: latest)
+
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval verify
@@ -356,6 +384,9 @@ Flags:
       --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval version
@@ -371,4 +402,7 @@ Examples:
 
 Flags:
   -h, --help   help for version
+
+Global Flags:
+      --plain   plain output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```

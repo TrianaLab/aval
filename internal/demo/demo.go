@@ -80,7 +80,10 @@ not available in the browser.
 // Demo is one visitor's session: the project files, the registry and the key.
 type Demo struct {
 	// Repo is the repository named in references.
-	Repo  string
+	Repo string
+	// Plain prints aval run's plain lines, as the CLI does on a pipe,
+	// instead of the styled form without colour of a terminal.
+	Plain bool
 	files map[string][]byte
 	key   *ecdsa.PrivateKey
 	pub   string
@@ -307,7 +310,7 @@ func (d *Demo) verifyCmd(output string, out, errw io.Writer) int {
 	if code != exitOK {
 		return code
 	}
-	r := d.verify(c, fp, errw)
+	r := d.verify(c, fp, cliout.Run{Err: errw})
 	_ = cliout.WriteReport(out, output, r) // ponytail: in-memory writers do not fail
 	switch r.Outcome {
 	case evidence.OutcomeVerified:
@@ -329,10 +332,13 @@ func (d *Demo) run(explain bool, out, errw io.Writer) int {
 	if explain {
 		fmt.Fprint(out, fp.Manifest)
 	}
-	w := cliout.Run{Out: out, Err: errw}
-	r := d.verify(c, fp, errw)
+	// The styled form without colour, as on a NO_COLOR terminal: the page
+	// writes with textContent and cannot parse ANSI.
+	w := cliout.Run{Out: out, Err: errw, Styled: !d.Plain}
+	r := d.verify(c, fp, w)
 	w.Decision(r, c.Cacheability)
 	sum := cliout.Summary{Test: c.Metadata.Name, Result: evidence.ResultPassed, Security: len(r.Rejected) > 0}
+	w.Security = sum.Security
 	code = exitOK
 	if r.Outcome == evidence.OutcomeVerified {
 		// ponytail: the demo only signs passes and tamper breaks the
@@ -360,7 +366,7 @@ func (d *Demo) run(explain bool, out, errw io.Writer) int {
 // evidence.Verify against the policy that trusts the throwaway key. As in
 // the CLI, a verified candidate wins and rejected ones are listed, with one
 // SECURITY line.
-func (d *Demo) verify(c *contract.Contract, fp fingerprint.Fingerprint, errw io.Writer) evidence.Report {
+func (d *Demo) verify(c *contract.Contract, fp fingerprint.Fingerprint, w cliout.Run) evidence.Report {
 	r := evidence.Report{Version: evidence.ReportVersion, TestID: c.Metadata.Name, Fingerprint: fp.Digest}
 	atts := d.reg[fp.Digest]
 	if len(atts) == 0 {
@@ -386,7 +392,7 @@ func (d *Demo) verify(c *contract.Contract, fp fingerprint.Fingerprint, errw io.
 		}
 	}
 	if len(r.Rejected) > 0 {
-		cliout.Security(errw, len(r.Rejected), r.TestID)
+		w.SecurityBlock(cliout.SecurityLine(len(r.Rejected), r.TestID))
 	}
 	if best == nil {
 		first := r.Rejected[0]

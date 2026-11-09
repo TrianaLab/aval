@@ -68,8 +68,16 @@ func (g *globalFlags) resolve(getenv func(string) string) {
 // environment, so a run never uses a setting it does not show. A nil g
 // prints nothing.
 func (g *globalFlags) printConfig(w io.Writer) {
+	if l := g.configLine(); l != "" {
+		fmt.Fprintln(w, l)
+	}
+}
+
+// configLine is the config: line, empty when no value came from the
+// environment or g is nil.
+func (g *globalFlags) configLine() string {
 	if g == nil || len(g.fromEnv) == 0 {
-		return
+		return ""
 	}
 	var parts []string
 	for _, v := range []struct{ name, env, val string }{{"registry", registryEnv, g.registry}, {"policy", policyEnv, g.policy}} {
@@ -81,5 +89,5 @@ func (g *globalFlags) printConfig(w io.Writer) {
 			parts = append(parts, fmt.Sprintf("%s=%s (%s)", v.name, cliout.OneLine(v.val), src))
 		}
 	}
-	fmt.Fprintln(w, "config: "+strings.Join(parts, " "))
+	return "config: " + strings.Join(parts, " ")
 }

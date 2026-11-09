@@ -1,0 +1,84 @@
+=== push=false shadow=false failed=false
+exit 0
+--- stdout
+· miss unit 18bf449f
+  reason    cacheability non-deterministic is never reusable
+· run unit: sh -c echo test output; exit 0
+test output
+✓ unit passed (exit 0) in D
+unit passed in D; aval push publishes it for the next run.
+--- stderr
+=== push=false shadow=false failed=true
+exit 3
+--- stdout
+· miss unit f9b2e0e9
+  reason    cacheability non-deterministic is never reusable
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+unit failed in D; fix it, then aval run again.
+--- stderr
+=== push=false shadow=true failed=false
+exit 0
+--- stdout
+· miss unit 18bf449f
+  reason    cacheability non-deterministic is never reusable
+· run unit: sh -c echo test output; exit 0
+test output
+✓ unit passed (exit 0) in D
+unit passed in D; aval push publishes it for the next run.
+--- stderr
+=== push=false shadow=true failed=true
+exit 3
+--- stdout
+· miss unit f9b2e0e9
+  reason    cacheability non-deterministic is never reusable
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+unit failed in D; fix it, then aval run again.
+--- stderr
+=== push=true shadow=false failed=false
+exit 0
+--- stdout
+· miss unit 18bf449f
+  reason    cacheability non-deterministic is never reusable
+· run unit: sh -c echo test output; exit 0
+test output
+✓ unit passed (exit 0) in D
+✓ pushed reg.example/r@sha256:bb
+unit passed in D; published for the next run with these inputs.
+--- stderr
+=== push=true shadow=false failed=true
+exit 3
+--- stdout
+· miss unit f9b2e0e9
+  reason    cacheability non-deterministic is never reusable
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+✓ pushed reg.example/r@sha256:bb
+unit failed in D; published for the next run with these inputs.
+--- stderr
+=== push=true shadow=true failed=false
+exit 0
+--- stdout
+· miss unit 18bf449f
+  reason    cacheability non-deterministic is never reusable
+· run unit: sh -c echo test output; exit 0
+test output
+✓ unit passed (exit 0) in D
+✓ pushed reg.example/r@sha256:bb
+unit passed in D; published for the next run with these inputs.
+--- stderr
+=== push=true shadow=true failed=true
+exit 3
+--- stdout
+· miss unit f9b2e0e9
+  reason    cacheability non-deterministic is never reusable
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+✓ pushed reg.example/r@sha256:bb
+unit failed in D; published for the next run with these inputs.
+--- stderr

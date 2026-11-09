@@ -1,0 +1,108 @@
+=== push=false shadow=false failed=false
+exit 5
+--- stdout
+✗ verification-failed unit 77ad8f66
+  reference reg.example/r@sha256:ff
+  reason    attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+· run unit: sh -c echo test output; exit 0
+test output
+· unit passed (exit 0) in D
+✗ SECURITY: an attestation for unit failed verification; treat it as a security event, not a flaky test.
+--- stderr
+✗ SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=false shadow=false failed=true
+exit 5
+--- stdout
+✗ verification-failed unit 1a818124
+  reference reg.example/r@sha256:ff
+  reason    attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+✗ SECURITY: an attestation for unit failed verification; treat it as a security event, not a flaky test.
+--- stderr
+✗ SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=false shadow=true failed=false
+exit 5
+--- stdout
+✗ verification-failed unit 77ad8f66
+  reference reg.example/r@sha256:ff
+  reason    attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+· run unit: sh -c echo test output; exit 0
+test output
+· unit passed (exit 0) in D
+✗ SECURITY: an attestation for unit failed verification; treat it as a security event, not a flaky test.
+--- stderr
+✗ SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=false shadow=true failed=true
+exit 5
+--- stdout
+✗ verification-failed unit 1a818124
+  reference reg.example/r@sha256:ff
+  reason    attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+✗ SECURITY: an attestation for unit failed verification; treat it as a security event, not a flaky test.
+--- stderr
+✗ SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=true shadow=false failed=false
+exit 5
+--- stdout
+✗ verification-failed unit 77ad8f66
+  reference reg.example/r@sha256:ff
+  reason    attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+· run unit: sh -c echo test output; exit 0
+test output
+· unit passed (exit 0) in D
+· pushed reg.example/r@sha256:bb
+✗ SECURITY: an attestation for unit failed verification; treat it as a security event, not a flaky test.
+--- stderr
+✗ SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=true shadow=false failed=true
+exit 5
+--- stdout
+✗ verification-failed unit 1a818124
+  reference reg.example/r@sha256:ff
+  reason    attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+· pushed reg.example/r@sha256:bb
+✗ SECURITY: an attestation for unit failed verification; treat it as a security event, not a flaky test.
+--- stderr
+✗ SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=true shadow=true failed=false
+exit 5
+--- stdout
+✗ verification-failed unit 77ad8f66
+  reference reg.example/r@sha256:ff
+  reason    attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+· run unit: sh -c echo test output; exit 0
+test output
+· unit passed (exit 0) in D
+· pushed reg.example/r@sha256:bb
+✗ SECURITY: an attestation for unit failed verification; treat it as a security event, not a flaky test.
+--- stderr
+✗ SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+=== push=true shadow=true failed=true
+exit 5
+--- stdout
+✗ verification-failed unit 1a818124
+  reference reg.example/r@sha256:ff
+  reason    attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
+· run unit: sh -c echo test output; exit 1
+test output
+✗ unit failed (exit 1) in D
+· pushed reg.example/r@sha256:bb
+✗ SECURITY: an attestation for unit failed verification; treat it as a security event, not a flaky test.
+--- stderr
+✗ SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
+aval: SECURITY: 1 attestation(s) for unit failed signature or policy verification; treat it as a security event, see https://aval.run/latest/trust-model/
