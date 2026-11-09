@@ -250,11 +250,12 @@ Trust comes from `.github/aval/main.yaml` (main and releases: only `ci.yaml`
 on `main`, runner level) and `.github/aval/pr.yaml` (pull requests: also
 developer signatures); `tests/architecture/dogfood_test.go` enforces both,
 and fails if a dogfood suite reads a tracked file outside its contract's
-scope. On a pull request, `.github/aval/trust-from-base.sh` reads `pr.yaml`
-and the registry from `main` (never from the PR or its base branch), so a PR
-cannot change them by editing those files, and the jobs that pass `--policy`
-verify with the pinned release (see below), not with an `aval` or a
-`Makefile` from the PR. Those jobs run `main`'s copies of
+scope. On a pull request, or any event other than a push to `main` (such as
+the version PR's dispatched run), `.github/aval/trust-from-base.sh` reads
+`pr.yaml` and the registry from `main` (never from the checked-out ref or a
+PR's base branch), so a PR cannot change them by editing those files, and
+the jobs that pass `--policy` verify with the pinned release (see below),
+not with an `aval` or a `Makefile` from the PR. Those jobs run `main`'s copies of
 `trust-from-base.sh` and `install.sh` with `/bin/bash`, and both scripts call
 their tools by absolute path; if `main` has no `trust-from-base.sh` yet, no
 policy is set and nothing is reused. `tests/architecture/policy_source_test.go`
@@ -485,8 +486,14 @@ version packages` PR open that applies the pending changesets: it sets the
 version in `package.json` and writes `CHANGELOG.md`. `package.json` only holds
 the version; Aval is not an npm package. To release:
 
-1. Close and reopen the version PR so `ci` runs on it (PRs opened with
-   `GITHUB_TOKEN` trigger no workflows), then merge it.
+1. Merge the version PR once `required` is green. Its pushes use
+   `GITHUB_TOKEN` and trigger no workflow, so the `version-pr-ci` job
+   dispatches `ci` on `changeset-release/main` after each one; that run
+   reports `required` on the PR's head commit. It takes the trust policy and
+   registry from `main`, like a PR, and publishes nothing. If the dispatch
+   failed (`version-pr-ci` is red on `main`, and `required` stays "Expected"
+   on the version PR, so it cannot merge), start it by hand:
+   `gh workflow run ci.yaml --ref changeset-release/main`.
 2. Wait for the release. When `ci` on `main` passes for the merge commit (its
    `dogfood-publish` job pushes the e2e result to
    `ghcr.io/trianalab/aval-attestations`), the `auto-tag` job in

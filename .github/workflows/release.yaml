@@ -2,12 +2,16 @@ name: release
 
 # Changesets drive the version: each PR adds a .changeset/*.md entry, and on
 # main the version-pr job keeps a "chore: version packages" PR open that
-# applies them (package.json version, CHANGELOG.md). Once ci passes on the
-# merge commit, auto-tag (on workflow_run of ci) tags it v<package.json
-# version> and dispatches this workflow on the tag; the release job dispatches
-# docs.yaml once the release exists. A tag created with GITHUB_TOKEN triggers
-# no workflow, but a dispatch does, so the release job still runs on refs/tags/v<version> and signs with the
-# release.yaml@refs/tags/<tag> identity tests/release requires. A maintainer
+# applies them (package.json version, CHANGELOG.md). A push made with
+# GITHUB_TOKEN starts no workflow, so after changesets creates or rewrites that
+# PR (branch changeset-release/main), the version-pr-ci job dispatches ci.yaml
+# on it; the dispatch run is the PR's ci, and its `required` check reports on
+# the PR's head commit. Once ci passes on the merge commit, auto-tag (on
+# workflow_run of ci) tags it v<package.json version> and dispatches this
+# workflow on the tag; the release job dispatches docs.yaml once the release
+# exists. A tag created with GITHUB_TOKEN triggers no workflow, but a dispatch
+# does, so the release job still runs on refs/tags/v<version> and signs with
+# the release.yaml@refs/tags/<tag> identity tests/release requires. A maintainer
 # can still push a tag by hand. The release job builds, signs and attests,
 # verifies dist/ with tests/release, and only then creates the GitHub Release.
 # A tag that does not match package.json fails verification and publishes
@@ -43,6 +47,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+      pr-number: ${{ steps.changesets.outputs.pr-number }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,12 +59,36 @@ jobs:
       - run: npm ci --ignore-scripts
       # changesets/action v2 input names (version-script, pr-title,
       # commit-message, github-token). Publishes nothing: no publish script.
-      - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+      - id: changesets
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           github-token: ${{ github.token }}
           version-script: npm run release:version
           pr-title: 'chore: version packages'
           commit-message: 'chore: version packages'
+
+  # pr-number is set when changesets created or updated the version PR. Its
+  # push used GITHUB_TOKEN and started no ci run; a dispatch does. A job of its
+  # own, so actions: write never sits beside contents: write and the npm code
+  # version-pr runs (that pair could tag and dispatch a release). No checkout:
+  # GH_REPO names the repository.
+  version-pr-ci:
+    needs: version-pr
+    if: needs.version-pr.outputs.pr-number != ''
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Run ci on the version PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for _ in 1 2 3; do
+            gh workflow run ci.yaml --ref changeset-release/main && exit 0
+            sleep 15
+          done
+          exit 1
 
   # Tags the merge of the version PR (or the first green commit after it with
   # no pending changeset). Releases nothing unless the tag does not exist yet,

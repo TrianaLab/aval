@@ -15,6 +15,16 @@ on:
     # the current title. Every job reruns: skipping the others on `edited`
     # would let `required` go green over a failed run on the same commit.
     types: [opened, edited, synchronize, reopened]
+  # release.yaml's version-pr-ci job dispatches this workflow on
+  # changeset-release/main after changesets rewrites the version PR with
+  # GITHUB_TOKEN, a push that starts no run. The `changes` job fails any other
+  # dispatched ref. A dispatch run is treated as a PR against main: trust
+  # policy and registry from main (trust-from-base.sh), AVAL_GOLDEN_BASE and
+  # the API base origin/main, and every job with write scopes stays push-only.
+  # pr-title and dependency-review are pull_request-only and skip on purpose:
+  # release.yaml fixes the title, and the version PR only bumps the version in
+  # package.json and package-lock.json.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,9 +42,11 @@ env:
   # there and docs.yaml (which names it too) builds the site's stats.json.
   AVAL_STATS_REGISTRY: ghcr.io/trianalab/aval-stats
 
+# event_name keeps a dispatch on main (by mistake or on purpose) from
+# cancelling main's push run, which auto-tag and dogfood-publish depend on.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
   # Path filter: a change that touches only Markdown or docs/ cannot affect
@@ -44,6 +56,16 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
     steps:
+      # Hygiene, not a trust boundary. A dispatched ref runs its own ci.yaml,
+      # so whoever can push that ref controls this check anyway; trust still
+      # comes from main and write scopes stay push-only.
+      - name: Dispatch only on the version PR branch
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/changeset-release/main'
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "::error::ci.yaml is dispatched only on refs/heads/changeset-release/main, not $REF"
+          exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
@@ -76,8 +98,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # TestEvidenceAPIIsAppendOnly compares the API snapshot with the
-          # base revision (merge base with the PR base, or `before` of the
-          # push event) and fails when it cannot resolve it.
+          # base revision (merge base with the PR base, `before` of the push
+          # event, or the merge base with origin/main on a dispatch) and fails
+          # when it cannot resolve it.
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -102,9 +125,10 @@ jobs:
 
   # The false-hit suite (#15): fails on any false hit in the corpus and on
   # a manifest change without a fingerprint.Version bump. No path filter, so
-  # it runs on every PR and push. Full history so TestGoldensAppendOnly can
-  # diff the committed goldens against the PR base or the previous push; it
-  # fails if AVAL_GOLDEN_BASE does not resolve.
+  # it runs on every PR, push and dispatch. Full history so
+  # TestGoldensAppendOnly can diff the committed goldens against the PR base,
+  # the previous push, or origin/main on a dispatch; it fails if
+  # AVAL_GOLDEN_BASE does not resolve.
   ci-false-hit:
     runs-on: ubuntu-latest
     steps:
@@ -116,7 +140,7 @@ jobs:
           go-version-file: go.mod
       - run: make ci-false-hit
         env:
-          AVAL_GOLDEN_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+          AVAL_GOLDEN_BASE: ${{ github.event_name == 'push' && (github.event.before || 'no-push-before') || format('origin/{0}', github.base_ref || 'main') }}
 
   # Dogfooding M3 (#28): the heavy suite (levels 2 and 4, aval.e2e.yaml)
   # through `aval run`. A verified passing result for the same inputs is
@@ -154,12 +178,12 @@ jobs:
           version: "0.9.18"
           enable-cache: false
       # AVAL_POLICY and AVAL_REGISTRY (#134): main reuses only this workflow
-      # on main (main.yaml); a PR also developer signatures, with pr.yaml and
-      # the registry read from main. Both scripts are main's copies, run by
-      # absolute path. If main has no trust-from-base.sh (before #134 lands),
-      # no policy is set and nothing is reused. This step is still the PR's
-      # own ci.yaml: on pull_request a hostile PR can make its own check
-      # green; required code-owner review is what protects main.
+      # on main (main.yaml); a PR or dispatch also developer signatures, with
+      # pr.yaml and the registry read from main. Both scripts are main's
+      # copies, run by absolute path. If main has no trust-from-base.sh
+      # (before #134 lands), no policy is set and nothing is reused. This step
+      # is still the PR's own ci.yaml: on pull_request a hostile PR can make
+      # its own check green; required code-owner review is what protects main.
       - name: Trust policy, registry and pinned aval release, from main
         run: |
           /usr/bin/git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
@@ -501,12 +525,12 @@ jobs:
         with:
           cosign-release: v3.0.6
       # AVAL_POLICY and AVAL_REGISTRY (#134): main reuses only this workflow
-      # on main (main.yaml); a PR also developer signatures, with pr.yaml and
-      # the registry read from main. Both scripts are main's copies, run by
-      # absolute path. If main has no trust-from-base.sh (before #134 lands),
-      # no policy is set and nothing is reused. This step is still the PR's
-      # own ci.yaml: on pull_request a hostile PR can make its own check
-      # green; required code-owner review is what protects main.
+      # on main (main.yaml); a PR or dispatch also developer signatures, with
+      # pr.yaml and the registry read from main. Both scripts are main's
+      # copies, run by absolute path. If main has no trust-from-base.sh
+      # (before #134 lands), no policy is set and nothing is reused. This step
+      # is still the PR's own ci.yaml: on pull_request a hostile PR can make
+      # its own check green; required code-owner review is what protects main.
       - name: Trust policy, registry and pinned aval release, from main
         run: |
           /usr/bin/git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
