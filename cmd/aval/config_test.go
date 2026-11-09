@@ -11,8 +11,8 @@ import (
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
-// Tests start from an environment without AVAL_REGISTRY and AVAL_POLICY:
-// CI runs them under `aval run` with both set.
+// Tests start from an environment without AVAL_REGISTRY and AVAL_POLICY: a
+// developer shell may export them.
 func TestMain(m *testing.M) {
 	_ = os.Unsetenv(registryEnv)
 	_ = os.Unsetenv(policyEnv)
@@ -24,19 +24,23 @@ func TestResolvePrecedence(t *testing.T) {
 	cases := []struct {
 		name      string
 		flag, env string
+		unset     bool // the variables are absent, not empty
 		want      string
 		fromEnv   bool
 	}{
-		{"flag beats env", "flag.example/r", "env.example/r", "flag.example/r", false},
-		{"env without flag", "", "env.example/r", "env.example/r", true},
-		{"flag without env", "flag.example/r", "", "flag.example/r", false},
-		{"empty env is unset", "", "", "", false},
-		{"neither", "", "", "", false},
+		{"flag beats env", "flag.example/r", "env.example/r", false, "flag.example/r", false},
+		{"env without flag", "", "env.example/r", false, "env.example/r", true},
+		{"flag without env", "flag.example/r", "", true, "flag.example/r", false},
+		{"empty env is unset", "", "", false, "", false},
+		{"neither", "", "", true, "", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			env := map[string]string{registryEnv: tc.env, policyEnv: tc.env}
-			g := &globalFlags{registry: tc.flag, policy: tc.flag}
+			if tc.unset {
+				env = map[string]string{}
+			}
+			g := &globalFlags{registry: tc.flag, policy: tc.flag, usesPolicy: true}
 			g.resolve(func(k string) string { return env[k] })
 			if g.registry != tc.want || g.policy != tc.want || g.fromEnv[registryEnv] != tc.fromEnv || g.fromEnv[policyEnv] != tc.fromEnv {
 				t.Fatalf("registry %q policy %q fromEnv %v; want %q from env %v", g.registry, g.policy, g.fromEnv, tc.want, tc.fromEnv)
@@ -138,11 +142,12 @@ func TestUnreadableEnvPolicyNeverReuses(t *testing.T) {
 // policy come from flags or the environment, and match the golden report.
 func TestVerifyReportSameFromEnv(t *testing.T) {
 	c := writeContract(t, "hermetic")
-	golden, err := os.ReadFile("testdata/verify-no-policy.golden.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, output := range []string{"text", "json"} {
+	for output, ext := range map[string]string{"text": "txt", "json": "json"} {
+		// Generated once by the verify command before #163 (epic/13-cli).
+		golden, err := os.ReadFile("testdata/verify-no-policy.golden." + ext)
+		if err != nil {
+			t.Fatal(err)
+		}
 		fc, fout, _ := runCLI("verify", "-f", c, "--registry", "reg.example/r", "-o", output)
 		t.Setenv(registryEnv, "reg.example/r")
 		ec, eout, estderr := runCLI("verify", "-f", c, "-o", output)
@@ -153,8 +158,42 @@ func TestVerifyReportSameFromEnv(t *testing.T) {
 		if estderr != "config: registry=reg.example/r (env AVAL_REGISTRY)\n" {
 			t.Fatalf("%s: stderr %q", output, estderr)
 		}
-		if output == "json" && eout != string(golden) {
-			t.Fatalf("json report:\n%s\nwant:\n%s", eout, golden)
+		if eout != string(golden) {
+			t.Fatalf("%s report:\n%s\nwant:\n%s", output, eout, golden)
+		}
+	}
+}
+
+// Commands that do not use the policy neither take --policy nor show
+// AVAL_POLICY: a config: line names only settings the command uses.
+func TestPolicyOnlyWhereUsed(t *testing.T) {
+	t.Setenv(policyEnv, "p.yaml")
+	for _, cmd := range []string{"stats", "record", "push"} {
+		_, _, stderr := runCLI(cmd, "--registry", "reg.example/r")
+		if strings.Contains(stderr, "config:") || strings.Contains(stderr, "p.yaml") {
+			t.Errorf("%s: stderr %q", cmd, stderr)
+		}
+		if code, _, stderr := runCLI(cmd, "--policy", "p.yaml"); code != ExitUsage || !strings.Contains(stderr, "unknown flag: --policy") {
+			t.Errorf("%s --policy: exit %d, stderr %q", cmd, code, stderr)
+		}
+	}
+	for _, cmd := range []string{"version", "upgrade"} {
+		if code, _, _ := runCLI(cmd, "--registry", "reg.example/r"); code != ExitUsage {
+			t.Errorf("%s --registry: exit %d, want usage", cmd, code)
+		}
+	}
+}
+
+// runner.command sees neither the registry nor the trust policy: a nested
+// aval in the test must not reuse or publish against the operator's
+// settings.
+func TestChildEnvWithholdsTrustSettings(t *testing.T) {
+	t.Setenv(registryEnv, "reg.example/r")
+	t.Setenv(policyEnv, "p.yaml")
+	t.Setenv(idTokenEnv, "token")
+	for _, kv := range childEnv() {
+		if k, _, _ := strings.Cut(kv, "="); k == registryEnv || k == policyEnv || k == idTokenEnv {
+			t.Errorf("child env has %s", kv)
 		}
 	}
 }

@@ -131,7 +131,7 @@ envelope):
 - **Both:** the envelope must be the exact one the bundle signs; no bundle
   means no verification.
 
-Without `--policy` nothing is trusted and nothing is looked up: miss. A policy
+Without `--policy` or `AVAL_POLICY` nothing is trusted and nothing is looked up: miss. A policy
 or trusted root that cannot load: outcome `error` (exit 1), and the test runs.
 
 ### Keyless verification needs the network and a writable HOME
@@ -163,6 +163,11 @@ signing identity, sign a passing result for its own inputs, and get a green
 check it wrote itself. Read the policy and the registry from the default
 branch instead. Not from `github.base_ref`: a PR can target any branch,
 including one its author controls.
+
+`AVAL_POLICY` and `AVAL_REGISTRY` count the same as the flags (a flag wins;
+empty is unset). Set them in the step, or from the default branch as below,
+never from a file in the checkout. Aval reads them from no file: there is no
+config file and no `aval.yaml` field.
 
 ```yaml
 on: pull_request

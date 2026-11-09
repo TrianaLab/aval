@@ -24,7 +24,7 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 ??? failure "Flag errors"
     | Message | Fix |
     |---|---|
-    | `--push requires --registry`, `--record requires --registry`, `--registry is required`, `--registry and --record-file are required` | add the flags it names, or set `AVAL_REGISTRY` |
+    | `--push requires --registry`, `--record requires --registry`, `--registry is required`, `--record-file is required` | add the flags it names, or set `AVAL_REGISTRY` |
     | `--shadow and --no-reuse exclude each other` | pick one |
     | `--registry <x> is not an OCI repository` | use `host/name`, no `https://`, tag or digest |
     | `--registry-timeout must be positive`, `--output must be text or json`, `unknown command` | fix the value; see `aval <command> --help` |

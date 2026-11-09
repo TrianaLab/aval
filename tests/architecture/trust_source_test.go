@@ -22,8 +22,16 @@ var (
 	trustEnvName     = regexp.MustCompile(`^AVAL_(?:REGISTRY|POLICY)$`)
 )
 
-// envResolver is the one file that may read AVAL_REGISTRY and AVAL_POLICY.
-const envResolver = "cmd/aval/config.go"
+const (
+	// envResolver is the one file that may read AVAL_REGISTRY and AVAL_POLICY.
+	envResolver = "cmd/aval/config.go"
+	// statsReport has a json "registry" field in a report Aval writes and
+	// never parses for trust.
+	statsReport = "pkg/evidence/stats.go"
+)
+
+// trustEnvConst names the resolver's constants for the variables.
+var trustEnvConst = map[string]bool{"registryEnv": true, "policyEnv": true}
 
 // trustSourceProblems: Go code under dir (tests excluded) reads the registry
 // or the trust policy from something other than a flag or the environment
@@ -57,7 +65,7 @@ func trustSourceProblems(t *testing.T, dir string, rel func(string) string) []st
 // trust from the base branch (#137). So the registry and the policy come
 // only from flags or AVAL_REGISTRY / AVAL_POLICY (#163).
 func TestTrustSource(t *testing.T) {
-	for _, dir := range []string{"cmd", "internal"} {
+	for _, dir := range []string{"cmd", "internal", "pkg"} {
 		for _, p := range trustSourceProblems(t, filepath.Join(root, dir), func(p string) string {
 			r, _ := filepath.Rel(root, p)
 			return filepath.ToSlash(r)
@@ -68,7 +76,7 @@ func TestTrustSource(t *testing.T) {
 }
 
 func TestTrustSourceCheckCatchesFixtures(t *testing.T) {
-	for _, fixture := range []string{"contract", "configfile", "env"} {
+	for _, fixture := range []string{"contract", "configfile", "env", "envconst"} {
 		dir := filepath.Join("testdata", "trustsource", fixture)
 		if p := trustSourceProblems(t, dir, filepath.ToSlash); len(p) == 0 {
 			t.Errorf("%s: no problem reported", fixture)
@@ -81,7 +89,7 @@ func nodeProblems(name string, n ast.Node) []string {
 	var problems []string
 	switch n := n.(type) {
 	case *ast.Field:
-		if n.Tag == nil {
+		if n.Tag == nil || name == statsReport {
 			break
 		}
 		tag, _ := strconv.Unquote(n.Tag.Value)
@@ -101,6 +109,21 @@ func nodeProblems(name string, n ast.Node) []string {
 		if trustEnvName.MatchString(s) && name != envResolver {
 			problems = append(problems, name+": reads "+s+" outside "+envResolver)
 		}
+	case *ast.CallExpr:
+		problems = append(problems, constEnvProblems(name, n)...)
 	}
 	return problems
+}
+
+// constEnvProblems: call reads the variable through the resolver's constant,
+// os.Getenv(policyEnv), outside envResolver.
+func constEnvProblems(name string, call *ast.CallExpr) []string {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || name == envResolver || (sel.Sel.Name != "Getenv" && sel.Sel.Name != "LookupEnv") || len(call.Args) != 1 {
+		return nil
+	}
+	if id, ok := call.Args[0].(*ast.Ident); ok && trustEnvConst[id.Name] {
+		return []string{name + ": reads " + id.Name + " outside " + envResolver}
+	}
+	return nil
 }

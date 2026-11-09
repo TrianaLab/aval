@@ -232,9 +232,9 @@ ci-false-hit:
 	AVAL_GOLDEN_BASE="$${AVAL_GOLDEN_BASE-origin/main}" go test -count=1 ./internal/fingerprint/... ./internal/contract/...
 # Levels 2 and 4, the heavy suite, through `aval run` with the contract
 # aval.e2e.yaml. Locally (no AVAL_REGISTRY, AVAL_POLICY) it always runs. With
-# both set (aval reads them itself), a verified passing result for the same inputs is reused and
-# anything unproven runs (invariant 3); a verification failure runs the suite
-# and exits 5. The report is in the `aval verify --output json` format. The
+# both set (aval reads them itself), a verified passing result for the same
+# inputs is reused and anything unproven runs (invariant 3); a verification
+# failure runs the suite and exits 5. The report is in the `aval verify --output json` format. The
 # run record (statistics) goes to .aval/e2e-record.json; on main CI publishes
 # it with `aval record` from a job that runs no tests. CI runs the same
 # `aval run` with the pinned release, not this target (#134).

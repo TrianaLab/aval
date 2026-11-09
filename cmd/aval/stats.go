@@ -21,8 +21,9 @@ import (
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
-func newStatsCmd(g *globalFlags) *cobra.Command {
+func newStatsCmd() *cobra.Command {
 	var test, since, output, by string
+	g := &globalFlags{}
 	cmd := &cobra.Command{
 		Use:   "stats",
 		Short: "Aggregate the run records in the registry: reuse, misses, time saved",
@@ -82,6 +83,7 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.`,
 			return writeStats(cmd.OutOrStdout(), output, aggregate(repo, from, by == "repository", set))
 		},
 	}
+	g.bind(cmd, false, false)
 	f := cmd.Flags()
 	f.StringVar(&test, "test", "", "only this test id (metadata.name); default: every test with run records")
 	f.StringVar(&since, "since", "", "only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)")

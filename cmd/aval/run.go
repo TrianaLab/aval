@@ -56,8 +56,9 @@ type runFlags struct {
 	config                                              *globalFlags // prints the config: line; nil prints none
 }
 
-func newRunCmd(g *globalFlags) *cobra.Command {
+func newRunCmd() *cobra.Command {
 	var o runFlags
+	g := &globalFlags{}
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Reuse a verified result for the current inputs, or run the test",
@@ -78,7 +79,7 @@ covers lookup and fetch together; --push has its own.
 
 Exit codes: 0 pass, 3 fail, 5 verification failed, 1 error or false hit,
 2 usage. Keyless signing reads $` + idTokenEnv + `; runner.command never sees
-it.
+it, $` + registryEnv + ` or $` + policyEnv + `.
 ` + loginHelp + `.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -86,6 +87,7 @@ it.
 			return runTest(cmd, o)
 		},
 	}
+	g.bind(cmd, true, true)
 	f := cmd.Flags()
 	f.BoolVar(&o.push, "push", false, "sign and publish the result after running (needs --registry)")
 	f.StringVar(&o.key, "key", "", "signing key path for --push (default: keyless OIDC)")
@@ -432,10 +434,14 @@ func hasVersion(out, want string) bool {
 }
 
 // childEnv is the environment of commands Aval runs, without the signing
-// token: the code under test must not be able to sign results as this
-// workload.
+// token, the registry and the trust policy: the code under test must not be
+// able to sign results as this workload, nor reuse or publish against the
+// operator's trust settings.
 func childEnv() []string {
-	return slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, idTokenEnv+"=") })
+	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		k, _, _ := strings.Cut(kv, "=")
+		return k == idTokenEnv || k == registryEnv || k == policyEnv
+	})
 }
 
 // execute runs runner.command in the contract's directory and returns the
@@ -623,8 +629,9 @@ func signAndPush(ctx context.Context, p *evidence.Predicate, c *contract.Contrac
 	return d.Reference(), nil
 }
 
-func newPushCmd(g *globalFlags) *cobra.Command {
+func newPushCmd() *cobra.Command {
 	var key, resultFile string
+	g := &globalFlags{}
 	var interactive bool
 	cmd := &cobra.Command{
 		Use:   "push",
@@ -668,6 +675,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 			return nil
 		},
 	}
+	g.bind(cmd, true, false)
 	f := cmd.Flags()
 	f.StringVar(&key, "key", "", "signing key path (default: keyless OIDC)")
 	f.BoolVar(&interactive, "login", false, loginFlagHelp)
@@ -675,8 +683,9 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 	return cmd
 }
 
-func newRecordCmd(g *globalFlags) *cobra.Command {
+func newRecordCmd() *cobra.Command {
 	var file, repository string
+	g := &globalFlags{}
 	cmd := &cobra.Command{
 		Use:   "record",
 		Short: "Publish a run record written by 'aval run --record-file'",
@@ -689,11 +698,11 @@ record's source repository.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			repo, timeout := g.registry, g.timeout
 			g.printConfig(cmd.ErrOrStderr())
-			if repo == "" || file == "" {
-				return usageError{errors.New("--registry and --record-file are required")}
-			}
-			if err := cmp.Or(checkRegistry(repo), checkTimeout(timeout)); err != nil {
+			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout)); err != nil {
 				return err
+			}
+			if file == "" {
+				return usageError{errors.New("--record-file is required")}
 			}
 			raw, err := os.ReadFile(file)
 			if err != nil {
@@ -714,6 +723,7 @@ record's source repository.`,
 			return nil
 		},
 	}
+	g.bind(cmd, false, false)
 	f := cmd.Flags()
 	f.StringVar(&file, "record-file", "", "run record written by 'aval run --record-file' (required)")
 	f.StringVar(&repository, "repository", "", "source repository (e.g. acme/orders); default: the one in the record")

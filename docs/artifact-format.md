@@ -554,7 +554,7 @@ with the test result ([Outcomes](concepts/outcomes.md)).
 - A fingerprint error: `aval verify` prints no report and exits 1;
   `aval run --report` writes outcome `error` with an empty `fingerprint`, then
   runs the test. Bad flags or an invalid contract: no report, exit 2.
-- No `--policy`, or a `non-deterministic` contract: `miss`, no lookup.
+- No `--policy` (or `AVAL_POLICY`), or a `non-deterministic` contract: `miss`, no lookup.
 - A policy, or a trusted root a candidate needs, that cannot load: `error`.
 
 Example (`verified`):

@@ -185,7 +185,8 @@ func newRootCmd() *cobra.Command {
 		Long: `Verifiable test execution reuse: signed test results as OCI artifacts.
 
 --registry and --policy fall back to $` + registryEnv + ` and $` + policyEnv + `; a flag
-wins, and an empty value counts as unset. There is no config file.`,
+wins, and an empty value counts as unset (an empty flag too: use --no-reuse
+to turn reuse off). There is no config file.`,
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -198,10 +199,7 @@ wins, and an empty value counts as unset. There is no config file.`,
 		return nil
 	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
-	g := &globalFlags{}
-	g.bind(root)
-	root.PersistentPreRun = func(*cobra.Command, []string) { g.resolve(os.Getenv) }
-	root.AddCommand(newRunCmd(g), newPushCmd(g), newRecordCmd(g), newStatsCmd(g), newVerifyCmd(g), newVersionCmd(), newUpgradeCmd())
+	root.AddCommand(newRunCmd(), newPushCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
 	return root
 }
 
@@ -367,8 +365,9 @@ func inScope(dir string, c *contract.Contract, p string) bool {
 		match(c.Scope.Dependencies, contract.Glob.Match)
 }
 
-func newVerifyCmd(g *globalFlags) *cobra.Command {
+func newVerifyCmd() *cobra.Command {
 	var output string
+	g := &globalFlags{}
 	cmd := &cobra.Command{
 		Use:   "verify",
 		Short: "Check whether a trusted result exists for the current inputs",
@@ -404,6 +403,7 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 			return nil
 		},
 	}
+	g.bind(cmd, true, true)
 	cmd.Flags().StringVarP(&output, "output", "o", "text", "output format: text or json")
 	return cmd
 }
