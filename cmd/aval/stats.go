@@ -27,7 +27,7 @@ func newStatsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stats",
 		Short: "Aggregate the run records in the registry: reuse, misses, time saved",
-		Long: `stats reads the run records that 'aval run --record' and 'aval record'
+		Long: `stats reads the run records that 'aval run --stats' and 'aval stats publish'
 published to the registry and aggregates them: runs, hit rate, misses by
 cause, verification failures, shadow false hits, and total and saved test
 time, per test (or per source repository with --by repository) and in total.
@@ -89,6 +89,7 @@ Exit codes: 0 statistics printed, 1 error (registry), 2 usage.`,
 	f.StringVar(&since, "since", "", "only records made since: a duration (168h, 30d) or a date (2026-11-01, RFC 3339)")
 	f.StringVarP(&output, "output", "o", "text", "output format: text or json")
 	f.StringVar(&by, "by", "test", "group by test or repository (the run record's source repository)")
+	cmd.AddCommand(newStatsPublishCmd())
 	return cmd
 }
 

@@ -42,7 +42,7 @@ history would tie Aval to one CI vendor's API.
 Run in shadow mode and record every run:
 
 ```sh
-aval run --shadow --record --registry ghcr.io/acme/orders-aval --policy policy.yaml
+aval run --shadow --stats --registry ghcr.io/acme/orders-aval --policy policy.yaml
 ```
 
 | You see | It means |
@@ -52,18 +52,18 @@ aval run --shadow --record --registry ghcr.io/acme/orders-aval --policy policy.y
 
 ## Record where you can write
 
-`--record` publishes one run record per run, next to your results. To keep
-records apart, write them to a file and publish them with `aval record` to a
-registry of your own:
+`--stats` publishes one run record per run, next to your results. To keep
+records apart, write them to a file and publish them with `aval stats publish`
+to a registry of your own:
 
 ```sh
-aval run --record-file record.json --repository acme/orders \
+aval run --stats-file record.json --source-repo acme/orders \
   --registry ghcr.io/acme/orders-aval --policy policy.yaml
-aval record --record-file record.json --registry ghcr.io/acme/aval-stats
+aval stats publish --registry ghcr.io/acme/aval-stats record.json
 ```
 
 A test job without write access only writes the file; a job with write
-access, which runs no tests, runs `aval record`.
+access, which runs no tests, runs `aval stats publish`.
 
 ## Read the numbers
 
@@ -74,7 +74,7 @@ cause, verification failures, shadow false hits and time saved.
 aval stats --registry ghcr.io/acme/aval-stats --since 7d
 ```
 
-`--by repository` needs `--repository <name>` on `aval run` or `aval record`.
+`--by repository` needs `--source-repo <name>` on `aval run` or `aval stats publish`.
 
 ```text
 run records in ghcr.io/acme/aval-stats since 2026-10-31T12:30:00Z

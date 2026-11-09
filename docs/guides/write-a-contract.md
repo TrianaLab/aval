@@ -23,7 +23,7 @@ which CI runs:
 Put it next to your test and check what it hashes:
 
 ```sh
-aval run --explain --fingerprint-only
+aval explain
 ```
 
 ## Step by step
@@ -90,7 +90,7 @@ happen; `--shadow` catches it only after it flips a result
 strace -f -e trace=openat -o trace.txt pytest tests/unit
 grep -v ENOENT trace.txt | grep -o '"[^"]*"' | tr -d '"' | sed "s|^$PWD/||" \
   | grep -v '^/' | sort -u > read.txt
-aval run --explain --fingerprint-only | awk '$1 == "source" || $1 == "dependency"' \
+aval explain | awk '$1 == "source" || $1 == "dependency"' \
   | cut -d' ' -f4- | sort -u > scope.txt
 comm -23 read.txt scope.txt   # prints tests/conftest.py
 ```
@@ -106,7 +106,7 @@ caches (`__pycache__`). Check `scope.contracts` the same way.
 
     ```sh
     scope=$(mktemp -d)
-    aval run --explain --fingerprint-only | awk '$1 == "source" || $1 == "dependency"' \
+    aval explain | awk '$1 == "source" || $1 == "dependency"' \
       | cut -d' ' -f4- | tar -cf - -T - | tar -xf - -C "$scope"
     (cd "$scope" && pytest tests/unit)
     ```

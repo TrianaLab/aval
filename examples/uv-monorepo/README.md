@@ -39,7 +39,7 @@ Run each shard, sign and publish its result and coverage:
 
 ```sh
 for n in 1 2; do
-  aval run -f aval.shard-$n.yaml --result .aval/shard-$n.json --registry $REPO --push --key aval.key
+  aval run -f aval.shard-$n.yaml --result-file .aval/shard-$n.json --registry $REPO --push --key aval.key
 done
 ```
 
@@ -50,7 +50,7 @@ pytest:
 ```sh
 rm coverage-shard-*.xml
 for n in 1 2; do
-  aval run -f aval.shard-$n.yaml --result .aval/shard-$n.json --registry $REPO --policy policy.yaml
+  aval run -f aval.shard-$n.yaml --result-file .aval/shard-$n.json --registry $REPO --policy policy.yaml
 done
 ```
 

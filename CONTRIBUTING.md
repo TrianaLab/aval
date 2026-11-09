@@ -237,8 +237,9 @@ Both fail on a verification failure (exit 5), read
 (the `aval verify --output json` format) as artifacts. On `main`,
 `dogfood-publish`, the only job with `id-token: write`, signs keyless and
 pushes the results that were not reused; it runs no tests. Both suites also
-write a run record (`--record-file`), and on `main` `dogfood-record`
-(`packages: write` only, no tests) publishes them with `aval record` to the
+write a run record (`--stats-file`), and on `main` `dogfood-record`
+(`packages: write` only, no tests) publishes them with `aval stats publish`
+(the pinned release in ci.yaml still uses `aval record`) to the
 public stats registry `ghcr.io/trianalab/aval-stats`, whatever the suites'
 outcome; a record that cannot be published is a warning. `dogfood-shadow`
 adds `aval stats --by repository --since 30d` over that registry to its job
@@ -403,11 +404,11 @@ A repository appears on the [Stats](https://aval.run/main/stats/) page once it p
    records the test jobs wrote:
 
     ```sh
-    aval record --record-file record.json --repository "$GITHUB_REPOSITORY" \
-      --registry ghcr.io/trianalab/aval-stats
+    aval stats publish --source-repo "$GITHUB_REPOSITORY" \
+      --registry ghcr.io/trianalab/aval-stats record.json
     ```
 
-    Without `--repository` here or on `aval run`, the repository shows as
+    Without `--source-repo` here or on `aval run`, the repository shows as
     `unknown`. Aval's own `dogfood-record` job in `ci.yaml` does this.
 
 A maintainer can refresh the site's `stats.json` at any time from the Actions

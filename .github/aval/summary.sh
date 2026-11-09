@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: summary.sh <name> <report.json>
-# Adds one `aval run --report` result to the job summary. Only the outcome and
+# Adds one `aval run --report-file` result to the job summary. Only the outcome and
 # result are printed, and only known values: the reason can carry text from an
 # untrusted attestation, so it stays in the uploaded report. A verification
 # failure, as the outcome or among the rejected candidates, is annotated as an
