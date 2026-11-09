@@ -21,10 +21,15 @@ var autoTagGuards = []string{
 	"github.event.workflow_run.head_repository.full_name == github.repository",
 }
 
+// versionPRPermissions: version-pr writes the version PR and dispatches
+// ci.yaml on it, nothing else (no packages or id-token write).
+var versionPRPermissions = map[string]string{"contents": "write", "pull-requests": "write", "actions": "write"}
+
 // releaseWorkflowProblems: release.yaml's auto-tag job tags and dispatches
 // only after ci passed on a push to main, holds only contents and actions
 // write, and runs no code from its checkout; version-pr and release keep
-// their push-only and tag-only conditions.
+// their push-only and tag-only conditions, and version-pr holds only
+// versionPRPermissions.
 func releaseWorkflowProblems(data []byte) ([]string, error) {
 	var wf struct {
 		Jobs map[string]permJob `yaml:"jobs"`
@@ -55,6 +60,9 @@ func releaseWorkflowProblems(data []byte) ([]string, error) {
 	if c := wf.Jobs["version-pr"].If; c != "github.event_name == 'push' && github.ref == 'refs/heads/main'" {
 		problems = append(problems, "version-pr runs on "+c)
 	}
+	if !maps.Equal(wf.Jobs["version-pr"].Permissions, versionPRPermissions) {
+		problems = append(problems, "version-pr: permissions must be exactly contents, pull-requests and actions write")
+	}
 	if c := wf.Jobs["release"].If; c != "startsWith(github.ref, 'refs/tags/v')" {
 		problems = append(problems, "release runs on "+c)
 	}
@@ -78,6 +86,7 @@ func TestReleaseAutoTagOnlyAfterCIOnMain(t *testing.T) {
 func TestReleaseWorkflowCheckCatchesLooseAutoTag(t *testing.T) {
 	ok := "jobs:\n" +
 		"  version-pr:\n    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n" +
+		"    permissions: {contents: write, pull-requests: write, actions: write}\n" +
 		"  release:\n    if: startsWith(github.ref, 'refs/tags/v')\n" +
 		"  auto-tag:\n    if: >-\n      " + strings.Join(autoTagGuards, " &&\n      ") + "\n" +
 		"    permissions: {contents: write, actions: write}\n" +
@@ -94,6 +103,7 @@ func TestReleaseWorkflowCheckCatchesLooseAutoTag(t *testing.T) {
 		"runs make":          {"gh workflow run release.yaml", "make build"},
 		"third-party action": {"actions/checkout@x", "evil/action@x"},
 		"release on push":    {"startsWith(github.ref, 'refs/tags/v')", "github.event_name == 'push'"},
+		"version-pr signs":   {"pull-requests: write, actions: write}", "pull-requests: write, actions: write, id-token: write}"},
 	}
 	for name, c := range cases {
 		wf := strings.Replace(ok, c[0], c[1], 1)

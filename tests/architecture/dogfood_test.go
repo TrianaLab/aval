@@ -145,7 +145,8 @@ func writeScoped(p map[string]string) bool {
 }
 
 // writeScopeProblems: a job that can publish or sign (packages or id-token
-// write) runs only on push, never on pull_request, and runs no test suite,
+// write) runs only on push, never on pull_request or workflow_dispatch (the
+// version PR's run, on a ref main does not protect), and runs no test suite,
 // so no credential reaches code under test. Write scopes are never granted
 // workflow-wide.
 func writeScopeProblems(data []byte) ([]string, error) {
@@ -194,13 +195,15 @@ func TestWriteScopedJobsRunOnlyOnPush(t *testing.T) {
 
 func TestWriteScopeCheckCatchesPRJobs(t *testing.T) {
 	cases := map[string]string{
-		"no condition":   "jobs:\n  a:\n    permissions: {id-token: write}\n",
-		"on PRs":         "jobs:\n  a:\n    if: github.event_name == 'pull_request'\n    permissions: {packages: write}\n",
-		"runs the suite": "jobs:\n  a:\n    if: github.event_name == 'push'\n    permissions: {packages: write}\n    steps: [{run: make ci-e2e}]\n",
-		"push or PR":     "jobs:\n  a:\n    if: github.event_name == 'push' || github.event_name == 'pull_request'\n    permissions: {packages: write}\n",
-		"go test":        "jobs:\n  a:\n    if: github.event_name == 'push'\n    permissions: {id-token: write}\n    steps: [{run: go test ./...}]\n",
-		"make test":      "jobs:\n  a:\n    if: github.event_name == 'push'\n    permissions: {id-token: write}\n    steps: [{run: make test-acceptance}]\n",
-		"workflow-wide":  "permissions: {packages: write}\njobs:\n  a:\n    steps: [{run: echo}]\n",
+		"no condition":     "jobs:\n  a:\n    permissions: {id-token: write}\n",
+		"on PRs":           "jobs:\n  a:\n    if: github.event_name == 'pull_request'\n    permissions: {packages: write}\n",
+		"runs the suite":   "jobs:\n  a:\n    if: github.event_name == 'push'\n    permissions: {packages: write}\n    steps: [{run: make ci-e2e}]\n",
+		"push or PR":       "jobs:\n  a:\n    if: github.event_name == 'push' || github.event_name == 'pull_request'\n    permissions: {packages: write}\n",
+		"on dispatch":      "jobs:\n  a:\n    if: github.event_name == 'workflow_dispatch'\n    permissions: {id-token: write}\n",
+		"push or dispatch": "jobs:\n  a:\n    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'\n    permissions: {packages: write}\n",
+		"go test":          "jobs:\n  a:\n    if: github.event_name == 'push'\n    permissions: {id-token: write}\n    steps: [{run: go test ./...}]\n",
+		"make test":        "jobs:\n  a:\n    if: github.event_name == 'push'\n    permissions: {id-token: write}\n    steps: [{run: make test-acceptance}]\n",
+		"workflow-wide":    "permissions: {packages: write}\njobs:\n  a:\n    steps: [{run: echo}]\n",
 	}
 	for name, wf := range cases {
 		if p, err := writeScopeProblems([]byte(wf)); err != nil || len(p) == 0 {

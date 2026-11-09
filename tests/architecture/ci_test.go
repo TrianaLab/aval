@@ -270,10 +270,11 @@ jobs:
 	}
 }
 
-// goldenBase is the only AVAL_GOLDEN_BASE the false-hit job may set: the PR
-// base branch, or the commit before the push. Anything else (HEAD, the PR
-// branch) would let a PR rewrite a committed golden unseen.
-const goldenBase = "${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}"
+// goldenBase is the only AVAL_GOLDEN_BASE the false-hit job may set: the
+// commit before the push, the PR base branch, or origin/main on a dispatch
+// (the version PR). Anything else (HEAD, the PR branch, the dispatched ref)
+// would let a change rewrite a committed golden unseen.
+const goldenBase = "${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}"
 
 // falseHitRecipe is the only recipe `make ci-false-hit` may have: both
 // packages, uncached, nothing skipped, and AVAL_GOLDEN_BASE always set (an

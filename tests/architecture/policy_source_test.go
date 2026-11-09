@@ -269,6 +269,8 @@ func TestPolicySourceCheckCatchesWorkingTreePolicies(t *testing.T) {
 		"push or PR job":         "on: [push, pull_request]\njobs:\n  a:\n    if: github.event_name == 'push' || github.event_name == 'pull_request'\n    steps: [{run: aval run --policy p.yaml}]\n",
 		"negated push":           "on: [push, pull_request]\njobs:\n  a:\n    if: \"!(github.event_name == 'push')\"\n    env: {AVAL_POLICY: evil.yaml}\n    steps: [" + pre + ", " + use + "]\n",
 		"not push":               "on: [push, pull_request]\njobs:\n  a:\n    if: github.event_name != 'push'\n    steps: [{run: aval run --policy p.yaml}]\n",
+		"dispatch job":           "on: [push, pull_request, workflow_dispatch]\njobs:\n  a:\n    if: github.event_name == 'workflow_dispatch'\n    steps: [{run: aval run --policy .github/aval/main.yaml}]\n",
+		"push or dispatch":       "on: [push, pull_request, workflow_dispatch]\njobs:\n  a:\n    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'\n    env: {AVAL_POLICY: evil.yaml}\n    steps: [" + pre + ", " + use + "]\n",
 		"pull_request_target":    "on: pull_request_target\njobs:\n  a:\n    steps: [{run: aval verify --policy p.yaml}]\n",
 		"policy flag, no value":  pr(pre + ", {run: aval run --policy}"),
 		"inline assignment":      pr(pre + ", {run: AVAL_POLICY=evil.yaml make ci-e2e}"),
@@ -401,8 +403,9 @@ func writeFiles(t *testing.T, dir string, files map[string]string) {
 }
 
 // A PR that edits pr.yaml and the registry, or targets a base branch other
-// than main, does not change the policy or registry its own CI uses; on push
-// the checkout (main) is used (#134).
+// than main, does not change the policy or registry its own CI uses, nor does
+// a dispatched ref (the version PR) that edits main.yaml; on push the
+// checkout (main) is used (#134).
 func TestTrustStepReadsTheBaseBranch(t *testing.T) {
 	origin, clone := t.TempDir(), t.TempDir()
 	git(t, origin, "init", "-q")
@@ -433,15 +436,19 @@ func TestTrustStepReadsTheBaseBranch(t *testing.T) {
 	git(t, clone, "checkout", "-qb", "pr")
 	writeFiles(t, clone, map[string]string{
 		".github/aval/pr.yaml":      "pr adds its own identity\n",
+		".github/aval/main.yaml":    "head adds its own identity\n",
 		".github/workflows/ci.yaml": "jobs:\n  a:\n    env:\n      AVAL_REGISTRY: evil.io/x\n",
 	})
 	git(t, clone, "commit", "-qam", "pr")
-	vars, err = runTrustStep(t, clone, "pull_request")
-	if err != nil {
-		t.Fatalf("pull_request: %v", err)
-	}
-	if got := readAbs(t, vars["AVAL_POLICY"]); got != "base pr policy\n" || vars["AVAL_REGISTRY"] != "ghcr.io/base/attestations" {
-		t.Errorf("pull_request: policy %q, registry %q, want main's", got, vars["AVAL_REGISTRY"])
+	// Every event but push reads main's pr.yaml: an unknown one fails closed too.
+	for _, event := range []string{"pull_request", "workflow_dispatch", "workflow_run"} {
+		vars, err = runTrustStep(t, clone, event)
+		if err != nil {
+			t.Fatalf("%s: %v", event, err)
+		}
+		if got := readAbs(t, vars["AVAL_POLICY"]); got != "base pr policy\n" || vars["AVAL_REGISTRY"] != "ghcr.io/base/attestations" {
+			t.Errorf("%s: policy %q, registry %q, want main's", event, got, vars["AVAL_REGISTRY"])
+		}
 	}
 
 	// A base branch with two registries, or none, fails closed.
