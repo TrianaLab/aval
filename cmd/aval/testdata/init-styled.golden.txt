@@ -1,0 +1,6 @@
+· source matches 1 file: src/a.txt
+✓ wrote aval.key (private: keep it secret, do not commit it) and aval.pub, key id <kid>
+✓ wrote policy.yaml: trusts aval.pub at trust level developer
+✓ wrote aval.yaml
+✓ added aval.key, .aval/ to .gitignore
+Wrote the contract for unit; next: export AVAL_REGISTRY=<oci repository> AVAL_POLICY=policy.yaml, then aval run --push --key aval.key.
