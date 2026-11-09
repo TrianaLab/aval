@@ -169,7 +169,7 @@ func checkReport(t *testing.T, stdout, reason string, pub []byte) {
 	}
 	if r.Outcome == evidence.OutcomeVerified {
 		kid, _ := evidence.PublicKeyID(string(pub))
-		if r.Signer == nil || r.Signer.KeyID != kid || r.Signer.TrustLevel != evidence.TrustDeveloper {
+		if s := r.Signer; s == nil || *s != (evidence.Identity{KeyID: kid, TrustLevel: evidence.TrustDeveloper, TrustLevelName: "developer"}) {
 			t.Fatalf("verified report: %s", stdout)
 		}
 		return

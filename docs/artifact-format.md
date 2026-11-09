@@ -531,7 +531,7 @@ This is the stable machine interface for CI scripts and external tools.
 | `fingerprint` | string | always | Locally computed `sha256:<hex>`. |
 | `reference` | string | when an attestation was found | Immutable `repo@sha256:<manifest digest>`. |
 | `result` | string | `verified` only | `passed` or `failed` from the verified predicate. |
-| `signer` | object | `verified` only | Accepted policy identity that matched (`issuer`, `subjectRegexp`, `trustLevel`) plus the identity the signature actually carried: `subject`, the certificate subject (SAN) for keyless signatures, or `keyId`, `base64(sha256(DER public key))` for key-based ones. `subject` and `keyId` are omitted when empty. |
+| `signer` | object | `verified` only | Accepted policy identity that matched (`issuer`, `subjectRegexp`, `trustLevel`, and `trustLevelName`: `developer`, `runner` or `isolated`, derived from the policy entry's level, never from the predicate) plus the identity the signature actually carried: `subject`, the certificate subject (SAN) for keyless signatures, or `keyId`, `base64(sha256(DER public key))` for key-based ones. `subject` and `keyId` are omitted when empty. |
 | `predicate` | object | `verified` only | Full verified predicate. |
 | `reason` | string | non-`verified` outcomes | Human-readable cause. |
 | `rejected` | array | when a candidate was not used | Each `{reference, outcome, reason}`; `outcome` is `verification-failed`, `error` or `miss`. A `verification-failed` entry is a security event even when `outcome` is `verified`: alert. A `miss` entry is an authentic attestation whose signer the policy lists below `minTrustLevel`: routine non-reuse, no alert. |
@@ -571,6 +571,7 @@ Example (`verified`):
     "issuer": "https://token.actions.githubusercontent.com",
     "subjectRegexp": "^https://github.com/acme/orders/\\.github/workflows/ci\\.yaml@refs/heads/main$",
     "trustLevel": 2,
+    "trustLevelName": "runner",
     "subject": "https://github.com/acme/orders/.github/workflows/ci.yaml@refs/heads/main"
   },
   "predicate": { "...": "as in the predicate example" }

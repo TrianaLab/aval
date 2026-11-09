@@ -24,8 +24,8 @@ public Go API:
 | `(*Predicate).Validate() error` | structural checks: `schemaVersion == "v2"`, subject, `test.id`, `result`, fingerprint format, `runner.identity`, timestamps |
 | `Verify(ctx, *Envelope, VerifyOptions) (*Verification, error)` | check the signature, match the signer against the policy, enforce the minimum level, decode the statement, require the expected fingerprint, test id and a reusable cacheability; every failure is a `*VerificationError` |
 | `SignatureVerifier`, `Signer` | checks a signature cryptographically and returns the signer it binds, with no policy. `pkg/evidence` ships no implementation, to stay free of Sigstore; a public Sigstore one is planned for milestone 5 |
-| `MatchIdentity(ids, issuer, subject) (Identity, bool)` | the keyless identity that grants a signer the highest level; `SubjectRegexp` matches the whole subject |
-| `MatchSigner(ids, Signer) (Identity, bool)` | `MatchIdentity` for keyless signers, `PublicKey` entries for key signers |
+| `MatchIdentity(ids, issuer, subject) (Identity, bool)` | the keyless identity that grants a signer the highest level; `SubjectRegexp` matches the whole subject; sets `TrustLevelName` from the entry's level |
+| `MatchSigner(ids, Signer) (Identity, bool)` | `MatchIdentity` for keyless signers, `PublicKey` entries for key signers; sets `TrustLevelName` from the entry's level |
 | `PublicKeyID(pem) (string, error)` | `base64(sha256(DER))` of a PEM public key, the key hint in key-based bundles |
 | `VerifyOptions` | expected fingerprint and test id, accepted `Identities`, `MinTrustLevel`, `AllowedCacheability`, `Signature` (required) |
 | `ErrNotFound` | no attestation for the fingerprint: a miss, run the test |
