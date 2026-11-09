@@ -1,7 +1,7 @@
 # Troubleshooting
 
 Goal: go from an exit code or an error message to its cause and its fix.
-In the messages below, text in `<...>` changes per run.
+Text in `<...>` changes per run.
 
 ```mermaid
 flowchart LR
@@ -12,10 +12,6 @@ flowchart LR
 ```
 
 ## Start with the exit code
-
-```sh
-aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit $?"
-```
 
 --8<-- "docs/cli-reference.md:exit-codes"
 
@@ -51,7 +47,9 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 
 ## Errors (exit 1)
 
-`aval verify` exits 1. `aval run` prints these as outcome `error`, warns `aval: warning: reuse off: <message>` on stderr, runs the test and exits with the test's code; its `summary:` line ends in `; reuse was off`. It exits 1 only when the test cannot start (`running <x>`), a probe fails (`environment.probe`) or the result cannot be published.
+- `aval verify` exits 1.
+- `aval run` prints outcome `error`, warns `aval: warning: reuse off: <message>`, runs the test and exits with its code.
+- `aval run` exits 1 only when the test cannot start, a probe fails or the result cannot be published.
 
 ??? failure "Fingerprint and trust policy"
     | Message | Fix |
@@ -97,12 +95,11 @@ aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml; echo "exit
 
 ## Verification failures (exit 5)
 
-The `aval: SECURITY:` line comes first (`aval run` repeats it last) and
-`reason:` says why. Usually a wrong policy; possibly an attacker. See
-[Outcomes](../concepts/outcomes.md#a-verification-failure-is-a-security-event).
-
-It also appears beside a verified result (exit 0), listed in `rejected`: gate
-on `rejected` where that must stop a pipeline (`.github/aval/summary.sh`).
+`aval: SECURITY:` comes first (`aval run` repeats it last); `reason:` says
+why. Usually a wrong policy, possibly an attacker
+([Outcomes](../concepts/outcomes.md#a-verification-failure-is-a-security-event)).
+Beside a verified result (exit 0) it shows in `rejected`: gate on it where it
+must stop a pipeline (`.github/aval/summary.sh`).
 
 ??? danger "Reasons"
     | Reason | Fix |

@@ -1,31 +1,29 @@
 # Quickstart
 
-On your laptop, in five minutes: a miss, a reuse, a changed input and a
-rejected result.
+What does Aval do? See it in five minutes on your laptop: a miss, a reuse,
+a changed input and a rejected result.
 
-You need `aval` ([Install](install.md)) and Docker. Run the blocks
-in order in one shell. Each `text` block is the expected output; `...`
-stands for a digest, key id, duration or docs version that changes between
-runs.
+You need `aval` ([Install](install.md)) and Docker. Run the blocks in order
+in one shell. `text` blocks show the output; `...` changes per run.
 
 <!-- quickstart:start (tests/acceptance/readme_test.go runs the sh blocks and checks the text blocks) -->
 
 ## 1. Set up
 
-A local OCI registry (port 5001: macOS uses 5000 for AirPlay). The first
-line removes a registry left from an earlier try (silent if there is none):
+Start a local registry on port 5001 (macOS keeps 5000 for AirPlay):
 
 ```sh
 docker rm -f aval-registry 2>/dev/null || true
 docker run -d --name aval-registry -p 5001:5000 registry:2
 ```
 
-A project with one input file; the first line removes the project left from
-an earlier try. `aval init` writes `aval.yaml`, which names
-the test command and the files it reads (`scope`), a signing key (ECDSA
-P-256) and `policy.yaml`, a trust policy that trusts the key. `--source` and
-`--cacheability` have no default: you declare what the test reads, and init
-lists the files it matches:
+Make a project with one input file. `aval init` writes:
+
+- `aval.yaml`: the test command and the files it reads (`scope`);
+- a signing key;
+- `policy.yaml`: a trust policy that trusts that key.
+
+You declare what the test reads (`--source`); Aval never guesses:
 
 ```sh
 rm -rf aval-demo && mkdir aval-demo && cd aval-demo
@@ -42,10 +40,8 @@ added aval.key, .aval/ to .gitignore
 next: export AVAL_REGISTRY=<oci repository> AVAL_POLICY=policy.yaml, then aval run --push --key aval.key
 ```
 
-On a terminal, `aval init` without flags asks for each value.
-
-Set the registry and the trust policy once for this shell. `--registry` and
-`--policy` override them for one command:
+Without flags, `aval init` asks for each value. Now set the registry and the
+policy once for this shell:
 
 ```sh
 export AVAL_REGISTRY=localhost:5001/demo/hello-aval AVAL_POLICY=policy.yaml
@@ -55,16 +51,14 @@ export AVAL_REGISTRY=localhost:5001/demo/hello-aval AVAL_POLICY=policy.yaml
 
 ![aval run prints miss, runs the test, which passes, and pushes the signed result to localhost:5001](assets/gifs/miss.gif)
 
-Nothing has been pushed for these inputs yet, so Aval runs the test, then
-`--push` signs the result with `aval.key` and pushes it:
+Nothing is stored for these inputs yet: the test runs, then `--push` signs
+the result and stores it:
 
 ```sh
 aval run --push --key aval.key
 ```
 
-These transcripts are the plain form printed in CI or with `--plain`; on a
-terminal the same steps show as glyph lines. The `config:` line names each
-value that came from the environment.
+This is the plain output, as in CI. A terminal shows glyph lines instead.
 
 ```text
 config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
@@ -81,7 +75,7 @@ summary: hello ran: passed in ...; result pushed
 
 ![aval verify prints verified, then aval run prints reused passed result without running the test](assets/gifs/hit.gif)
 
-Check that a result you trust exists for these exact inputs:
+Is there a trusted result for these inputs?
 
 ```sh
 aval verify
@@ -96,7 +90,7 @@ reference: localhost:5001/demo/hello-aval@sha256:...
 exit code: 0
 ```
 
-Run again. Aval finds the trusted result and skips the test:
+Run again. The test is skipped:
 
 ```sh
 aval run
@@ -115,8 +109,7 @@ summary: hello reused: passed; saved ...
 
 ![after editing src/hello.txt, aval run prints miss with a new fingerprint and runs the test](assets/gifs/changed-input.gif)
 
-Edit a file in `scope`. The fingerprint changes, so nothing matches and the
-test runs:
+Edit a file in `scope`. New fingerprint, nothing matches, the test runs:
 
 ```sh
 echo "hello, world" > src/hello.txt
@@ -137,11 +130,9 @@ summary: hello ran: passed in ...
 
 ![a result signed with a key the policy does not trust, other.key, is pushed; aval run prints SECURITY, verification-failed, runs the test and exits 5](assets/gifs/tampered.gif)
 
-Someone who can push to the registry, but with a key your policy does not
-trust, publishes a result. `AVAL_POLICY=` (empty) runs that one push without
-your policy, as an attacker's would. Aval rejects the result, runs the test
-and exits 5: a security event, not a miss. A tampered result ends the same
-way:
+Someone pushes a result signed with a key your policy does not trust
+(`AVAL_POLICY=` drops your policy for that one push). Aval rejects it, runs
+the test and exits 5: a security event, not a miss.
 
 ```sh
 aval keygen other
@@ -188,15 +179,11 @@ flowchart LR
   look -- "yes, only untrusted signers" --> bad([verification-failed:<br>run the test, exit 5<br>step 5]):::err
 ```
 
-The fingerprint covers only what `scope` lists. See
-[Outcomes](concepts/outcomes.md) and [Trust](concepts/trust.md).
-
-Stop the registry when you are done:
+Stop the registry:
 
 ```sh
 docker rm -f aval-registry
 ```
 
-Next: [write a contract](guides/write-a-contract.md) for your own test, then
-[use GitHub Actions](guides/github-actions.md) and
-[sign results](guides/signing.md) without a key.
+Next: [write a contract](guides/write-a-contract.md), then
+[use GitHub Actions](guides/github-actions.md).

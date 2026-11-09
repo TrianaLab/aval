@@ -1,30 +1,28 @@
 # Vision and roadmap
 
+Why does Aval exist, and where is it going?
+
 ## Thesis
 
-Aval turns test results into signed, verifiable OCI artifacts. An expensive
-test runs once, locally or in CI. The result is published to an OCI registry
-as a signed attestation bound to a deterministic fingerprint of the test's
-inputs. Any other environment computes the same fingerprint, finds the
-attestation, verifies it, and if the trust policy allows it, reuses the result
-instead of running the test again.
+```mermaid
+flowchart LR
+  run([run once]) --> sign[sign] --> reg[registry] --> v{policy trusts it,<br>same fingerprint?}
+  v -- yes --> reuse([reuse]):::ok
+  v -- no --> again([run the test]):::muted
+```
 
-This is not a test cache. A cache optimizes for hit rate and quietly tolerates
-a stale entry now and then. Aval optimizes for being able to justify every
-reuse, and when it can't, it runs the test.
-
-A signature proves *who claims* the test passed, not that it ran honestly or
-against the inputs you have now. So reuse needs an explicit **input
-contract** (`aval.yaml`), so "same inputs" can be checked, and a **trust
-policy** over signer identities, so "who ran it" can be accepted or rejected.
+- An expensive test runs once and its result is signed and stored in an OCI registry.
+- Any other job with the same inputs verifies it and, if the policy allows, skips the test.
+- Not a cache: a cache tolerates a stale entry now and then. Aval must justify
+  every reuse; when it cannot, the test runs.
+- A signature proves *who claims* a pass, not that the inputs match. So reuse
+  needs a declared input **contract** (`aval.yaml`) and a **trust policy**.
 
 ## Problem
 
-Heavy tests (integration, end-to-end, hardware, long suites) re-run on every
-pipeline, branch and environment even when nothing they depend on changed.
-Teams pay for it in time and compute, or skip tests on informal judgment that
-nobody can audit. Build caches solve this only for teams on a hermetic build
-system.
+Heavy tests (integration, end-to-end, hardware) rerun on every pipeline even
+when nothing they read changed. Teams pay in time, or skip tests on judgment
+nobody can audit. Build caches help only teams on a hermetic build system.
 
 ## Design decisions
 
@@ -53,7 +51,7 @@ system.
 | Risk | Mitigation | Signal it isn't working |
 |---|---|---|
 | Bazel or a remote cache is already enough | target tests outside a hermetic build graph (integration, e2e, cross-environment) | early users are mostly Bazel shops that want Aval for build actions |
-| Declaring scope costs more than it saves | a small contract (globs, lockfiles, a toolchain map), debuggable with `aval run --explain` | contracts drift from the code, or teams give up on wide-scope tests |
+| Declaring scope costs more than it saves | a small contract (globs, lockfiles, a toolchain map), debuggable with `aval explain` | contracts drift from the code, or teams give up on wide-scope tests |
 | Inputs always change, so savings are small | the docs say a "whole repo" scope is a bad fit | a low hit rate in the example and in early adopters' pipelines |
 | Security policies reject developer signatures | expected: CI requires runner or higher; developer stays personal | the value does not hold with only runner and isolated signatures |
 
@@ -61,7 +59,7 @@ system.
 
 | # | Milestone | Status | Done when |
 |---|---|---|---|
-| 1 | Fingerprint and contract | implemented | `aval.yaml` is validated with unknown fields rejected, and `--fingerprint-only` / `--explain` give a deterministic `aval-fingerprint/v1` digest that fails closed on unprovable inputs |
+| 1 | Fingerprint and contract | implemented | `aval.yaml` is validated with unknown fields rejected, and `aval explain` gives a deterministic `aval-fingerprint/v1` digest that fails closed on unprovable inputs |
 | 2 | Push and verify against a registry, with signing | implemented | `aval run --push` signs and publishes; `aval verify` and `aval run` reuse a trusted result (exit 0), report a miss (exit 4) and a tampered or untrusted one (exit 5); the policy format is defined |
 | 3 | End-to-end example in GitHub Actions | in progress ([CI quality gates](https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#ci-quality-gates)) | a public example where one run publishes, an unchanged run reuses, and a changed run misses, all visible in the logs |
 | 4 | False-hit suite | implemented ([false-hit suite](https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#false-hit-suite), [known gaps](contract.md#known-gaps)) | every known kind of relevant change is shown not to reuse a previous execution |

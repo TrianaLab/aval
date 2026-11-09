@@ -18,7 +18,7 @@ scope:
 - The digest Aval reads is the registry's, not the runner's. Compose without
   `pull_policy: always`, or Kubernetes with `IfNotPresent`, can run a copy
   pulled earlier: pull before the test, or pin by digest.
-- Also covers what the [scanner](../pinning.md#container-images) cannot see,
+- Also covers what the [scanner](../mutable-references.md#limits) cannot see,
   such as Helm values that split `repository` and `tag`: declare the image
   those values make.
 - An image test code starts through testcontainers is declared the same

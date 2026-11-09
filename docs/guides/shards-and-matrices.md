@@ -1,7 +1,7 @@
 # Shards and matrices
 
-Goal: a test suite split into shards across CI matrix jobs gets one result and
-one fingerprint per shard, each bound only to what that shard reads.
+Goal: one result and one fingerprint per CI shard, each bound only to what
+that shard reads.
 
 ```mermaid
 flowchart LR
@@ -10,76 +10,56 @@ flowchart LR
   c[change under packages/app] -. reruns .-> s2
 ```
 
-No new field: shards use `-f`, `scope` and `environment.env`. The example is
-[`examples/uv-monorepo`](https://github.com/TrianaLab/aval/tree/main/examples/uv-monorepo),
-a uv workspace with two packages, which Aval's CI runs.
+No new field: `-f`, `scope` and `environment.env` do it. Example:
+[`examples/uv-monorepo`](https://github.com/TrianaLab/aval/tree/main/examples/uv-monorepo).
 
 ## Pattern A: one contract per shard
 
-Each shard has its own contract, `metadata.name` and scope. A file holds one
-contract and `-f` takes one path, so put the shard contracts side by side,
-each under its own name. Globs cannot contain `..`: a contract lives in the
-directory that holds all its inputs, here the workspace root.
+Best reuse. Each shard has its own contract, side by side at the root:
 
 ```yaml
 --8<-- "examples/uv-monorepo/aval.shard-1.yaml"
 ```
 
-Shard 2 tests `app`, which imports `core`, so `core`'s code is in its scope:
+Shard 2 tests `app`, which imports `core`, so `core` is in its scope:
 
 ```yaml
 --8<-- "examples/uv-monorepo/aval.shard-2.yaml"
 ```
 
-A change under `packages/app` reruns shard 2 only. A change to `core` or to
-`uv.lock` reruns both. If shared code lives outside a directory you want for
-a shard, bind it with `scope.contracts` instead of widening the globs:
-[Depend on another part of the repo](depend-on-a-contract.md).
+A change under `packages/app` reruns shard 2 only. A change to `core` or
+`uv.lock` reruns both.
 
 ## Pattern B: one contract, shard variables
 
-One contract for every shard, with the shard index and count as declared
-environment variables:
+Simpler, less reuse: a change anywhere reruns every shard.
 
 ```yaml
 --8<-- "internal/fingerprint/testdata/shards/pattern-b.yaml"
 ```
 
-Each shard gets its own fingerprint, but over the whole suite's scope, so a
-change anywhere reruns every shard. Simpler to set up, less reuse.
-
 !!! warning "Declare both variables"
     Leave `SHARD_INDEX` or `SHARD_TOTAL` out of `environment.env` and shards
-    share a fingerprint: shard 2 reuses shard 1's result without running its
-    own tests, a false hit.
+    share a fingerprint: shard 2 reuses shard 1's result, a false hit.
 
 ## The matrix
 
-One job per shard. Shards that share a checkout write different `--result-file`
-files, and each declares its own coverage file under `outputs`, restored
-on reuse:
+One job per shard, each with its own `--result-file` and coverage `outputs`:
 
 ```yaml
 --8<-- "examples/uv-monorepo/workflow.yaml"
 ```
 
-The same job locally, for shard 2:
+The same job locally, with `AVAL_REGISTRY` and `AVAL_POLICY` exported as in
+the workflow:
 
 ```sh
-aval run -f aval.shard-2.yaml --result-file .aval/shard-2.json --registry "$REPO" --policy "$POLICY"
+aval run -f aval.shard-2.yaml --result-file .aval/shard-2.json
 ```
 
-To publish, add the push step from [Use GitHub Actions](github-actions.md)
-to each job. On pull requests, read the policy from a protected branch:
-[Take the policy from a protected branch](../trust-model.md#take-the-policy-from-a-protected-branch).
-
-??? info "Not built: several contracts in one call, templated contracts"
-    `aval run` takes one contract and reports one result. Your CI already runs
-    the matrix jobs and aggregates their status. A contract with
-    placeholders would make the scope computed instead of declared.
+To publish, add the push step from [Use GitHub Actions](github-actions.md).
 
 ## Read next
 
-- [Write a contract](write-a-contract.md)
 - [Depend on another part of the repo](depend-on-a-contract.md)
 - [Use GitHub Actions](github-actions.md)

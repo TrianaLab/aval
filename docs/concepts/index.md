@@ -1,34 +1,25 @@
 # How Aval works
 
-Aval runs a test once, signs the result and stores it in your OCI registry.
-The next job with the same inputs checks that signature and skips the test.
+How does Aval decide to skip a test?
 
 ```mermaid
 flowchart LR
-  run([aval run]) --> fp[fingerprint] --> look[look up] --> verify{trusted?}
-  verify -- yes --> reuse([reuse]):::ok
-  verify -- no --> exec[run the test] --> sign[sign] --> push([push]):::muted
+  run([aval run]) --> fp[fingerprint] --> reg[registry] --> pol{policy<br>trusts it?}
+  pol -- yes --> reuse([reuse]):::ok
+  pol -- no --> exec[run the test] --> push([sign and push]):::muted
 ```
-
-## The steps
 
 | Step | What happens |
 |---|---|
-| Fingerprint | hash `aval.yaml` and every input it declares into one `sha256` |
-| Look up | ask your registry for results under that fingerprint |
-| Verify | the signature must come from a signer your [policy](trust.md) trusts |
-| Reuse or run | verified: the test is skipped. Anything else: it runs ([Outcomes](outcomes.md)) |
-| Push | with `--push`, sign the new result and push it |
+| Fingerprint | hash `aval.yaml` and every input it lists into one `sha256` |
+| Registry | look up results stored under that fingerprint |
+| Policy | the signer must be one your [policy](trust.md) trusts |
+| Reuse or run | trusted: skip the test. Anything else: run it ([Outcomes](outcomes.md)) |
+| Push | with `--push`, sign the new result and store it |
 
-If Aval cannot prove reuse is safe, the test runs. See it run:
-[Quickstart](../quickstart.md).
+- No proof, no reuse: the test runs.
+- Aval does not guess inputs. A file `aval.yaml` does not list is invisible.
+- No server: results live in an OCI registry you already have.
 
-## What Aval does not do
-
-- It does not guess inputs: a file the contract does not list is invisible to
-  it.
-- It runs no server. Results live in an OCI registry you already have.
-
-Details: [the test contract](../contract.md),
-[the trust model](../trust-model.md),
-[the artifact format](../artifact-format.md).
+See it: [Quickstart](../quickstart.md). Specs: [contract](../contract.md),
+[trust model](../trust-model.md), [artifact format](../artifact-format.md).
