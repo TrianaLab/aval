@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"os"
 	"strings"
 	"sync"
@@ -35,14 +34,15 @@ func (s *syncBuffer) String() string {
 
 var t0 = time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
 
-// fakeSpinClock freezes now at t0 and returns the tick and signal channels
-// the spinner reads, unbuffered so a send returns once the spinner took it.
+// fakeSpinClock starts every spinner at t0 and returns the tick and signal
+// channels the spinner reads, unbuffered so a send returns once the spinner
+// took it.
 func fakeSpinClock(t *testing.T) (ticks chan time.Time, sigs chan os.Signal) {
 	t.Helper()
-	n, tk, in := now, spinTicker, interrupts
-	t.Cleanup(func() { now, spinTicker, interrupts = n, tk, in })
+	n, tk, in := spinNow, spinTicker, interrupts
+	t.Cleanup(func() { spinNow, spinTicker, interrupts = n, tk, in })
 	ticks, sigs = make(chan time.Time), make(chan os.Signal)
-	now = func() time.Time { return t0 }
+	spinNow = func() time.Time { return t0 }
 	spinTicker = func() (<-chan time.Time, func()) { return ticks, func() {} }
 	interrupts = func() (<-chan os.Signal, func()) { return sigs, func() {} }
 	return ticks, sigs
@@ -83,29 +83,20 @@ func TestSpinner(t *testing.T) {
 	}
 }
 
-// Ctrl-C during a wait erases the line, then dies of the signal again, or
-// exits 130 where the signal cannot be re-raised (Windows).
+// Ctrl-C during a wait erases the line, then dies of the signal again.
 func TestSpinnerInterrupt(t *testing.T) {
-	r, e := raise, exit
-	t.Cleanup(func() { raise, exit = r, e })
-	for _, raiseErr := range []error{nil, errors.New("not supported")} {
-		ticks, sigs := fakeSpinClock(t)
-		var buf syncBuffer
-		var raised os.Signal
-		code := -1
-		raise = func(s os.Signal) error { raised = s; return raiseErr }
-		exit = func(c int) { code = c }
-		_, stop := spin(&buf, true, "looking up r")
-		ticks <- t0.Add(time.Second)
-		sigs <- os.Interrupt
-		stop() // returns: the spinner is gone
-		wantCode := -1
-		if raiseErr != nil {
-			wantCode = 130
-		}
-		if !strings.HasSuffix(buf.String(), "1s"+eraseLine) || raised != os.Interrupt || code != wantCode {
-			t.Fatalf("raise error %v: wrote %q, raised %v, exit %d", raiseErr, buf.String(), raised, code)
-		}
+	r := raise
+	t.Cleanup(func() { raise = r })
+	ticks, sigs := fakeSpinClock(t)
+	var buf syncBuffer
+	var raised os.Signal
+	raise = func(s os.Signal) error { raised = s; return nil }
+	_, stop := spin(&buf, true, "looking up r")
+	ticks <- t0.Add(time.Second)
+	sigs <- os.Interrupt
+	stop() // returns: the spinner is gone
+	if !strings.HasSuffix(buf.String(), "1s"+eraseLine) || raised != os.Interrupt {
+		t.Fatalf("wrote %q, raised %v", buf.String(), raised)
 	}
 }
 
@@ -120,24 +111,40 @@ func TestSpinnerSeams(t *testing.T) {
 }
 
 // aval run on a terminal: the spinner shows while the registry is asked,
-// is erased before the decision, and the runner writes only after it.
+// is erased before the decision, and the runner writes only after it. With
+// a verification failure the frame is erased before the first SECURITY and
+// stderr still ends with the plain `aval: SECURITY:` line.
 func TestRunSpinnerStopsBeforeRunner(t *testing.T) {
-	onTTY(t, "1")
-	ticks, _ := fakeSpinClock(t)
-	fakeVerify(t, evidence.ErrNotFound, nil, nil)
-	lk := lookup
-	lookup = func(ctx context.Context, repo, digest string) ([]registry.Descriptor, error) {
-		ticks <- t0.Add(2 * time.Second)
-		return lk(ctx, repo, digest)
-	}
-	c := contractWith(t, "hermetic", "sh", "-c", "echo RUNNER")
-	var term syncBuffer
-	run([]string{"run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", t.TempDir() + "/r.json"}, &term, &term)
-	out := term.String()
-	frame := strings.Index(out, "looking up reg.example/r… 2s")
-	erase := strings.LastIndex(out, eraseLine)
-	runner := strings.Index(out, "RUNNER")
-	if frame < 0 || erase < frame || runner < erase || strings.Count(out, eraseLine) != 2 {
-		t.Fatalf("spinner not erased before the runner:\n%q", out)
+	for _, verifyErr := range []error{nil, evidence.ErrVerification} {
+		onTTY(t, "1")
+		ticks, _ := fakeSpinClock(t)
+		lookupErr := evidence.ErrNotFound
+		if verifyErr != nil {
+			lookupErr = nil
+		}
+		fakeVerify(t, lookupErr, nil, verifyErr)
+		lk := lookup
+		lookup = func(ctx context.Context, repo, digest string) ([]registry.Descriptor, error) {
+			ticks <- t0.Add(2 * time.Second)
+			return lk(ctx, repo, digest)
+		}
+		c := contractWith(t, "hermetic", "sh", "-c", "echo RUNNER")
+		var term syncBuffer
+		run([]string{"run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", t.TempDir() + "/r.json"}, &term, &term)
+		lookup = lk
+		out := term.String()
+		frame := strings.Index(out, "looking up reg.example/r… 2s")
+		erase := strings.LastIndex(out, eraseLine)
+		runner := strings.Index(out, "RUNNER")
+		if frame < 0 || erase < frame || runner < erase || strings.Count(out, eraseLine) != 2 {
+			t.Fatalf("verify error %v: spinner not erased before the runner:\n%q", verifyErr, out)
+		}
+		if verifyErr == nil {
+			continue
+		}
+		lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+		if sec := strings.Index(out, "SECURITY"); sec < erase || !strings.HasPrefix(lines[len(lines)-1], "aval: SECURITY: ") {
+			t.Fatalf("SECURITY before the erase or not last:\n%q", out)
+		}
 	}
 }

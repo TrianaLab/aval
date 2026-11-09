@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -17,8 +18,10 @@ const eraseLine = "\r\x1b[K"
 
 var spinFrames = []rune("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
 
-// Seams for the spinner tests: a fake clock and fake signals.
+// Seams for the spinner tests: a fake clock and fake signals. spinNow is
+// its own seam so a test that fakes now (stats --since) leaves it alone.
 var (
+	spinNow    = time.Now
 	spinTicker = func() (<-chan time.Time, func()) {
 		t := time.NewTicker(100 * time.Millisecond)
 		return t.C, t.Stop
@@ -30,10 +33,9 @@ var (
 	}
 	// raise sends s to this process again, now with the default handler.
 	raise = func(s os.Signal) error {
-		p, _ := os.FindProcess(os.Getpid()) // ponytail: never fails on Unix; Signal fails on Windows
+		p, _ := os.FindProcess(os.Getpid()) // ponytail: never fails on Unix
 		return p.Signal(s)
 	}
-	exit = os.Exit
 )
 
 // spinner shows `⠹ <label>… 4s` on a terminal while Aval waits on the
@@ -51,15 +53,20 @@ type spinner struct {
 // terminal) and returns the writer to use for w meanwhile and the function
 // that stops it. stop erases the line and returns only once nothing more
 // can be written, so it runs before anything else prints (the runner).
-// Without on it returns w and a no-op.
+// Without on, or on Windows, it returns w and a no-op.
+// ponytail: the label holds the whole registry reference; on a terminal
+// narrower than the frame the line wraps and an erase clears only its last
+// row. Truncate to term.GetSize width if that shows up.
 func spin(w io.Writer, on bool, label string) (io.Writer, func()) {
-	if !on {
+	// ponytail: no spinner on Windows, where the legacy console prints CSI
+	// codes raw; enable VT with x/sys/windows.SetConsoleMode to add it.
+	if !on || runtime.GOOS == "windows" {
 		return w, func() {}
 	}
 	s := &spinner{w: w, done: make(chan struct{}), finished: make(chan struct{})}
 	ticks, stopTicks := spinTicker()
 	sigs, stopSigs := interrupts()
-	start := now()
+	start := spinNow()
 	go func() {
 		defer close(s.finished)
 		defer stopTicks()
@@ -71,12 +78,10 @@ func spin(w io.Writer, on bool, label string) (io.Writer, func()) {
 				return
 			case sig := <-sigs:
 				// Ctrl-C: leave the terminal clean, then die of the signal as
-				// before; exit 130 where it cannot be re-raised (Windows).
+				// before (Unix only: there is no spinner on Windows).
 				s.clear()
 				stopSigs()
-				if raise(sig) != nil {
-					exit(130)
-				}
+				_ = raise(sig)
 				return
 			case t := <-ticks:
 				if d := t.Sub(start); d >= spinDelay {
