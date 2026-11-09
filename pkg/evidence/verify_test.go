@@ -296,4 +296,7 @@ func TestVerifyTrustLevelNameFromPolicy(t *testing.T) {
 	if err != nil || v.Signer.TrustLevelName != "runner" {
 		t.Fatalf("trustLevelName: %+v, %v", v, err)
 	}
+	if m, ok := MatchIdentity(o.Identities, testGH, testCI); !ok || m.TrustLevelName != "developer" {
+		t.Fatalf("MatchIdentity kept a forged name: %+v, %v", m, ok)
+	}
 }

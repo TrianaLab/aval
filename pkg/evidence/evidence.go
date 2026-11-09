@@ -292,9 +292,10 @@ type Identity struct {
 	// TrustLevel granted to signatures from this identity.
 	TrustLevel TrustLevel `json:"trustLevel"`
 	// TrustLevelName is TrustLevel.String() ("developer", "runner",
-	// "isolated"). MatchSigner sets it from the matched policy entry's
-	// level, so it never comes from a predicate claim; it is ignored in
-	// VerifyOptions.Identities.
+	// "isolated"; "unknown" only for an out-of-range level a library caller
+	// passed). MatchIdentity and MatchSigner set it from the matched entry's
+	// level, so it never comes from a predicate claim; any value set on
+	// VerifyOptions.Identities is overwritten.
 	TrustLevelName string `json:"trustLevelName,omitempty"`
 	// PublicKey is a PEM-encoded public key accepted for key-based
 	// signatures. An entry has either PublicKey or Issuer and
@@ -315,7 +316,7 @@ type Identity struct {
 // must be equal and non-empty, and SubjectRegexp must match the whole
 // subject (it is anchored even if the policy omits ^ and $). An invalid
 // regexp matches nothing. The level comes from the policy entry only, never
-// from a predicate's runner claim.
+// from a predicate's runner claim; TrustLevelName is set from that level.
 func MatchIdentity(ids []Identity, issuer, subject string) (Identity, bool) {
 	var best Identity
 	found := false
@@ -333,6 +334,9 @@ func MatchIdentity(ids []Identity, issuer, subject string) (Identity, bool) {
 			continue
 		}
 		best, found = id, true
+	}
+	if found {
+		best.TrustLevelName = best.TrustLevel.String()
 	}
 	return best, found
 }
