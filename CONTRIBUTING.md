@@ -481,15 +481,18 @@ the version; Aval is not an npm package. To release:
 
 1. Close and reopen the version PR so `ci` runs on it (PRs opened with
    `GITHUB_TOKEN` trigger no workflows), then merge it.
-2. Wait until `ci` on `main` has passed for the merge commit (its
+2. Nothing else. When `ci` on `main` passes for the merge commit (its
    `dogfood-publish` job pushes the e2e result to
-   `ghcr.io/trianalab/aval-attestations`), then tag the merge commit
-   `v<version from package.json>` and push the tag. The `release` job
-   refuses to publish without a verified, passing e2e attestation for that
-   commit (`aval verify -f aval.e2e.yaml --registry
+   `ghcr.io/trianalab/aval-attestations`), the `auto-tag` job in
+   `release.yaml` tags it `v<version from package.json>` and dispatches the
+   `release` job and the docs deploy on that tag. It tags nothing when the tag
+   exists, the commit is no longer on `main`, or a `.changeset/*.md` entry is
+   pending, so a feature merge never releases. The `release` job refuses to
+   publish without a verified, passing e2e attestation for that commit
+   (`aval verify -f aval.e2e.yaml --registry
    ghcr.io/trianalab/aval-attestations --policy .github/aval/main.yaml`).
-   A tag pushed too early fails; re-run the `release` job once `ci` on
-   `main` has finished.
+   A maintainer can still tag by hand: push the tag, or re-run a failed
+   release with Actions > release > Run workflow on the tag.
 
 One-time human step, before the first release after v0.1.0: when the first
 `main` run creates the `aval-attestations` package, make it public in its

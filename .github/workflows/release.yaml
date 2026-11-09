@@ -2,30 +2,43 @@ name: release
 
 # Changesets drive the version: each PR adds a .changeset/*.md entry, and on
 # main the version-pr job keeps a "chore: version packages" PR open that
-# applies them (package.json version, CHANGELOG.md). After that PR merges, a
-# maintainer tags the merge commit v<package.json version>; the tag runs the
-# release job, which builds, signs and attests, verifies dist/ with
-# tests/release, and only then creates the GitHub Release. A tag that does not
-# match package.json fails verification and publishes nothing.
+# applies them (package.json version, CHANGELOG.md). Once ci passes on the
+# merge commit, auto-tag (on workflow_run of ci) tags it v<package.json
+# version> and dispatches this workflow and docs.yaml on the tag. A tag pushed
+# with GITHUB_TOKEN triggers no workflow, but a dispatch does, so the release
+# job still runs on refs/tags/v<version> and signs with the
+# release.yaml@refs/tags/<tag> identity tests/release requires. A maintainer
+# can still push a tag by hand. The release job builds, signs and attests,
+# verifies dist/ with tests/release, and only then creates the GitHub Release.
+# A tag that does not match package.json fails verification and publishes
+# nothing.
 #
-# Write scopes only on push to main or on a tag, never on pull_request; the
-# PR-side dry-run is the ci-release job in ci.yaml.
+# Write scopes only on push to main, on a tag, or on a successful ci run of a
+# push to main (workflow_run runs this file from main and checks out only that
+# main commit), never on pull_request; the PR-side dry-run is the ci-release
+# job in ci.yaml.
 
 on:
   push:
     branches: [main]
     tags: ['v*']
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  # auto-tag dispatches the release on the tag; a dispatch on a branch runs no job.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'workflow_run' && 'auto-tag' || github.ref }}
   cancel-in-progress: false
 
 jobs:
   version-pr:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -46,6 +59,47 @@ jobs:
           version-script: npm run release:version
           pr-title: 'chore: version packages'
           commit-message: 'chore: version packages'
+
+  # Tags the merge of the version PR. Releases nothing unless the commit is on
+  # main, no changeset is pending (a feature merge still carries its
+  # .changeset/*.md) and the tag does not exist yet.
+  auto-tag:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the tag
+      actions: write # dispatch release.yaml and docs.yaml on the tag
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Tag a merged version PR and dispatch the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          tag="v$(jq -r .version package.json)"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "$tag exists: nothing to release"; exit 0
+          fi
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "$SHA is no longer on main: not tagging"; exit 0
+          fi
+          pending=$(find .changeset -name '*.md' ! -name README.md)
+          if [ -n "$pending" ]; then
+            echo "changesets pending, not a version PR merge: not tagging"; echo "$pending"; exit 0
+          fi
+          git tag "$tag" "$SHA"
+          git push origin "refs/tags/$tag"
+          gh workflow run release.yaml --ref "$tag"
+          gh workflow run docs.yaml --ref "$tag"
+          echo "::notice title=release dispatched::tagged $SHA as $tag"
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')

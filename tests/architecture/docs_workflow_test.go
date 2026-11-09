@@ -10,8 +10,9 @@ import (
 )
 
 // docs.yaml: only `deploy` holds write scopes, never on pull_request, and a
-// manual run (workflow_dispatch) gets them only on main, so a dispatch on
-// another branch never deploys that branch's code.
+// manual run (workflow_dispatch) gets them only on main or a release tag v*
+// (release.yaml auto-tag), so a dispatch on another branch never deploys that
+// branch's code.
 func TestDocsDeployWriteScopesOnlyOnMain(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "docs.yaml"))
 	if err != nil {
@@ -45,7 +46,8 @@ func TestDocsDeployWriteScopesOnlyOnMain(t *testing.T) {
 		t.Errorf("deploy runs on pull_request: %s", cond)
 	}
 	const dispatchOnMain = "(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')"
-	if strings.Count(cond, "workflow_dispatch") != strings.Count(cond, dispatchOnMain) {
-		t.Errorf("deploy: a manual run must be limited to main: %s", cond)
+	const dispatchOnTag = "(github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v'))"
+	if strings.Count(cond, "workflow_dispatch") != strings.Count(cond, dispatchOnMain)+strings.Count(cond, dispatchOnTag) {
+		t.Errorf("deploy: a manual run must be limited to main or a release tag: %s", cond)
 	}
 }
