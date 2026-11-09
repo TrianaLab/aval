@@ -61,6 +61,7 @@ type workflow struct {
 }
 
 type step struct {
+	If              string            `yaml:"if"`
 	Env             map[string]string `yaml:"env"`
 	Run             string            `yaml:"run"`
 	Uses            string            `yaml:"uses"`
@@ -273,8 +274,9 @@ jobs:
 // goldenBase is the only AVAL_GOLDEN_BASE the false-hit job may set: the
 // commit before the push, the PR base branch, or origin/main on a dispatch
 // (the version PR). Anything else (HEAD, the PR branch, the dispatched ref)
-// would let a change rewrite a committed golden unseen.
-const goldenBase = "${{ github.event_name == 'push' && github.event.before || format('origin/{0}', github.base_ref || 'main') }}"
+// would let a change rewrite a committed golden unseen. A push with an empty
+// `before` gets a base that does not resolve, so the job fails closed.
+const goldenBase = "${{ github.event_name == 'push' && (github.event.before || 'no-push-before') || format('origin/{0}', github.base_ref || 'main') }}"
 
 // falseHitRecipe is the only recipe `make ci-false-hit` may have: both
 // packages, uncached, nothing skipped, and AVAL_GOLDEN_BASE always set (an
@@ -382,6 +384,74 @@ jobs:
 		}
 		if len(p) == 0 {
 			t.Errorf("%s: not reported", name)
+		}
+	}
+}
+
+// dispatchGuard is the first step of `changes` in a ci.yaml that runs on
+// workflow_dispatch: only the version PR branch may be dispatched.
+const dispatchGuard = "github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/changeset-release/main'"
+
+// dispatchProblems: the concurrency group separates events, so a dispatch on
+// main cannot cancel main's push run, and a workflow_dispatch trigger comes
+// with the ref guard as the first step of `changes`.
+func dispatchProblems(data []byte) ([]string, error) {
+	var wf struct {
+		On          yaml.Node `yaml:"on"`
+		Concurrency struct {
+			Group string `yaml:"group"`
+		} `yaml:"concurrency"`
+	}
+	var jobs workflow
+	if err := yaml.Unmarshal(data, &wf); err != nil {
+		return nil, err
+	}
+	if err := yaml.Unmarshal(data, &jobs); err != nil {
+		return nil, err
+	}
+	var problems []string
+	if !strings.Contains(wf.Concurrency.Group, "github.event_name") {
+		problems = append(problems, "concurrency group must include github.event_name: "+wf.Concurrency.Group)
+	}
+	if !slices.Contains(triggers(wf.On), "workflow_dispatch") {
+		return problems, nil
+	}
+	steps := jobs.Jobs["changes"].Steps
+	if len(steps) == 0 || steps[0].If != dispatchGuard || !strings.HasSuffix(strings.TrimSpace(steps[0].Run), "exit 1") {
+		problems = append(problems, "changes: first step must be `if: "+dispatchGuard+"` ending in `exit 1`")
+	}
+	return problems, nil
+}
+
+func TestCIDispatchIsGuarded(t *testing.T) {
+	problems, err := dispatchProblems(readCI(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range problems {
+		t.Error(p)
+	}
+}
+
+func TestDispatchCheckCatchesLooseGuards(t *testing.T) {
+	guard := "      - if: " + dispatchGuard + "\n        run: |\n          echo no\n          exit 1\n"
+	good := "on: [push, pull_request, workflow_dispatch]\nconcurrency:\n  group: ci-${{ github.event_name }}-${{ github.ref }}\njobs:\n  changes:\n    steps:\n" +
+		guard + "      - uses: actions/checkout@x\n"
+	if p, err := dispatchProblems([]byte(good)); err != nil || len(p) != 0 {
+		t.Fatalf("valid workflow reported %v (%v)", p, err)
+	}
+	cases := map[string]string{
+		"group without event": strings.Replace(good, "${{ github.event_name }}-", "", 1),
+		"guard removed":       strings.Replace(good, guard, "", 1),
+		"other ref":           strings.Replace(good, "changeset-release/main", "evil", 1),
+		"guard does not fail": strings.Replace(good, "exit 1", "exit 0", 1),
+	}
+	for name, wf := range cases {
+		if wf == good {
+			t.Fatalf("%s: case changes nothing", name)
+		}
+		if p, err := dispatchProblems([]byte(wf)); err != nil || len(p) == 0 {
+			t.Errorf("%s: no problem reported (%v)", name, err)
 		}
 	}
 }

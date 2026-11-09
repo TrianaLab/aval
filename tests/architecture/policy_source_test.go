@@ -77,6 +77,12 @@ func pushOnly(cond string) bool {
 // onPullRequest: the workflow triggers on pull_request or
 // pull_request_target, whatever form `on` takes.
 func onPullRequest(on yaml.Node) bool {
+	names := triggers(on)
+	return slices.Contains(names, "pull_request") || slices.Contains(names, "pull_request_target")
+}
+
+// triggers: the event names in `on`, whatever form it takes.
+func triggers(on yaml.Node) []string {
 	var names []string
 	switch on.Kind {
 	case yaml.ScalarNode:
@@ -88,7 +94,39 @@ func onPullRequest(on yaml.Node) bool {
 			names = append(names, on.Content[i].Value)
 		}
 	}
-	return slices.Contains(names, "pull_request") || slices.Contains(names, "pull_request_target")
+	return names
+}
+
+// dispatchUnchecked: the workflow runs on workflow_dispatch but not on
+// pull_request, so policySourceProblems skips it. ci.yaml's dispatch runs
+// (the version PR) take the same jobs as its pull_request runs, so only
+// keeping pull_request in its `on` keeps them checked. release.yaml is
+// dispatch-only on purpose: its release job is tag-gated.
+func dispatchUnchecked(data []byte) (bool, error) {
+	var wf struct {
+		On yaml.Node `yaml:"on"`
+	}
+	if err := yaml.Unmarshal(data, &wf); err != nil {
+		return false, err
+	}
+	return slices.Contains(triggers(wf.On), "workflow_dispatch") && !onPullRequest(wf.On), nil
+}
+
+func TestCIDispatchStaysPolicyChecked(t *testing.T) {
+	if bad, err := dispatchUnchecked(readCI(t)); err != nil || bad {
+		t.Errorf("ci.yaml runs on workflow_dispatch without pull_request, so policySourceProblems skips it (%v)", err)
+	}
+	for name, wf := range map[string]string{
+		"dispatch without PR": "on: [push, workflow_dispatch]\njobs:\n  a:\n    steps: [{run: aval run --policy .github/aval/main.yaml}]\n",
+		"mapping form":        "on: {push: {}, workflow_dispatch: {}}\n",
+	} {
+		if bad, err := dispatchUnchecked([]byte(wf)); err != nil || !bad {
+			t.Errorf("%s: not reported (%v)", name, err)
+		}
+	}
+	if bad, _ := dispatchUnchecked([]byte("on: [push, pull_request, workflow_dispatch]\n")); bad {
+		t.Error("dispatch with pull_request reported")
+	}
 }
 
 // usesPolicy: the step passes --policy, directly or through `make ci` or
@@ -334,9 +372,9 @@ func TestCodeOwnersCoverTrust(t *testing.T) {
 	}
 }
 
-// runTrustStep runs trust-from-base.sh in dir for event and returns the
-// variables it exported.
-func runTrustStep(t *testing.T, dir, event string) (map[string]string, error) {
+// runTrustStep runs trust-from-base.sh in dir for event on ref and returns
+// the variables it exported.
+func runTrustStep(t *testing.T, dir, event, ref string) (map[string]string, error) {
 	t.Helper()
 	script, err := filepath.Abs(filepath.Join(root, trustScript))
 	if err != nil {
@@ -353,7 +391,7 @@ func runTrustStep(t *testing.T, dir, event string) (map[string]string, error) {
 	envFile := filepath.Join(tmp, "env")
 	cmd := exec.Command("/bin/bash", script)
 	cmd.Dir = dir
-	cmd.Env = runnerEnv(event, tmp, dir)
+	cmd.Env = append(runnerEnv(event, tmp, dir), "GITHUB_REF="+ref)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("%w\n%s", err, out)
 	}
@@ -424,7 +462,7 @@ func TestTrustStepReadsTheBaseBranch(t *testing.T) {
 	git(t, origin, "checkout", "-q", "main")
 	git(t, clone, "clone", "-q", "file://"+origin, ".")
 
-	vars, err := runTrustStep(t, clone, "push")
+	vars, err := runTrustStep(t, clone, "push", "refs/heads/main")
 	if err != nil {
 		t.Fatalf("push: %v", err)
 	}
@@ -440,14 +478,20 @@ func TestTrustStepReadsTheBaseBranch(t *testing.T) {
 		".github/workflows/ci.yaml": "jobs:\n  a:\n    env:\n      AVAL_REGISTRY: evil.io/x\n",
 	})
 	git(t, clone, "commit", "-qam", "pr")
-	// Every event but push reads main's pr.yaml: an unknown one fails closed too.
-	for _, event := range []string{"pull_request", "workflow_dispatch", "workflow_run"} {
-		vars, err = runTrustStep(t, clone, event)
+	// Every event but a push to main reads main's pr.yaml: an unknown event,
+	// or a push to another branch, fails closed too.
+	for _, c := range [][2]string{
+		{"pull_request", "refs/pull/1/merge"},
+		{"workflow_dispatch", "refs/heads/changeset-release/main"},
+		{"workflow_run", "refs/heads/main"},
+		{"push", "refs/heads/pr"},
+	} {
+		vars, err = runTrustStep(t, clone, c[0], c[1])
 		if err != nil {
-			t.Fatalf("%s: %v", event, err)
+			t.Fatalf("%s on %s: %v", c[0], c[1], err)
 		}
 		if got := readAbs(t, vars["AVAL_POLICY"]); got != "base pr policy\n" || vars["AVAL_REGISTRY"] != "ghcr.io/base/attestations" {
-			t.Errorf("%s: policy %q, registry %q, want main's", event, got, vars["AVAL_REGISTRY"])
+			t.Errorf("%s on %s: policy %q, registry %q, want main's", c[0], c[1], got, vars["AVAL_REGISTRY"])
 		}
 	}
 
@@ -459,7 +503,7 @@ func TestTrustStepReadsTheBaseBranch(t *testing.T) {
 	} {
 		writeFiles(t, origin, map[string]string{".github/workflows/ci.yaml": ci})
 		git(t, origin, "commit", "-qam", name)
-		if _, err := runTrustStep(t, clone, "pull_request"); err == nil {
+		if _, err := runTrustStep(t, clone, "pull_request", "refs/pull/1/merge"); err == nil {
 			t.Errorf("%s: trust step succeeded", name)
 		}
 	}

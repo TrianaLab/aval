@@ -1,9 +1,10 @@
 #!/bin/bash
-# Usage: trust-from-base.sh (reads GITHUB_EVENT_NAME, RUNNER_TEMP, GITHUB_ENV)
-# Sets AVAL_POLICY and AVAL_REGISTRY for the rest of the job (#134). On push
-# (main) they come from the checkout, which is main. On any other event (a
-# pull request, the version PR's workflow_dispatch) both come from main with
-# pr.yaml, never from the checked-out ref or a PR's base branch (a PR to
+# Usage: trust-from-base.sh (reads GITHUB_EVENT_NAME, GITHUB_REF, RUNNER_TEMP,
+# GITHUB_ENV)
+# Sets AVAL_POLICY and AVAL_REGISTRY for the rest of the job (#134). On a push
+# to main they come from the checkout, which is main. On any other event or
+# ref (a pull request, the version PR's workflow_dispatch) both come from main
+# with pr.yaml, never from the checked-out ref or a PR's base branch (a PR to
 # another branch could control that), so a ref that adds its own identity to
 # a policy or points the registry elsewhere does not change what its CI
 # trusts. The registry is the one AVAL_REGISTRY value that ci.yaml declares;
@@ -15,7 +16,7 @@
 # "Take the policy from a protected branch").
 set -euo pipefail
 : "${GITHUB_EVENT_NAME:?}" "${RUNNER_TEMP:?}" "${GITHUB_ENV:?}"
-if [ "$GITHUB_EVENT_NAME" = push ]; then
+if [ "$GITHUB_EVENT_NAME" = push ] && [ "${GITHUB_REF:-}" = refs/heads/main ]; then
   src=HEAD policy=main.yaml
 else
   /usr/bin/git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
