@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -16,7 +18,11 @@ func newKeygenCmd() *cobra.Command {
 		Long: `keygen writes a new ECDSA P-256 signing key to name.key (unencrypted PKCS#8
 PEM, mode 0600) and its public key to name.pub, the file a policy trusts with
 publicKey. It prints the key id the verify report shows for this signer. It
-refuses to replace either file without --force.`,
+refuses to replace either file without --force. A trailing .key in the name is
+dropped, so "aval keygen ci.key" writes ci.key and ci.pub.
+
+Exit codes: 0 written, 1 error (name.key or name.pub exists without --force,
+or cannot be written), 2 usage.`,
 		Args: func(c *cobra.Command, args []string) error {
 			if err := cobra.MaximumNArgs(1)(c, args); err != nil {
 				return usageError{err}
@@ -26,13 +32,16 @@ refuses to replace either file without --force.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := "aval"
 			if len(args) == 1 {
-				name = args[0]
+				name = strings.TrimSuffix(args[0], ".key")
+			}
+			if name == "" {
+				return usageError{errors.New("keygen: name must not be empty")}
 			}
 			kid, err := attest.WriteKeyPair(name, force)
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "wrote %[1]s.key (private, keep it secret) and %[1]s.pub\nkey id: %[2]s\nnext: trust %[1]s.pub in your policy (publicKey: %[1]s.pub) and sign with --key %[1]s.key\n", name, kid)
+			fmt.Fprintf(cmd.OutOrStdout(), "wrote %[1]s.key (private: keep it secret, do not commit it) and %[1]s.pub\nkey id: %[2]s\nnext: trust %[1]s.pub in your policy (publicKey: %[1]s.pub) and sign with --key %[1]s.key\n", name, kid)
 			return nil
 		},
 	}

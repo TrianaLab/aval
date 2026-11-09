@@ -32,22 +32,55 @@ func WriteKeyPair(name string, force bool) (string, error) {
 		{name + ".key", pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), 0o600},
 		{name + ".pub", pub, 0o644},
 	}
+	// Check both paths before touching either, so a refusal writes and
+	// removes nothing.
 	for _, f := range files {
-		if !force {
-			if _, err := os.Lstat(f.path); !errors.Is(err, fs.ErrNotExist) {
-				return "", fmt.Errorf("%s already exists; pass --force to replace it", f.path)
-			}
-		} else if err := os.Remove(f.path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		st, err := os.Lstat(f.path)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+		case err != nil:
 			return "", err
+		case !force:
+			return "", fmt.Errorf("%s already exists; pass --force to replace it", f.path)
+		case st.IsDir():
+			return "", fmt.Errorf("%s is a directory", f.path)
 		}
 	}
-	// ponytail: neither file exists now, so WriteFile creates both with
-	// f.mode; a file planted between the check and the write is not guarded.
-	for _, f := range files {
-		if err := os.WriteFile(f.path, f.data, f.mode); err != nil {
+	if force {
+		for _, f := range files {
+			if err := os.Remove(f.path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return "", err
+			}
+		}
+	}
+	// O_EXCL refuses a file or symlink planted after the check, so the key
+	// never lands in someone else's file or keeps a looser mode.
+	for i, f := range files {
+		if err := writeNew(f.path, f.data, f.mode); err != nil {
+			if i > 0 {
+				_ = os.Remove(files[0].path) // no orphan name.key blocking a rerun
+			}
 			return "", err
 		}
 	}
 	kid, _ := evidence.PublicKeyID(string(pub)) // cannot fail: a PKIX PEM just built
 	return kid, nil
+}
+
+// openNew creates a file that must not exist yet; a variable so tests can
+// plant a file between the check and the write.
+var openNew = func(path string, mode os.FileMode) (*os.File, error) {
+	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+}
+
+func writeNew(path string, data []byte, mode os.FileMode) error {
+	fh, err := openNew(path, mode)
+	if err != nil {
+		return err
+	}
+	_, err = fh.Write(data)
+	if cerr := fh.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }

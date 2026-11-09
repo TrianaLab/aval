@@ -1,6 +1,8 @@
 package attest
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,7 +66,6 @@ func TestWriteKeyPairRefuses(t *testing.T) {
 			t.Fatalf("existing %s: the other file was written", f)
 		}
 	}
-
 }
 
 func TestWriteKeyPairErrors(t *testing.T) {
@@ -72,14 +73,64 @@ func TestWriteKeyPairErrors(t *testing.T) {
 	if _, err := WriteKeyPair(filepath.Join(dir, "missing", "k"), false); err == nil {
 		t.Fatal("want an error for a missing directory")
 	}
-	// --force cannot remove a non-empty directory in the way.
+	// --force refuses a directory in the way before removing the old key.
 	if err := os.MkdirAll(filepath.Join(dir, "d.pub", "x"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := WriteKeyPair(filepath.Join(dir, "d"), true); err == nil {
+	if err := os.WriteFile(filepath.Join(dir, "d.key"), []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteKeyPair(filepath.Join(dir, "d"), true); err == nil || !strings.Contains(err.Error(), "is a directory") {
+		t.Fatalf("want a directory error, got %v", err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "d.key")); string(b) != "old" {
+		t.Fatal("old d.key lost although d.pub could not be replaced")
+	}
+	// --force cannot remove a file in a read-only directory.
+	ro := filepath.Join(dir, "ro")
+	if err := os.Mkdir(ro, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ro, "r.key"), []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(ro, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ro, 0o755) })
+	if _, err := WriteKeyPair(filepath.Join(ro, "r"), true); err == nil {
 		t.Fatal("want an error when --force cannot remove the old file")
 	}
-	if _, err := os.Stat(filepath.Join(dir, "d.key")); !os.IsNotExist(err) {
-		t.Fatal("d.key written although d.pub could not be replaced")
+	// A parent that cannot be searched is not reported as "already exists".
+	if err := os.Chmod(ro, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteKeyPair(filepath.Join(ro, "r"), false); err == nil || strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("unreadable parent: got %v", err)
+	}
+}
+
+// A file planted after the check is refused, not written through, and the
+// name.key already written is removed so a rerun is not blocked.
+func TestWriteKeyPairPlantedFile(t *testing.T) {
+	name := filepath.Join(t.TempDir(), "p")
+	real := openNew
+	t.Cleanup(func() { openNew = real })
+	openNew = func(path string, mode os.FileMode) (*os.File, error) {
+		if strings.HasSuffix(path, ".pub") {
+			if err := os.WriteFile(path, []byte("planted"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return real(path, mode)
+	}
+	if _, err := WriteKeyPair(name, false); !errors.Is(err, fs.ErrExist) {
+		t.Fatalf("want ErrExist, got %v", err)
+	}
+	if b, _ := os.ReadFile(name + ".pub"); string(b) != "planted" {
+		t.Fatalf("planted file overwritten: %q", b)
+	}
+	if _, err := os.Stat(name + ".key"); !os.IsNotExist(err) {
+		t.Fatal("orphan p.key left behind")
 	}
 }

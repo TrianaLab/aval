@@ -53,7 +53,7 @@ EOF
 <!-- --8<-- [end:key] -->
 
 ```text
-wrote aval.key (private, keep it secret) and aval.pub
+wrote aval.key (private: keep it secret, do not commit it) and aval.pub
 key id: ...
 next: trust aval.pub in your policy (publicKey: aval.pub) and sign with --key aval.key
 ```
@@ -164,7 +164,7 @@ echo "exit code: $?"
 ```
 
 ```text
-wrote other.key (private, keep it secret) and other.pub
+wrote other.key (private: keep it secret, do not commit it) and other.pub
 key id: ...
 next: trust other.pub in your policy (publicKey: other.pub) and sign with --key other.key
 test hello fingerprint sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b

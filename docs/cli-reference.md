@@ -90,7 +90,11 @@ Use "aval completion [command] --help" for more information about a command.
 keygen writes a new ECDSA P-256 signing key to name.key (unencrypted PKCS#8
 PEM, mode 0600) and its public key to name.pub, the file a policy trusts with
 publicKey. It prints the key id the verify report shows for this signer. It
-refuses to replace either file without --force.
+refuses to replace either file without --force. A trailing .key in the name is
+dropped, so "aval keygen ci.key" writes ci.key and ci.pub.
+
+Exit codes: 0 written, 1 error (name.key or name.pub exists without --force,
+or cannot be written), 2 usage.
 
 ```text
 Usage:
