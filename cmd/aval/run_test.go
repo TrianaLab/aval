@@ -521,12 +521,19 @@ func TestStalledRegistry(t *testing.T) {
 	start := time.Now()
 	code, _, stderr := runCLI("run", "-f", c, "--registry", repo, "--policy", pol, "--registry-timeout", "200ms",
 		"--push", "--key", keyFile, "--report-file", report, "--result-file", filepath.Join(dir, "result.json"))
-	if code != ExitError || !ran() || readReport(t, report).Outcome != evidence.OutcomeError || !strings.Contains(stderr, "deadline exceeded") {
-		t.Fatalf("run: exit %d, ran %v, report %+v, stderr %q", code, ran(), readReport(t, report), stderr)
+	// stderr says what to do; the report keeps the raw error (#167).
+	host, _, _ := strings.Cut(repo, "/")
+	hint := "cannot reach " + host + " (timed out; see --registry-timeout); is the registry running? check AVAL_REGISTRY or --registry"
+	r := readReport(t, report)
+	if code != ExitError || !ran() || r.Outcome != evidence.OutcomeError || !strings.Contains(r.Reason, "context deadline exceeded") ||
+		!strings.Contains(stderr, "aval: warning: reuse off: "+hint+"\n") || !strings.Contains(stderr, "aval: publishing: "+hint+"\n") {
+		t.Fatalf("run: exit %d, ran %v, report %+v, stderr %q", code, ran(), r, stderr)
 	}
-	code, stdout, _ := runCLI("verify", "-f", c, "--registry", repo, "--policy", pol, "--registry-timeout", "200ms", "-o", "json")
-	if code != ExitError || !strings.Contains(stdout, `"outcome": "error"`) {
-		t.Fatalf("verify: exit %d, report %s", code, stdout)
+	code, stdout, stderr := runCLI("verify", "-f", c, "--registry", repo, "--policy", pol, "--registry-timeout", "200ms", "-o", "json")
+	var vr evidence.Report
+	if err := json.Unmarshal([]byte(stdout), &vr); err != nil || code != ExitError || vr.Outcome != evidence.OutcomeError ||
+		!strings.Contains(vr.Reason, "context deadline exceeded") || stderr != "aval: "+hint+"\n" {
+		t.Fatalf("verify: exit %d, report %s, stderr %q", code, stdout, stderr)
 	}
 	if d := time.Since(start); d > 30*time.Second {
 		t.Fatalf("took %s", d)

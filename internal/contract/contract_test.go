@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 const valid = `
@@ -70,7 +72,7 @@ func TestParseInvalid(t *testing.T) {
 		"probe empty toolchain value": {`toolchain: {go: "1.25"}`, "toolchain: {go: \" \"}\n  probe: {go: [go, version]}", "environment.probe.go: environment.toolchain.go must not be empty"},
 		"probe empty argv":            {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: []}", "environment.probe.go: must be a non-empty argv list"},
 		"probe blank command":         {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: [\" \"]}", "environment.probe.go: must be a non-empty argv list"},
-		"probe not a list":            {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: go version}", "cannot unmarshal"},
+		"probe not a list":            {`toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: go version}", "line 13: environment.probe.go: got a string `go version`, want a list of strings"},
 		"no class":                    {"cacheability: controlled-environment", "", "cacheability: required"},
 		"empty glob":                  {`["go.sum"]`, `[""]`, "empty glob"},
 		"malformed glob":              {`["go.sum"]`, `["go.[sum"]`, "syntax error"},
@@ -96,7 +98,7 @@ func TestParseInvalid(t *testing.T) {
 		"resolve two keys": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   resolve: [{image: a, npm: b}]`, "one `kind: reference` pair"},
 		"resolve not a map": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
-  resolve: [postgres:16]`, "cannot unmarshal"},
+  resolve: [postgres:16]`, "scope.resolve[0]: got a string"},
 		"resolve space": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   resolve: [{npm: "react@>=1 <2"}]`, "scope.resolve[0]: npm: the reference must be non-empty, without spaces"},
 		"resolve empty": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
@@ -117,7 +119,7 @@ func TestParseInvalid(t *testing.T) {
 		"contracts space":        {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [\"b c/aval.yaml\"]", "without spaces"},
 		"contracts not yaml":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../backend]", "must name a contract file"},
 		"contracts listed twice": {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../b/aval.yaml, ../b/aval.yaml]", "scope.contracts[1]: \"../b/aval.yaml\" is listed twice"},
-		"contracts not a list":   {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: ../b/aval.yaml", "cannot unmarshal"},
+		"contracts not a list":   {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: ../b/aval.yaml", "scope.contracts: got a string `../b/av...`, want a list of strings"},
 		"outputs escaping":       {"cacheability:", "outputs: [../coverage.xml]\ncacheability:", "outputs[0]"},
 		"outputs absolute":       {"cacheability:", "outputs: [/tmp/junit.xml]\ncacheability:", "outputs[0]"},
 		"outputs empty":          {"cacheability:", "outputs: [\"\"]\ncacheability:", "outputs[0]: empty glob"},
@@ -228,6 +230,57 @@ func TestParseResolve(t *testing.T) {
 		if _, err := Parse([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   resolve: [{url: "`+ref+`"}]`, 1))); err != nil {
 			t.Errorf("%s: %v", ref, err)
+		}
+	}
+}
+
+// yaml.v3 problems read in YAML terms, one joined error each: the field's
+// path instead of a Go type, the closest field name for an unknown one, and
+// the user's text kept for the caller to escape. Unknown fields still fail
+// (a typo must never shrink the scope).
+func TestParseYAMLErrors(t *testing.T) {
+	doc := strings.NewReplacer("  source: [\"**/*.go\", \"compose.yaml\"]", "  sources: [\"**/*.go\"]\n  \"src\\e\": [x]",
+		`command: ["go", "test", "./..."]`, "command: go test ./...",
+		"cacheability: controlled-environment", "cacheability: controlled-environment\nmetadata2: x\nzzzzzzzz: 1").Replace(valid)
+	_, err := Parse([]byte(doc))
+	var j interface{ Unwrap() []error }
+	if !errors.As(err, &j) {
+		t.Fatalf("want joined problems, got %v", err)
+	}
+	var got []string
+	for _, e := range j.Unwrap() {
+		got = append(got, e.Error())
+	}
+	lines := []string{
+		"line 7: runner.command: got a string `go test...`, want a list of strings",
+		"line 9: scope.sources: unknown field; did you mean source?",
+		"line 10: scope.src\x1b: unknown field; known fields: source, exclude, dependencies, allowMutable, resolve, contracts", // the caller escapes it
+		"line 16: metadata2: unknown field; did you mean metadata?",
+		"line 17: zzzzzzzz: unknown field; known fields: apiVersion, kind, metadata, runner, scope, environment, cacheability, outputs",
+	}
+	if strings.Join(got, "\n") != strings.Join(lines, "\n") {
+		t.Fatalf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(lines, "\n"))
+	}
+	if errors.As(err, new(*yaml.TypeError)) {
+		t.Fatal("yaml types must not leak")
+	}
+	for msg, want := range map[string]string{
+		"line 3: field x not found in type other.T":       "line 3: unknown field x; check the spelling",
+		"line 3: cannot unmarshal !!binary into chan int": "line 3: got !!binary, want chan int",
+		"line 3: something else":                          "line 3: something else",
+	} {
+		if got := yamlPath(msg, nil); got != want {
+			t.Errorf("%q: got %q, want %q", msg, got, want)
+		}
+	}
+	for goType, w := range map[string]string{"[]contract.AllowMutable": "a list of mappings", "contract.Scope": "a mapping", "contract.Cacheability": "a string", "chan int": "chan int"} {
+		if got := want(goType); got != w {
+			t.Errorf("want(%s) = %q, want %q", goType, got, w)
+		}
+	}
+	for tag, w := range map[string]string{"!!bool": "a boolean", "!!map": "a mapping", "!!float": "a number", "!!null": "nothing", "!!x": "!!x"} {
+		if got := kindOf(tag); got != w {
+			t.Errorf("kindOf(%s) = %q", tag, got)
 		}
 	}
 }
@@ -444,7 +497,9 @@ func TestLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	bad := write("bad.yaml", "kind: Test\n")
-	if _, err := Load(bad); err == nil || !strings.Contains(err.Error(), bad) {
+	_, err := Load(bad)
+	var fe *FileError
+	if !errors.As(err, &fe) || fe.File != bad || err.Error() != bad+": "+errors.Unwrap(err).Error() {
 		t.Fatalf("invalid contract error must name the file, got %v", err)
 	}
 	// A missing contract is still ErrNotExist, plus a next step.

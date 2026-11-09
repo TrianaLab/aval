@@ -81,7 +81,11 @@ func TestRegistryMustBeARepository(t *testing.T) {
 	for _, repo := range []string{"https://ghcr.io/acme/orders-aval", "http://localhost:5000/x", "ghcr.io", "localhost:5000", "ghcr.io/acme/orders-aval:v1", "ghcr.io/acme/orders-aval@sha256:" + strings.Repeat("a", 64)} {
 		for _, cmd := range []string{"run", "verify", "push"} {
 			code, _, stderr := runCLI(cmd, "-f", c, "--registry", repo)
-			if code != ExitUsage || ran() || !strings.Contains(stderr, "e.g. ghcr.io/acme/orders-aval") || !strings.Contains(stderr, "is not an OCI repository") {
+			hint := "e.g. ghcr.io/acme/orders-aval"
+			if scheme, rest, ok := strings.Cut(repo, "://"); ok {
+				hint = "drop " + scheme + "://: try --registry " + rest + "\n" // #167
+			}
+			if code != ExitUsage || ran() || !strings.Contains(stderr, hint) || !strings.Contains(stderr, "is not an OCI repository") {
 				t.Errorf("%s --registry %s: exit %d ran %v, stderr %q", cmd, repo, code, ran(), stderr)
 			}
 		}

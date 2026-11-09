@@ -77,3 +77,15 @@ func TestFloodLine(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+// Each problem gets an indented line of its own, escaped: a value from the
+// file cannot start a line in a log.
+func TestProblems(t *testing.T) {
+	var b strings.Builder
+	Problems(&b, "aval.yaml: invalid contract:", errors.Join(errors.New("line 2: scope.sources: unknown field; did you mean source?"), errors.New("forged\n::error::x \x1b[31m")))
+	Problems(&b, "one:", errors.New("single"))
+	want := "aval: aval.yaml: invalid contract:\n  line 2: scope.sources: unknown field; did you mean source?\n  forged\\n::error::x \\x1b[31m\naval: one:\n  single\n"
+	if b.String() != want {
+		t.Fatalf("got %q, want %q", b.String(), want)
+	}
+}
