@@ -260,6 +260,11 @@ Without a registry and a trust policy the test always runs. --registry-timeout
 covers lookup and fetch together; --push has its own. runner.command never
 sees $SIGSTORE_ID_TOKEN, $AVAL_REGISTRY or $AVAL_POLICY.
 
+runner.command and the probes get $AVAL_RUN_STACK, the contracts of
+the enclosing aval runs. A run whose contract is already there exits 2 before
+doing anything: runner.command must not start the same contract again. A
+nested run of another contract works.
+
 Exit codes: 0 pass, 3 fail, 5 verification failed (a security event, after
 running the test: also a verified result beside a rejected verification-failed
 attestation, which is never reused, or more attestations than the lookup cap),
