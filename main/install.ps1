@@ -22,6 +22,12 @@
 #   AVAL_NO_VERIFY     "1" skips the cosign and gh checks (never the sha256)
 #   AVAL_DOWNLOAD_URL  release download base, for a mirror (default: GitHub
 #                      Releases); the signer identity stays pinned.
+#   AVAL_SHA256        pinned sha256 of the archive, [<os>_<arch>=]<hex>,
+#                      several separated by spaces; the archive must have it
+#                      and checksums.txt must list it, or nothing is installed
+#   AVAL_REQUIRE_VERIFY      "1": a missing cosign is an error, not a note
+#   AVAL_REQUIRE_PROVENANCE  "1": a missing gh is an error, not a note
+#                      Both need DESIRED_VERSION and exclude AVAL_NO_VERIFY.
 
 # Everything runs inside a script block: under `iex` the script shares the
 # caller's session, so top-level variables would leak into it, and `exit`
@@ -51,6 +57,18 @@
   $InstallDir = if ($env:AVAL_INSTALL_DIR) { $env:AVAL_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\aval' }
   $DownloadUrl = if ($env:AVAL_DOWNLOAD_URL) { $env:AVAL_DOWNLOAD_URL } else { "https://github.com/$Repo/releases/download" }
   $NoVerify = $env:AVAL_NO_VERIFY -eq '1'
+  $RequireVerify = $env:AVAL_REQUIRE_VERIFY -eq '1'
+  $RequireProvenance = $env:AVAL_REQUIRE_PROVENANCE -eq '1'
+  $SHA256Pins = @("$env:AVAL_SHA256" -split '\s+' | Where-Object { $_ })
+
+  # Usage errors, before anything is downloaded.
+  foreach ($pin in $SHA256Pins) {
+    if ($pin -cnotmatch '^([a-z0-9]+_[a-z0-9]+=)?[0-9a-f]{64}$') { throw "AVAL_SHA256 wants [<os>_<arch>=]<64 lowercase hex>, got '$pin'" }
+  }
+  if ($RequireVerify -or $RequireProvenance) {
+    if ($NoVerify) { throw 'AVAL_REQUIRE_VERIFY and AVAL_REQUIRE_PROVENANCE exclude AVAL_NO_VERIFY' }
+    if (-not $env:DESIRED_VERSION) { throw 'AVAL_REQUIRE_VERIFY and AVAL_REQUIRE_PROVENANCE need DESIRED_VERSION' }
+  }
 
   # A 32-bit PowerShell on 64-bit Windows reports x86 in
   # PROCESSOR_ARCHITECTURE and the real one in PROCESSOR_ARCHITEW6432.
@@ -75,6 +93,12 @@
   if ($Tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$') { throw "not a release version: '$Tag'" }
   $Version = $Tag.Substring(1)
   $Archive = "aval_${Version}_windows_${Arch}.zip"
+  # The pins for this platform: bare ones apply everywhere. Pins for other
+  # platforms only, and none for this one, is an error, not "unpinned".
+  $Pins = @(foreach ($pin in $SHA256Pins) {
+    if ($pin.StartsWith("windows_${Arch}=")) { $pin.Split('=')[1] } elseif (-not $pin.Contains('=')) { $pin }
+  })
+  if ($SHA256Pins.Count -gt 0 -and $Pins.Count -eq 0) { throw "no AVAL_SHA256 entry for windows_$Arch" }
   $Base = "$DownloadUrl/$Tag"
 
   Write-Host "Installing aval $Tag (windows/$Arch) into $InstallDir"
@@ -103,22 +127,28 @@
           '--certificate-oidc-issuer', $Issuer, '--certificate-identity', "$Signer/$Tag")
         if ($code -ne 0) { throw "checksums.txt is not signed by $Signer/$Tag (cosign verify-blob failed)" }
         Write-Host '  signature ok (cosign: checksums.txt signed by the release workflow)'
+      } elseif ($RequireVerify) {
+        throw 'AVAL_REQUIRE_VERIFY: cosign is not installed, so checksums.txt cannot be verified'
       } else {
         Write-Host '  signature not checked: cosign is not installed'
       }
     }
 
-    # 2. The archive matches checksums.txt, by exact file name (a substring
-    # match would let the .sbom.json line answer for the archive).
+    # 2. The archive has the pinned sha256, if any, and matches checksums.txt,
+    # by exact file name (a substring match would let the .sbom.json line
+    # answer for the archive).
+    $actual = (Get-FileHash -Algorithm SHA256 (Join-Path $tmp $Archive)).Hash.ToLower()
+    foreach ($pin in $Pins) {
+      if ($pin -ne $actual) { throw "sha256 mismatch for ${Archive}: pinned $pin, got $actual" }
+    }
     $expected = $null
     foreach ($line in Get-Content (Join-Path $tmp 'checksums.txt')) {
       $fields = $line -split '\s+'
       if ($fields.Count -ge 2 -and $fields[1] -eq $Archive) { $expected = $fields[0].ToLower() }
     }
     if (-not $expected) { throw "checksums.txt does not list $Archive" }
-    $actual = (Get-FileHash -Algorithm SHA256 (Join-Path $tmp $Archive)).Hash.ToLower()
     if ($expected -ne $actual) { throw "checksum mismatch for ${Archive}: expected $expected, got $actual" }
-    Write-Host '  sha256 ok'
+    if ($Pins.Count -gt 0) { Write-Host '  sha256 ok (pinned)' } else { Write-Host '  sha256 ok' }
 
     # 3. Who built the archive: the release workflow's SLSA provenance. An old
     # gh without `gh attestation` counts as absent.
@@ -130,6 +160,8 @@
           '--repo', $Repo, '--cert-identity', "$Signer/$Tag", '--cert-oidc-issuer', $Issuer)
         if ($code -ne 0) { throw "$Archive does not match the provenance of $Signer/$Tag (gh attestation verify failed)" }
         Write-Host '  provenance ok (gh: built by the release workflow)'
+      } elseif ($RequireProvenance) {
+        throw 'AVAL_REQUIRE_PROVENANCE: gh 2.49 or later is not installed, so the provenance cannot be verified'
       } else {
         Write-Host '  provenance not checked: gh (2.49 or later) is not installed'
       }

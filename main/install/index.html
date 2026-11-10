@@ -610,6 +610,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#in-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#upgrade" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2205,6 +2216,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#in-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#upgrade" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2370,6 +2392,24 @@ checked before it is installed.</p>
 <td>yes</td>
 <td>download from a mirror; the <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> stays pinned</td>
 </tr>
+<tr>
+<td><code>AVAL_SHA256=&lt;hex&gt;</code></td>
+<td><code>--sha256 &lt;hex&gt;</code></td>
+<td>yes</td>
+<td>the archive must have this sha256; <code>&lt;os&gt;_&lt;arch&gt;=&lt;hex&gt;</code> pins one platform (repeat the flag, or separate with spaces)</td>
+</tr>
+<tr>
+<td><code>AVAL_REQUIRE_VERIFY=1</code></td>
+<td><code>--require-verify</code></td>
+<td>yes</td>
+<td>fail if <code>cosign</code> is missing; needs a version, excludes <code>--no-verify</code></td>
+</tr>
+<tr>
+<td><code>AVAL_REQUIRE_PROVENANCE=1</code></td>
+<td><code>--require-provenance</code></td>
+<td>yes</td>
+<td>fail if <code>gh</code> 2.49 or later is missing; needs a version, excludes <code>--no-verify</code></td>
+</tr>
 </tbody>
 </table>
 <p>Piped, pass flags after <code>bash -s --</code>:</p>
@@ -2395,20 +2435,43 @@ checked before it is installed.</p>
 <td>always</td>
 </tr>
 <tr>
+<td>the archive's sha256 is the pinned one</td>
+<td>with <code>--sha256</code></td>
+</tr>
+<tr>
 <td><code>checksums.txt</code> has a Sigstore signature from Aval's release workflow at that tag</td>
-<td>if <code>cosign</code> is on <code>PATH</code></td>
+<td>if <code>cosign</code> is on <code>PATH</code>; required with <code>--require-verify</code></td>
 </tr>
 <tr>
 <td>the archive matches the release's SLSA provenance</td>
-<td>if <code>gh</code> 2.49 or later is on <code>PATH</code> (no login)</td>
+<td>if <code>gh</code> 2.49 or later is on <code>PATH</code> (no login); required with <code>--require-provenance</code></td>
 </tr>
 </tbody>
 </table>
-<p>A failed check installs nothing. A check that cannot run is reported.</p>
+<p>A failed check installs nothing. A check that cannot run is reported, or is
+an error with <code>--require-verify</code> / <code>--require-provenance</code>.</p>
+<h2 id="in-ci">In CI<a class="headerlink" href="#in-ci" title="Anchor link">&para;</a></h2>
+<p>Install one exact release and nothing you cannot verify. Vendor the
+installer at a release tag, so a change on <code>main</code> cannot alter your pipeline,
+then pin the version and the archive's sha256 (from that release's
+<code>checksums.txt</code>):</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-fsSLo<span class="w"> </span>.ci/get-aval.sh<span class="w"> </span>https://raw.githubusercontent.com/TrianaLab/aval/v0.8.0/scripts/get-aval.sh
+</span></code></pre></div>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># cosign (and gh for --require-provenance) must be on PATH.</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>bash<span class="w"> </span>.ci/get-aval.sh<span class="w"> </span>--version<span class="w"> </span>v0.8.0<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--sha256<span class="w"> </span><span class="nv">linux_amd64</span><span class="o">=</span>&lt;sha256<span class="w"> </span>of<span class="w"> </span>aval_0.8.0_linux_amd64.tar.gz&gt;<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--sha256<span class="w"> </span><span class="nv">darwin_arm64</span><span class="o">=</span>&lt;sha256<span class="w"> </span>of<span class="w"> </span>aval_0.8.0_darwin_arm64.tar.gz&gt;<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>--require-verify<span class="w"> </span>--require-provenance
+</span></code></pre></div>
+<p>The entry for the runner's platform is required. A re-tagged release, a
+mirror serving another build, or a missing <code>cosign</code> fails the install.
+<code>--sha256</code>, <code>--require-verify</code> and <code>--require-provenance</code> first ship in the
+release after 0.7.0. Aval's own CI does the same with <code>main</code>'s copy
+(<code>.github/aval/install.sh</code>).</p>
 <h2 id="upgrade">Upgrade<a class="headerlink" href="#upgrade" title="Anchor link">&para;</a></h2>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aval<span class="w"> </span>upgrade<span class="w">                    </span><span class="c1"># to the latest release</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>aval<span class="w"> </span>upgrade<span class="w"> </span>--version<span class="w"> </span>v0.4.0<span class="w">   </span><span class="c1"># to a given release</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>aval<span class="w"> </span>upgrade<span class="w"> </span>--check<span class="w">            </span><span class="c1"># print the current and target versions, change nothing</span>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>aval<span class="w"> </span>upgrade<span class="w">                    </span><span class="c1"># to the latest release</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>aval<span class="w"> </span>upgrade<span class="w"> </span>--version<span class="w"> </span>v0.4.0<span class="w">   </span><span class="c1"># to a given release</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>aval<span class="w"> </span>upgrade<span class="w"> </span>--check<span class="w">            </span><span class="c1"># print the current and target versions, change nothing</span>
 </span></code></pre></div>
 <ul>
 <li>It checks the Sigstore signature of <code>checksums.txt</code> itself (issuer
@@ -2422,21 +2485,21 @@ checked before it is installed.</p>
 <p><code>aval version</code> prints the version, Go version and platform.</p>
 <h2 id="by-hand">By hand<a class="headerlink" href="#by-hand" title="Anchor link">&para;</a></h2>
 <p>Download, check, then put <code>aval</code> on your <code>PATH</code>:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">VERSION</span><span class="o">=</span><span class="m">0</span>.2.0
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">OS</span><span class="o">=</span>linux<span class="w">        </span><span class="c1"># or darwin</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nv">ARCH</span><span class="o">=</span>amd64<span class="w">      </span><span class="c1"># or arm64</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nv">BASE</span><span class="o">=</span>https://github.com/TrianaLab/aval/releases/download/v<span class="nv">$VERSION</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/aval_</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">OS</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span><span class="s2">.tar.gz"</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/checksums.txt"</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/checksums.txt.sigstore.json"</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/provenance.sigstore.json"</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>cosign<span class="w"> </span>verify-blob<span class="w"> </span>checksums.txt<span class="w"> </span>--bundle<span class="w"> </span>checksums.txt.sigstore.json<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span>--certificate-oidc-issuer<span class="w"> </span>https://token.actions.githubusercontent.com<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">  </span>--certificate-identity<span class="w"> </span><span class="s2">"https://github.com/TrianaLab/aval/.github/workflows/release.yaml@refs/tags/v</span><span class="nv">$VERSION</span><span class="s2">"</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>sha256sum<span class="w"> </span>--ignore-missing<span class="w"> </span>-c<span class="w"> </span>checksums.txt<span class="w">   </span><span class="c1"># macOS: shasum -a 256 --ignore-missing -c checksums.txt</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>gh<span class="w"> </span>attestation<span class="w"> </span>verify<span class="w"> </span><span class="s2">"aval_</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">OS</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span><span class="s2">.tar.gz"</span><span class="w"> </span>--bundle<span class="w"> </span>provenance.sigstore.json<span class="w"> </span>--repo<span class="w"> </span>TrianaLab/aval
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>tar<span class="w"> </span>-xzf<span class="w"> </span><span class="s2">"aval_</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">OS</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span><span class="s2">.tar.gz"</span><span class="w"> </span>aval
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>sudo<span class="w"> </span>mv<span class="w"> </span>aval<span class="w"> </span>/usr/local/bin/
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nv">VERSION</span><span class="o">=</span><span class="m">0</span>.2.0
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nv">OS</span><span class="o">=</span>linux<span class="w">        </span><span class="c1"># or darwin</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nv">ARCH</span><span class="o">=</span>amd64<span class="w">      </span><span class="c1"># or arm64</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nv">BASE</span><span class="o">=</span>https://github.com/TrianaLab/aval/releases/download/v<span class="nv">$VERSION</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/aval_</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">OS</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span><span class="s2">.tar.gz"</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/checksums.txt"</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/checksums.txt.sigstore.json"</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>curl<span class="w"> </span>-fsSLO<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE</span><span class="s2">/provenance.sigstore.json"</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>cosign<span class="w"> </span>verify-blob<span class="w"> </span>checksums.txt<span class="w"> </span>--bundle<span class="w"> </span>checksums.txt.sigstore.json<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span>--certificate-oidc-issuer<span class="w"> </span>https://token.actions.githubusercontent.com<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span>--certificate-identity<span class="w"> </span><span class="s2">"https://github.com/TrianaLab/aval/.github/workflows/release.yaml@refs/tags/v</span><span class="nv">$VERSION</span><span class="s2">"</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>sha256sum<span class="w"> </span>--ignore-missing<span class="w"> </span>-c<span class="w"> </span>checksums.txt<span class="w">   </span><span class="c1"># macOS: shasum -a 256 --ignore-missing -c checksums.txt</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>gh<span class="w"> </span>attestation<span class="w"> </span>verify<span class="w"> </span><span class="s2">"aval_</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">OS</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span><span class="s2">.tar.gz"</span><span class="w"> </span>--bundle<span class="w"> </span>provenance.sigstore.json<span class="w"> </span>--repo<span class="w"> </span>TrianaLab/aval
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>tar<span class="w"> </span>-xzf<span class="w"> </span><span class="s2">"aval_</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">OS</span><span class="si">}</span><span class="s2">_</span><span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span><span class="s2">.tar.gz"</span><span class="w"> </span>aval
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>sudo<span class="w"> </span>mv<span class="w"> </span>aval<span class="w"> </span>/usr/local/bin/
 </span></code></pre></div>
 <h2 id="from-source">From source<a class="headerlink" href="#from-source" title="Anchor link">&para;</a></h2>
 <p><code>go install github.com/TrianaLab/aval/cmd/aval@latest</code>. The binary reports
