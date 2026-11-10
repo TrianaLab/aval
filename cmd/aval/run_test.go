@@ -343,7 +343,7 @@ func TestRunThenPush(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, fp, _ := loadAndFingerprint(context.Background(), c)
+	_, _, fp, _ := loadAndFingerprint(context.Background(), c, "")
 	if p.Result != evidence.ResultFailed || p.Execution.ExitCode != 1 || p.Execution.Fingerprint != fp.Digest || p.Test.ID != "unit" || p.Test.Cacheability != "hermetic" {
 		t.Fatalf("pushed predicate %+v", p)
 	}

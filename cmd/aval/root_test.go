@@ -76,7 +76,7 @@ func TestScopeRootFailsClosed(t *testing.T) {
 			}
 		}
 	}
-	c, err := contract.Load(none)
+	c, err := contract.Load(none, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestScopeRootOutputs(t *testing.T) {
 func TestScopeRootCollectOutputs(t *testing.T) {
 	dir, file := rootContract(t, "..")
 	write(t, dir, "coverage.xml", "cov")
-	c, err := contract.Load(file)
+	c, err := contract.Load(file, "")
 	if err != nil {
 		t.Fatal(err)
 	}

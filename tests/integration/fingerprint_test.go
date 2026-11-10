@@ -39,7 +39,7 @@ func copyTree(t *testing.T, src, dst string) {
 
 func loadAndCompute(t *testing.T, dir string) string {
 	t.Helper()
-	c, err := contract.Load(filepath.Join(dir, "aval.yaml"))
+	c, err := contract.Load(filepath.Join(dir, "aval.yaml"), "")
 	if err != nil {
 		t.Fatal(err)
 	}

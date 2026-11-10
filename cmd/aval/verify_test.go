@@ -40,7 +40,7 @@ func devKey(t *testing.T, dir, name string) (string, []byte) {
 // fingerprint, edited by edit, with keyFile.
 func signedFor(t *testing.T, contractFile, keyFile string, edit func(*evidence.Predicate)) *registry.Attestation {
 	t.Helper()
-	c, _, fp, err := loadAndFingerprint(context.Background(), contractFile)
+	c, _, fp, err := loadAndFingerprint(context.Background(), contractFile, "")
 	if err != nil {
 		t.Fatal(err)
 	}

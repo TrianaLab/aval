@@ -93,7 +93,7 @@ func TestInitFlags(t *testing.T) {
 			name = "init-styled.golden.txt"
 		}
 		golden(t, name, out)
-		c, err := contract.Load("aval.yaml")
+		c, err := contract.Load("aval.yaml", "")
 		if err != nil || c.Metadata.Name != "unit" || c.Cacheability != contract.Hermetic || strings.Join(c.Runner.Command, " ") != "grep -q a src/a.txt" {
 			t.Fatalf("contract %+v, %v", c, err)
 		}
@@ -275,7 +275,7 @@ func TestInitPrompts(t *testing.T) {
 		t.Fatalf("exit %d, %s", code, errOut)
 	}
 	golden(t, "init-prompts.golden.txt", out)
-	if _, err := contract.Load("aval.yaml"); err != nil {
+	if _, err := contract.Load("aval.yaml", ""); err != nil {
 		t.Fatal(err)
 	}
 

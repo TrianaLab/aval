@@ -89,7 +89,7 @@ func TestUnreachableKeepsTheReason(t *testing.T) {
 // writeReportFor is the report verify printed before #167 for a lookup
 // that failed with err.
 func writeReportFor(b *strings.Builder, format string, err error, c string) error {
-	ct, _, fp, lerr := loadAndFingerprint(context.Background(), c)
+	ct, _, fp, lerr := loadAndFingerprint(context.Background(), c, "")
 	if lerr != nil {
 		return lerr
 	}

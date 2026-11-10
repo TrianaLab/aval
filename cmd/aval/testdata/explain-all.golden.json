@@ -1,0 +1,16 @@
+{
+  "tests": [
+    {
+      "name": "unit",
+      "fingerprint": "sha256:d836e547a6ec34a756bead7f9e46c4ea32e2f5585eab021a30a347f6e0a3f422"
+    },
+    {
+      "name": "deps",
+      "error": "fingerprint: dependency glob \"missing.lock\" matched no files"
+    },
+    {
+      "name": "mut",
+      "error": "aval.yaml: invalid contract: scope.allowMutable[0].files[0]: glob \"nope/*\" matches no file in scope"
+    }
+  ]
+}

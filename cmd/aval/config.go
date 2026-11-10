@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/TrianaLab/aval/internal/cliout"
 	"github.com/TrianaLab/aval/internal/contract"
+	"github.com/TrianaLab/aval/internal/fingerprint"
 	"github.com/TrianaLab/aval/internal/policy"
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
@@ -33,6 +37,7 @@ const (
 // the ones it uses, so no command accepts a flag it ignores.
 type globalFlags struct {
 	file, registry, policy string
+	test                   string              // -t/--test: the test of the contract file
 	minTrust               string              // --min-trust-level as given
 	minLevel               evidence.TrustLevel // minTrust parsed; 0 when unset
 	timeout                time.Duration
@@ -46,6 +51,7 @@ func (g *globalFlags) bind(cmd *cobra.Command, withContract, withPolicy bool) {
 	f := cmd.Flags()
 	if withContract {
 		f.StringVarP(&g.file, "contract", "f", contract.DefaultFile, "path to the test contract")
+		testFlag(f, &g.test)
 	}
 	registryDefault := "$" + registryEnv
 	if withPolicy {
@@ -59,6 +65,34 @@ func (g *globalFlags) bind(cmd *cobra.Command, withContract, withPolicy bool) {
 	f.DurationVar(&g.timeout, "registry-timeout", time.Minute, "deadline for this command's registry calls")
 	g.usesPolicy = withPolicy
 	cmd.PreRunE = func(*cobra.Command, []string) error { return g.resolve(os.Getenv) }
+}
+
+// testFlag adds -t/--test to f.
+func testFlag(f *pflag.FlagSet, test *string) {
+	f.StringVarP(test, "test", "t", "", "the test to use, by metadata.name: required on a TestSet of more than one test; output files default to "+fingerprint.OutputDir+"/<test>/")
+}
+
+// testOutputs points each output flag of cmd that was not set (under its
+// name or deprecated aliases) to its file in .aval/<test>/, so tests of one
+// TestSet never share outputs (#207). Without --test it changes nothing.
+// Each entry is a value, its file name, then the flag names.
+func testOutputs(cmd *cobra.Command, test string, outs ...testOutput) {
+	if test == "" {
+		return
+	}
+	for _, o := range outs {
+		if !slices.ContainsFunc(o.flags, cmd.Flags().Changed) {
+			*o.value = filepath.Join(fingerprint.OutputDir, test, o.file)
+		}
+	}
+}
+
+// testOutput is an output flag, its file name in .aval/<test>/ and its flag
+// names.
+type testOutput struct {
+	value *string
+	file  string
+	flags []string
 }
 
 // resolve applies flag > env > unset to --registry and --policy, then, for a

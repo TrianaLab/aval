@@ -18,7 +18,8 @@ const KindTestSet = "TestSet"
 // and so scope.contracts).
 var ErrTestSet = errors.New("kind: TestSet holds many tests; this place takes one kind: Test")
 
-// maxTests bounds the tests one TestSet expands to, matrices included.
+// maxTests bounds the tests one TestSet expands to, plain tests and
+// matrices together.
 const maxTests = 1024
 
 // testSet is the parsed form of a kind: TestSet file.
@@ -100,6 +101,9 @@ func (s *testSet) expand() ([]*Contract, error) {
 		at := fmt.Sprintf("tests[%d]", i)
 		if t.Metadata.Name != "" {
 			at += " (" + t.Metadata.Name + ")"
+		}
+		if len(out) >= maxTests {
+			return nil, errors.Join(append(errs, fmt.Errorf("%s: the set expands to more than %d tests", at, maxTests))...)
 		}
 		cs, err := s.test(t, used, maxTests-len(out))
 		if err != nil {

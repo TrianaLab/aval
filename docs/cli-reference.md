@@ -100,8 +100,15 @@ fingerprint is the one 'aval run' computes with its default --result-file and
 without --report-file or --stats-file inside the contract root. With
 scope.root it prints the resolved root after the header.
 
+--expand prints the test as the standalone kind: Test it expands to (a test
+of a TestSet with defaults, fragments and matrix applied). --all checks every
+test of the file: it prints one "name fingerprint" line per test (-o json:
+one object per test), reports every failing test by name instead of stopping
+at the first, and executes nothing, not even environment.probe.
+
 Exit codes: 0 printed, 1 the fingerprint cannot be computed (unprovable
-inputs), 2 usage or invalid aval.yaml.
+inputs), 2 usage or invalid aval.yaml. With --all, 2 when any failing test
+is invalid, else 1 when any fingerprint cannot be computed.
 
 ```text
 Usage:
@@ -115,9 +122,13 @@ Examples:
   aval explain --digest
 
 Flags:
+      --all               check and fingerprint every test of the file, one line per test
   -f, --contract string   path to the test contract (default "aval.yaml")
       --digest            print only the fingerprint (sha256:...)
+      --expand            print the test as the standalone kind: Test it expands to
   -h, --help              help for explain
+  -o, --output string     output format of --all: text or json (default "text")
+  -t, --test string       the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
 
 Global Flags:
       --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
@@ -218,6 +229,7 @@ Flags:
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --report-file string          report written by the same 'aval run'; push nothing when it reused a verified result
       --result-file string          result recorded by 'aval run' (default ".aval/result.json")
+  -t, --test string                 the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
 
 Global Flags:
       --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
@@ -306,6 +318,7 @@ Flags:
       --source-repo string          source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
       --stats                       publish a run record for statistics after the run (needs --registry; best-effort)
       --stats-file string           also write the run record to this file, for 'aval stats publish'
+  -t, --test string                 the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
 
 Global Flags:
       --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
@@ -442,6 +455,7 @@ Flags:
       --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+  -t, --test string                 the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
 
 Global Flags:
       --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)

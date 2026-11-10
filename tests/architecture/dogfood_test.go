@@ -313,7 +313,7 @@ func undeclaredReads(t *testing.T, c *contract.Contract, dirs suiteDirs) []strin
 
 func TestDogfoodScopeCoversEveryRead(t *testing.T) {
 	for file, dirs := range dogfoodSuites {
-		c, err := contract.Load(filepath.Join(root, file))
+		c, err := contract.Load(filepath.Join(root, file), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -324,7 +324,7 @@ func TestDogfoodScopeCoversEveryRead(t *testing.T) {
 }
 
 func TestDogfoodScopeCheckCatchesUndeclaredReads(t *testing.T) {
-	c, err := contract.Load(filepath.Join(root, "aval.yaml"))
+	c, err := contract.Load(filepath.Join(root, "aval.yaml"), "")
 	if err != nil {
 		t.Fatal(err)
 	}

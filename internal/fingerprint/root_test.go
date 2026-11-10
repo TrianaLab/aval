@@ -309,7 +309,7 @@ func TestRealPaths(t *testing.T) {
 
 func mustLoad(t *testing.T, file string) *contract.Contract {
 	t.Helper()
-	c, err := contract.Load(file)
+	c, err := contract.Load(file, "")
 	if err != nil {
 		t.Fatal(err)
 	}
