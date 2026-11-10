@@ -361,8 +361,9 @@ func decodeStrict(raw []byte, v any) error {
 }
 
 // inScope reports whether the scope of c, rooted at dir, would hash the file
-// at path p if it were not an Aval output: it lies inside dir, outside .git
-// and .aval directories, and matches source (not excluded) or dependencies.
+// at path p if it were not an Aval output: it lies inside dir, is neither a
+// .git entry (directory, file or symlink) nor under one, lies outside .aval
+// directories, and matches source (not excluded) or dependencies.
 // A path that cannot be resolved is not skipped by fingerprint.Compute either.
 func inScope(dir string, c *contract.Contract, p string) bool {
 	root, err := filepath.Abs(dir)
@@ -375,7 +376,7 @@ func inScope(dir string, c *contract.Contract, p string) bool {
 		return false
 	}
 	segs := strings.Split(filepath.ToSlash(rel), "/")
-	if slices.ContainsFunc(segs[:len(segs)-1], func(s string) bool { return s == ".git" || s == fingerprint.OutputDir }) {
+	if slices.Contains(segs, ".git") || slices.Contains(segs[:len(segs)-1], fingerprint.OutputDir) {
 		return false
 	}
 	match := func(globs []string, m func(contract.Glob, []string) bool) bool {

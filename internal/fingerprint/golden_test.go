@@ -39,8 +39,8 @@ func goldenFile(version string) string {
 // The tree adds a nested path, a path with a space, pkg.go (sorts before
 // pkg/..., unlike walk order), an empty file under a dot-directory
 // (included), CRLF content, an excluded vendor file and a file outside the
-// scope; goldenTree adds a top-level and a nested .git directory (skipped)
-// and a regular file pkg/.git (included).
+// scope; goldenTree adds a top-level and a nested .git directory and a
+// regular file pkg/.git, all skipped.
 var goldenContracts = []string{"contract.yaml", "minimal.yaml", "empty.yaml"}
 
 // goldenModes fixes the mode of tree files (default 0644), so the mode column
@@ -124,8 +124,8 @@ func goldenDir(t *testing.T) string {
 	}
 	// git cannot commit .git paths, so they are made here. The .go files
 	// under the top-level and the nested .git directory match **/*.go and
-	// must not appear in any manifest; the regular file pkg/.git (a worktree
-	// or submodule gitfile) is in scope and must.
+	// must not appear in any manifest, and neither must the regular file
+	// pkg/.git (a worktree or submodule gitfile), which pkg/** matches.
 	for name, data := range map[string]string{
 		".git/g.go":       "package g\n",
 		"pkg/b/.git/n.go": "package n\n",

@@ -54,7 +54,7 @@ func TestStory(t *testing.T) {
 
 	exec(t, d, "edit README.md", exitOK)
 	out, _ = exec(t, d, "aval run --explain", exitOK)
-	mustContain(t, "out of scope edit", out, "aval-fingerprint/v1\n", "source ", " - greet.go\n", "↺ verified greet "+fp[:15]+"\n", "↺ reused passed result")
+	mustContain(t, "out of scope edit", out, "aval-fingerprint/v2\n", "source ", " - greet.go\n", "↺ verified greet "+fp[:15]+"\n", "↺ reused passed result")
 	exec(t, d, "edit aval.yaml", exitOK) // a comment: the canonical contract is the same
 	out, _ = exec(t, d, "aval verify --output=text", exitOK)
 	mustContain(t, "comment in aval.yaml", out, "verified greet "+fp)
@@ -125,7 +125,7 @@ func TestExplain(t *testing.T) {
 	out, _ := exec(t, d, "aval explain", exitOK)
 	digest, _ := exec(t, d, "aval explain --digest", exitOK)
 	manifest, _, _ := strings.Cut(run, "· miss greet ")
-	if want := "fingerprint manifest for greet (aval-fingerprint/v1)\n" + manifest + "fingerprint " + digest; out != want {
+	if want := "fingerprint manifest for greet (aval-fingerprint/v2)\n" + manifest + "fingerprint " + digest; out != want {
 		t.Fatalf("explain %q, want %q", out, want)
 	}
 	if !strings.HasPrefix(digest, "sha256:") || len(d.reg) != 0 {

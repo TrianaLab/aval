@@ -1,7 +1,7 @@
 === push=false shadow=false failed=false
 exit 5
 --- stdout
-[1m[31m✗ verification-failed unit sha256:77ad8f66[0m
+[1m[31m✗ verification-failed unit sha256:8a2cd781[0m
   [2mreference[0m reg.example/r@sha256:ff
   [2mreason   [0m attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
 [2m· run unit: sh -c echo test output; exit 0[0m
@@ -14,7 +14,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=false shadow=false failed=true
 exit 5
 --- stdout
-[1m[31m✗ verification-failed unit sha256:1a818124[0m
+[1m[31m✗ verification-failed unit sha256:889c3506[0m
   [2mreference[0m reg.example/r@sha256:ff
   [2mreason   [0m attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
 [2m· run unit: sh -c echo test output; exit 1[0m
@@ -27,7 +27,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=false shadow=true failed=false
 exit 5
 --- stdout
-[1m[31m✗ verification-failed unit sha256:77ad8f66[0m
+[1m[31m✗ verification-failed unit sha256:8a2cd781[0m
   [2mreference[0m reg.example/r@sha256:ff
   [2mreason   [0m attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
 [2m· run unit: sh -c echo test output; exit 0[0m
@@ -40,7 +40,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=false shadow=true failed=true
 exit 5
 --- stdout
-[1m[31m✗ verification-failed unit sha256:1a818124[0m
+[1m[31m✗ verification-failed unit sha256:889c3506[0m
   [2mreference[0m reg.example/r@sha256:ff
   [2mreason   [0m attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
 [2m· run unit: sh -c echo test output; exit 1[0m
@@ -53,7 +53,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=true shadow=false failed=false
 exit 5
 --- stdout
-[1m[31m✗ verification-failed unit sha256:77ad8f66[0m
+[1m[31m✗ verification-failed unit sha256:8a2cd781[0m
   [2mreference[0m reg.example/r@sha256:ff
   [2mreason   [0m attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
 [2m· run unit: sh -c echo test output; exit 0[0m
@@ -67,7 +67,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=true shadow=false failed=true
 exit 5
 --- stdout
-[1m[31m✗ verification-failed unit sha256:1a818124[0m
+[1m[31m✗ verification-failed unit sha256:889c3506[0m
   [2mreference[0m reg.example/r@sha256:ff
   [2mreason   [0m attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
 [2m· run unit: sh -c echo test output; exit 1[0m
@@ -81,7 +81,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=true shadow=true failed=false
 exit 5
 --- stdout
-[1m[31m✗ verification-failed unit sha256:77ad8f66[0m
+[1m[31m✗ verification-failed unit sha256:8a2cd781[0m
   [2mreference[0m reg.example/r@sha256:ff
   [2mreason   [0m attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
 [2m· run unit: sh -c echo test output; exit 0[0m
@@ -95,7 +95,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=true shadow=true failed=true
 exit 5
 --- stdout
-[1m[31m✗ verification-failed unit sha256:1a818124[0m
+[1m[31m✗ verification-failed unit sha256:889c3506[0m
   [2mreference[0m reg.example/r@sha256:ff
   [2mreason   [0m attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
 [2m· run unit: sh -c echo test output; exit 1[0m
