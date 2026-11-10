@@ -1,0 +1,12 @@
+# The CI test of the publish action (ci.yaml publish-action, #212): two
+# tests whose only input, run-id, the jobs write once per workflow run, so
+# every run of that test publishes a new fingerprint.
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope: {source: [run-id]}
+  cacheability: hermetic
+tests:
+  - metadata: {name: "publish-{n}"}
+    runner: {command: ["true"]}
+    matrix: {n: [a, b]}
