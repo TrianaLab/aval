@@ -111,9 +111,14 @@ scanned.
 - `file` is the path Aval prints before the line number, relative to the
   contract (`runner.command` for the command), and limits the entry to that
   file. Without it, a `ref` that two files report (`resources[0]` repeats) is
-  not accepted, and the finding asks for `file`. With
-  [`scope.contracts`](guides/depend-on-a-contract.md), each contract's entries
-  apply to its own findings.
+  not accepted, and the finding asks for `file`.
+- `files` is a list of globs, matched like `scope.source`, instead of
+  `file` (not both). The entry accepts its exact `ref` in every file in
+  scope that a glob matches, never in `runner.command`. Each glob must match
+  a file in scope, or the contract is invalid (exit 2). There is no `ref`
+  wildcard: every accepted reference is one somebody wrote down.
+- With [`scope.contracts`](guides/depend-on-a-contract.md), each contract's
+  entries apply to its own findings.
 - It is part of the contract, so it changes the fingerprint and shows in
   review.
 - `aval run` still prints the finding, marked `(allowed: <reason>)`.

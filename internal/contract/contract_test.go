@@ -97,6 +97,16 @@ func TestParseInvalid(t *testing.T) {
   allowMutable: [{file: /compose.yaml, ref: a, reason: b}]`, "scope.allowMutable[0]: file"},
 		"allowMutable file dot": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   allowMutable: [{file: ./compose.yaml, ref: a, reason: b}]`, "scope.allowMutable[0]: file"},
+		"allowMutable file and files": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{file: compose.yaml, files: ["*.yaml"], ref: a, reason: b}]`, "scope.allowMutable[0]: file and files exclude each other"},
+		"allowMutable files without ref": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{files: ["*.yaml"], reason: b}]`, "scope.allowMutable[0]: ref and reason are both required"},
+		"allowMutable files empty reason": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{files: ["*.yaml"], ref: a, reason: ""}]`, "scope.allowMutable[0]: ref and reason are both required"},
+		"allowMutable files outside": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{files: ["deploy/*.yaml", "../x/*.yaml"], ref: a, reason: b}]`, "scope.allowMutable[0].files[1]: \"../x/*.yaml\": empty, '.' or '..' segments"},
+		"allowMutable files not a list": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{files: "*.yaml", ref: a, reason: b}]`, "files"},
 		"resolve unknown kind": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   resolve: [{docker: postgres:16}]`, `scope.resolve[0]: unknown kind "docker"`},
 		"resolve two keys": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
@@ -147,11 +157,15 @@ func TestParseAllowMutable(t *testing.T) {
       reason: the image is rebuilt and scanned nightly
     - file: deploy/kustomization.yaml
       ref: resources[0]
-      reason: vendored upstream`, 1)))
+      reason: vendored upstream
+    - files: ["charts/**/values.yaml", "a[1].yaml"]
+      ref: ghcr.io/stefanprodan/podinfo:6.5.0
+      reason: public demo image`, 1)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []AllowMutable{{Ref: "postgres:16", Reason: "the image is rebuilt and scanned nightly"}, {File: "deploy/kustomization.yaml", Ref: "resources[0]", Reason: "vendored upstream"}}
+	want := []AllowMutable{{Ref: "postgres:16", Reason: "the image is rebuilt and scanned nightly"}, {File: "deploy/kustomization.yaml", Ref: "resources[0]", Reason: "vendored upstream"},
+		{Files: []string{"charts/**/values.yaml", "a[1].yaml"}, Ref: "ghcr.io/stefanprodan/podinfo:6.5.0", Reason: "public demo image"}}
 	if fmt.Sprint(c.Scope.AllowMutable) != fmt.Sprint(want) {
 		t.Fatalf("allowMutable = %+v", c.Scope.AllowMutable)
 	}

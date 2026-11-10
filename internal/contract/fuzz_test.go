@@ -21,6 +21,8 @@ func FuzzParse(f *testing.F) {
 	}
 	f.Add([]byte(strings.Replace(valid, `"compose.yaml"`, `"../secrets"`, 1)))
 	f.Add([]byte(valid + "\n---\nfoo: bar\n"))
+	f.Add([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  allowMutable: [{files: ["deploy/**/*.yaml", "a[1].yaml"], ref: "nginx:1.27", reason: r}]`, 1)))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		c, err := Parse(data)
 		if err != nil {
@@ -29,7 +31,14 @@ func FuzzParse(f *testing.F) {
 		if err := c.Validate(); err != nil {
 			t.Fatalf("Parse accepted an invalid contract: %v", err)
 		}
-		for _, g := range append(append(append([]string{}, c.Scope.Source...), c.Scope.Exclude...), c.Scope.Dependencies...) {
+		globs := append(append(append([]string{}, c.Scope.Source...), c.Scope.Exclude...), c.Scope.Dependencies...)
+		for _, a := range c.Scope.AllowMutable {
+			if a.File != "" && len(a.Files) > 0 {
+				t.Fatalf("Parse accepted file and files together: %+v", a)
+			}
+			globs = append(globs, a.Files...)
+		}
+		for _, g := range globs {
 			if err := ValidateGlob(g); err != nil {
 				t.Fatalf("Parse accepted glob %q: %v", g, err)
 			}
