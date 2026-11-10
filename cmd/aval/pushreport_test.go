@@ -182,10 +182,11 @@ func readReportIfAny(p string) *evidence.Report {
 	return &r
 }
 
-// Issue #201: any outcome but verified keeps push publishing exactly what
-// aval run --push publishes: passing, failing and non-deterministic results.
+// Issue #201: a miss or an error keeps push publishing exactly what aval run
+// --push publishes: passing and failing results. A security event and a
+// non-deterministic test are #210 (TestPushTestBindsReport).
 func TestPushPublishesAfterNonReuse(t *testing.T) {
-	for _, outcome := range []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeError, evidence.OutcomeVerificationFailed} {
+	for _, outcome := range []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeError} {
 		for _, tc := range []struct {
 			class, command string
 			code           int
@@ -193,7 +194,6 @@ func TestPushPublishesAfterNonReuse(t *testing.T) {
 		}{
 			{"hermetic", "true", ExitOK, evidence.ResultPassed},
 			{"hermetic", "false", ExitTestFailed, evidence.ResultFailed},
-			{"non-deterministic", "true", ExitOK, evidence.ResultPassed},
 		} {
 			signed := fakePublish(t, nil, nil)
 			c := contractWith(t, tc.class, tc.command)

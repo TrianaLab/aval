@@ -72,7 +72,7 @@ flowchart LR
     |---|---|
     | `cannot reach <host> (<cause>); is the registry running?`, `loading registry credentials: <x>`, `resolving <tag>: <x>`, `listing referrers: <x>`, `fetching manifest <x>`, `fetching layer <x>` | check the address (`AVAL_REGISTRY`, `--registry`), that the registry runs, the network and `docker login`; a report's `reason` keeps the raw error |
     | `signing: <x>`, `publishing: <x>`, `pushing manifest: <x>`, `tagging anchor: <x>` | check the token or key, and write access |
-    | `more than <n> attestations` | outcome `verification-failed`, exit 5: none was verified, so check who pushed them (it may be a flooding attempt), then delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)) |
+    | `more than <n> attestations`, `that failed verification: nothing pushed` | outcome `verification-failed`, exit 5. Too many: none was verified, so check who pushed them (it may be a flooding attempt), then delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)). Nothing pushed: the run's report records a security event, so `aval push` signs nothing; investigate that run's `aval: SECURITY:` line first |
     | `is not listed among the referrers of` | push again, or use a registry with OCI 1.1 referrers |
     | `running <x>`, `environment.probe <key> <argv>: declared <x>, observed <y>` | install the program `runner.command` starts, or the declared toolchain version ([Probe the toolchain](../contract.md#probe-the-toolchain)) |
     | `FALSE HIT: <x>` (with `--shadow`) | the test reads an input `scope` does not list: [find it](write-a-contract.md#find-undeclared-inputs) |
