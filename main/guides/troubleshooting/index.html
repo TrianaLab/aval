@@ -2321,7 +2321,7 @@ Text in <code>&lt;...&gt;</code> changes per run.</p>
 <tr>
 <td>0</td>
 <td>the test passed, or a verified passing result was reused</td>
-<td>a verified result exists (passing or failing)</td>
+<td>a verified result exists (passing or failing) and no <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> failed verification</td>
 <td>pushed</td>
 </tr>
 <tr>
@@ -2350,8 +2350,8 @@ Text in <code>&lt;...&gt;</code> changes per run.</p>
 </tr>
 <tr>
 <td>5</td>
-<td>verification failed, after running the test: a security event</td>
-<td>verification failed: a security event</td>
+<td>verification failed, after running the test: a security event, also beside a verified result (never reused then) or over the 64-<abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> cap; wins over 3 and 1</td>
+<td>verification failed: a security event, also beside a verified result (the report keeps <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>) or over the 64-<abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> cap</td>
 <td>not used</td>
 </tr>
 <tr>
@@ -2550,7 +2550,7 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 </tr>
 <tr>
 <td><code>more than &lt;n&gt; attestations</code></td>
-<td>delete old results (<a href="../../artifact-format/#the-64-candidate-cap-and-cleanup">cleanup</a>); the <code>aval: SECURITY:</code> line before it means none was verified, so check who pushed them: it may be a flooding attempt</td>
+<td><abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verification-failed</code>, exit 5: none was verified, so check who pushed them (it may be a flooding attempt), then delete old results (<a href="../../artifact-format/#the-64-candidate-cap-and-cleanup">cleanup</a>)</td>
 </tr>
 <tr>
 <td><code>is not listed among the referrers of</code></td>
@@ -2633,8 +2633,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <p><code>aval: SECURITY:</code> comes first (<code>aval run</code> repeats it last); <code>reason:</code> says
 why. Usually a wrong <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, possibly an attacker
 (<a href="../../concepts/outcomes/#a-verification-failure-is-a-security-event">Outcomes</a>).
-Beside a verified result (exit 0) it shows in <code>rejected</code>: gate on it where it
-must stop a pipeline (<code>.github/aval/summary.sh</code>).</p>
+Beside a verified result it shows in <code>rejected</code>: the report keeps <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>
+<code>verified</code>, but nothing is reused and the exit code is 5.</p>
 <details class="danger">
 <summary>Reasons</summary>
 <table>
@@ -2656,6 +2656,10 @@ must stop a pipeline (<code>.github/aval/summary.sh</code>).</p>
 <tr>
 <td><code>fingerprint &lt;x&gt;, want &lt;y&gt;</code>, <code>test id &lt;x&gt;, want &lt;y&gt;</code>, <code>statement subject does not match the predicate subject</code></td>
 <td>a result that claims other inputs: delete it</td>
+</tr>
+<tr>
+<td><code>failed verification beside the verified one</code></td>
+<td>the report says <code>verified</code>, but the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> in <code>rejected</code> is bad: its reason is one of these rows</td>
 </tr>
 <tr>
 <td><code>cacheability &lt;x&gt; is not reusable under the policy</code>, <code>cacheability &lt;x&gt;, want &lt;y&gt;</code>, <code>tag &lt;x&gt; points at &lt;y&gt;, not the fingerprint anchor</code></td>

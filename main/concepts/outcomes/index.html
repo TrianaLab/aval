@@ -2255,7 +2255,7 @@
 <tr>
 <td><code>verified</code></td>
 <td>a trusted result exists for these exact inputs</td>
-<td>reuses it: exit 0 for a pass, 3 for a failure</td>
+<td>reuses it: exit 0 for a pass, 3 for a failure; beside a result that fails verification it runs the test and exits 5</td>
 </tr>
 <tr>
 <td><code>miss</code></td>
@@ -2290,6 +2290,10 @@
 <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr>, or a claim of other inputs. The cause is a wrong <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or an
 attacker. Aval runs the test, prints <code>aval: SECURITY: ...</code> and exits 5. Fail
 the job and investigate; never hide or retry it.</p>
+<p>The same holds when another result verifies beside the bad one (the report
+says <code>verified</code> and lists the bad one in <code>rejected</code>): nothing is reused and
+the exit code is 5. More than 64 results for one <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is
+<code>verification-failed</code> too: none is verified, so one may hide an attacker's.</p>
 <h2 id="read-more">Read more<a class="headerlink" href="#read-more" title="Anchor link">&para;</a></h2>
 <ul>
 <li>What <code>aval run</code> prints: <a href="../../output/">CLI output</a></li>

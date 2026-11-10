@@ -2425,8 +2425,8 @@ the test and exits 5: a security event, not a miss.</p>
   files[src/hello.txt&lt;br&gt;listed in scope] --&gt; fp[fingerprint&lt;br&gt;sha256:fb39...]
   fp --&gt; look{result for this&lt;br&gt;fingerprint?}
   look -- no --&gt; miss([miss: run the test&lt;br&gt;steps 2 and 4]):::muted
-  look -- "yes, signer in policy.yaml" --&gt; ok([verified: reuse,&lt;br&gt;skip the test&lt;br&gt;step 3]):::ok
-  look -- "yes, only untrusted signers" --&gt; bad([verification-failed:&lt;br&gt;run the test, exit 5&lt;br&gt;step 5]):::err</code></pre>
+  look -- "yes, every signer in policy.yaml" --&gt; ok([verified: reuse,&lt;br&gt;skip the test&lt;br&gt;step 3]):::ok
+  look -- "yes, any untrusted signer" --&gt; bad([security event:&lt;br&gt;run the test, exit 5&lt;br&gt;step 5]):::err</code></pre>
 <p>Stop the registry:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>docker<span class="w"> </span>rm<span class="w"> </span>-f<span class="w"> </span>aval-registry
 </span></code></pre></div>

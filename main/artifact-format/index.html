@@ -3172,14 +3172,19 @@ earlier one. <code>aval verify</code> verifies every candidate:</p>
 <li>If nothing is reused: <code>verification-failed</code> beats <code>error</code> beats <code>miss</code>.</li>
 </ul>
 <p>Unused candidates are listed in the report's <code>rejected</code>; any that failed
-verification add one <code>aval: SECURITY: ...</code> line on stderr.</p>
+verification add one <code>aval: SECURITY: ...</code> line on stderr. Such a candidate
+is a security event even beside a verified one: the report keeps <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>
+<code>verified</code> and its <code>reference</code>, but <code>aval verify</code> exits 5 and <code>aval run</code> does
+not reuse, runs the test and exits 5.</p>
 <h3 id="the-64-candidate-cap-and-cleanup">The 64-candidate cap and cleanup<a class="headerlink" href="#the-64-candidate-cap-and-cleanup" title="Anchor link">&para;</a></h3>
 <p>Every push adds one execution, even for the same inputs (hostname and
 timestamps differ), and Aval never deletes one. Past 64 executions, every
-lookup for that <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>error</code> and the test always runs; every push
-still adds one, then exits 1. Nothing past the cap is verified, so the lookup
-also prints an <code>aval: SECURITY:</code> line naming the cap: someone with push
-access may be flooding the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> to hide an untrusted <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>.
+lookup for that <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>verification-failed</code> (the reason names the
+cap): nothing is verified, so trust cannot be proven and someone with push
+access may be flooding the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> to hide an untrusted <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>. The
+lookup prints an <code>aval: SECURITY:</code> line naming the cap, <code>aval run</code> runs the
+test and <code>aval verify</code> and <code>aval run</code> exit 5; every push still adds one, then
+exits 1.
 Other fingerprints are not affected, so the next input change also ends it.</p>
 <p>Push from one place (for example CI on the main branch). <code>aval run --push</code>
 does not push after a reuse, but <code>aval run --shadow --push</code> pushes every time.</p>
@@ -3260,7 +3265,7 @@ limit, publishing a record fails with a warning; prune old records (see
 <td><code>outcome</code></td>
 <td>string</td>
 <td>always</td>
-<td>The lookup decision, as in the verify report.</td>
+<td>The lookup decision, as in the verify report, except a <code>verified</code> lookup beside a rejected <code>verification-failed</code> candidate: the run did not reuse, so it records <code>verification-failed</code>.</td>
 </tr>
 <tr>
 <td><code>reused</code></td>
@@ -3827,7 +3832,7 @@ This is the stable machine interface for CI scripts and external tools.</p>
 </tr>
 <tr>
 <td><code>verification-failed</code></td>
-<td>Attestation exists but fails signature or <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>.</td>
+<td>Attestation exists but fails signature or <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, or the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> holds more than 64 attestations (none verified).</td>
 <td>Run the test <strong>and</strong> alert. Never hide this.</td>
 </tr>
 <tr>

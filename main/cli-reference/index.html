@@ -2499,7 +2499,7 @@
 <tr>
 <td>0</td>
 <td>the test passed, or a verified passing result was reused</td>
-<td>a verified result exists (passing or failing)</td>
+<td>a verified result exists (passing or failing) and no <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> failed verification</td>
 <td>pushed</td>
 </tr>
 <tr>
@@ -2528,8 +2528,8 @@
 </tr>
 <tr>
 <td>5</td>
-<td>verification failed, after running the test: a security event</td>
-<td>verification failed: a security event</td>
+<td>verification failed, after running the test: a security event, also beside a verified result (never reused then) or over the 64-<abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> cap; wins over 3 and 1</td>
+<td>verification failed: a security event, also beside a verified result (the report keeps <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>) or over the 64-<abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> cap</td>
 <td>not used</td>
 </tr>
 <tr>
@@ -2742,7 +2742,9 @@ and records the result. Anything Aval cannot prove runs the test.</p>
 covers lookup and fetch together; --push has its own. runner.command never
 sees $SIGSTORE_ID_TOKEN, $AVAL_REGISTRY or $AVAL_POLICY.</p>
 <p>Exit codes: 0 pass, 3 fail, 5 verification failed (a security event, after
-running the test), 1 error or false hit (--shadow), 2 usage.</p>
+running the test: also a verified result beside a rejected verification-failed
+<abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>, which is never reused, or more attestations than the lookup cap),
+1 error or false hit (--shadow), 2 usage. 5 wins over 3 and 1.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Usage:
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  aval run [flags]
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
@@ -2869,8 +2871,10 @@ checksum, older latest release, replacing the binary), 2 usage.</p>
 <p>verify computes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, looks up the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> and verifies its
 signature and the trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, without running anything. It needs a
 registry; without a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> every lookup is a miss.</p>
-<p>Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
-1 error (registry, <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>), 2 usage or invalid aval.yaml.</p>
+<p>Exit codes: 0 verified, 4 miss, 5 verification failed (security event:
+also a verified result beside a rejected verification-failed <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>, or
+more attestations than the lookup cap), 1 error (registry, <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or
+<abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>), 2 usage or invalid aval.yaml.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Usage:
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  aval verify [flags]
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
