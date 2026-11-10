@@ -1,6 +1,7 @@
-# The CI test of the publish action (ci.yaml publish-action, #212): two
+# The CI test of the publish action (ci.yaml publish-action, #212): three
 # tests whose only input, run-id, the jobs write once per workflow run, so
-# every run of that test publishes a new fingerprint.
+# every run of that test publishes a new fingerprint. publish-outputs
+# declares an output, which the artifact carries to the publish job (#236).
 apiVersion: aval.trianalab.io/v1
 kind: TestSet
 defaults:
@@ -10,3 +11,6 @@ tests:
   - metadata: {name: "publish-{n}"}
     runner: {command: ["true"]}
     matrix: {n: [a, b]}
+  - metadata: {name: publish-outputs}
+    runner: {command: ["sh", "-c", "cat run-id > coverage.out"]}
+    outputs: [coverage.out]

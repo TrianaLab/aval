@@ -461,8 +461,9 @@ jobs:
           path: '*.json'
           if-no-files-found: ignore
 
-  # The publish action (#212) on Aval's own main: a suite job uploads two
-  # aval-* artifacts; the publish job runs the action's scripts, which sign
+  # The publish action (#212) on Aval's own main: a suite job uploads three
+  # aval-* artifacts, one carrying a declared output as the run action does
+  # (#236); the publish job runs the action's scripts, which sign
   # each with a fresh OIDC token of this job, and aval verify then accepts
   # them under integrations/github/publish/testdata/policy.yaml, which trusts
   # only ci.yaml on main: the certificate names the calling workflow, not
@@ -482,13 +483,16 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Run the two tests
+      - name: Run the three tests
         run: |
           go build -o bin/aval ./cmd/aval
           # Run id only: a re-run of publish-action alone must recompute the
           # fingerprint of the suite job's first-attempt artifacts.
           echo "$GITHUB_RUN_ID" > integrations/github/publish/testdata/run-id
-          for t in publish-a publish-b; do bin/aval run -f integrations/github/publish/testdata/aval.yaml --test "$t"; done
+          # --outputs-dir as integrations/github/run/run.sh passes it.
+          for t in publish-a publish-b publish-outputs; do
+            bin/aval run -f integrations/github/publish/testdata/aval.yaml --test "$t" --outputs-dir ".aval/$t/outputs"
+          done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aval-publish-a
@@ -498,6 +502,33 @@ jobs:
         with:
           name: aval-publish-b
           path: .aval/publish-b/
+          include-hidden-files: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: aval-publish-outputs
+          path: .aval/publish-outputs/
+          include-hidden-files: true
+      # The run action's scripts on examples/github-monorepo's unit test, whose
+      # artifact carries its output coverage.out (#236). The policy trusts
+      # ci.yaml on main, so once published the result is reused (coverage.out
+      # restored) until unit's inputs change, and nothing piles up under one
+      # fingerprint.
+      - name: The run action's scripts on the example's unit test
+        working-directory: examples/github-monorepo
+        env:
+          INPUT_TEST: unit
+          INPUT_FILE: aval.yaml
+          INPUT_POLICY: integrations/github/publish/testdata/policy.yaml
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          AVAL="$GITHUB_WORKSPACE/bin/aval" /bin/bash ../../integrations/github/run/guard.sh
+          AVAL="$GITHUB_WORKSPACE/bin/aval" /bin/bash ../../integrations/github/run/run.sh
+      # Not aval-*: dogfood-publish downloads those.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: example-github-monorepo-unit
+          path: examples/github-monorepo/.aval/unit/
           include-hidden-files: true
 
   publish-action:
@@ -541,14 +572,34 @@ jobs:
         run: |
           AVAL="$PWD/bin/aval" /bin/bash integrations/github/publish/guard.sh
           AVAL="$PWD/bin/aval" /bin/bash integrations/github/publish/publish.sh
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: example-github-monorepo-unit
+          path: ${{ runner.temp }}/monorepo-artifacts/aval-unit
+      - name: Publish the example's unit test with the action's scripts
+        working-directory: examples/github-monorepo
+        env:
+          ALLOW_UNPROTECTED: "false"
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          ARTIFACTS: ${{ runner.temp }}/monorepo-artifacts
+          INPUT_FILE: aval.yaml
+          INPUT_POLICY: integrations/github/publish/testdata/policy.yaml
+          INPUT_STATS: "false"
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          AVAL="$GITHUB_WORKSPACE/bin/aval" /bin/bash ../../integrations/github/publish/guard.sh
+          AVAL="$GITHUB_WORKSPACE/bin/aval" /bin/bash ../../integrations/github/publish/publish.sh
       - name: The certificates name ci.yaml on main
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          for t in publish-a publish-b; do
+          for t in publish-a publish-b publish-outputs; do
             bin/aval verify -f integrations/github/publish/testdata/aval.yaml --test "$t" --policy integrations/github/publish/testdata/policy.yaml
           done
+          bin/aval verify -f examples/github-monorepo/aval.yaml --test unit --policy integrations/github/publish/testdata/policy.yaml
 
   # The run action on examples/github-monorepo (#217), on every event
   # against the real contents API: the PR edits the example's trust policy

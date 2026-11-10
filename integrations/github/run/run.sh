@@ -46,6 +46,11 @@ if [ -n "${DEFAULT_BRANCH:-}" ]; then
       "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/contents/$INPUT_POLICY?ref=$ref") || status=000
 fi
 args=(run -f "$INPUT_FILE" --test "$INPUT_TEST" --source-repo "$GITHUB_REPOSITORY")
+# The files the outputs globs matched travel in the artifact, for the
+# publish job's aval push --outputs-dir (#236); aval resolves them.
+if [ "$upload" = true ]; then
+  args+=(--outputs-dir ".aval/$INPUT_TEST/outputs")
+fi
 if [ -n "${GITHUB_RUN_ID:-}" ]; then
   args+=(--ci-run-url "${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
 fi

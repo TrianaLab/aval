@@ -24,30 +24,27 @@ import (
 // match that is not a regular file (a symlink), that is an input (in scope)
 // or the contract file, or that breaks a cap is an error, so nothing is
 // published. .git entries (directory, file or symlink) and .aval directories
-// are skipped, as in the fingerprint.
-func collectOutputs(dir, name string, c *contract.Contract) ([]registry.Output, error) {
+// are skipped, as in the fingerprint. strict is for a directory that holds
+// only outputs (--outputs-dir): there, anything that is not a declared
+// output, .git entries and .aval directories included, is an error too.
+func collectOutputs(dir, name string, c *contract.Contract, strict bool) ([]registry.Output, error) {
 	globs := splitGlobs(c.Outputs)
 	matched := make([]bool, len(globs))
 	var out []registry.Output
 	var total int64
 	err := fs.WalkDir(os.DirFS(dir), ".", func(rel string, d fs.DirEntry, err error) error {
-		if err != nil {
+		if err != nil || rel == "." {
 			return err
 		}
-		segs := strings.Split(rel, "/")
-		if d.Name() == ".git" { // VCS metadata of any type, as in the fingerprint
-			if d.IsDir() {
-				return fs.SkipDir
-			}
+		descend, output := outputEntry(globs, matched, strings.Split(rel, "/"), d)
+		switch {
+		case descend:
 			return nil
-		}
-		if d.IsDir() {
-			if rel != "." && (d.Name() == fingerprint.OutputDir || !slices.ContainsFunc(globs, func(g contract.Glob) bool { return g.MayContain(segs) })) {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if !matchOutput(globs, matched, segs) {
+		case !output && strict:
+			return fmt.Errorf("%s holds %s, which is not a declared output: nothing is published", dir, rel)
+		case !output && d.IsDir():
+			return fs.SkipDir
+		case !output:
 			return nil
 		}
 		if len(out) == registry.MaxOutputFiles {
@@ -192,6 +189,20 @@ func writable(dir, rel string) error {
 	return nil
 }
 
+// outputEntry reports whether collectOutputs walks into the entry d at the
+// split path segs, a directory that may hold outputs, or reads it, a file
+// that matches a glob (marked in matched). .git entries of any type and
+// .aval directories are neither.
+func outputEntry(globs []contract.Glob, matched []bool, segs []string, d fs.DirEntry) (descend, output bool) {
+	switch {
+	case d.Name() == ".git", d.IsDir() && d.Name() == fingerprint.OutputDir:
+		return false, false
+	case d.IsDir():
+		return slices.ContainsFunc(globs, func(g contract.Glob) bool { return g.MayContain(segs) }), false
+	}
+	return false, matchOutput(globs, matched, segs)
+}
+
 // matchOutput reports whether the split path matches any of globs, and
 // marks each glob it matches.
 func matchOutput(globs []contract.Glob, matched []bool, segs []string) bool {
@@ -210,4 +221,53 @@ func splitGlobs(globs []string) []contract.Glob {
 		out[i] = contract.SplitGlob(g)
 	}
 	return out
+}
+
+// saveOutputs copies the outputs of c, as push would collect them, into
+// dst (--outputs-dir), so a later 'aval push --outputs-dir' in another job
+// publishes the files this run wrote. dst is empty or missing (preflight).
+func saveOutputs(dst, file string, c *contract.Contract) error {
+	dir, name, err := contractRoot(file, c)
+	var files []registry.Output
+	if err == nil {
+		files, err = collectOutputs(dir, name, c, false)
+	}
+	for _, f := range files {
+		p := filepath.Join(dst, filepath.FromSlash(f.Path))
+		if err = os.MkdirAll(filepath.Dir(p), 0o755); err == nil {
+			err = os.WriteFile(p, f.Data, 0o644)
+		}
+		if err != nil {
+			break
+		}
+	}
+	return err
+}
+
+// outputsFrom checks --outputs-dir of push: the contract declares outputs
+// and dir is a directory, not a symlink to one.
+func outputsFrom(dir string, c *contract.Contract) error {
+	if len(c.Outputs) == 0 {
+		return fmt.Errorf("--outputs-dir %s: the contract declares no outputs: nothing is published", dir)
+	}
+	fi, err := os.Lstat(dir)
+	if err == nil && !fi.IsDir() {
+		err = errors.New("not a directory (symlinks are not followed)")
+	}
+	if err != nil {
+		return fmt.Errorf("--outputs-dir %s: %w", dir, err)
+	}
+	return nil
+}
+
+// emptyOrMissing fails unless dir does not exist or is an empty directory.
+func emptyOrMissing(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err == nil && len(entries) > 0 {
+		err = errors.New("is not empty")
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return err
 }

@@ -74,14 +74,22 @@ for dir in "$ARTIFACTS"/aval-*/; do
   if ! [[ "$name" =~ ^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$ ]]; then
     echo "::error title=aval publish::artifact aval-$name: \"$name\" is not a valid metadata.name"
     code=2
+  elif extra=$(/usr/bin/find "$dir" -mindepth 1 -maxdepth 1 ! -name result.json ! -name report.json ! -name record.json ! -name outputs -print -quit) && [ -n "$extra" ]; then
+    echo "::error title=aval publish::artifact aval-$name holds ${extra##*/}, which is not part of the artifact layout"
+    code=1
   elif ! token=$(printf 'header = "Authorization: Bearer %s"\n' "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" |
     /usr/bin/curl -fsS --retry 3 -K - "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | /usr/bin/jq -er '.value'); then
     echo "::error title=aval publish::$name: could not get an OIDC token for Sigstore"
     code=1
   else
     pushed=$((pushed + 1))
-    SIGSTORE_ID_TOKEN="$token" "$AVAL" push -f "$INPUT_FILE" --test "$name" --registry "$registry" \
-      --report-file "${dir}report.json" --result-file "${dir}result.json" || code=$?
+    args=(push -f "$INPUT_FILE" --test "$name" --registry "$registry" --report-file "${dir}report.json" --result-file "${dir}result.json")
+    # aval push checks every file under outputs/ against the contract's
+    # outputs globs and refuses anything else (#236).
+    if [ -e "${dir}outputs" ] || [ -L "${dir}outputs" ]; then
+      args+=(--outputs-dir "${dir}outputs")
+    fi
+    SIGSTORE_ID_TOKEN="$token" "$AVAL" "${args[@]}" || code=$?
   fi
   echo "| $name | exit $code |" >> "$GITHUB_STEP_SUMMARY"
   if [ "$code" -eq 5 ]; then

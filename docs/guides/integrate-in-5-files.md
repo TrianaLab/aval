@@ -73,9 +73,11 @@ say in `CONTRIBUTING.md` that CI reuses results.
 
 !!! note "Milestone 14"
     The actions install aval 0.7.0 until their pin moves to a release with
-    `--test`. The run action uploads `.aval/<test>/` only, so the publish
-    job cannot push a test with `outputs` (exit 1 for that test) until the
-    artifact carries them. TODO(milestone-14): carry `outputs` in the artifact (#236).
+    `--test`.
+
+The run action's artifact carries `coverage.out`, the output of `unit`, and
+the publish job pushes it from there, not from its own checkout
+([the artifact](github-actions.md#split-credentials)).
 
 ## Before you start
 

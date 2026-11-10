@@ -311,3 +311,102 @@ func TestGitHubPublishActionRefuses(t *testing.T) {
 		t.Fatalf("no artifacts: exit %d\n%s", r.code, r.out)
 	}
 }
+
+// outputsSet is a TestSet whose test cov writes the declared output
+// coverage.out.
+const outputsSet = `apiVersion: aval.trianalab.io/v1
+kind: TestSet
+tests:
+  - metadata: {name: cov}
+    runner: {command: ["sh", "-c", "printf cov > coverage.out"]}
+    scope: {source: ["src/**"]}
+    cacheability: hermetic
+    outputs: [coverage.out]
+`
+
+// outputsStory is a publish story whose contract is outputsSet. Its
+// artifact func runs the run action for cov on a push to main, copies
+// .aval/cov/ to the artifact aval-cov, lets edit change it, then deletes
+// coverage.out from the project, as the publish job's checkout has none.
+func outputsStory(t *testing.T) (*publishStory, func(t *testing.T, edit func(dst string))) {
+	t.Helper()
+	s := newPublishStory(t)
+	if err := os.WriteFile(filepath.Join(s.dir, "aval.yaml"), []byte(outputsSet), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cov := filepath.Join(s.dir, "coverage.out")
+	return s, func(t *testing.T, edit func(dst string)) {
+		t.Helper()
+		s.reset(t)
+		_ = os.Remove(cov)
+		if r := action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", "INPUT_TEST=cov"); r.code != 0 || r.outputs["upload"] != "true" {
+			t.Fatalf("run action: exit %d\n%s", r.code, r.out)
+		}
+		dst := filepath.Join(s.artifacts, "aval-cov")
+		if err := os.CopyFS(dst, os.DirFS(filepath.Join(s.dir, ".aval", "cov"))); err != nil {
+			t.Fatal(err)
+		}
+		if b, err := os.ReadFile(filepath.Join(dst, "outputs", "coverage.out")); err != nil || string(b) != "cov" {
+			t.Fatalf("artifact outputs/coverage.out: %q %v", b, err)
+		}
+		if edit != nil {
+			edit(dst)
+		}
+		if err := os.Remove(cov); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// The run action carries a test's outputs in its artifact (#236): the
+// publish action pushes them from there, in a checkout without them, the
+// attestation verifies, and a later run reuses it and restores them.
+func TestGitHubActionsCarryOutputs(t *testing.T) {
+	s, artifact := outputsStory(t)
+	artifact(t, nil)
+	if r := s.publish(t); r.code != 0 || len(pushes(r.calls)) != 1 || !strings.Contains(r.calls[0], "--outputs-dir "+filepath.Join(s.artifacts, "aval-cov", "outputs")) {
+		t.Fatalf("publish: exit %d\n%s\n%s", r.code, r.out, strings.Join(r.calls, "\n"))
+	}
+	if code := s.verify(t, "cov"); code != 0 {
+		t.Fatalf("verify cov: exit %d, want 0", code)
+	}
+	if out, errOut, code := avalIn(t, s.dir, "run", "--test", "cov", "--registry", s.repo, "--policy", ".github/aval/policy.yaml"); code != 0 || !strings.Contains(out, "restored coverage.out") {
+		t.Fatalf("reuse: exit %d\n%s\n%s", code, out, errOut)
+	}
+	if b, err := os.ReadFile(filepath.Join(s.dir, "coverage.out")); err != nil || string(b) != "cov" {
+		t.Fatalf("restored coverage.out: %q %v", b, err)
+	}
+}
+
+// An artifact with anything outside its layout, or an outputs/ entry that
+// is not a declared output, is refused for that test with exit 1 and
+// nothing is pushed.
+func TestGitHubActionsRefuseBadOutputs(t *testing.T) {
+	s, artifact := outputsStory(t)
+	put := func(rel, body string) func(string) {
+		return func(dst string) {
+			p := filepath.Join(dst, filepath.FromSlash(rel))
+			if err := errors.Join(os.MkdirAll(filepath.Dir(p), 0o755), os.WriteFile(p, []byte(body), 0o644)); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	for name, tc := range map[string]struct {
+		edit func(string)
+		want string
+	}{
+		"file outside the layout": {put("evil.sh", "x"), "artifact aval-cov holds evil.sh, which is not part of the artifact layout"},
+		"undeclared output":       {put("outputs/notes.txt", "x"), "notes.txt, which is not a declared output"},
+		"output escaping by symlink": {func(dst string) {
+			p := filepath.Join(dst, "outputs", "coverage.out")
+			if err := errors.Join(os.Remove(p), os.Symlink("/etc/hosts", p)); err != nil {
+				t.Fatal(err)
+			}
+		}, "coverage.out is not a regular file"},
+	} {
+		artifact(t, tc.edit)
+		if r := s.publish(t); r.code != 1 || !strings.Contains(r.out, tc.want) || s.verify(t, "cov") != 4 {
+			t.Fatalf("%s: exit %d, want 1, ~%q and nothing published\n%s", name, r.code, tc.want, r.out)
+		}
+	}
+}

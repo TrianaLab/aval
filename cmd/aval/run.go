@@ -51,7 +51,7 @@ const (
 
 type runFlags struct {
 	file, test, repo, policyFile, resultFile, reportFile, key string
-	recordFile, ciRunURL, repository                          string
+	recordFile, ciRunURL, repository, outputsDir              string
 	push, noReuse, shadow, fingerprintOnly, explain           bool
 	record, login                                             bool
 	registryTimeout                                           time.Duration
@@ -98,6 +98,7 @@ attestation, which is never reused, or more attestations than the lookup cap),
 	f.BoolVar(&o.login, "login", false, loginFlagHelp)
 	f.StringVar(&o.resultFile, "result-file", defaultResult, "where to record the result for 'aval push'")
 	f.StringVar(&o.reportFile, "report-file", "", "also write the lookup decision as a verify report (JSON) to this file")
+	f.StringVar(&o.outputsDir, "outputs-dir", "", "also copy the contract's outputs to this empty directory when the result is recorded, for 'aval push --outputs-dir' in another job (keep it outside the scope, e.g. under "+fingerprint.OutputDir+"/)")
 	f.BoolVar(&o.noReuse, "no-reuse", false, "always run, never reuse (excludes --shadow)")
 	f.BoolVar(&o.shadow, "shadow", false, "verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)")
 	f.BoolVar(&o.fingerprintOnly, "fingerprint-only", false, "print the execution fingerprint and exit (same as 'aval explain --digest')")
@@ -255,6 +256,9 @@ func (o runFlags) preflight() (string, error) {
 		if err := os.RemoveAll(filepath.Join(fingerprint.OutputDir, o.test)); err != nil {
 			return "", fmt.Errorf("removing the outputs of the last run: %w", err)
 		}
+	}
+	if err := emptyOrMissing(o.outputsDir); o.outputsDir != "" && !o.fingerprintOnly && err != nil {
+		return "", usageError{fmt.Errorf("--outputs-dir %s: %w", o.outputsDir, err)}
 	}
 	return stack, o.checkOutputs()
 }
@@ -643,6 +647,12 @@ func keep(ctx context.Context, w cliout.Run, sum *cliout.Summary, c *contract.Co
 	if err := writeJSON(o.resultFile, p); err != nil {
 		return []error{fmt.Errorf("recording result: %w", err)}
 	}
+	if o.outputsDir != "" && len(c.Outputs) > 0 {
+		// A failed test may write no outputs; push refuses that later.
+		if err := saveOutputs(o.outputsDir, o.file, c); err != nil {
+			fmt.Fprintf(w.Err, "aval: warning: outputs not copied to %s: %s\n", o.outputsDir, cliout.OneLine(err.Error()))
+		}
+	}
 	if !o.push {
 		return nil
 	}
@@ -650,7 +660,7 @@ func keep(ctx context.Context, w cliout.Run, sum *cliout.Summary, c *contract.Co
 		return []error{fmt.Errorf("result not published: %s", pinErr)}
 	}
 	warnUntrustedKey(w.Err, o.key, o.policyFile)
-	ref, err := signAndPush(ctx, w, p, c, o.file, o.repo, o.key, token, o.registryTimeout)
+	ref, err := signAndPush(ctx, w, p, c, o.file, "", o.repo, o.key, token, o.registryTimeout)
 	if err != nil {
 		return []error{err}
 	}
@@ -741,17 +751,26 @@ func writeJSON(path string, v any) error {
 // token from the interactive login when there is no key and no token,
 // publishes the outputs, then signs the predicate with them (key-based with
 // key, else keyless with the token) and publishes it under its fingerprint,
-// each within timeout. Outputs that break a rule, or a failed login,
+// each within timeout. With from (--outputs-dir), the outputs are read from
+// that directory, which must hold nothing else. Outputs that break a rule, or a failed login,
 // publish nothing. The login runs only now, after the test, so the
 // short-lived token is fresh and runner.command never had it. ui shows the
 // registry wait spinner, never over the login prompt.
-func signAndPush(ctx context.Context, ui cliout.Run, p *evidence.Predicate, c *contract.Contract, file, repo, key, token string, timeout time.Duration) (string, error) {
+func signAndPush(ctx context.Context, ui cliout.Run, p *evidence.Predicate, c *contract.Contract, file, from, repo, key, token string, timeout time.Duration) (string, error) {
 	var files []registry.Output
 	var err error
+	if from != "" {
+		if err := outputsFrom(from, c); err != nil {
+			return "", fmt.Errorf("result not published: %w", err)
+		}
+	}
 	if len(c.Outputs) > 0 {
 		dir, name, err := contractRoot(file, c)
+		if from != "" {
+			dir = from
+		}
 		if err == nil {
-			files, err = collectOutputs(dir, name, c)
+			files, err = collectOutputs(dir, name, c, from != "")
 		}
 		if err != nil {
 			return "", fmt.Errorf("result not published: %w", err)
@@ -795,7 +814,7 @@ func signAndPush(ctx context.Context, ui cliout.Run, p *evidence.Predicate, c *c
 }
 
 func newPushCmd() *cobra.Command {
-	var key, resultFile, reportFile string
+	var key, resultFile, reportFile, outputsDir string
 	g := &globalFlags{}
 	var interactive bool
 	cmd := &cobra.Command{
@@ -809,6 +828,9 @@ when it records a security event (outcome verification-failed, or a rejected
 attestation that failed verification), push publishes nothing and exits 5.
 A non-deterministic test is never pushed: push publishes nothing and exits 0.
 With --test, the result and the report must both be for that test.
+--outputs-dir reads the contract's outputs from the directory that
+'aval run --outputs-dir' filled, not from the contract root: any entry in it
+that is not a regular file matched by an outputs glob publishes nothing.
 Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 ` + loginHelp + `.`,
 		Args: noArgs,
@@ -859,7 +881,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 					p.Test.ID, p.Test.Cacheability, p.Execution.Fingerprint, c.Metadata.Name, c.Cacheability, fp.Digest)
 			}
 			ui := runWriter(cmd.OutOrStdout(), cmd.ErrOrStderr(), plainFlag(cmd))
-			ref, err := signAndPush(cmd.Context(), ui, p, c, file, repo, key, token, timeout)
+			ref, err := signAndPush(cmd.Context(), ui, p, c, file, outputsDir, repo, key, token, timeout)
 			if err != nil {
 				return err
 			}
@@ -873,6 +895,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 	f.BoolVar(&interactive, "login", false, loginFlagHelp)
 	f.StringVar(&resultFile, "result-file", defaultResult, "result recorded by 'aval run'")
 	f.StringVar(&reportFile, "report-file", "", "report written by the same 'aval run'; push nothing when it reused a verified result, and exit 5 when it records a security event")
+	f.StringVar(&outputsDir, "outputs-dir", "", "read the contract's outputs from this directory ('aval run --outputs-dir') instead of the contract root; anything in it that is not a declared output publishes nothing")
 	alias(cmd, "result-file", "result") // TODO(milestone-13): remove (deprecated in 0.7.0, #165), not before 0.8.0.
 	return cmd
 }

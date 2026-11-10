@@ -35,8 +35,8 @@ takes `test` (required), `file` (default `aval.yaml`) and `policy` (default
    ([Write a trust policy](trust-policy.md)); the job's `AVAL_REGISTRY` and
    `AVAL_POLICY` are ignored. With no policy nothing is reused, the test
    runs and a warning is logged.
-4. Runs `aval run -f <file> --test <test>` with the CI run URL and the
-   repository for the run record.
+4. Runs `aval run -f <file> --test <test>` with the CI run URL, the
+   repository and, on a push to the default branch, `--outputs-dir`.
 5. Writes the outcome to the step summary and the `outcome` output. Exit 5
    sets the outcome to `verification-failed`, becomes an `aval SECURITY`
    error annotation and fails the step; a miss is routine.
@@ -46,9 +46,7 @@ takes `test` (required), `file` (default `aval.yaml`) and `policy` (default
    `minTrustLevel`.
 
 The policy is a separate file on the default branch, so `publicKey` paths in
-it are not fetched; use keyless identities.
-
-The action runs on Linux and macOS runners that ship `/usr/bin/jq`
+it are not fetched; use keyless identities. The action needs `/usr/bin/jq`
 (GitHub's Ubuntu images, macOS 15 and later).
 
 !!! note "Pinned release"
@@ -93,17 +91,19 @@ What `aval push` does with each artifact:
 - A `miss` or an `error` publishes the result, failures included: on a tie
   in trust level a failure outranks a later flaky pass.
 - A report that records a security event signs nothing and exits 5.
+- The artifact holds `result.json`, `report.json`, `record.json` and
+  `outputs/<path>`, the files the `outputs` globs matched; push publishes
+  those (`--outputs-dir`), not the checkout's. Any other entry, or a symlink,
+  extra file, input, `.git` or `.aval` in `outputs/`, exits 1 and publishes nothing.
 - Trust only this workflow on `main`: [Write a trust policy](trust-policy.md#the-example).
 
 ### Why a composite action
 
-The publish action is a composite action, not a reusable workflow
-(`workflow_call`). The steps of a composite action run inside the caller's
-job, so the Fulcio certificate names the calling workflow, for example
-`https://github.com/acme/app/.github/workflows/ci.yaml@refs/heads/main`.
-A reusable workflow would put Aval's workflow in the certificate of every
-repository that calls it, and a `subjectRegexp` for it would trust them all.
-Aval's CI checks the certificates its `main` signs this way.
+The publish action is a composite action, not a reusable workflow: its steps
+run in the caller's job, so the Fulcio certificate names the calling workflow
+(`https://github.com/acme/app/.github/workflows/ci.yaml@refs/heads/main`). A
+reusable workflow would put Aval's workflow in every caller's certificate, and
+one `subjectRegexp` would trust them all. Aval's CI checks this.
 
 ## Pull requests
 
