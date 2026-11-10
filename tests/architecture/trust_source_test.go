@@ -28,6 +28,11 @@ const (
 	// statsReport has a json "registry" field in a report Aval writes and
 	// never parses for trust.
 	statsReport = "pkg/evidence/stats.go"
+	// policyFile is the trust policy parser. Its yaml "registry" field is the
+	// one file source of the registry (#209): the policy comes from the
+	// protected branch, never from the tree under test. It may not name a
+	// policy, and nothing else may name the registry.
+	policyFile = "internal/policy/policy.go"
 )
 
 // trustEnvConst names the resolver's constants for the variables.
@@ -63,7 +68,8 @@ func trustSourceProblems(t *testing.T, dir string, rel func(string) string) []st
 
 // The tree under test controls aval.yaml and every file in it; PR CI takes
 // trust from the base branch (#137). So the registry and the policy come
-// only from flags or AVAL_REGISTRY / AVAL_POLICY (#163).
+// only from flags or AVAL_REGISTRY / AVAL_POLICY (#163), and the registry
+// also from the trust policy (#209).
 func TestTrustSource(t *testing.T) {
 	for _, dir := range []string{"cmd", "internal", "pkg"} {
 		for _, p := range trustSourceProblems(t, filepath.Join(root, dir), func(p string) string {
@@ -84,6 +90,30 @@ func TestTrustSourceCheckCatchesFixtures(t *testing.T) {
 	}
 }
 
+// Only the policy parser may read a registry from a file, only under yaml
+// "registry", and it may not name a policy; aval.yaml or a config file
+// naming the registry is still reported (#209).
+func TestOnlyThePolicyNamesTheRegistry(t *testing.T) {
+	field := func(tag string) *ast.Field {
+		return &ast.Field{Tag: &ast.BasicLit{Kind: token.STRING, Value: strconv.Quote(tag)}}
+	}
+	if p := nodeProblems(policyFile, field(`yaml:"registry"`)); len(p) != 0 {
+		t.Errorf("policy registry reported: %v", p)
+	}
+	for name, tag := range map[string]string{
+		policyFile:                      `yaml:"policy"`,
+		policyFile + " json":            `json:"registry"`,
+		"internal/contract/contract.go": `yaml:"registry"`,
+		"cmd/aval/config.go":            `yaml:"registry,omitempty"`,
+		"internal/policy/other.go":      `yaml:"registry"`,
+	} {
+		file, _, _ := strings.Cut(name, " ")
+		if p := nodeProblems(file, field(tag)); len(p) == 0 {
+			t.Errorf("%s %s: no problem reported", name, tag)
+		}
+	}
+}
+
 // nodeProblems checks one syntax node of the file name.
 func nodeProblems(name string, n ast.Node) []string {
 	var problems []string
@@ -94,7 +124,11 @@ func nodeProblems(name string, n ast.Node) []string {
 		}
 		tag, _ := strconv.Unquote(n.Tag.Value)
 		for _, key := range []string{"yaml", "json"} {
-			if v, _, _ := strings.Cut(reflect.StructTag(tag).Get(key), ","); trustField.MatchString(v) {
+			v, _, _ := strings.Cut(reflect.StructTag(tag).Get(key), ",")
+			if name == policyFile && key == "yaml" && v == "registry" {
+				continue
+			}
+			if trustField.MatchString(v) {
 				problems = append(problems, name+": field tagged "+key+":"+strconv.Quote(v)+" reads the registry or policy from a file")
 			}
 		}

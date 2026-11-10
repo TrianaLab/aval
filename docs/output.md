@@ -16,8 +16,9 @@ summary: hello ran: passed in 12ms
 ```
 
 - The first line is `<outcome> <test> <digest>`.
-- When a value came from `AVAL_REGISTRY` or `AVAL_POLICY`, a `config:` line shows
-  the registry and policy in use and where each came from.
+- When a value came from `AVAL_REGISTRY`, `AVAL_POLICY` or the policy's
+  `registry` field, a `config:` line shows the registry and policy in use and
+  where each came from (`flag`, `env AVAL_REGISTRY`, `policy <file>`).
 - The test's own output sits between `--- run` and `--- end`, untouched.
 - `summary:` may add `; saved <time>` (display only), `; result pushed`,
   `; reuse was off` and `; SECURITY`.

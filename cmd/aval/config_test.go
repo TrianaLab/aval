@@ -41,11 +41,80 @@ func TestResolvePrecedence(t *testing.T) {
 				env = map[string]string{}
 			}
 			g := &globalFlags{registry: tc.flag, policy: tc.flag, usesPolicy: true}
-			g.resolve(func(k string) string { return env[k] })
-			if g.registry != tc.want || g.policy != tc.want || g.fromEnv[registryEnv] != tc.fromEnv || g.fromEnv[policyEnv] != tc.fromEnv {
-				t.Fatalf("registry %q policy %q fromEnv %v; want %q from env %v", g.registry, g.policy, g.fromEnv, tc.want, tc.fromEnv)
+			if err := g.resolve(func(k string) string { return env[k] }); err != nil {
+				t.Fatal(err)
+			}
+			fromEnv := func(k string) bool { return g.source[k] == "env "+k }
+			if g.registry != tc.want || g.policy != tc.want || fromEnv(registryEnv) != tc.fromEnv || fromEnv(policyEnv) != tc.fromEnv {
+				t.Fatalf("registry %q policy %q source %v; want %q from env %v", g.registry, g.policy, g.source, tc.want, tc.fromEnv)
 			}
 		})
+	}
+}
+
+// The registry: --registry > AVAL_REGISTRY > the policy's registry > none
+// (#209), and the config: line names the source that won. Only a command
+// that uses the policy falls back to it.
+func TestRegistryPrecedenceWithPolicy(t *testing.T) {
+	cases := []struct {
+		name, flag, env, policyReg string
+		usesPolicy                 bool
+		want, config               string
+	}{
+		{"flag", "flag.example/r", "env.example/r", "pol.example/r", true, "flag.example/r", ""},
+		{"env", "", "env.example/r", "pol.example/r", true, "env.example/r", "config: registry=env.example/r (env AVAL_REGISTRY) policy=p.yaml (flag)"},
+		{"policy", "", "", "pol.example/r", true, "pol.example/r", "config: registry=pol.example/r (policy p.yaml) policy=p.yaml (flag)"},
+		{"none", "", "", "", true, "", ""},
+		{"policy not used", "", "", "pol.example/r", false, "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			l := loadPolicy
+			t.Cleanup(func() { loadPolicy = l })
+			loadPolicy = func(p string) (*policy.Policy, error) {
+				if p != "p.yaml" {
+					return nil, fmt.Errorf("policy %q used", p)
+				}
+				return &policy.Policy{Registry: tc.policyReg}, nil
+			}
+			g := &globalFlags{registry: tc.flag, usesPolicy: tc.usesPolicy}
+			if tc.usesPolicy {
+				g.policy = "p.yaml"
+			}
+			if err := g.resolve(func(k string) string { return map[string]string{registryEnv: tc.env}[k] }); err != nil {
+				t.Fatal(err)
+			}
+			if g.registry != tc.want || g.configLine() != tc.config {
+				t.Fatalf("registry %q, config %q; want %q, %q", g.registry, g.configLine(), tc.want, tc.config)
+			}
+		})
+	}
+}
+
+// A policy registry with credentials exits 2 before anything runs, even
+// when a flag names the registry, and never prints the secret. The test is
+// not run.
+func TestPolicyRegistryCredentialsExit2(t *testing.T) {
+	dir := t.TempDir()
+	pol := filepath.Join(dir, "policy.yaml")
+	body := "apiVersion: aval.trianalab.io/v1\nkind: Policy\nminTrustLevel: runner\nregistry: user:s3cret@ghcr.io/acme/x\nidentities:\n  - issuer: https://issuer.example\n    subjectRegexp: ci\n    trustLevel: runner\n"
+	if err := os.WriteFile(pol, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	argv, ran := marker(t, 0)
+	c := contractWith(t, "hermetic", argv...)
+	for _, args := range [][]string{
+		{"run", "-f", c, "--policy", pol, "--result-file", filepath.Join(dir, "r.json")},
+		{"run", "-f", c, "--policy", pol, "--registry", "reg.example/r", "--result-file", filepath.Join(dir, "r.json")},
+		{"verify", "-f", c, "--policy", pol},
+	} {
+		code, stdout, stderr := runCLI(args...)
+		if code != ExitUsage || strings.Contains(stdout+stderr, "s3cret") || !strings.Contains(stderr, "credentials") {
+			t.Errorf("%v: exit %d, stdout %q, stderr %q", args, code, stdout, stderr)
+		}
+	}
+	if ran() {
+		t.Error("runner.command ran")
 	}
 }
 
@@ -58,13 +127,16 @@ func TestRunTakesRegistryAndPolicyFromEnv(t *testing.T) {
 		env, flags []string
 		reason     string
 		config     string
+		policyReg  string
 	}{
-		{"neither: reuse off", nil, nil, "reuse off: no registry (set AVAL_REGISTRY or --registry)", ""},
-		{"empty env is unset", []string{"", ""}, nil, "reuse off: no registry", ""},
-		{"env registry, no policy", []string{"reg.example/env", ""}, nil, "reuse off: no trust policy (set AVAL_POLICY or --policy)", "config: registry=reg.example/env (env AVAL_REGISTRY)\n"},
-		{"env both", []string{"reg.example/env", "p.yaml"}, nil, "verified", "config: registry=reg.example/env (env AVAL_REGISTRY) policy=p.yaml (env AVAL_POLICY)\n"},
-		{"flag beats env", []string{"bad registry", "missing.yaml"}, []string{"--registry", "reg.example/r", "--policy", "p.yaml"}, "verified", ""},
-		{"flag registry, env policy", []string{"", "p.yaml"}, []string{"--registry", "reg.example/r"}, "verified", "config: registry=reg.example/r (flag) policy=p.yaml (env AVAL_POLICY)\n"},
+		{"neither: reuse off", nil, nil, "reuse off: no registry (set AVAL_REGISTRY or --registry)", "", ""},
+		{"empty env is unset", []string{"", ""}, nil, "reuse off: no registry", "", ""},
+		{"env registry, no policy", []string{"reg.example/env", ""}, nil, "reuse off: no trust policy (set AVAL_POLICY or --policy)", "config: registry=reg.example/env (env AVAL_REGISTRY)\n", ""},
+		{"env both", []string{"reg.example/env", "p.yaml"}, nil, "verified", "config: registry=reg.example/env (env AVAL_REGISTRY) policy=p.yaml (env AVAL_POLICY)\n", ""},
+		{"flag beats env", []string{"bad registry", "missing.yaml"}, []string{"--registry", "reg.example/r", "--policy", "p.yaml"}, "verified", "", ""},
+		{"flag registry, env policy", []string{"", "p.yaml"}, []string{"--registry", "reg.example/r"}, "verified", "config: registry=reg.example/r (flag) policy=p.yaml (env AVAL_POLICY)\n", ""},
+		{"policy registry", []string{"", "p.yaml"}, nil, "verified", "config: registry=pol.example/r (policy p.yaml) policy=p.yaml (env AVAL_POLICY)\n", "pol.example/r"},
+		{"env beats policy registry", []string{"reg.example/env", "p.yaml"}, nil, "verified", "config: registry=reg.example/env (env AVAL_REGISTRY) policy=p.yaml (env AVAL_POLICY)\n", "pol.example/r"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -74,7 +146,9 @@ func TestRunTakesRegistryAndPolicyFromEnv(t *testing.T) {
 				if p != "p.yaml" {
 					return nil, fmt.Errorf("policy %q used", p)
 				}
-				return fake(p)
+				pol, err := fake(p)
+				pol.Registry = tc.policyReg
+				return pol, err
 			}
 			if tc.env != nil {
 				t.Setenv(registryEnv, tc.env[0])

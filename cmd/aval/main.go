@@ -201,7 +201,8 @@ func newRootCmd() *cobra.Command {
 
 --registry and --policy fall back to $` + registryEnv + ` and $` + policyEnv + `; a flag
 wins, and an empty value counts as unset (an empty flag too: use --no-reuse
-to turn reuse off). There is no config file.`,
+to turn reuse off). run and verify then take the registry from the trust
+policy's registry field. There is no config file.`,
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
