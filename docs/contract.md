@@ -76,7 +76,7 @@ each shard of a split suite its own file
 | `apiVersion` | string | yes | Must be `aval.trianalab.io/v1`. |
 | `kind` | string | yes | Must be `Test`. |
 | `metadata.name` | string | yes | 1-64 chars of `[a-z0-9._-]`, starting and ending with `[a-z0-9]`. |
-| `runner.command` | list of strings | yes | Non-empty argv, first element not blank. No shell. |
+| `runner.command` | list of strings | yes | Non-empty argv, first element not blank. No shell. It must not start `aval run` on the same contract again, directly or through other contracts: see [Nested runs](#nested-runs). |
 | `scope.source` | list of globs | yes | At least one glob. Each glob must match a file, and at least one file must remain after `exclude`. |
 | `scope.exclude` | list of globs | no | Removes files from the `source` set (not from `dependencies`). May match nothing. |
 | `scope.dependencies` | list of globs | no | Lockfiles and manifests. Each glob must match a file. |
@@ -85,9 +85,27 @@ each shard of a split suite its own file
 | `scope.contracts` | list of paths | no | Other contracts this test depends on ([Depend on another part of the repo](guides/depend-on-a-contract.md)). Each path is relative to this contract's directory: clean (`..` only at the start), slash-separated, no spaces, ending in `.yaml` or `.yml`, listed once. At fingerprint time the file must be a valid contract inside the git working tree of this contract (the nearest directory at or above it with a `.git` entry), with no symlink on the path; if this contract's own directory is a symlink, `..` is resolved from its real location. No cycles, at most 8 levels and 64 distinct contracts. A referenced contract's mutable references block reuse here too, unless its own `scope.allowMutable` accepts them. |
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
 | `environment.probe` | map string to list of strings | no | Each key must be an `environment.toolchain` key with a non-empty value; each value a non-empty argv, first element not blank. See [Probe the toolchain](#probe-the-toolchain). |
-| `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
+| `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`, except `AVAL_RUN_STACK` in any case (set by `aval run`, not an input). |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
 | `outputs` | list of globs | no | Files the test writes that a reused result restores, such as `coverage.xml` ([Restore coverage and reports on reuse](guides/write-a-contract.md#restore-coverage-and-reports-on-reuse)). Same glob rules as `scope`. When publishing, each glob must match a regular file (no symlink) that is not the contract file, outside the scope, `.git` and `.aval`; at most 256 files, 16 MiB each, 64 MiB in total. Otherwise nothing is published (exit 1). Omitted from the fingerprint when empty, so existing contracts keep theirs; adding it changes the fingerprint, so a result without outputs is never reused for it. |
+
+## Nested runs
+
+`aval run` sets `AVAL_RUN_STACK` for `runner.command` and the probes: the
+absolute, symlink-resolved paths of the contracts of the enclosing runs plus
+its own, joined by the OS path list separator (`:` or `;`). A run whose
+contract is already in the stack exits 2 before it probes, looks up or runs
+anything:
+
+```text
+aval: aval.yaml is already running in an outer aval run (/repo/aval.yaml): runner.command must not start the same contract again
+```
+
+The outer run then records a failed test (exit 3). This catches a make target
+that calls `aval run` and a contract whose `runner.command` calls that target,
+and a cycle through several contracts. A `runner.command` that runs `aval run`
+on a different contract works. `AVAL_RUN_STACK` is not an input: it is never
+hashed nor recorded, and `environment.env` cannot list it.
 
 ## Globs
 

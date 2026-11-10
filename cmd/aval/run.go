@@ -72,6 +72,11 @@ Without a registry and a trust policy the test always runs. --registry-timeout
 covers lookup and fetch together; --push has its own. runner.command never
 sees $` + idTokenEnv + `, $` + registryEnv + ` or $` + policyEnv + `.
 
+runner.command and the probes get $` + contract.RunStackEnv + `, the contracts of
+the enclosing aval runs. A run whose contract is already there exits 2 before
+doing anything: runner.command must not start the same contract again. A
+nested run of another contract works.
+
 Exit codes: 0 pass, 3 fail, 5 verification failed (a security event, after
 running the test: also a verified result beside a rejected verification-failed
 attestation, which is never reused, or more attestations than the lookup cap),
@@ -229,6 +234,16 @@ func (o runFlags) checkOutputs() error {
 	return nil
 }
 
+// preflight refuses a run nested in its own runner.command and outputs Aval
+// would not overwrite, and returns $AVAL_RUN_STACK for the commands it starts.
+func (o runFlags) preflight() (string, error) {
+	stack, err := runStack(o.file)
+	if err != nil {
+		return "", err
+	}
+	return stack, o.checkOutputs()
+}
+
 // outputs are the files run writes as Aval output. A file at --stats-file
 // that Aval did not write is left out, so it stays what it is (an input, if
 // in scope): recordRun does not overwrite it, and a statistics flag never
@@ -252,7 +267,8 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	if c == nil {
 		return fpErr
 	}
-	if err := o.checkOutputs(); err != nil {
+	stack, err := o.preflight()
+	if err != nil {
 		return err
 	}
 	ctx, out, warn := cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr()
@@ -263,7 +279,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 		}
 	}
 	w.Note(o.config.configLine())
-	observed, probeErr := probe(ctx, c, filepath.Dir(o.file))
+	observed, probeErr := probe(ctx, c, filepath.Dir(o.file), stack)
 	r, files, lookupErr := decide(ctx, w, c, fp, cmp.Or(fpErr, probeErr), o)
 	// A rejected verification-failed candidate blocks reuse even beside a
 	// verified one: run the test, then exit 5 (invariants 3, 4, #195).
@@ -293,7 +309,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 		errs = append(errs, shown{lookupErr})
 	}
 	w.Start(c.Metadata.Name, c.Runner.Command)
-	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), fp, observed)
+	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), stack, fp, observed)
 	if err != nil {
 		recordRun(ctx, out, warn, o, r, false, nil)
 		return errors.Join(append(errs, err)...)
@@ -485,13 +501,13 @@ const maxProbeOutput = 4 << 10
 // signing token, and checks that its output holds the declared toolchain
 // value as a version token. It returns the outputs as probe.<key>. Only
 // `aval run` calls it: a consumer never executes contract-supplied commands.
-func probe(ctx context.Context, c *contract.Contract, dir string) (map[string]string, error) {
+func probe(ctx context.Context, c *contract.Contract, dir, stack string) (map[string]string, error) {
 	seen := map[string]string{}
 	for _, k := range slices.Sorted(maps.Keys(c.Environment.Probe)) {
 		argv, want := c.Environment.Probe[k], c.Environment.Toolchain[k]
 		pctx, cancel := context.WithTimeout(ctx, probeTimeout)
 		x := exec.CommandContext(pctx, argv[0], argv[1:]...)
-		x.Dir, x.Env, x.WaitDelay = dir, childEnv(), time.Second
+		x.Dir, x.Env, x.WaitDelay = dir, childEnv(stack), time.Second
 		raw, err := x.CombinedOutput()
 		cancel()
 		if err == nil && len(raw) > maxProbeOutput {
@@ -522,21 +538,43 @@ func hasVersion(out, want string) bool {
 // childEnv is the environment of commands Aval runs, without the signing
 // token, the registry and the trust policy: the code under test must not be
 // able to sign results as this workload, nor reuse or publish against the
-// operator's trust settings.
-func childEnv() []string {
-	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
+// operator's trust settings. $AVAL_RUN_STACK is set to stack (see runStack).
+func childEnv(stack string) []string {
+	return append(slices.DeleteFunc(os.Environ(), func(kv string) bool {
 		k, _, _ := strings.Cut(kv, "=")
-		return k == idTokenEnv || k == registryEnv || k == policyEnv
-	})
+		return k == idTokenEnv || k == registryEnv || k == policyEnv || k == contract.RunStackEnv
+	}), contract.RunStackEnv+"="+stack)
+}
+
+// runStack returns $AVAL_RUN_STACK for the commands this run starts: the
+// outer runs' contracts plus file, absolute and symlink-resolved, joined by
+// the OS path list separator. A contract already in the outer stack is a
+// usage error: its runner.command started it again, which would loop
+// without end (#196). The stack is never an input: contract validation
+// rejects it in environment.env.
+func runStack(file string) (string, error) {
+	self, err := filepath.Abs(file)
+	if err == nil {
+		self, err = filepath.EvalSymlinks(self)
+	}
+	if err != nil {
+		return "", err
+	}
+	outer := os.Getenv(contract.RunStackEnv)
+	stack := filepath.SplitList(outer)
+	if slices.Contains(stack, self) {
+		return "", usageError{fmt.Errorf("%s is already running in an outer aval run (%s): runner.command must not start the same contract again", file, outer)}
+	}
+	return strings.Join(append(stack, self), string(os.PathListSeparator)), nil
 }
 
 // execute runs runner.command in the contract's directory and returns the
 // unsigned predicate for the run, with the probe outputs (observed) in its
 // environment. A command that cannot start is an error, not a failed test.
-func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract, dir string, fp fingerprint.Fingerprint, observed map[string]string) (*evidence.Predicate, error) {
+func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract, dir, stack string, fp fingerprint.Fingerprint, observed map[string]string) (*evidence.Predicate, error) {
 	argv := c.Runner.Command
 	x := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	x.Dir, x.Stdout, x.Stderr, x.Env = dir, stdout, stderr, childEnv()
+	x.Dir, x.Stdout, x.Stderr, x.Env = dir, stdout, stderr, childEnv(stack)
 	start := time.Now().UTC()
 	err := x.Run()
 	var exit *exec.ExitError

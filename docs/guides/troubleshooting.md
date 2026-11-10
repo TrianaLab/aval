@@ -26,6 +26,7 @@ flowchart LR
     | `--registry-timeout must be positive`, `--output must be text or json`, `unknown command`, `unknown flag` | fix the value (the message names the closest command or flag, `did you mean "run"?`); see `aval <command> --help` |
     | `signing needs one of:` | pass `--key` (`aval keygen` makes one), set `SIGSTORE_ID_TOKEN`, or sign on a terminal or with `--login` ([Signing](signing.md)) |
     | `not a PEM file`, `PEM type <x> is encrypted`, `not an ECDSA P-256 key`, `is a public key`, `pass the private key` | make an unencrypted P-256 key ([Signing](signing.md)); for a public key, pass `<name>.key`, not `<name>.pub` |
+    | `is already running in an outer aval run` | `runner.command` starts `aval run` on the same contract again, directly or through other contracts: call the test command itself, not the target that wraps it in `aval run` ([Nested runs](../contract.md#nested-runs)) |
     | `holds neither an Aval result nor a report`, `is an input of the test` | write `--result-file` and `--report-file` under `.aval/`; for `output <x> is an input of the test`, exclude it from `scope` |
 
 ??? failure "Contract errors"
@@ -39,7 +40,7 @@ flowchart LR
     | `scope.source: at least one glob is required` | list the files the test reads |
     | `empty glob`, `must be a relative, slash-separated path`, `empty, '.' or '..' segments are not allowed`, `'**' must be a whole path segment` | write globs like `src/**/*.go` |
     | `cacheability: required`, `cacheability: unknown class` | pick a [class](write-a-contract.md#step-by-step) |
-    | `environment.toolchain: invalid key`, `invalid variable name`, `environment.probe.<key>: not a key of environment.toolchain`, `environment.probe.<key>: must be a non-empty argv list`, `environment.probe.<key>: environment.toolchain.<key> must not be empty` | lower case tool names, valid variable names; probe only declared, non-empty toolchain keys, each with an argv |
+    | `environment.toolchain: invalid key`, `invalid variable name`, `environment.probe.<key>: not a key of environment.toolchain`, `environment.probe.<key>: must be a non-empty argv list`, `environment.probe.<key>: environment.toolchain.<key> must not be empty`, `is set by aval run and is not an input` | lower case tool names, valid variable names other than `AVAL_RUN_STACK`; probe only declared, non-empty toolchain keys, each with an argv |
     | `scope.allowMutable[<i>]: ref and reason are both required`, `file <x> must be a slash-separated path relative to the contract` | give each entry a `ref`, a `reason` and, if needed, a `file` as the finding prints it ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
     | `scope.resolve[<i>]: <x>`, `unknown kind <x>`, `the reference must be non-empty`, `credentials in the reference are not allowed`, `a scope.resolve entry is one` | one known `kind: reference` per entry, no credentials ([Resolve references](../resolve/index.md)) |
     | `scope.contracts[<i>]: <x>`, `must be slash-separated`, `must be a clean relative path`, `must name a contract file`, `is listed twice` | a relative path to a `.yaml` contract, listed once ([Depend on another part of the repo](depend-on-a-contract.md)) |
