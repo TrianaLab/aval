@@ -1,0 +1,12 @@
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata: {name: unit}
+runner: {command: [go, test, ./src/...]}
+scope:
+  source: ["src/**", "VERSION"]
+  exclude: ["**/testdata/**"]
+  dependencies: ["go.sum"]
+environment:
+  toolchain: {go: "1.25"}
+  env: [CI]
+cacheability: hermetic

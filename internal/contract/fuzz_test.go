@@ -83,3 +83,34 @@ func FuzzMatch(f *testing.F) {
 		}
 	})
 }
+
+// FuzzParseAll: ParseAll never panics, and every test of an accepted
+// TestSet is a valid standalone kind: Test with a name of its own.
+func FuzzParseAll(f *testing.F) {
+	f.Add([]byte(set))
+	f.Add([]byte(valid))
+	f.Add([]byte(strings.Replace(set, "use: [web, db]", "use: [web, db, nope]", 1)))
+	f.Add([]byte(strings.Replace(set, `total: ["2"]`, `total: ["2", "{index}"]`, 1)))
+	f.Add([]byte(strings.Replace(set, "web:\n", "web:\n    use: [db]\n", 1)))
+	f.Add([]byte(strings.Replace(set, `toolchain: {postgres: "16"}`, `toolchain: {postgres: "16", go: "1.24"}`, 1)))
+	f.Add([]byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ntests: []\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		cs, err := ParseAll(data)
+		if err != nil {
+			return
+		}
+		names := map[string]bool{}
+		for _, c := range cs {
+			if err := c.Validate(); err != nil {
+				t.Fatalf("ParseAll accepted an invalid test: %v", err)
+			}
+			if names[c.Metadata.Name] {
+				t.Fatalf("ParseAll accepted two tests named %q", c.Metadata.Name)
+			}
+			names[c.Metadata.Name] = true
+		}
+		if len(cs) == 0 || len(cs) > maxTests {
+			t.Fatalf("ParseAll returned %d tests", len(cs))
+		}
+	})
+}

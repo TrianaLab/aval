@@ -424,6 +424,10 @@ func (t *tree) load(file string) (Dependency, error) {
 		return Dependency{}, err
 	}
 	c, err := contract.Parse(data)
+	if errors.Is(err, contract.ErrTestSet) {
+		// Fragments share scope inside a TestSet; a reference binds one test.
+		return Dependency{}, fmt.Errorf("%w: %s is a kind: TestSet; scope.contracts takes a kind: Test (share scope with fragments instead)", ErrContract, file)
+	}
 	if err != nil {
 		return Dependency{}, err
 	}

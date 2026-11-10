@@ -10,7 +10,8 @@ flowchart LR
   c[change under packages/app] -. reruns .-> s2
 ```
 
-No new field: `-f`, `scope` and `environment.env` do it. Example:
+Patterns A and B need no new field: `-f`, `scope` and `environment.env` do
+it. Pattern C uses a TestSet `matrix`. Example:
 [`examples/uv-monorepo`](https://github.com/TrianaLab/aval/tree/main/examples/uv-monorepo).
 
 ## Pattern A: one contract per shard
@@ -41,6 +42,22 @@ Simpler, less reuse: a change anywhere reruns every shard.
 !!! warning "Declare both variables"
     Leave `SHARD_INDEX` or `SHARD_TOTAL` out of `environment.env` and shards
     share a fingerprint: shard 2 reuses shard 1's result, a false hit.
+
+## Pattern C: one TestSet, a `matrix`
+
+One file, and each shard is its own test: `matrix` writes the shard into
+`runner.command`, so it is part of the fingerprinted argv and no variable can
+drift between the job that runs a shard and the job that pushes it. Reuse
+is the same as pattern B, since the shards share one scope. Rules:
+[Many tests in one file](../contract.md#many-tests-in-one-file-testset).
+
+```yaml
+--8<-- "internal/fingerprint/testdata/shards/pattern-c.yaml"
+```
+
+!!! note "Not runnable yet"
+    The set has two tests, and `aval run` takes a TestSet of one test until
+    a test can be selected by name (#207).
 
 ## The matrix
 

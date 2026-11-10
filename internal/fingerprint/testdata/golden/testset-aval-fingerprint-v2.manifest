@@ -1,0 +1,35 @@
+aval-fingerprint/v2
+contract efcfed38ca6536887ed01465f484dc885034cda70ef062567d9ee97790200e41
+source 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03 - VERSION
+source ec016cc15d1b6ac2ddd18a8986d7cec46fced460244c9daa761ddfd5b9a10907 - src/a.go
+dependency 8eb0d464e29d8660146a56e6cac2b5d8f9c384b571b2389da4916eaeb12ce449 - go.sum
+toolchain go=1.25
+env CI unset
+aval-fingerprint/v2
+contract 6f693830b3880b664b64675e6b254298be278a67252e1be959c8515ebd23cbd7
+source 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03 - VERSION
+source fb1392022b81a61d209097d28d3ccc17a0de4619aa440f5f820859a94b208102 - db/schema.sql
+source 11e6d60e8d8b1830e6ebe95ad0d470f546936d07a5109b8b2004e3f81fbdf847 - web/index.html
+dependency 8eb0d464e29d8660146a56e6cac2b5d8f9c384b571b2389da4916eaeb12ce449 - go.sum
+toolchain go=1.25
+toolchain postgres=16
+env CI unset
+env DB_URL unset
+aval-fingerprint/v2
+contract 14c6932dad666e818cceda1e1718dd7f60a0c417d7f79da0d5d6f7e3b57bb73e
+source 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03 - VERSION
+source fb1392022b81a61d209097d28d3ccc17a0de4619aa440f5f820859a94b208102 - db/schema.sql
+dependency 8eb0d464e29d8660146a56e6cac2b5d8f9c384b571b2389da4916eaeb12ce449 - go.sum
+toolchain go=1.25
+toolchain postgres=16
+env CI unset
+env DB_URL unset
+aval-fingerprint/v2
+contract aa685a830afd88f899ea448ad1ec0af90af2aa6b1b6a66292108669f86a04842
+source 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03 - VERSION
+source fb1392022b81a61d209097d28d3ccc17a0de4619aa440f5f820859a94b208102 - db/schema.sql
+dependency 8eb0d464e29d8660146a56e6cac2b5d8f9c384b571b2389da4916eaeb12ce449 - go.sum
+toolchain go=1.25
+toolchain postgres=16
+env CI unset
+env DB_URL unset

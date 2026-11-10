@@ -87,6 +87,15 @@ contract's mutable references block the dependent. `TestContractsManifestGolden`
 pins the `contract <path>` lines in
 `testdata/golden/contracts-aval-fingerprint-vN.manifest`.
 
+`TestTestSetGolden` checks that every test of `testdata/testset/aval.yaml`,
+a `kind: TestSet`, has the same manifest as its `standalone-<name>.yaml`,
+and pins those manifests in
+`testdata/golden/testset-aval-fingerprint-vN.manifest`.
+`TestTestSetFalseHits` and `TestTestSetDistinctTests` show that dropping or
+changing a fragment, two matrix values and two names over one scope each
+change the fingerprint, and that a test cannot drop an inherited list item;
+`TestTestSetUseOrderProperty` shows that the order of `use` does not.
+
 `TestManifestGolden` pins, per manifest version, the manifests of three
 contracts over a fixed tree (`internal/fingerprint/testdata/golden/tree`),
 concatenated in `testdata/golden/aval-fingerprint-vN.manifest`. One

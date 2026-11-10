@@ -39,7 +39,8 @@ func CheckAPIVersion(got string) error {
 	return fmt.Errorf("apiVersion: got %q, want %q", got, APIVersion)
 }
 
-// Kind is the only contract kind accepted in v1.
+// Kind is a contract of one test. A file may also hold a set of tests
+// (KindTestSet).
 const Kind = "Test"
 
 // DefaultFile is the conventional contract file name.
@@ -198,8 +199,27 @@ var (
 	rootRe    = regexp.MustCompile(`^\.\.(/\.\.)*$`)
 )
 
-// Load reads and validates a contract file.
+// Load reads and validates a contract file of one test: a kind: Test, or a
+// kind: TestSet that expands to exactly one test.
 func Load(file string) (*Contract, error) {
+	cs, err := LoadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	if len(cs) > 1 {
+		names := make([]string, len(cs))
+		for i, c := range cs {
+			names[i] = c.Metadata.Name
+		}
+		// TODO(milestone-1): select a test by name (#207).
+		return nil, fmt.Errorf("%s: the TestSet holds %d tests (%s); this aval runs a TestSet of one test only", file, len(cs), strings.Join(names, ", "))
+	}
+	return cs[0], nil
+}
+
+// LoadAll reads and validates a contract file and returns its tests: one
+// for a kind: Test, each expanded test for a kind: TestSet (ParseAll).
+func LoadAll(file string) ([]*Contract, error) {
 	data, err := os.ReadFile(file)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("%w: create %s (see docs/contract.md) or pass its path with -f", err, file)
@@ -207,11 +227,11 @@ func Load(file string) (*Contract, error) {
 	if err != nil {
 		return nil, err
 	}
-	c, err := Parse(data)
+	cs, err := ParseAll(data)
 	if err != nil {
 		return nil, &FileError{File: file, Err: err}
 	}
-	return c, nil
+	return cs, nil
 }
 
 // FileError is a contract file that does not decode or validate. Err holds
@@ -224,27 +244,50 @@ type FileError struct {
 func (e *FileError) Error() string { return e.File + ": " + e.Err.Error() }
 func (e *FileError) Unwrap() error { return e.Err }
 
-// Parse decodes and validates contract bytes. Unknown fields are rejected so
-// that typos never silently shrink the declared scope.
+// Parse decodes and validates the bytes of one kind: Test. Unknown fields
+// are rejected so that typos never silently shrink the declared scope. A
+// kind: TestSet is ErrTestSet: use ParseAll.
 func Parse(data []byte) (*Contract, error) {
-	dec := yaml.NewDecoder(bytes.NewReader(data))
-	dec.KnownFields(true)
-	var c Contract
-	if err := dec.Decode(&c); err != nil {
-		var te *yaml.TypeError
-		if errors.As(err, &te) {
-			return nil, typeErrors(data, te)
-		}
-		return nil, fmt.Errorf("decoding contract: %w", err)
+	if peekKind(data) == KindTestSet {
+		return nil, ErrTestSet
 	}
-	var extra yaml.Node
-	if err := dec.Decode(&extra); err != io.EOF {
-		return nil, errors.New("decoding contract: multiple YAML documents are not allowed")
+	var c Contract
+	if err := decodeStrict(data, &c); err != nil {
+		return nil, err
 	}
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
 	return &c, nil
+}
+
+// peekKind returns the kind of a YAML document, or "" if it has none or
+// does not decode; decodeStrict then reports why.
+func peekKind(data []byte) string {
+	var k struct {
+		Kind string `yaml:"kind"`
+	}
+	_ = yaml.Unmarshal(data, &k)
+	return k.Kind
+}
+
+// decodeStrict decodes the one YAML document in data into v, rejecting
+// unknown fields and further documents.
+func decodeStrict(data []byte, v any) error {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(v); err != nil {
+		var te *yaml.TypeError
+		if errors.As(err, &te) {
+			return typeErrors(data, te)
+		}
+		return fmt.Errorf("decoding contract: %w", err)
+	}
+	var extra yaml.Node
+	if err := dec.Decode(&extra); err != io.EOF {
+		return errors.New("decoding contract: multiple YAML documents are not allowed")
+	}
+	return nil
 }
 
 // Validate checks the contract and returns all problems found, joined.
@@ -256,7 +299,7 @@ func (c *Contract) Validate() error {
 		errs = append(errs, err)
 	}
 	if c.Kind != Kind {
-		add("kind: got %q, want %q", c.Kind, Kind)
+		add("kind: got %q, want %q or %q", c.Kind, Kind, KindTestSet)
 	}
 	if err := ValidateName(c.Metadata.Name); err != nil {
 		errs = append(errs, err)
