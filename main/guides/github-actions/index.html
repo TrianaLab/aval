@@ -2310,19 +2310,29 @@ without them and sign in a second job. The suite job keeps both files:</p>
 <p>The publishing job downloads them and runs one command per result:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aval<span class="w"> </span>push<span class="w"> </span>-f<span class="w"> </span><span class="s2">"</span><span class="nv">$CONTRACT</span><span class="s2">"</span><span class="w"> </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$AVAL_REGISTRY</span><span class="s2">"</span><span class="w"> </span>--result-file<span class="w"> </span>R<span class="w"> </span>--report-file<span class="w"> </span>P
 </span></code></pre></div>
+<p>With a <a href="../../contract/#select-a-test">TestSet</a>, upload one artifact per test
+and name the test it holds with <code>--test</code>:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aval<span class="w"> </span>push<span class="w"> </span>-f<span class="w"> </span><span class="s2">"</span><span class="nv">$CONTRACT</span><span class="s2">"</span><span class="w"> </span>--registry<span class="w"> </span><span class="s2">"</span><span class="nv">$AVAL_REGISTRY</span><span class="s2">"</span><span class="w"> </span>--test<span class="w"> </span>unit<span class="w"> </span>--result-file<span class="w"> </span>R<span class="w"> </span>--report-file<span class="w"> </span>P
+</span></code></pre></div>
 <ul>
 <li>When the report's <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is <code>verified</code> (also under <code>--shadow</code>), push prints
   <code>nothing to push: ...</code>, signs nothing and exits 0, even if a stale result
   file is present.</li>
-<li>Any other <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> publishes the result, as <code>aval run --push</code> would. Failing
-  results are published on purpose: on a tie in <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> a failure
-  outranks a pass, so a later flaky pass cannot become reusable.</li>
+<li>A <code>miss</code> or an <code>error</code> publishes the result, as <code>aval run --push</code> would.
+  Failing results are published on purpose: on a tie in <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> a
+  failure outranks a pass, so a later flaky pass cannot become reusable.</li>
 <li>The result and the report come from an unprivileged job and are unsigned.
-  Push checks that both match the test id and the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> it computes
-  now, then signs the result's claims with the publishing identity. Decide
-  which job may supply which files in your workflow.</li>
-<li>A verification failure stays the suite job's security event: it already
-  exits 5. Push does not repeat it.</li>
+  Push checks that both match the test id (the <code>--test</code> name, if given) and
+  the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> it computes now from the checkout, then signs the result's
+  claims with the publishing identity. A result or report for another test,
+  or for other inputs (a changed file or declared env value), exits 1 and
+  publishes nothing: an artifact can only publish the test it is named
+  after. Decide which job may supply which files in your workflow.</li>
+<li>A report that records a security event (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verification-failed</code>, or
+  a <code>rejected</code> entry that failed verification) signs nothing and exits 5. The
+  suite job already exited 5 for it: investigate before publishing.</li>
+<li>A <code>non-deterministic</code> test is never pushed: push prints
+  <code>nothing to push: ...</code> and exits 0.</li>
 </ul>
 <h2 id="pull-requests">Pull requests<a class="headerlink" href="#pull-requests" title="Anchor link">&para;</a></h2>
 <p>Write scopes mean the job above runs only on <code>main</code>. A PR job can still reuse:</p>

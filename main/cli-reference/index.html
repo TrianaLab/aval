@@ -2698,7 +2698,11 @@ or cannot be written), 2 usage.</p>
 <p>push signs the result recorded by 'aval run' and publishes it. The result
 must be for the current inputs: same test id, <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> and <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.
 --report-file names the report that run wrote with the result: when its
-<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is verified (also under --shadow), push publishes nothing and exits 0.
+<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is verified (also under --shadow), push publishes nothing and exits 0;
+when it records a security event (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> verification-failed, or a rejected
+<abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> that failed verification), push publishes nothing and exits 5.
+A non-deterministic test is never pushed: push publishes nothing and exits 0.
+With --test, the result and the report must both be for that test.
 Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
 Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
 --login) opens the interactive Sigstore login in the browser; no token is
@@ -2716,7 +2720,7 @@ stored.</p>
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
 </span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
 </span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>      --report-file string          report written by the same 'aval run'; push nothing when it reused a verified result
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>      --report-file string          report written by the same 'aval run'; push nothing when it reused a verified result, and exit 5 when it records a security event
 </span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>      --result-file string          result recorded by 'aval run' (default ".aval/result.json")
 </span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>  -t, --test string                 the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/&lt;test&gt;/
 </span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>

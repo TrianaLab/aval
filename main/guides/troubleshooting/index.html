@@ -2557,8 +2557,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>check the token or key, and write access</td>
 </tr>
 <tr>
-<td><code>more than &lt;n&gt; attestations</code></td>
-<td><abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verification-failed</code>, exit 5: none was verified, so check who pushed them (it may be a flooding attempt), then delete old results (<a href="../../artifact-format/#the-64-candidate-cap-and-cleanup">cleanup</a>)</td>
+<td><code>more than &lt;n&gt; attestations</code>, <code>that failed verification: nothing pushed</code></td>
+<td><abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verification-failed</code>, exit 5. Too many: none was verified, so check who pushed them (it may be a flooding attempt), then delete old results (<a href="../../artifact-format/#the-64-candidate-cap-and-cleanup">cleanup</a>). Nothing pushed: the run's report records a security event, so <code>aval push</code> signs nothing; investigate that run's <code>aval: SECURITY:</code> line first</td>
 </tr>
 <tr>
 <td><code>is not listed among the referrers of</code></td>
