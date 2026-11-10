@@ -1,5 +1,26 @@
 # aval
 
+## 0.8.1
+
+### Patch Changes
+
+- 806588c: New guide "Integrate Aval in 5 files" and the example `examples/github-monorepo`
+  (#217): a monorepo with a Go module, a Node UI, a Dockerfile, a data
+  directory and an end-to-end suite in 3 shards, put on Aval by adding
+  `aval.yaml` and `.github/aval/policy.yaml` and editing `ci.yml` and
+  `.gitignore`. Aval's tests check that the integration is exactly those files,
+  run every test through the CLI (miss and push, reuse per shard, a fragment
+  edit reruns only its tests, an unaccepted mutable reference, exit 5 on a
+  tampered attestation), and CI checks that the run action ignores a trust
+  policy edited in a pull request. No CLI or format change. Known gap: the
+  GitHub publish action cannot push a test with `outputs` yet, because the run
+  action's artifact holds `.aval/<test>/` only.
+- 6815771: The release gate verifies the e2e attestation with the aval release `ci.yaml`
+  pins, the one that signed it, instead of a binary built from the tag (#234).
+  A newer `aval` computes `aval-fingerprint/v2`, so the gate missed (exit 4) on
+  v0.8.0 and published nothing: the v0.8.0 tag has no GitHub Release, and this
+  patch ships its changes as v0.8.1.
+
 ## 0.8.0
 
 ### Minor Changes

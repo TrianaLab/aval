@@ -1,6 +1,6 @@
 {
   "name": "aval",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "Version and changelog source for the aval release (Changesets). Not an npm package.",
   "license": "Apache-2.0",
