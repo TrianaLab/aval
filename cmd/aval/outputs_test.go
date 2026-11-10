@@ -77,7 +77,9 @@ func TestCollectOutputs(t *testing.T) {
 		"missing":      {`[coverage.xml]`, nil, `outputs glob "coverage.xml" matched no files`},
 		"an input":     {`["*.txt"]`, nil, "in.txt is an input of the test"},
 		"the contract": {`["*.yaml"]`, nil, "aval.yaml is the contract"},
-		"backslash":    {`["*.xml"]`, func(t *testing.T, dir string) { write(t, dir, `a\b.xml`, "x") }, "backslashes"},
+		// A gitfile (#199) is never published, like a .git directory.
+		"gitfile":   {`[".git"]`, func(t *testing.T, dir string) { write(t, dir, ".git", "gitdir: /src/.git/worktrees/a\n") }, `outputs glob ".git" matched no files`},
+		"backslash": {`["*.xml"]`, func(t *testing.T, dir string) { write(t, dir, `a\b.xml`, "x") }, "backslashes"},
 		"symlink": {`[coverage.xml]`, func(t *testing.T, dir string) {
 			if err := os.Symlink("in.txt", filepath.Join(dir, "coverage.xml")); err != nil {
 				t.Fatal(err)
@@ -269,6 +271,7 @@ func TestOutputsVerificationFailures(t *testing.T) {
 		"glob without a path":           {"[coverage.xml, junit.xml]", listed("coverage.xml"), nil},
 		"path that is an input":         {`["**"]`, listed("in.txt"), nil},
 		"path under .git":               {`["**"]`, listed(".git/hooks/pre-commit"), nil},
+		"gitfile":                       {`["**"]`, listed(".git"), nil},
 		"path that is the contract":     {`["*.yaml"]`, listed("aval.yaml"), nil},
 		"path under .aval":              {`["**"]`, listed(".aval/result.json"), nil},
 		"stored outputs differ (fetch)": {"[coverage.xml]", listed("coverage.xml"), &evidence.VerificationError{Reason: "outputs: layer 0 does not match"}},

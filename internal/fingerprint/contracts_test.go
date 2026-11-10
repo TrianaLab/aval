@@ -450,7 +450,7 @@ func TestContractsComputeFSMatchesCompute(t *testing.T) {
 var contractsGolden = filepath.Join(filepath.Dir(goldenFile(Version)), "contracts-"+filepath.Base(goldenFile(Version)))
 
 // TestContractsManifestGolden pins the contract <path> lines of
-// aval-fingerprint/v1: one per scope.contracts entry, sorted by path, after
+// the current manifest version: one per scope.contracts entry, sorted by path, after
 // every other line. Manifests without scope.contracts are pinned by
 // TestManifestGolden and stay byte-identical.
 func TestContractsManifestGolden(t *testing.T) {

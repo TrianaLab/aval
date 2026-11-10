@@ -169,7 +169,7 @@ func TestCLI(t *testing.T) {
 		{"help", nil, ExitOK, "Usage:", ""},
 		{"bad flag", []string{"--bogus"}, ExitUsage, "", "aval: unknown flag"},
 		{"fingerprint only", []string{"run", "-f", hermetic, "--fingerprint-only"}, ExitOK, "sha256:", ""},
-		{"explain", []string{"run", "-f", hermetic, "--explain", "--fingerprint-only"}, ExitOK, "aval-fingerprint/v1\n", ""},
+		{"explain", []string{"run", "-f", hermetic, "--explain", "--fingerprint-only"}, ExitOK, "aval-fingerprint/v2\n", ""},
 		{"explain then run", []string{"run", "-f", hermetic, "--explain", "--result-file", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "ran unit: passed", ""},
 		{"run without registry runs the test", []string{"run", "-f", hermetic, "--result-file", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "miss unit sha256:", ""},
 		{"non-deterministic", []string{"run", "-f", nondet, "--result-file", filepath.Join(t.TempDir(), "r.json")}, ExitOK, "cacheability non-deterministic: never reusable", ""},

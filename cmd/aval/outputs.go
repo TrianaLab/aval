@@ -22,7 +22,8 @@ import (
 // match under its directory, sorted by path. Every glob must match a file; a
 // match that is not a regular file (a symlink), that is an input (in scope)
 // or the contract file, or that breaks a cap is an error, so nothing is
-// published. .git and .aval directories are skipped, as in the fingerprint.
+// published. .git entries (directory, file or symlink) and .aval directories
+// are skipped, as in the fingerprint.
 func collectOutputs(file string, c *contract.Contract) ([]registry.Output, error) {
 	dir := filepath.Dir(file)
 	globs := splitGlobs(c.Outputs)
@@ -34,8 +35,14 @@ func collectOutputs(file string, c *contract.Contract) ([]registry.Output, error
 			return err
 		}
 		segs := strings.Split(rel, "/")
+		if d.Name() == ".git" { // VCS metadata of any type, as in the fingerprint
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
 		if d.IsDir() {
-			if rel != "." && (d.Name() == ".git" || d.Name() == fingerprint.OutputDir || !slices.ContainsFunc(globs, func(g contract.Glob) bool { return g.MayContain(segs) })) {
+			if rel != "." && (d.Name() == fingerprint.OutputDir || !slices.ContainsFunc(globs, func(g contract.Glob) bool { return g.MayContain(segs) })) {
 				return fs.SkipDir
 			}
 			return nil

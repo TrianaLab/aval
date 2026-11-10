@@ -1,7 +1,7 @@
 === push=false shadow=false failed=false
 exit 0
 --- stdout
-⚠ miss unit sha256:77ad8f66
+⚠ miss unit sha256:8a2cd781
   reason    reuse off: no trust policy (set AVAL_POLICY or --policy)
 · run unit: sh -c echo test output; exit 0
 test output
@@ -11,7 +11,7 @@ unit passed in D with reuse off; see the reason above.
 === push=false shadow=false failed=true
 exit 3
 --- stdout
-⚠ miss unit sha256:1a818124
+⚠ miss unit sha256:889c3506
   reason    reuse off: no trust policy (set AVAL_POLICY or --policy)
 · run unit: sh -c echo test output; exit 1
 test output
@@ -21,7 +21,7 @@ unit failed in D with reuse off; see the reason above.
 === push=false shadow=true failed=false
 exit 0
 --- stdout
-⚠ miss unit sha256:77ad8f66
+⚠ miss unit sha256:8a2cd781
   reason    reuse off: no trust policy (set AVAL_POLICY or --policy)
 · run unit: sh -c echo test output; exit 0
 test output
@@ -31,7 +31,7 @@ unit passed in D with reuse off; see the reason above.
 === push=false shadow=true failed=true
 exit 3
 --- stdout
-⚠ miss unit sha256:1a818124
+⚠ miss unit sha256:889c3506
   reason    reuse off: no trust policy (set AVAL_POLICY or --policy)
 · run unit: sh -c echo test output; exit 1
 test output
@@ -41,7 +41,7 @@ unit failed in D with reuse off; see the reason above.
 === push=true shadow=false failed=false
 exit 0
 --- stdout
-⚠ miss unit sha256:77ad8f66
+⚠ miss unit sha256:8a2cd781
   reason    reuse off: no trust policy (set AVAL_POLICY or --policy)
 · run unit: sh -c echo test output; exit 0
 test output
@@ -52,7 +52,7 @@ unit passed in D; published for the next run with these inputs.
 === push=true shadow=false failed=true
 exit 3
 --- stdout
-⚠ miss unit sha256:1a818124
+⚠ miss unit sha256:889c3506
   reason    reuse off: no trust policy (set AVAL_POLICY or --policy)
 · run unit: sh -c echo test output; exit 1
 test output
@@ -63,7 +63,7 @@ unit failed in D; published for the next run with these inputs.
 === push=true shadow=true failed=false
 exit 0
 --- stdout
-⚠ miss unit sha256:77ad8f66
+⚠ miss unit sha256:8a2cd781
   reason    reuse off: no trust policy (set AVAL_POLICY or --policy)
 · run unit: sh -c echo test output; exit 0
 test output
@@ -74,7 +74,7 @@ unit passed in D; published for the next run with these inputs.
 === push=true shadow=true failed=true
 exit 3
 --- stdout
-⚠ miss unit sha256:1a818124
+⚠ miss unit sha256:889c3506
   reason    reuse off: no trust policy (set AVAL_POLICY or --policy)
 · run unit: sh -c echo test output; exit 1
 test output

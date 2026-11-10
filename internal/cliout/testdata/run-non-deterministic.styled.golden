@@ -1,7 +1,7 @@
 === push=false shadow=false failed=false
 exit 0
 --- stdout
-· miss unit sha256:18bf449f
+· miss unit sha256:cce00133
   reason    cacheability non-deterministic is never reusable
 · run unit: sh -c echo test output; exit 0
 test output
@@ -11,7 +11,7 @@ unit passed in D; cacheability non-deterministic is never reused.
 === push=false shadow=false failed=true
 exit 3
 --- stdout
-· miss unit sha256:f9b2e0e9
+· miss unit sha256:15b2c612
   reason    cacheability non-deterministic is never reusable
 · run unit: sh -c echo test output; exit 1
 test output
@@ -21,7 +21,7 @@ unit failed in D; cacheability non-deterministic is never reused.
 === push=false shadow=true failed=false
 exit 0
 --- stdout
-· miss unit sha256:18bf449f
+· miss unit sha256:cce00133
   reason    cacheability non-deterministic is never reusable
 · run unit: sh -c echo test output; exit 0
 test output
@@ -31,7 +31,7 @@ unit passed in D; cacheability non-deterministic is never reused.
 === push=false shadow=true failed=true
 exit 3
 --- stdout
-· miss unit sha256:f9b2e0e9
+· miss unit sha256:15b2c612
   reason    cacheability non-deterministic is never reusable
 · run unit: sh -c echo test output; exit 1
 test output
@@ -41,7 +41,7 @@ unit failed in D; cacheability non-deterministic is never reused.
 === push=true shadow=false failed=false
 exit 0
 --- stdout
-· miss unit sha256:18bf449f
+· miss unit sha256:cce00133
   reason    cacheability non-deterministic is never reusable
 · run unit: sh -c echo test output; exit 0
 test output
@@ -52,7 +52,7 @@ unit passed in D; cacheability non-deterministic is never reused.
 === push=true shadow=false failed=true
 exit 3
 --- stdout
-· miss unit sha256:f9b2e0e9
+· miss unit sha256:15b2c612
   reason    cacheability non-deterministic is never reusable
 · run unit: sh -c echo test output; exit 1
 test output
@@ -63,7 +63,7 @@ unit failed in D; cacheability non-deterministic is never reused.
 === push=true shadow=true failed=false
 exit 0
 --- stdout
-· miss unit sha256:18bf449f
+· miss unit sha256:cce00133
   reason    cacheability non-deterministic is never reusable
 · run unit: sh -c echo test output; exit 0
 test output
@@ -74,7 +74,7 @@ unit passed in D; cacheability non-deterministic is never reused.
 === push=true shadow=true failed=true
 exit 3
 --- stdout
-· miss unit sha256:f9b2e0e9
+· miss unit sha256:15b2c612
   reason    cacheability non-deterministic is never reusable
 · run unit: sh -c echo test output; exit 1
 test output

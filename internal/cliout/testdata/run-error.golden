@@ -1,7 +1,7 @@
 === push=false shadow=false failed=false
 exit 0
 --- stdout
-error unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+error unit sha256:8a2cd7815048efb348bc5f1413b74e99bd12b28e3005c73d5cf38ae8b3a943b9
 reason: registry down
 --- run unit: sh -c echo test output; exit 0
 test output
@@ -13,7 +13,7 @@ aval: warning: reuse off: registry down
 === push=false shadow=false failed=true
 exit 3
 --- stdout
-error unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+error unit sha256:889c35065e544e3cb806cbc162e10e8caa3608b598ac1211ffa3dcbdd33c1f85
 reason: registry down
 --- run unit: sh -c echo test output; exit 1
 test output
@@ -25,7 +25,7 @@ aval: warning: reuse off: registry down
 === push=false shadow=true failed=false
 exit 0
 --- stdout
-error unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+error unit sha256:8a2cd7815048efb348bc5f1413b74e99bd12b28e3005c73d5cf38ae8b3a943b9
 reason: registry down
 --- run unit: sh -c echo test output; exit 0
 test output
@@ -37,7 +37,7 @@ aval: warning: reuse off: registry down
 === push=false shadow=true failed=true
 exit 3
 --- stdout
-error unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+error unit sha256:889c35065e544e3cb806cbc162e10e8caa3608b598ac1211ffa3dcbdd33c1f85
 reason: registry down
 --- run unit: sh -c echo test output; exit 1
 test output
@@ -49,7 +49,7 @@ aval: warning: reuse off: registry down
 === push=true shadow=false failed=false
 exit 0
 --- stdout
-error unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+error unit sha256:8a2cd7815048efb348bc5f1413b74e99bd12b28e3005c73d5cf38ae8b3a943b9
 reason: registry down
 --- run unit: sh -c echo test output; exit 0
 test output
@@ -62,7 +62,7 @@ aval: warning: reuse off: registry down
 === push=true shadow=false failed=true
 exit 3
 --- stdout
-error unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+error unit sha256:889c35065e544e3cb806cbc162e10e8caa3608b598ac1211ffa3dcbdd33c1f85
 reason: registry down
 --- run unit: sh -c echo test output; exit 1
 test output
@@ -75,7 +75,7 @@ aval: warning: reuse off: registry down
 === push=true shadow=true failed=false
 exit 0
 --- stdout
-error unit sha256:77ad8f667448cf8d5e0db342355e8413c5627d922ea47368fd145c2fc34d5a42
+error unit sha256:8a2cd7815048efb348bc5f1413b74e99bd12b28e3005c73d5cf38ae8b3a943b9
 reason: registry down
 --- run unit: sh -c echo test output; exit 0
 test output
@@ -88,7 +88,7 @@ aval: warning: reuse off: registry down
 === push=true shadow=true failed=true
 exit 3
 --- stdout
-error unit sha256:1a818124f17883d3a6e3326d1a62c459e903c2c0d79af9da2fa5c1349efada8c
+error unit sha256:889c35065e544e3cb806cbc162e10e8caa3608b598ac1211ffa3dcbdd33c1f85
 reason: registry down
 --- run unit: sh -c echo test output; exit 1
 test output

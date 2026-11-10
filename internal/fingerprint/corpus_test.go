@@ -162,10 +162,6 @@ var corpus = []corpusCase{
 	{name: "group exec bit only", change: func(f *fixture) { f.chmod("main.go", 0o654) }, want: differ},
 	{name: "other exec bit only", change: func(f *fixture) { f.chmod("main.go", 0o645) }, want: differ},
 	{name: "LF to CRLF", change: func(f *fixture) { f.write("main.go", strings.ReplaceAll(baseFiles["main.go"], "\n", "\r\n")) }, want: differ},
-	{name: "gitfile in scope edited", setup: func(f *fixture) {
-		f.c.Scope.Source = append(f.c.Scope.Source, "pkg/.git")
-		f.write("pkg/.git", "gitdir: ../.git/worktrees/a\n")
-	}, change: func(f *fixture) { f.write("pkg/.git", "gitdir: ../.git/worktrees/b\n") }, want: differ},
 	{name: "exec bit cleared", setup: func(f *fixture) { f.chmod("main.go", 0o755) }, change: func(f *fixture) { f.chmod("main.go", 0o644) }, want: differ},
 	{name: "unicode NFC to NFD rename", setup: func(f *fixture) { f.write("caf\u00e9.go", "package main\n") }, change: func(f *fixture) {
 		// Paths are hashed as the bytes the filesystem returns, never
@@ -267,6 +263,32 @@ var corpus = []corpusCase{
 	// Only the exact name .git is skipped: a case-insensitive match would drop
 	// in-scope files under .GIT on every filesystem.
 	{name: "file under .GIT added", change: func(f *fixture) { f.write(".GIT/x.go", "package x\n") }, want: differ},
+	{name: ".GIT regular file added", setup: func(f *fixture) { f.c.Scope.Source = []string{"**"} },
+		change: func(f *fixture) { f.write(".GIT", "gitdir: x\n") }, want: differ},
+	// A .git file or symlink is VCS metadata too (#199): the gitfile of a
+	// linked worktree or submodule holds a machine-specific path git never
+	// versions, so checkouts of one commit must share a fingerprint.
+	{name: "gitfile edited", setup: func(f *fixture) {
+		f.c.Scope.Source = []string{"**"}
+		f.write(".git", "gitdir: /src/main/.git/worktrees/a\n")
+	}, change: func(f *fixture) { f.write(".git", "gitdir: /src/main/.git/worktrees/b\n") }, want: same},
+	{name: "nested gitfile added", setup: func(f *fixture) { f.c.Scope.Source = []string{"**"} },
+		change: func(f *fixture) { f.write("pkg/sub/.git", "gitdir: ../../.git/modules/sub\n") }, want: same},
+	{name: "gitfile replaced by .git directory", setup: func(f *fixture) {
+		f.c.Scope.Source = []string{"**"}
+		f.write(".git", "gitdir: /src/main/.git/worktrees/a\n")
+	}, change: func(f *fixture) {
+		f.remove(".git")
+		f.write(".git/HEAD", "ref: refs/heads/main\n")
+	}, want: same},
+	// An exact glob naming a gitfile matches nothing, so it fails like any
+	// glob that matches no file: never a silently dropped input.
+	{name: "exact glob naming a gitfile", change: func(f *fixture) {
+		f.c.Scope.Source = append(f.c.Scope.Source, "pkg/.git")
+		f.write("pkg/.git", "gitdir: ../.git/modules/pkg\n")
+	}, want: failClosed},
+	{name: ".git symlink", setup: func(f *fixture) { f.c.Scope.Source = []string{"**"} },
+		change: func(f *fixture) { f.symlink(f.t.TempDir(), "pkg/.git") }, want: same},
 	// Aval's own outputs are never inputs (#63): .aval directories at any
 	// depth, and the --result and --report paths inside the root.
 	{name: "file under .aval added", change: func(f *fixture) { f.write(".aval/result.go", "package r\n") }, want: same},
