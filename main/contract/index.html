@@ -2751,9 +2751,9 @@ does not accept is a miss, and its result is not published
 (<a href="../pinning/">Pin your dependencies</a>).</p>
 <h2 id="what-goes-into-the-fingerprint">What goes into the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr><a class="headerlink" href="#what-goes-into-the-fingerprint" title="Anchor link">&para;</a></h2>
 <p>The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>sha256:&lt;hex&gt;</code> of a line-oriented manifest (format
-<code>aval-fingerprint/v1</code>). <code>aval explain</code> prints the exact text that was
+<code>aval-fingerprint/v2</code>). <code>aval explain</code> prints the exact text that was
 hashed, in this order:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aval-fingerprint/v1
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aval-fingerprint/v2
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>source &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>dependency &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
@@ -2773,7 +2773,7 @@ hashed, in this order:</p>
 <tbody>
 <tr>
 <td>header</td>
-<td><code>aval-fingerprint/v1</code>, bumped when an existing <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s manifest would change</td>
+<td><code>aval-fingerprint/v2</code>, bumped when an existing <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s manifest would change</td>
 <td></td>
 </tr>
 <tr>
@@ -2825,8 +2825,8 @@ executable file fingerprints differently there than on Unix.</p>
 <td>the main risk: keep the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> honest</td>
 </tr>
 <tr>
-<td><code>.git</code> directories</td>
-<td>exact name; a regular <code>.git</code> file is hashed</td>
+<td><code>.git</code> (directory, file or symlink)</td>
+<td>exact name, at any depth; covers linked worktrees and submodules. An exact glob such as <code>pkg/.git</code> matches no file and fails</td>
 </tr>
 <tr>
 <td><code>.aval/</code> directories and the command's <code>--result-file</code>/<code>--report-file</code> files</td>
@@ -2857,6 +2857,8 @@ depends on one of these can reuse a result it should not:</p>
   network service: use <code>scope.resolve</code> or <code>external-dependencies</code></li>
 <li>the installed toolchain, OS and architecture, unless <code>environment.probe</code>
   checks the toolchain entry</li>
+<li>git state the test reads (log, worktree or submodule layout), the same as
+  commit and branch</li>
 </ul>
 <p>Mitigation: review the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, use <code>aval run --shadow</code>, pick the right
 <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class.</p>

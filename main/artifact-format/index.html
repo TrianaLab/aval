@@ -2967,7 +2967,7 @@ truth. The identifiers and JSON shapes below are frozen; see
 annotation <code>io.trianalab.aval.fingerprint</code> (informational, frozen: verification
 reads the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> from the signed predicate); the stats anchor carries
 <code>io.trianalab.aval.test</code> (provisional) with the test id. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
-<code>apiVersion</code> and the <code>aval-fingerprint/v1</code> manifest version are also frozen
+<code>apiVersion</code> and the <code>aval-fingerprint/v2</code> manifest version are also frozen
 (see the table under <a href="#versioning-and-compatibility">Versioning</a>).</p>
 <h2 id="oci-layout">OCI layout<a class="headerlink" href="#oci-layout" title="Anchor link">&para;</a></h2>
 <p>There is no Aval server or database. The registry is the only index.</p>
@@ -3076,7 +3076,7 @@ reading. Each of these is a verification failure, never a miss:</p>
 <li>the manifest's layers differ from the predicate's list (extra, missing,
   renamed or reordered)</li>
 <li>a path that matches no <code>outputs</code> glob, is the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file, is in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>
-  or under <code>.git</code> or <code>.aval</code>; a glob that matches no path; a predicate without outputs for a
+  or is or lies under a <code>.git</code> entry (directory or file) or <code>.aval</code>; a glob that matches no path; a predicate without outputs for a
   <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> with <code>outputs</code>, or the reverse</li>
 </ul>
 <p><code>aval run</code> then writes the files: each is staged next to its target and
@@ -3616,7 +3616,7 @@ checked by <code>Predicate.Validate</code> (called by <code>evidence.Parse</code
 <td><code>execution.fingerprintVersion</code></td>
 <td>string</td>
 <td></td>
-<td>Manifest format, e.g. <code>aval-fingerprint/v1</code>.</td>
+<td>Manifest format, e.g. <code>aval-fingerprint/v2</code>.</td>
 </tr>
 <tr>
 <td><code>execution.environment</code></td>
@@ -3715,7 +3715,7 @@ put secrets there: the predicate is published to the registry.</p>
 </span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"passed"</span><span class="p">,</span>
 </span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">  </span><span class="nt">"execution"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">    </span><span class="nt">"fingerprint"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7"</span><span class="p">,</span>
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">    </span><span class="nt">"fingerprintVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval-fingerprint/v1"</span><span class="p">,</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">    </span><span class="nt">"fingerprintVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aval-fingerprint/v2"</span><span class="p">,</span>
 </span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">    </span><span class="nt">"environment"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="w">      </span><span class="nt">"go"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.25"</span><span class="p">,</span>
 </span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="w">      </span><span class="nt">"os"</span><span class="p">:</span><span class="w"> </span><span class="s2">"linux"</span><span class="p">,</span>
@@ -3923,7 +3923,7 @@ with the test result (<a href="../concepts/outcomes/">Outcomes</a>).</p>
 <tr>
 <td>Fingerprint manifest</td>
 <td>header line, <code>execution.fingerprintVersion</code></td>
-<td><code>aval-fingerprint/v1</code></td>
+<td><code>aval-fingerprint/v2</code></td>
 </tr>
 </tbody>
 </table>
@@ -4013,6 +4013,11 @@ version adds a new file. The tests that enforce this:
   and the outputs manifest (<code>outputs.v1</code>, <code>output.v1</code>) was added; the
   <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> gained <code>outputs</code>, omitted when empty, so no existing
   <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> changes.</li>
+<li><code>aval-fingerprint/v1</code> became <code>aval-fingerprint/v2</code> (#199) when a
+  <code>.git</code> file or symlink (the gitfile of a linked worktree or submodule)
+  stopped being hashed, like a <code>.git</code> directory. Every existing
+  <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> is a miss once and the tests run again; there is no
+  lookup by v1.</li>
 </ul>
 </details>
 
