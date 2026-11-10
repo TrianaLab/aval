@@ -1,5 +1,196 @@
 # aval
 
+## 0.8.0
+
+### Minor Changes
+
+- 7de8cd6: `scope.allowMutable` entries take an optional `files` list of globs (#208).
+  One entry accepts its exact `ref` in every file in scope a glob matches,
+  instead of one entry per file. `files` excludes `file`, which stays an exact
+  path; each glob must match a file in scope, otherwise `aval` exits 2. Format
+  change: an additive optional contract field under the same `apiVersion`.
+  Existing contracts hash as before; an older `aval` rejects a contract that
+  uses `files` (unknown field), which fails closed.
+- b0b968a: Every security event Aval detects now exits 5 (#195). A verified result beside
+  an attestation that failed verification is no longer reused: `aval run` runs
+  the test and exits 5, and `aval verify` exits 5 with the unchanged report
+  (outcome `verified`, the bad attestation in `rejected`). More than 64
+  attestations for one fingerprint is now outcome `verification-failed` (exit 5
+  in `aval run` and `aval verify`) instead of `error`. The run record of such a
+  run says `verification-failed`, so `aval stats` counts it under
+  `verificationFailures`. Consumers no longer need to inspect `rejected`: the
+  exit code alone separates miss, error and security event. No new outcome or
+  exit code; the verify report, predicate and fingerprint are unchanged.
+- b518636: New GitHub composite action `integrations/github/publish` (#212): one step in
+  the consumer's own publish job signs and pushes every `aval-<test>` artifact
+  the run action uploaded in the workflow run. It refuses any ref but the
+  default branch unless `allow-unprotected: true`, always refuses
+  `pull_request_target` and `workflow_run`, and needs `id-token: write`;
+  installs the same pinned, verified aval release as the run action; fetches
+  the trust policy from the default branch and pushes to its `registry`
+  (credentials default to `github.actor` and `github.token`); downloads the
+  artifacts into `$RUNNER_TEMP`; and runs `aval push --test <name>` per
+  artifact with a fresh OIDC token, trying every artifact and exiting with the
+  worst code (5 is never downgraded). `stats: true` also publishes each pushed
+  test's run record, best effort. It is a composite action, not a reusable
+  workflow, so the certificate names the calling workflow; CI checks this on
+  Aval's `main`. No change to the aval binary, its exit codes or formats.
+- 15ade1b: New GitHub composite action `integrations/github/run` (#211): a CI job runs
+  one test through Aval with `uses: TrianaLab/aval/integrations/github/run@<sha>`
+  and `with: {test: <name>}` (inputs `file` and `policy` are optional). It
+  refuses `pull_request_target`, `workflow_run` and any job with
+  `id-token: write`; installs the aval release pinned in its `action.yml`,
+  checked against the per-platform sha256, signature and provenance; fetches
+  the trust policy, and the registry inside it, from the default branch
+  through the contents API on every event (no policy: nothing is reused, with
+  a warning); writes the outcome to the step summary; turns exit 5 into an
+  `aval SECURITY` error annotation; uploads `.aval/<test>/` as the artifact
+  `aval-<test>` on a push to the default branch only; and warns when the
+  policy trusts a `refs/pull/` subject at or above `minTrustLevel`. The
+  action pins 0.7.0 until the next release, which has `--test` and the
+  policy's `registry` (#213). `docs/guides/github-actions.md` is rewritten
+  around it. No change to the aval binary, its exit codes or formats.
+- ecc519f: `aval init --set` writes a two-file starting layout (#215): `aval.yaml` as a
+  `kind: TestSet` with the test and one fragment holding the source globs, and
+  `.github/aval/policy.yaml` with one placeholder keyless identity whose
+  anchored `subjectRegexp` trusts no signer until `<OWNER>/<REPO>` is replaced.
+  Scope and cacheability stay required. An existing file exits 2 unless
+  `--force`. No format change.
+- 6a91ec3: The installers can pin and require verification for CI (#202).
+  `get-aval.sh --sha256 <hex>` (or `AVAL_SHA256`; `<os>_<arch>=<hex>` per
+  platform, the entry for the detected platform required) refuses an archive
+  with another digest or one that `checksums.txt` does not list with it.
+  `--require-verify` (`AVAL_REQUIRE_VERIFY=1`) makes a missing `cosign` an
+  error, `--require-provenance` (`AVAL_REQUIRE_PROVENANCE=1`) does the same for
+  `gh`; both need `--version` and exclude `--no-verify`. `install.ps1` reads the
+  same variables. Interactive installs behave as before. `docs/install.md`
+  has a CI recipe, and Aval's own CI installs its pinned release this way.
+- 4f70316: `aval run` and `aval verify` take `--min-trust-level` (or
+  `AVAL_MIN_TRUST_LEVEL`) to raise the trust policy's `minTrustLevel` for one
+  run (#214), so one policy can trust developer keys on PRs and require
+  `runner` on main. A value below the policy's minimum, or an unknown level,
+  exits 2. A result below the raised minimum is a miss (exit 4), never exit 5.
+  The verify report is unchanged. `runner.command` does not see
+  `AVAL_MIN_TRUST_LEVEL`.
+- e5cf98f: The trust policy takes an optional `registry` field (#209). `aval run` and
+  `aval verify` use it when neither `--registry` nor `AVAL_REGISTRY` is set, and
+  the `config:` line names the source that won (`registry=<x> (policy <file>)`).
+  Reading the policy from a protected branch now carries the registry too.
+  A policy `registry` with credentials (`user:password@`) exits 2 without
+  printing them.
+  
+  Format change (additive): `kind: Policy` gains an optional field under the
+  same `apiVersion`. Older aval releases reject a policy that uses it (unknown
+  field), which fails closed; policies without it work everywhere.
+- 83ba4b5: `aval push --report-file FILE` reads the report written by the `aval run` that
+  recorded the result (#201). When its outcome is `verified`, push prints
+  `nothing to push: ...`, signs nothing and exits 0, so split-credential
+  publishing is one command and a stale result file is not published again.
+  Any other outcome publishes the result as before. A report for another test id
+  or fingerprint, an unknown report version or an unreadable report exits 1. No
+  format changes: the predicate, verify report, fingerprint and exit codes are
+  unchanged.
+- 1c8baae: `aval push --test <name>` publishes only the test an artifact is named after
+  (#210). A result or report for another test, or for inputs other than the
+  ones push recomputes from the checkout (a changed file or declared env value),
+  exits 1 and publishes nothing. Behaviour changes: a report that records a
+  security event (outcome `verification-failed`, or a `rejected` entry that
+  failed verification) now makes push sign nothing and exit 5, where it used to
+  publish; and `aval push` never publishes a `non-deterministic` test, it prints
+  `nothing to push: ...` and exits 0. `aval run --push` is unchanged.
+- 8efc307: New optional contract field `scope.root` (#200): the path from the
+  contract's directory up to the root of its tree, `..` segments only (`..`,
+  `../..`). A contract such as `aval/unit.yaml` with `root: ..` behaves as if
+  its file sat in the root: globs, `outputs`, `allowMutable[].file` and `files`, manifest
+  and finding paths, and `execution.outputs.files[].path` are relative to the
+  root; `runner.command` and `environment.probe` run there; the
+  `--result-file`, `--report-file` and `--stats-file` skip set is computed
+  against it. `scope.contracts` paths stay relative to the contract file. The
+  root must lie inside the git working tree that holds the contract, otherwise
+  `aval run`, `explain`, `verify` and `push` exit 2. `aval explain` prints the resolved
+  root. Globs still cannot contain `..`.
+  
+  Format changes: additive change to the contract schema
+  (`aval.trianalab.io/v1` stays). Contracts without `scope.root` keep their
+  fingerprint byte for byte; setting or changing it changes the `contract`
+  manifest line and so the fingerprint. The manifest version
+  (`aval-fingerprint/v2`) does not change. Older `aval` binaries reject a
+  contract that uses the field.
+- a4e260c: `-t/--test <name>` on `aval run`, `explain`, `verify` and `push` selects one
+  test of a contract file (#207). A TestSet of more than one test without
+  `--test` exits 2 and lists the names; on a `kind: Test` the flag is optional
+  and must equal `metadata.name`. With `--test` the output files default to
+  `.aval/<name>/{result,report,record}.json`, and `aval run` removes a stale
+  `.aval/<name>/` first; without it nothing changes. `aval explain --test
+  <name> --expand` prints the expanded standalone `kind: Test`, and
+  `aval explain --all [-o json]` fingerprints every test without running
+  anything, reports every failing test by name and exits 2 (or 1). A TestSet
+  expands to at most 1024 tests in total, plain tests included.
+  
+  Format changes: additive CLI flags only. No new exit code; the verify report,
+  predicate and manifest version do not change.
+- 013ebd5: The fingerprint skips every entry named exactly `.git`, whatever its type
+  (#199). A linked worktree or a submodule has a `.git` file that holds a
+  machine-specific path; a `**` source glob used to hash it, so the main
+  checkout, each worktree and each machine got a different fingerprint for the
+  same commit and scope. They now share one, and the `exclude: ["**/.git"]`
+  workaround is no longer needed. A `.git` symlink is skipped instead of failing
+  the fingerprint. The match stays case-sensitive (`.GIT` is still an input). An
+  exact glob such as `source: ["pkg/.git"]` now matches no file and fails the
+  fingerprint (exit 1, `matched no files`). `outputs` skip a `.git` file too, so
+  it is never published.
+  
+  Format changes: the fingerprint manifest moves from `aval-fingerprint/v1` to
+  `aval-fingerprint/v2`. Every existing attestation becomes a miss once, so each
+  test runs again and publishes a v2 result; there is no fallback lookup by v1.
+- 26058a5: New contract kind `kind: TestSet` (#206): many tests in one file, with
+  `defaults`, named `fragments` a test pulls in with `use`, and a `matrix`
+  that creates one test per value. Merge order is defaults, the used
+  fragments, then the test; lists are unioned, so nothing inherited is
+  removed, and a toolchain, probe or `scope.root` key set to two values exits
+  2 naming both sources. `matrix` substitutes `{var}` into `metadata.name` and
+  `runner.command` only. Each test expands to a standalone `kind: Test` and
+  fingerprints byte for byte like it. Unknown or unused fragments, a fragment
+  that uses another or sets `exclude`, `runner`, `metadata`, `outputs`,
+  `matrix` or `cacheability`, an unknown `{var}`, duplicate expanded names and
+  a `scope.contracts` entry that points at a TestSet exit 2. `aval run`,
+  `explain`, `verify` and `push` take a TestSet of one test; selecting one test
+  of many comes with #207.
+  
+  Format changes: additive new kind under `aval.trianalab.io/v1`. Older
+  `aval` binaries reject `kind: TestSet` with exit 2 (fail closed). The
+  manifest version (`aval-fingerprint/v2`) does not change.
+
+### Patch Changes
+
+- f8dbb8a: `aval run` no longer exits 1 when an `environment.probe` fails without
+  `--push` (#197). It still looks nothing up (outcome `error`), runs the test
+  and records nothing to `--result-file`, so `aval push` cannot publish the
+  result; it now warns `result not recorded: <reason>` and exits with the
+  test's code (0 passed, 3 failed). With `--push` it still exits 1
+  (`result not published: <reason>`), or 3 when the test failed. No new exit
+  code or outcome; the verify report, predicate and fingerprint are unchanged.
+- fb575db: `aval run` no longer loops without end when `runner.command` starts `aval run`
+  on the same contract again, directly or through other contracts (#196). It
+  passes `AVAL_RUN_STACK` to `runner.command`, and a nested run of a contract
+  already in it exits 2; the outer run records the test as failed (exit 3). A
+  nested run of a different contract still works. `environment.env` may no
+  longer list `AVAL_RUN_STACK`. No format changes: the fingerprint, predicate
+  and verify report are unchanged.
+- 21f9727: After each release, the release workflow opens a PR that moves the aval
+  version and per-platform sha256 pinned in `integrations/github/run` and
+  `integrations/github/publish` to that release, from its `checksums.txt`
+  (#213). Pinning either action by commit SHA pins the aval binary too, and one
+  Dependabot bump upgrades both. `tests/release` fails when a pin does not
+  match the pinned release's `checksums.txt`. No change to the aval binary,
+  its exit codes or formats.
+- 9cc6596: The fingerprint no longer refuses a symlink that `scope.exclude` covers by
+  name and contents, such as `node_modules/.bin/tool` under `pkg/**` with
+  `**/node_modules/**` excluded (#198). The symlink is skipped, not followed,
+  and stays out of the manifest. A symlink a `dependencies` glob reaches, or
+  one excluded only by name or only by its contents, is still an error. No
+  format changes: every tree that fingerprinted before keeps its fingerprint.
+
 ## 0.7.0
 
 ### Minor Changes
