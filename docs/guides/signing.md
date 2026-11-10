@@ -61,7 +61,9 @@ flowchart LR
 - Keys: unencrypted ECDSA P-256 in PEM (PKCS#8 or SEC1). Cosign keys are
   encrypted and do not work.
 - `aval push` signs later the result `aval run` saved in `.aval/result.json`.
-  It refuses a result whose inputs changed.
+  It refuses a result whose inputs changed. With `--report-file` it publishes
+  nothing after a run that reused a verified result:
+  [split credentials](github-actions.md#split-credentials).
 - `--login` asks for the browser login without a terminal.
   `$SIGSTORE_OIDC_ISSUER` and `$SIGSTORE_OIDC_CLIENT_ID` override the defaults
   (`oauth2.sigstore.dev`, client `sigstore`).

@@ -776,7 +776,7 @@ func signAndPush(ctx context.Context, ui cliout.Run, p *evidence.Predicate, c *c
 }
 
 func newPushCmd() *cobra.Command {
-	var key, resultFile string
+	var key, resultFile, reportFile string
 	g := &globalFlags{}
 	var interactive bool
 	cmd := &cobra.Command{
@@ -784,6 +784,8 @@ func newPushCmd() *cobra.Command {
 		Short: "Sign and publish a recorded execution result",
 		Long: `push signs the result recorded by 'aval run' and publishes it. The result
 must be for the current inputs: same test id, cacheability and fingerprint.
+--report-file names the report that run wrote with the result: when its
+outcome is verified (also under --shadow), push publishes nothing and exits 0.
 Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 ` + loginHelp + `.`,
 		Args: noArgs,
@@ -794,9 +796,19 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout), checkSigner(key, token, interactive)); err != nil {
 				return err
 			}
-			c, fp, err := loadAndFingerprint(cmd.Context(), file, resultFile)
+			c, fp, err := loadAndFingerprint(cmd.Context(), file, resultFile, reportFile)
 			if err != nil {
 				return err
+			}
+			if reportFile != "" {
+				ref, reused, err := reusedByRun(reportFile, c, fp)
+				if err != nil {
+					return err
+				}
+				if reused {
+					fmt.Fprintf(cmd.OutOrStdout(), "nothing to push: %s reused a verified result (%s)\n", c.Metadata.Name, ref)
+					return nil
+				}
 			}
 			if err := mutable(c, fp); err != nil {
 				return fmt.Errorf("result not published: %s", err)
@@ -830,8 +842,32 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 	f.StringVar(&key, "key", "", "signing key path (default: keyless OIDC)")
 	f.BoolVar(&interactive, "login", false, loginFlagHelp)
 	f.StringVar(&resultFile, "result-file", defaultResult, "result recorded by 'aval run'")
+	f.StringVar(&reportFile, "report-file", "", "report written by the same 'aval run'; push nothing when it reused a verified result")
 	alias(cmd, "result-file", "result") // TODO(milestone-13): remove (deprecated in 0.7.0, #165), not before 0.8.0.
 	return cmd
+}
+
+// reusedByRun reads the report that 'aval run --report-file' wrote and
+// reports whether that run reused a verified result, with its reference. The
+// report is unsigned: it must be for the current test id and fingerprint, and
+// it can only make push publish less, never more.
+func reusedByRun(file string, c *contract.Contract, fp fingerprint.Fingerprint) (string, bool, error) {
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return "", false, fmt.Errorf("reading the report written by 'aval run': %w", err)
+	}
+	var r evidence.Report
+	if err := json.Unmarshal(raw, &r); err != nil {
+		return "", false, fmt.Errorf("report %s: %w", file, err)
+	}
+	if r.Version != evidence.ReportVersion {
+		return "", false, fmt.Errorf("report %s: version %q, want %q", file, r.Version, evidence.ReportVersion)
+	}
+	if r.TestID != c.Metadata.Name || r.Fingerprint != fp.Digest {
+		return "", false, fmt.Errorf("report is for test %q with fingerprint %s; the contract is %q with fingerprint %s: run the test again",
+			r.TestID, r.Fingerprint, c.Metadata.Name, fp.Digest)
+	}
+	return r.Reference, r.Outcome == evidence.OutcomeVerified, nil
 }
 
 // recordDeprecated is the notice `aval record` prints on stderr, in cobra's
