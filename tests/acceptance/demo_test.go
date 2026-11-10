@@ -155,10 +155,10 @@ func comparableReport(t *testing.T, raw string) string {
 // tamper does to the registry what the demo's tamper does: the
 // attestations for the current fingerprint are replaced by copies whose
 // signed result says failed, with the original signature. fresh empties the
-// registry, which then holds only the copies.
-func tamper(t *testing.T, repo, dir string, fresh func()) {
+// registry, which then holds only the copies. args select the test (--test).
+func tamper(t *testing.T, repo, dir string, fresh func(), args ...string) {
 	t.Helper()
-	fp, _, code := avalIn(t, dir, "run", "--fingerprint-only")
+	fp, _, code := avalIn(t, dir, append([]string{"run", "--fingerprint-only"}, args...)...)
 	fp = strings.TrimSpace(fp)
 	if code != 0 {
 		t.Fatalf("fingerprint: exit %d", code)

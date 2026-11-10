@@ -1,0 +1,10 @@
+# The trust policy. The run and publish actions read it from the default
+# branch only, so a pull request that edits it changes nothing.
+apiVersion: aval.trianalab.io/v1
+kind: Policy
+registry: ghcr.io/acme/monorepo-aval
+minTrustLevel: runner
+identities:
+  - issuer: https://token.actions.githubusercontent.com
+    subjectRegexp: https://github\.com/acme/monorepo/\.github/workflows/ci\.yml@refs/heads/main
+    trustLevel: runner

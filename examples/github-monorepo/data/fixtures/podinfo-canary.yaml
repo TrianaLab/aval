@@ -1,0 +1,4 @@
+# The same workload as a canary.
+name: podinfo-canary
+image: ghcr.io/stefanprodan/podinfo:6.5.0
+replicas: 1

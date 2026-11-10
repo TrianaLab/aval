@@ -27,10 +27,23 @@ scope:
     - "scripts/estimate-reuse.sh"
     # tests/acceptance runs the GitHub action's scripts (#211).
     - "integrations/github/**"
+    # tests/acceptance runs the example's suites through aval (#217), one
+    # with the runner image's npm.
+    - "examples/github-monorepo/**"
   # Redundant since #63 (Aval never hashes .aval/), kept so the canonical
   # contract, and with it the published results, stay the same.
   exclude: ["**/.aval/**"]
   dependencies: [go.mod, go.sum, Makefile]
+  # The example's fixtures name this tag on purpose (#217); the suite only
+  # reads them, nothing pulls the image. One entry per file: the pinned
+  # release predates allowMutable[].files.
+  allowMutable:
+    - file: examples/github-monorepo/data/fixtures/podinfo.yaml
+      ref: ghcr.io/stefanprodan/podinfo:6.5.0
+      reason: example fixture, read as text by tests/acceptance
+    - file: examples/github-monorepo/data/fixtures/podinfo-canary.yaml
+      ref: ghcr.io/stefanprodan/podinfo:6.5.0
+      reason: example fixture, read as text by tests/acceptance
 environment:
   toolchain: {go: "1.27", uv: "0.9.18"}
   env: [GOFLAGS, GOEXPERIMENT, CGO_ENABLED]

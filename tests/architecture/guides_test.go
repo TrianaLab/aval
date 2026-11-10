@@ -13,7 +13,7 @@ import (
 var guides = []string{
 	"github-actions", "signing", "write-a-contract", "trust-policy",
 	"go-consumer", "measure-reuse", "troubleshooting", "depend-on-a-contract",
-	"shards-and-matrices",
+	"shards-and-matrices", "integrate-in-5-files",
 }
 
 // guideMaxLines is the maintainer's "under ~100 lines", with room for the

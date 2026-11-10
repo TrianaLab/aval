@@ -186,6 +186,7 @@ nav:
       - Depend on another part of the repo: guides/depend-on-a-contract.md
       - Shards and matrices: guides/shards-and-matrices.md
       - Use GitHub Actions: guides/github-actions.md
+      - Integrate Aval in 5 files: guides/integrate-in-5-files.md
       - Write a trust policy: guides/trust-policy.md
       - Sign results: guides/signing.md
       - Pin your dependencies: pinning.md

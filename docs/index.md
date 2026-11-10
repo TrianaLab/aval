@@ -16,3 +16,5 @@ Aval signs a test result and ties it to the exact inputs it used. A job with the
 3. **Verify, then skip.** Same fingerprint, trusted signer: the test is skipped. Anything else: the test runs.
 
 A result that fails verification is a security event, never a quiet miss.
+
+Already have CI for a monorepo? [Integrate Aval in 5 files](guides/integrate-in-5-files.md).

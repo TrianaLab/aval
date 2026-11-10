@@ -317,7 +317,9 @@ reuse, runs a pinned release instead: the heavy suite (`ci-e2e`, the same
 run (`dogfood-shadow`) and the publish steps (`dogfood-publish`,
 `dogfood-record`). The suites those jobs run still build and test the PR's
 code; only the `aval` that looks up, verifies, records and pushes results is
-the release.
+the release. The jobs that test the GitHub actions (`publish-action`,
+`example-github-monorepo`) run the actions' scripts with `aval` built from
+source until the actions' pin has `--test` (milestone 14).
 
 `ci.yaml` pins the release as `AVAL_VERSION` and `AVAL_SHA256` (the sha256 of
 `aval_<version>_linux_amd64.tar.gz`). `.github/aval/install.sh` runs

@@ -1,0 +1,44 @@
+# Every test CI runs through Aval, and the files each one reads.
+# test-external calls a service this repository does not control, so it is
+# not here: CI runs it as a plain make job.
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [Makefile]
+  cacheability: hermetic
+fragments:
+  go:
+    scope:
+      source: ["cmd/**", "internal/**", "pkg/**"]
+      dependencies: [go.mod]
+    environment:
+      toolchain: {go: "1.25"}
+      env: [GOFLAGS, CGO_ENABLED]
+  ui:
+    scope:
+      source: ["ui/src/**", "ui/test/**"]
+      dependencies: [ui/package.json, ui/package-lock.json]
+    environment:
+      toolchain: {node: "24"}
+  image:
+    scope:
+      source: [Dockerfile, "data/**"]
+      allowMutable:
+        - files: ["data/fixtures/*.yaml"]
+          ref: ghcr.io/stefanprodan/podinfo:6.5.0
+          reason: public demo workload; the e2e suite only starts it
+tests:
+  - metadata: {name: unit}
+    use: [go]
+    runner: {command: [make, test]}
+    outputs: [coverage.out]
+  - metadata: {name: ui}
+    use: [ui]
+    runner: {command: [make, ui]}
+  - metadata: {name: "e2e-{shard}"}
+    use: [go, image]
+    runner: {command: [make, e2e, "SHARD={shard}"]}
+    scope: {source: ["e2e/**"]}
+    matrix: {shard: ["1", "2", "3"]}
+    cacheability: controlled-environment
