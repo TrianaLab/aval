@@ -487,3 +487,23 @@ func TestContractsTopOutputsSkipped(t *testing.T) {
 		t.Fatalf("output changed the fingerprint:\n%s", after.Manifest)
 	}
 }
+
+// A referenced contract skips a symlink by its own exclude (#198): the same
+// tree fails closed until shared excludes lib/bin by name and contents.
+func TestContractsExcludedSymlink(t *testing.T) {
+	files := monorepoFiles()
+	root := writeTree(t, files)
+	if err := os.Symlink(t.TempDir(), filepath.Join(root, "shared", "lib", "bin")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := computeFile(root, "frontend/aval.yaml"); err == nil || !strings.Contains(err.Error(), `"lib/bin" is a symlink`) {
+		t.Fatalf("want the symlink refused, got %v", err)
+	}
+	shared := avalYAML("shared", "lib/**", nil, `exclude: ["lib/bin", "lib/bin/**"]`)
+	if err := os.WriteFile(filepath.Join(root, "shared", "aval.yaml"), []byte(shared), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := computeFile(root, "frontend/aval.yaml"); err != nil {
+		t.Fatal(err)
+	}
+}

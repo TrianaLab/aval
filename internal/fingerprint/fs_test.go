@@ -92,3 +92,43 @@ func TestComputeFSSymlinkedDirectory(t *testing.T) {
 		t.Fatalf("want an error naming sub, got %v", err)
 	}
 }
+
+// The npm ci repro from #198: pkg/** with node_modules excluded fingerprints,
+// and nothing under node_modules reaches the manifest.
+func TestExcludedSymlinkLeavesNoManifestLine(t *testing.T) {
+	f := newFixture(t)
+	nodeModulesTool(f)
+	fp, err := f.compute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(fp.Manifest, "node_modules") {
+		t.Fatalf("node_modules in the manifest:\n%s", fp.Manifest)
+	}
+}
+
+// Each condition of excludedSymlink on its own.
+func TestExcludedSymlink(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		deps, exclude []string
+		want          bool
+	}{
+		{"name and contents excluded by one glob", nil, []string{"pkg/**"}, true},
+		{"name and contents excluded by two globs", nil, []string{"pkg/bin", "pkg/bin/**"}, true},
+		{"nothing excluded", nil, nil, false},
+		{"name excluded, contents not", nil, []string{"pkg/bin"}, false},
+		{"contents excluded only by the zero-segment form", nil, []string{"pkg/bin/**"}, false},
+		{"contents glob does not match the parent", nil, []string{"pkg/bin", "pkg/*/x/**"}, false},
+		{"dependency glob matches the name", []string{"pkg/bin"}, []string{"pkg/bin", "pkg/bin/**"}, false},
+		{"dependency glob reaches under it", []string{"pkg/**/*.so"}, []string{"pkg/bin", "pkg/bin/**"}, false},
+		{"dependency glob elsewhere", []string{"go.sum"}, []string{"pkg/bin", "pkg/bin/**"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := excludedSymlink([]string{"pkg", "bin"}, splitGlobs(tc.deps), splitGlobs(tc.exclude))
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
