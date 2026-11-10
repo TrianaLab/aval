@@ -395,8 +395,10 @@ func newVerifyCmd() *cobra.Command {
 signature and the trust policy, without running anything. It needs a
 registry; without a trust policy every lookup is a miss.
 
-Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
-1 error (registry, policy or fingerprint), 2 usage or invalid aval.yaml.`,
+Exit codes: 0 verified, 4 miss, 5 verification failed (security event:
+also a verified result beside a rejected verification-failed attestation, or
+more attestations than the lookup cap), 1 error (registry, policy or
+fingerprint), 2 usage or invalid aval.yaml.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			file, repo, timeout := g.file, g.registry, g.timeout
@@ -433,21 +435,42 @@ Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
 
 // verify decides whether a trusted result exists and returns the outputs
 // it carries, fetched and checked (never written). When any attestation
-// failed verification it prints one SECURITY line, even beside a verified
-// candidate (invariant 4); the reasons are in the report. It prints one too
-// when the fingerprint holds more attestations than lookup lists.
+// failed verification it prints one SECURITY line and returns an error
+// wrapping evidence.ErrVerification, even beside a verified candidate
+// (invariant 4, #195); the reasons are in the report. It does so too when
+// the fingerprint holds more attestations than lookup lists.
 func verify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
 	r, files, err := lookupAndVerify(ctx, warn, c, file, fp, repo, policyFile)
 	if line := securityLineFor(r, err); line != "" {
 		fmt.Fprintln(warn, line)
 	}
-	return r, files, err
+	return r, files, securityErr(r, err)
+}
+
+// errRejected is the error of a verified lookup beside an attestation that
+// failed verification: a security event, so nothing is reused and the exit
+// code is 5 (invariant 4, #195). The report keeps outcome verified.
+var errRejected = &evidence.VerificationError{Reason: "an attestation for the fingerprint failed verification beside the verified one"}
+
+// securityErr is err, or errRejected when err is nil but r holds a rejected
+// verification-failed attestation.
+func securityErr(r evidence.Report, err error) error {
+	if err == nil && securityCount(r) > 0 {
+		return errRejected
+	}
+	return err
+}
+
+// reusable reports whether the lookup r, with its error after securityErr,
+// may be reused: verified, and no attestation failed verification.
+func reusable(r evidence.Report, err error) bool {
+	return r.Outcome == evidence.OutcomeVerified && err == nil
 }
 
 // securityLineFor is the SECURITY line for the lookup r and its error, or
 // empty. Over the candidate cap nothing was verified, so an untrusted
-// attestation may hide among them (#135); the outcome stays error and the
-// test runs.
+// attestation may hide among them (#135): the outcome is
+// verification-failed and the line names the cap.
 func securityLineFor(r evidence.Report, err error) string {
 	if errors.Is(err, registry.ErrTooManyCandidates) {
 		return cliout.FloodLine(registry.ErrTooManyCandidates, r.TestID)

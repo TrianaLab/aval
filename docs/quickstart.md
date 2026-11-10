@@ -175,8 +175,8 @@ flowchart LR
   files[src/hello.txt<br>listed in scope] --> fp[fingerprint<br>sha256:fb39...]
   fp --> look{result for this<br>fingerprint?}
   look -- no --> miss([miss: run the test<br>steps 2 and 4]):::muted
-  look -- "yes, signer in policy.yaml" --> ok([verified: reuse,<br>skip the test<br>step 3]):::ok
-  look -- "yes, only untrusted signers" --> bad([verification-failed:<br>run the test, exit 5<br>step 5]):::err
+  look -- "yes, every signer in policy.yaml" --> ok([verified: reuse,<br>skip the test<br>step 3]):::ok
+  look -- "yes, any untrusted signer" --> bad([security event:<br>run the test, exit 5<br>step 5]):::err
 ```
 
 Stop the registry:

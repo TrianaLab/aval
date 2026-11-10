@@ -80,7 +80,8 @@ func TestStory(t *testing.T) {
 	if lines := strings.Split(strings.TrimSpace(errw), "\n"); len(lines) != 2 || lines[0] != "✗ "+strings.TrimPrefix(lines[1], "aval: ") || !strings.HasPrefix(lines[1], "aval: SECURITY: ") {
 		t.Fatalf("run tampered: stderr %q, want the SECURITY line when found and last", errw)
 	}
-	out, errw = exec(t, d, "aval verify", exitOK)
+	// The tampered result stays beside the fresh one: exit 5 (#195).
+	out, errw = exec(t, d, "aval verify", exitVerificationFailed)
 	mustContain(t, "verify beside tampered", out, "verified greet", "rejected: "+DefaultRepo+"@sha256:")
 	mustContain(t, "verify beside tampered", errw, "aval: SECURITY: 1 attestation(s)")
 

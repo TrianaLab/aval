@@ -73,7 +73,9 @@ covers lookup and fetch together; --push has its own. runner.command never
 sees $` + idTokenEnv + `, $` + registryEnv + ` or $` + policyEnv + `.
 
 Exit codes: 0 pass, 3 fail, 5 verification failed (a security event, after
-running the test), 1 error or false hit (--shadow), 2 usage.`,
+running the test: also a verified result beside a rejected verification-failed
+attestation, which is never reused, or more attestations than the lookup cap),
+1 error or false hit (--shadow), 2 usage. 5 wins over 3 and 1.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			o.file, o.repo, o.policyFile, o.registryTimeout, o.config = g.file, g.registry, g.policy, g.timeout, g
@@ -263,6 +265,9 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	w.Note(o.config.configLine())
 	observed, probeErr := probe(ctx, c, filepath.Dir(o.file))
 	r, files, lookupErr := decide(ctx, w, c, fp, cmp.Or(fpErr, probeErr), o)
+	// A rejected verification-failed candidate blocks reuse even beside a
+	// verified one: run the test, then exit 5 (invariants 3, 4, #195).
+	lookupErr = securityErr(r, lookupErr)
 	sum, security := announce(w, c, r, lookupErr, o.repo)
 	w.Security = sum.Security
 	// Whatever fails below, the SECURITY line announce printed is repeated as
@@ -274,7 +279,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	if err := writeReportFile(o.reportFile, r); err != nil {
 		errs = append(errs, err)
 	}
-	if r.Outcome == evidence.OutcomeVerified && !o.shadow && len(errs) == 0 {
+	if reusable(r, lookupErr) && !o.shadow && len(errs) == 0 {
 		// Outputs that cannot be written safely run the test instead.
 		if err := restore(out, filepath.Dir(o.file), files); err != nil {
 			errs = append(errs, fmt.Errorf("restoring outputs: %w", err))
@@ -297,7 +302,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	w.End(c.Metadata.Name, p.Result, p.Execution.ExitCode, sum.Took)
 	kept := keep(ctx, w, &sum, c, p, fpErr, probeErr, mutable(c, fp), token, o)
 	recordRun(ctx, out, warn, o, r, false, p)
-	verdict := judge(w, r, p)
+	verdict := judge(w, r, p, o.shadow)
 	w.Summary(sum)
 	return errors.Join(append(append(errs, kept...), verdict)...)
 }
@@ -306,11 +311,11 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 // is the SECURITY line it printed, to repeat as the last stderr line;
 // empty when no attestation failed verification.
 func announce(w cliout.Run, c *contract.Contract, r evidence.Report, lookupErr error, repo string) (sum cliout.Summary, security string) {
-	// Flooding is a security event, not a routine reuse-off cause (#135).
+	// Flooding is a security event with its own wording (#135).
 	flood := errors.Is(lookupErr, registry.ErrTooManyCandidates)
 	security = securityLineFor(r, lookupErr)
 	sum = cliout.Summary{
-		Test: c.Metadata.Name, ReuseOff: !flood && (r.Outcome == evidence.OutcomeError || errors.As(lookupErr, new(reuseOff))),
+		Test: c.Metadata.Name, ReuseOff: r.Outcome == evidence.OutcomeError || errors.As(lookupErr, new(reuseOff)),
 		Security: security != "", Flood: flood,
 		NeverReusable: c.Cacheability == contract.NonDeterministic, Verified: r.Outcome == evidence.OutcomeVerified,
 	}
@@ -318,7 +323,7 @@ func announce(w cliout.Run, c *contract.Contract, r evidence.Report, lookupErr e
 		w.SecurityBlock(security) // when found, before the report; securityLast repeats it last
 	}
 	w.Decision(r, c.Cacheability)
-	if r.Outcome == evidence.OutcomeError && !flood {
+	if r.Outcome == evidence.OutcomeError {
 		// The test runs: fail closed (invariant 3). The report keeps the raw error.
 		w.ReuseOff(cmp.Or(unreachable(repo, lookupErr), r.Reason))
 	}
@@ -422,10 +427,10 @@ func noteFindings(note func(string), fp fingerprint.Fingerprint) {
 	}
 }
 
-// judge turns the real run into the command's verdict. With a verified
-// result (only in --shadow) a disagreement is a false hit.
-func judge(w cliout.Run, r evidence.Report, p *evidence.Predicate) error {
-	if r.Outcome == evidence.OutcomeVerified {
+// judge turns the real run into the command's verdict. In --shadow, with a
+// verified result, a disagreement is a false hit.
+func judge(w cliout.Run, r evidence.Report, p *evidence.Predicate, shadow bool) error {
+	if shadow && r.Outcome == evidence.OutcomeVerified {
 		if r.Result != p.Result {
 			fmt.Fprintf(w.Err, "aval: FALSE HIT: %s reused %s from %s, but the test %s\n", r.TestID, r.Result, r.Reference, p.Result)
 			return errFalseHit
@@ -607,11 +612,11 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 		return
 	}
 	rec := evidence.RunRecord{
-		Version: evidence.RunRecordVersion, TestID: r.TestID, Fingerprint: r.Fingerprint, Outcome: r.Outcome,
+		Version: evidence.RunRecordVersion, TestID: r.TestID, Fingerprint: r.Fingerprint, Outcome: recordOutcome(r),
 		AvalVersion: version, RecordedAt: now().UTC(), CIRunURL: o.ciRunURL,
 		Repository: o.repository,
 	}
-	if r.Outcome == evidence.OutcomeVerified {
+	if rec.Outcome == evidence.OutcomeVerified {
 		rec.VerifiedResult = r.Result
 	}
 	switch {
@@ -643,6 +648,16 @@ func recordRun(ctx context.Context, out, warn io.Writer, o runFlags, r evidence.
 		return
 	}
 	fmt.Fprintf(out, "recorded %s\n", d.Reference())
+}
+
+// recordOutcome is the run record outcome for r: its outcome, except that a
+// verified lookup beside a rejected verification-failed candidate was not
+// reused and counts as a verification failure (#195).
+func recordOutcome(r evidence.Report) evidence.Outcome {
+	if securityCount(r) > 0 {
+		return evidence.OutcomeVerificationFailed
+	}
+	return r.Outcome
 }
 
 // writeReportFile writes r to path, unless no --report-file was asked for.

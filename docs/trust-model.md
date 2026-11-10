@@ -219,9 +219,9 @@ the test runs.
 - **No silent replacement:** pushes only add results. Every candidate is
   verified and the highest trusted level wins. A candidate that fails
   verification is listed in `rejected` and stays visible; one that cannot be
-  fetched or checked blocks reuse. More than 64 candidates is `error` with an
-  `aval: SECURITY:` line naming the cap: none was verified, so an untrusted
-  one may hide among them.
+  fetched or checked blocks reuse. More than 64 candidates is
+  `verification-failed` (exit 5) with an `aval: SECURITY:` line naming the
+  cap: none was verified, so an untrusted one may hide among them.
 - **Unknown or missing fields** in `aval.yaml`: rejected, exit 2.
 
 `aval run --no-reuse` always runs and never looks anything up. What each
@@ -280,7 +280,7 @@ contract's is a verification failure.
 | Replay of a passing result for a different fingerprint or test id | Verification requires the signed fingerprint and test id to equal the ones computed locally. The signed predicate cannot be re-labeled without breaking the signature. Mismatch is `verification-failed`. |
 | Undeclared input changed (file outside scope, unlisted env var, network service) | Not detected: the fingerprint only covers declared inputs. Mitigated by contract review, `external-dependencies` not being reusable by default and `non-deterministic` never being reusable, and the false-hit suite. Observed-input tracing is future work; until then, [find undeclared inputs](guides/write-a-contract.md#find-undeclared-inputs) by hand. |
 | Content behind a declared name changed (repushed image tag, new upstream release, changed remote script) | The scanner reports the mutable references it recognizes in the scope and `runner.command`; for `hermetic` and `controlled-environment` an unaccepted one makes the lookup a `miss` and blocks publishing. Accepting one needs `scope.allowMutable`, which changes the fingerprint and shows in review. References it does not recognize stay a known gap ([Pin your dependencies](pinning.md)). |
-| Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with an `aval: SECURITY: ...` line on stderr. It can delete attestations (forcing re-runs) or deny service (`error`, re-run), for example by pushing more than 64 attestations for a fingerprint, which is reported with an `aval: SECURITY:` line as a possible flooding attempt. Availability is out of scope. |
+| Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with an `aval: SECURITY: ...` line on stderr that blocks reuse and exits 5. It can delete attestations (forcing re-runs) or deny service (re-run), for example by pushing more than 64 attestations for a fingerprint, which is `verification-failed` (exit 5) with an `aval: SECURITY:` line as a possible flooding attempt. Availability is out of scope. |
 | Forged or tampered run records (anyone with push access) | Unsigned statistics, never read by `aval run` or `aval verify`; `aval stats` skips malformed records and caps how many it reads. |
 | Pull request that edits the policy or registry its own CI reads | Read both from the default branch ([Take the policy from a protected branch](#take-the-policy-from-a-protected-branch)) and verify with a pinned `aval` release. The workflow file still comes from the PR, so a hostile PR can make its own check green; required code-owner review keeps it off the default branch, which trusts only its own CI. |
 | Dishonest but trusted signer (ran a modified test and signed "passed") | Out of scope for Aval. A signature proves who claims it, not that the test ran honestly. Limit which identities get which level; level 3 (isolated) exists for this. |

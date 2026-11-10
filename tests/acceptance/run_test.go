@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"io"
@@ -125,6 +126,50 @@ func TestRunPushReuseStory(t *testing.T) {
 	stdout, stderr, code := avalEnv(t, "run", "-f", file, "--registry", repo, "--result", result, "--policy", trusted)
 	if code != 0 || runs() != 4 || !strings.Contains(stdout, "miss story") {
 		t.Fatalf("changed input: exit %d, %d runs\nstdout %s\nstderr %s", code, runs(), stdout, stderr)
+	}
+}
+
+// #195: a result signed by a key the policy does not trust, beside a trusted
+// one for the same fingerprint, is a security event in the exit code alone:
+// run does not reuse, runs the test and exits 5 with the SECURITY line last;
+// verify prints the unchanged report (verified, the bad one in rejected) and
+// exits 5.
+func TestRejectedCandidateStory(t *testing.T) {
+	srv := httptest.NewServer(ggcr.New(ggcr.Logger(log.New(io.Discard, "", 0))))
+	t.Cleanup(srv.Close)
+	repo := strings.TrimPrefix(srv.URL, "http://") + "/acme/rejected-aval"
+
+	keys := t.TempDir()
+	key, pub := keyPair(t, keys, "dev")
+	otherKey, _ := keyPair(t, keys, "other")
+	trusted := writePolicy(t, keys, "trusted.yaml", pub)
+
+	runner := strings.Replace(contract, `["true"]`, `["sh", "-c", "echo ran >> runs.log"]`, 1)
+	dir := writeProject(t, map[string]string{"aval.yaml": runner, "src/a.txt": "a\n"})
+	file := filepath.Join(dir, "aval.yaml")
+	result := filepath.Join(dir, ".aval", "result.json")
+	run := []string{"run", "-f", file, "--registry", repo, "--result", result}
+	for _, k := range []string{key, otherKey} {
+		if stdout, stderr, code := avalEnv(t, append(run, "--push", "--key", k)...); code != 0 {
+			t.Fatalf("push with %s: exit %d\nstdout %s\nstderr %s", k, code, stdout, stderr)
+		}
+	}
+
+	stdout, stderr, code := avalEnv(t, append(run, "--policy", trusted)...)
+	lines := strings.Split(strings.TrimSpace(stderr), "\n")
+	if b, _ := os.ReadFile(filepath.Join(dir, "runs.log")); code != 5 || strings.Count(string(b), "ran\n") != 3 || strings.Contains(stdout, "reused") ||
+		!strings.HasPrefix(lines[len(lines)-1], "aval: SECURITY: 1 attestation(s) for story failed") {
+		t.Fatalf("run: exit %d, runs.log %q\nstdout %s\nstderr %s", code, b, stdout, stderr)
+	}
+
+	stdout, stderr, code = avalEnv(t, "verify", "-f", file, "--registry", repo, "--policy", trusted, "-o", "json")
+	var r struct {
+		Outcome, Reference string
+		Rejected           []struct{ Outcome string }
+	}
+	if err := json.Unmarshal([]byte(stdout), &r); err != nil || code != 5 || r.Outcome != "verified" || r.Reference == "" ||
+		len(r.Rejected) != 1 || r.Rejected[0].Outcome != "verification-failed" || !strings.Contains(stderr, "SECURITY") {
+		t.Fatalf("verify: exit %d, %v\nstdout %s\nstderr %s", code, err, stdout, stderr)
 	}
 }
 

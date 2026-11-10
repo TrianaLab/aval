@@ -297,7 +297,8 @@ func TestOutputsVerificationFailures(t *testing.T) {
 	})
 	c := outputsContract(t, "[coverage.xml]")
 	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(t.TempDir(), "r.json"))
-	if code != ExitOK || !strings.Contains(stdout, "restored coverage.xml") || !strings.Contains(stderr, "SECURITY: 1 attestation(s)") {
+	// The rejected sibling blocks reuse (#195): the test runs and exits 5.
+	if code != ExitVerificationFailed || strings.Contains(stdout, "restored") || !strings.Contains(stdout, "ran unit: passed") || !strings.Contains(stderr, "SECURITY: 1 attestation(s)") {
 		t.Fatalf("sibling: exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(filepath.Dir(filepath.Dir(c)), "escape.xml")); !os.IsNotExist(err) {

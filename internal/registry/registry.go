@@ -54,7 +54,7 @@ const (
 	// maxCandidates caps the attestations listed for one fingerprint, so
 	// anyone with push access cannot make verify fetch an unbounded number
 	// of manifests. Over the cap lookup fails with ErrTooManyCandidates, a
-	// plain error (outcome error: run the test).
+	// verification failure (run the test, exit 5).
 	maxCandidates = 64
 	// maxReferrerPages caps the referrers pages one listing requests. oras
 	// follows Link headers without a limit and skips empty pages, so a
@@ -70,9 +70,18 @@ const (
 var pushConfirmDelay = time.Second
 
 // ErrTooManyCandidates is wrapped by Lookup when a fingerprint holds more
-// attestations than it lists. None of them was verified, so an untrusted one
-// may hide among them: callers report it as a possible flooding attempt.
-var ErrTooManyCandidates = fmt.Errorf("more than %d attestations", maxCandidates)
+// attestations than it lists. None of them was verified, so trust cannot be
+// proven and an untrusted one may hide among them, which is suspicious: it
+// wraps evidence.ErrVerification (outcome verification-failed, #195), and
+// callers report it as a possible flooding attempt.
+var ErrTooManyCandidates error = tooManyCandidates{}
+
+type tooManyCandidates struct{}
+
+func (tooManyCandidates) Error() string {
+	return fmt.Sprintf("more than %d attestations", maxCandidates)
+}
+func (tooManyCandidates) Unwrap() error { return evidence.ErrVerification }
 
 var fingerprintRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 

@@ -15,7 +15,7 @@ flowchart LR
 
 | Outcome | Means | `aval run` does |
 |---|---|---|
-| `verified` | a trusted result exists for these exact inputs | reuses it: exit 0 for a pass, 3 for a failure |
+| `verified` | a trusted result exists for these exact inputs | reuses it: exit 0 for a pass, 3 for a failure; beside a result that fails verification it runs the test and exits 5 |
 | `miss` | nothing to reuse yet | runs the test |
 | `error` | Aval could not decide, such as an unreachable registry | runs the test |
 | `verification-failed` | a result exists but does not verify | runs the test, then exits 5 |
@@ -39,6 +39,11 @@ A result under your fingerprint does not verify: a bad signature, an unknown
 signer, or a claim of other inputs. The cause is a wrong policy or an
 attacker. Aval runs the test, prints `aval: SECURITY: ...` and exits 5. Fail
 the job and investigate; never hide or retry it.
+
+The same holds when another result verifies beside the bad one (the report
+says `verified` and lists the bad one in `rejected`): nothing is reused and
+the exit code is 5. More than 64 results for one fingerprint is
+`verification-failed` too: none is verified, so one may hide an attacker's.
 
 ## Read more
 

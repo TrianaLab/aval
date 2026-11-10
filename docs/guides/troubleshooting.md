@@ -70,7 +70,7 @@ flowchart LR
     |---|---|
     | `cannot reach <host> (<cause>); is the registry running?`, `loading registry credentials: <x>`, `resolving <tag>: <x>`, `listing referrers: <x>`, `fetching manifest <x>`, `fetching layer <x>` | check the address (`AVAL_REGISTRY`, `--registry`), that the registry runs, the network and `docker login`; a report's `reason` keeps the raw error |
     | `signing: <x>`, `publishing: <x>`, `pushing manifest: <x>`, `tagging anchor: <x>` | check the token or key, and write access |
-    | `more than <n> attestations` | delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)); the `aval: SECURITY:` line before it means none was verified, so check who pushed them: it may be a flooding attempt |
+    | `more than <n> attestations` | outcome `verification-failed`, exit 5: none was verified, so check who pushed them (it may be a flooding attempt), then delete old results ([cleanup](../artifact-format.md#the-64-candidate-cap-and-cleanup)) |
     | `is not listed among the referrers of` | push again, or use a registry with OCI 1.1 referrers |
     | `running <x>`, `environment.probe <key> <argv>: declared <x>, observed <y>` | install the program `runner.command` starts, or the declared toolchain version ([Probe the toolchain](../contract.md#probe-the-toolchain)) |
     | `FALSE HIT: <x>` (with `--shadow`) | the test reads an input `scope` does not list: [find it](write-a-contract.md#find-undeclared-inputs) |
@@ -98,8 +98,8 @@ flowchart LR
 `aval: SECURITY:` comes first (`aval run` repeats it last); `reason:` says
 why. Usually a wrong policy, possibly an attacker
 ([Outcomes](../concepts/outcomes.md#a-verification-failure-is-a-security-event)).
-Beside a verified result (exit 0) it shows in `rejected`: gate on it where it
-must stop a pipeline (`.github/aval/summary.sh`).
+Beside a verified result it shows in `rejected`: the report keeps outcome
+`verified`, but nothing is reused and the exit code is 5.
 
 ??? danger "Reasons"
     | Reason | Fix |
@@ -107,6 +107,7 @@ must stop a pipeline (`.github/aval/summary.sh`).
     | `signature: <x>`, `signer key id <x> is not in the trust policy`, `it lists no keyless identities`, `is not accepted by the policy` | trust that signer, or find out who pushed |
     | `bundle signs a different envelope`, `no Sigstore bundle stored with the attestation`, `decoding Sigstore bundle`, `bundle does not carry a DSSE envelope`, `envelope: missing or not an in-toto payload`, `decoding statement`, `statement: type <x>`, `predicate: <x>`, `malformed attestation: <x>` | a broken or forged result: delete it |
     | `fingerprint <x>, want <y>`, `test id <x>, want <y>`, `statement subject does not match the predicate subject` | a result that claims other inputs: delete it |
+    | `failed verification beside the verified one` | the report says `verified`, but the attestation in `rejected` is bad: its reason is one of these rows |
     | `cacheability <x> is not reusable under the policy`, `cacheability <x>, want <y>`, `tag <x> points at <y>, not the fingerprint anchor` | a lie about the result or the tag: find out who pushed |
     | `outputs: <x>`, `the result carries no outputs, the contract declares outputs`, `is not a declared output of the contract, or is an input`, `matches no output of the result` | the stored outputs do not match the signed list or the contract: a forged result, or the registry deleted the outputs. Find out who pushed, delete the result and push again |
     | `no signature verifier configured`, `expected fingerprint and test id are required` | only from Go: fill in `VerifyOptions` ([Consume from Go](go-consumer.md)) |
