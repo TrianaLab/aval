@@ -2400,6 +2400,10 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>make an unencrypted P-256 key (<a href="../signing/">Signing</a>); for a public key, pass <code>&lt;name&gt;.key</code>, not <code>&lt;name&gt;.pub</code></td>
 </tr>
 <tr>
+<td><code>is already running in an outer aval run</code></td>
+<td><code>runner.command</code> starts <code>aval run</code> on the same <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> again, directly or through other contracts: call the test command itself, not the target that wraps it in <code>aval run</code> (<a href="../../contract/#nested-runs">Nested runs</a>)</td>
+</tr>
+<tr>
 <td><code>holds neither an Aval result nor a report</code>, <code>is an input of the test</code></td>
 <td>write <code>--result-file</code> and <code>--report-file</code> under <code>.aval/</code>; for <code>output &lt;x&gt; is an input of the test</code>, exclude it from <code>scope</code></td>
 </tr>
@@ -2449,8 +2453,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>pick a <a href="../write-a-contract/#step-by-step">class</a></td>
 </tr>
 <tr>
-<td><code>environment.toolchain: invalid key</code>, <code>invalid variable name</code>, <code>environment.probe.&lt;key&gt;: not a key of environment.toolchain</code>, <code>environment.probe.&lt;key&gt;: must be a non-empty argv list</code>, <code>environment.probe.&lt;key&gt;: environment.toolchain.&lt;key&gt; must not be empty</code></td>
-<td>lower case tool names, valid variable names; probe only declared, non-empty toolchain keys, each with an argv</td>
+<td><code>environment.toolchain: invalid key</code>, <code>invalid variable name</code>, <code>environment.probe.&lt;key&gt;: not a key of environment.toolchain</code>, <code>environment.probe.&lt;key&gt;: must be a non-empty argv list</code>, <code>environment.probe.&lt;key&gt;: environment.toolchain.&lt;key&gt; must not be empty</code>, <code>is set by aval run and is not an input</code></td>
+<td>lower case tool names, valid variable names other than <code>AVAL_RUN_STACK</code>; probe only declared, non-empty toolchain keys, each with an argv</td>
 </tr>
 <tr>
 <td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code>, <code>file &lt;x&gt; must be a slash-separated path relative to the contract</code></td>

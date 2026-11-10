@@ -2741,6 +2741,10 @@ and records the result. Anything Aval cannot prove runs the test.</p>
 <p>Without a registry and a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> the test always runs. --registry-timeout
 covers lookup and fetch together; --push has its own. runner.command never
 sees $SIGSTORE_ID_TOKEN, $AVAL_REGISTRY or $AVAL_POLICY.</p>
+<p>runner.command and the probes get $AVAL_RUN_STACK, the contracts of
+the enclosing aval runs. A run whose <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> is already there exits 2 before
+doing anything: runner.command must not start the same <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> again. A
+nested run of another <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> works.</p>
 <p>Exit codes: 0 pass, 3 fail, 5 verification failed (a security event, after
 running the test: also a verified result beside a rejected verification-failed
 <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>, which is never reused, or more attestations than the lookup cap),
