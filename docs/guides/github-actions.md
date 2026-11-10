@@ -1,14 +1,14 @@
 # Use GitHub Actions
 
-Goal: each CI job runs its test through Aval in three lines of YAML, and only
-a job on `main` signs and publishes results.
+Goal: each CI job runs its test through Aval in three lines of YAML, and one
+job on `main` signs and publishes every result.
 
 ```mermaid
 flowchart LR
   job([unit job]) --> act[aval run action]
   act -- verified --> skip([reuse]):::ok
   act -- anything else --> test[run the test]
-  test -- "push to main" --> art([artifact aval-unit]) --> pub[publish job: aval push] --> reg([registry]):::muted
+  test -- "push to main" --> art([artifact aval-unit]) --> pub[publish action: aval push] --> reg([registry]):::muted
   act -- "exit 5" --> fail([step fails, SECURITY]):::err
 ```
 
@@ -52,36 +52,58 @@ The action runs on Linux and macOS runners that ship `/usr/bin/jq`
 (GitHub's Ubuntu images, macOS 15 and later).
 
 !!! note "Pinned release"
-    The action needs `--test` and the policy's `registry`, which ship in the
-    release after 0.7.0. Until its pin moves there (milestone 14, #213),
-    `aval run` exits 2 and the step fails.
+    The run and publish actions need `--test` and the policy's `registry`,
+    which ship in the release after 0.7.0. Until their pins move there
+    (milestone 14, #213), `aval run` and `aval push` exit 2 and the step
+    fails.
 
 ## Split credentials
 
-The publishing job signs with the workflow's identity and pushes what the
-suite job uploaded:
+One job signs what the suite jobs uploaded, with the workflow's identity:
 
 ```yaml
 --8<-- "docs/includes/github-actions.yml:publish"
 ```
 
-- The OIDC token is fetched in the publishing job, which runs no tests.
-- `--test` names the test the artifact holds, so a report for another test
-  cannot be published under this one.
-- A report whose outcome is `verified` (also under `--shadow`) makes push
-  print `nothing to push: ...`, sign nothing and exit 0. So does a
-  `non-deterministic` test.
-- A `miss` or an `error` publishes the result. Failing results are published
-  on purpose: on a tie in trust level a failure outranks a pass, so a later
-  flaky pass cannot become reusable.
-- The result and the report come from an unprivileged job and are unsigned.
-  Push checks that both match the test id and the fingerprint it computes
-  now from the checkout, then signs the result's claims with the publishing
-  identity. A mismatch exits 1 and publishes nothing.
-- A report that records a security event (outcome `verification-failed`, or
-  a `rejected` entry that failed verification) signs nothing and exits 5. The
-  suite job already exited 5 for it: investigate before publishing.
+The action [`integrations/github/publish`](https://github.com/TrianaLab/aval/blob/main/integrations/github/publish/action.yml)
+takes `file`, `policy`, `registry-username`, `registry-password` (default
+`github.actor` and `github.token`), `stats` and `allow-unprotected` (both
+default `false`). In order, it:
+
+1. Refuses a ref other than the default branch unless `allow-unprotected:
+   true`, always refuses `pull_request_target` and `workflow_run`, and fails
+   without `id-token: write`.
+2. Installs the same pinned, verified aval release as the run action.
+3. Fetches the policy from the default branch and logs in to the host of its
+   `registry`, where results go. No policy or no `registry` fails the step.
+4. Downloads this run's `aval-*` artifacts into `$RUNNER_TEMP`. For each
+   `aval-<name>`, fetches a fresh OIDC token (audience `sigstore`) and runs
+   `aval push --test <name>` with its report and result. It tries them all,
+   then exits with the worst code; 5 is never downgraded (`aval SECURITY`).
+5. With `stats: true`, publishes each pushed test's run record; a failure
+   is a warning.
+
+What `aval push` does with each artifact:
+
+- An artifact `aval-a` that holds test `b`, or a result that does not match
+  the fingerprint push computes from the checkout, exits 1 and publishes
+  nothing; the other artifacts are still pushed.
+- A reused result (report outcome `verified`, also under `--shadow`) and a
+  `non-deterministic` test print `nothing to push: ...` and exit 0.
+- A `miss` or an `error` publishes the result, failures included: on a tie
+  in trust level a failure outranks a later flaky pass.
+- A report that records a security event signs nothing and exits 5.
 - Trust only this workflow on `main`: [Write a trust policy](trust-policy.md#the-example).
+
+### Why a composite action
+
+The publish action is a composite action, not a reusable workflow
+(`workflow_call`). The steps of a composite action run inside the caller's
+job, so the Fulcio certificate names the calling workflow, for example
+`https://github.com/acme/app/.github/workflows/ci.yaml@refs/heads/main`.
+A reusable workflow would put Aval's workflow in the certificate of every
+repository that calls it, and a `subjectRegexp` for it would trust them all.
+Aval's CI checks the certificates its `main` signs this way.
 
 ## Pull requests
 

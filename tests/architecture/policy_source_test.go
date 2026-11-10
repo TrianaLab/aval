@@ -515,11 +515,11 @@ func TestTrustStepReadsTheBaseBranch(t *testing.T) {
 
 // The scripts the trust step runs use /bin/bash and call their tools by
 // absolute path, so an earlier step that writes GITHUB_PATH cannot shim them
-// (#134); so do the scripts of the aval run action (#211). cosign comes
-// from sigstore/cosign-installer, an allowed action.
+// (#134); so do the scripts of the aval run and publish actions (#211,
+// #212). cosign comes from sigstore/cosign-installer, an allowed action.
 func TestTrustScriptsCallToolsByAbsolutePath(t *testing.T) {
-	bare := regexp.MustCompile(`(?m)^[^#\n]*(?:^|[^/\w-])(?:git|sed|sort|grep|curl|sha256sum|tar|mkdir|bash|jq|awk|rm)\s`)
-	for _, f := range []string{trustScript, installScript, "integrations/github/run/guard.sh", "integrations/github/run/run.sh"} {
+	bare := regexp.MustCompile(`(?m)^[^#\n]*(?:^|[^/\w-])(?:git|sed|sort|grep|curl|sha256sum|tar|mkdir|bash|jq|awk|rm|base64|tr)\s`)
+	for _, f := range []string{trustScript, installScript, "integrations/github/run/guard.sh", "integrations/github/run/run.sh", "integrations/github/publish/guard.sh", "integrations/github/publish/publish.sh"} {
 		data, err := os.ReadFile(filepath.Join(root, f))
 		if err != nil {
 			t.Fatal(err)

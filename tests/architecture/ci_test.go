@@ -2,6 +2,7 @@ package architecture
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -541,5 +542,118 @@ func TestActionExampleCheckCatchesDrift(t *testing.T) {
 	}
 	if got, _ := actionExampleProblems([]byte("jobs: {}\n"), []byte(action)); len(got) != 1 {
 		t.Errorf("no use of the action: got %q", got)
+	}
+}
+
+// publishActionRef is how a workflow uses the aval publish action (#212).
+const publishActionRef = "TrianaLab/aval/integrations/github/publish@"
+
+// publishCondition and publishPermissions are what the documented publish
+// job must have: a push to the default branch, and only the scopes signing
+// and pushing need.
+const publishCondition = "${{ !cancelled() && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}"
+
+var publishPermissions = map[string]string{"contents": "read", "packages": "write", "id-token": "write"}
+
+// publishExampleProblems checks the publish job docs/guides/github-actions.md
+// shows against the publish action: its condition, its permissions and the
+// inputs it passes.
+func publishExampleProblems(example, action []byte) ([]string, error) {
+	var a struct {
+		Inputs map[string]any `yaml:"inputs"`
+	}
+	var wf struct {
+		Jobs map[string]permJob `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(action, &a); err != nil {
+		return nil, err
+	}
+	if err := yaml.Unmarshal(example, &wf); err != nil {
+		return nil, err
+	}
+	var problems []string
+	uses := 0
+	for name, j := range wf.Jobs {
+		for _, s := range j.Steps {
+			if !strings.HasPrefix(s.Uses, publishActionRef) {
+				continue
+			}
+			uses++
+			if j.If != publishCondition {
+				problems = append(problems, name+": condition is not "+publishCondition)
+			}
+			if !maps.Equal(j.Permissions, publishPermissions) {
+				problems = append(problems, name+": permissions are not contents: read, packages: write, id-token: write")
+			}
+			for in := range s.With {
+				if _, ok := a.Inputs[in]; !ok {
+					problems = append(problems, name+": input "+in+" is not in action.yml")
+				}
+			}
+		}
+	}
+	if uses == 0 {
+		problems = append(problems, "no job uses "+publishActionRef)
+	}
+	slices.Sort(problems)
+	return problems, nil
+}
+
+func TestGitHubPublishExampleMatchesTheAction(t *testing.T) {
+	p, err := publishExampleProblems([]byte(readFile(t, "docs/includes/github-actions.yml")), []byte(readFile(t, "integrations/github/publish/action.yml")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range p {
+		t.Error(s)
+	}
+}
+
+func TestPublishExampleCheckCatchesDrift(t *testing.T) {
+	action := "inputs:\n  file: {default: aval.yaml}\n"
+	bad := "jobs:\n  p:\n    if: github.event_name == 'push'\n    permissions: {contents: write, id-token: write}\n    steps:\n      - uses: " + publishActionRef + "x\n        with: {files: u}\n"
+	got, err := publishExampleProblems([]byte(bad), []byte(action))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"p: condition is not " + publishCondition, "p: input files is not in action.yml", "p: permissions are not contents: read, packages: write, id-token: write"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if got, _ := publishExampleProblems([]byte("jobs: {}\n"), []byte(action)); len(got) != 1 {
+		t.Errorf("no use of the action: got %q", got)
+	}
+}
+
+// installStep is the step of an action.yml that installs the pinned aval
+// release, as YAML, or "" when there is none.
+func installStep(t *testing.T, path string) string {
+	t.Helper()
+	var a struct {
+		Runs struct {
+			Steps []map[string]any `yaml:"steps"`
+		} `yaml:"runs"`
+	}
+	if err := yaml.Unmarshal([]byte(readFile(t, path)), &a); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range a.Runs.Steps {
+		if s["id"] == "install" {
+			out, err := yaml.Marshal(s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(out)
+		}
+	}
+	return ""
+}
+
+// Pinning either action by commit SHA pins the same verified aval release
+// (#212): the run and publish actions install it with identical steps.
+func TestActionsInstallTheSameRelease(t *testing.T) {
+	run, publish := installStep(t, "integrations/github/run/action.yml"), installStep(t, "integrations/github/publish/action.yml")
+	if run == "" || run != publish {
+		t.Errorf("the install steps of the run and publish actions differ:\n--- run\n%s--- publish\n%s", run, publish)
 	}
 }
