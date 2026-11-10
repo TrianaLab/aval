@@ -36,21 +36,27 @@ die() {
   exit 1
 }
 
-# run_installer NAME [VAR=value...]: runs the installer with its install dir under
-# $work/NAME and the given environment; leaves the output in $work/NAME.log.
+# run_installer NAME [VAR=value...] [-- FLAG...]: runs the installer with its
+# install dir under $work/NAME, the given environment and flags; leaves the
+# output in $work/NAME.log.
 run_installer() {
-  local name="$1"
+  local name="$1" vars=()
   shift
-  env USE_SUDO=false AVAL_INSTALL_DIR="$work/$name" "$@" "$BASH" "$installer" >"$work/$name.log" 2>&1
+  while [ $# -gt 0 ] && [ "$1" != "--" ]; do
+    vars+=("$1")
+    shift
+  done
+  [ $# -eq 0 ] || shift
+  env USE_SUDO=false AVAL_INSTALL_DIR="$work/$name" ${vars[@]+"${vars[@]}"} "$BASH" "$installer" "$@" >"$work/$name.log" 2>&1
 }
 
-# want_fail NAME MESSAGE [VAR=value...]: the install fails, says MESSAGE and
+# want_fail NAME MESSAGE [VAR=value...] [-- FLAG...]: the install fails, says MESSAGE and
 # leaves no binary behind.
 want_fail() {
   local name="$1" msg="$2"
   shift 2
   if run_installer "$name" "$@"; then cat "$work/$name.log"; die "$name: install succeeded"; fi
-  grep -qF "$msg" "$work/$name.log" || { cat "$work/$name.log"; die "$name: output lacks '$msg'"; }
+  grep -qF -- "$msg" "$work/$name.log" || { cat "$work/$name.log"; die "$name: output lacks '$msg'"; }
   [ ! -e "$work/$name/aval" ] || die "$name: aval was installed"
   pass "$name"
 }
@@ -70,6 +76,14 @@ grep -qF "aval version ${OLD_VERSION#v}" "$work/pinned.log" || { cat "$work/pinn
 pass "pinned"
 
 want_fail bad-version "not a release version" DESIRED_VERSION='1.0;rm'
+# Usage errors, refused before anything is downloaded.
+want_fail require-verify-no-verify "exclude --no-verify" DESIRED_VERSION="$OLD_VERSION" AVAL_REQUIRE_VERIFY=1 AVAL_NO_VERIFY=1
+want_fail require-verify-latest "need --version" AVAL_REQUIRE_VERIFY=1
+want_fail require-verify-flags "exclude --no-verify" -- --version "$OLD_VERSION" --require-verify --no-verify
+want_fail require-verify-flag-latest "need --version" -- --require-verify
+want_fail require-provenance-latest "need --version" AVAL_REQUIRE_PROVENANCE=1
+want_fail bad-sha256 "--sha256 wants" AVAL_SHA256=abc
+want_fail bad-sha256-glob "--sha256 wants" AVAL_SHA256='*'
 want_fail no-release "not found" DESIRED_VERSION=v0.0.0
 
 # Local mirror of $VERSION, one directory per case: <case>/<tag>/<file>.
@@ -118,6 +132,41 @@ url="http://127.0.0.1:$PORT"
 run_installer genuine DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/genuine" \
   || { cat "$work/genuine.log"; die "genuine: mirror install failed"; }
 pass "genuine"
+
+genuine_sha=$( (sha256sum "$real/$archive" 2>/dev/null || shasum -a 256 "$real/$archive") | awk '{print $1}')
+other_sha=$(printf '%064d' 0)
+
+# --sha256 and --require-verify: the right pin with cosign installs; a wrong
+# pin, or pins for other platforms only, installs nothing.
+run_installer pinned-verified DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/genuine" \
+  AVAL_SHA256="windows_amd64=$other_sha ${os}_${arch}=$genuine_sha" AVAL_REQUIRE_VERIFY=1 AVAL_REQUIRE_PROVENANCE=1 \
+  || { cat "$work/pinned-verified.log"; die "pinned-verified: install failed"; }
+for line in "signature ok" "sha256 ok (pinned)" "provenance ok"; do
+  grep -qF "$line" "$work/pinned-verified.log" || { cat "$work/pinned-verified.log"; die "pinned-verified: output lacks '$line'"; }
+done
+pass "pinned-verified"
+want_fail wrong-pin "pinned $other_sha, got $genuine_sha" DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/genuine" AVAL_SHA256="$other_sha"
+want_fail wrong-pin-flag "pinned $other_sha, got $genuine_sha" DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/genuine" AVAL_NO_VERIFY=1 \
+  -- --sha256 "${os}_${arch}=$other_sha"
+want_fail other-platform-pin "no --sha256 for ${os}_${arch}" DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/genuine" AVAL_SHA256="windows_amd64=$genuine_sha"
+# The pin matches the archive, but the signed checksums.txt does not list
+# that digest for it: a re-tagged archive is refused even with --no-verify.
+want_fail pinned-tampered-archive "checksum mismatch" DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/tampered-archive" \
+  AVAL_SHA256="$tampered_sha" AVAL_NO_VERIFY=1
+want_fail pinned-unlisted "does not list" DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/unlisted" AVAL_SHA256="$genuine_sha" AVAL_NO_VERIFY=1
+# --require-verify: a bad signature aborts; no cosign on PATH aborts.
+want_fail require-verify-bad-signature "is not signed by" DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/tampered-checksums" \
+  AVAL_SHA256="$tampered_sha" AVAL_REQUIRE_VERIFY=1
+nocosign=""
+IFS=: read -ra dirs <<<"$PATH"
+for d in "${dirs[@]}"; do [ -x "$d/cosign" ] || nocosign="$nocosign${nocosign:+:}$d"; done
+want_fail require-verify-no-cosign "cosign is not installed" PATH="$nocosign" DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/genuine" \
+  AVAL_SHA256="$genuine_sha" AVAL_REQUIRE_VERIFY=1
+# Without --require-verify, a missing cosign is only a note.
+run_installer no-cosign PATH="$nocosign" DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/genuine" \
+  || { cat "$work/no-cosign.log"; die "no-cosign: install failed"; }
+grep -qF "signature not checked" "$work/no-cosign.log" || die "no-cosign: no note printed"
+pass "no-cosign"
 
 want_fail tampered-archive "checksum mismatch" DESIRED_VERSION="$VERSION" AVAL_DOWNLOAD_URL="$url/tampered-archive"
 # --no-verify never skips the sha256.
