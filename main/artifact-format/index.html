@@ -3061,7 +3061,7 @@ It is tagged <code>sha256-&lt;fingerprint hex&gt;</code>.</p>
 manifest with <code>artifactType</code> <code>application/vnd.trianalab.aval.outputs.v1</code>,
 the OCI empty config, one layer per file (media type
 <code>application/vnd.trianalab.aval.output.v1</code>, annotation
-<code>org.opencontainers.image.title</code> = the path relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>) and
+<code>org.opencontainers.image.title</code> = the path relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root) and
 the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> anchor as <code>subject</code>. The predicate's <code>execution.outputs</code>
 holds its digest and every file's path, digest and size, so the signature
 covers them. Lookup lists only execution manifests: an outputs manifest is
@@ -3646,7 +3646,7 @@ checked by <code>Predicate.Validate</code> (called by <code>evidence.Parse</code
 <td><code>execution.outputs.files</code></td>
 <td>list of <code>{path, digest, size}</code></td>
 <td>yes, non-empty</td>
-<td>In layer order. <code>path</code> is relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, slash-separated and clean (no <code>..</code>, <code>.</code>, empty segment, leading <code>/</code>, backslash or control character), listed once; <code>digest</code> is <code>sha256:&lt;64 hex&gt;</code>; <code>size</code> is not negative.</td>
+<td>In layer order. <code>path</code> is relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root (<code>scope.root</code>, default the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory), slash-separated and clean (no <code>..</code>, <code>.</code>, empty segment, leading <code>/</code>, backslash or control character), listed once; <code>digest</code> is <code>sha256:&lt;64 hex&gt;</code>; <code>size</code> is not negative.</td>
 </tr>
 <tr>
 <td><code>runner</code></td>

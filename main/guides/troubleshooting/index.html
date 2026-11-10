@@ -2461,7 +2461,7 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>lower case tool names, valid variable names other than <code>AVAL_RUN_STACK</code>; probe only declared, non-empty toolchain keys, each with an argv</td>
 </tr>
 <tr>
-<td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code>, <code>file &lt;x&gt; must be a slash-separated path relative to the contract</code>, <code>file and files exclude each other</code>, <code>scope.allowMutable[&lt;i&gt;].files[&lt;j&gt;]: &lt;x&gt;</code>, <code>matches no file in scope</code></td>
+<td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code>, <code>file &lt;x&gt; must be a slash-separated path relative to the contract root</code>, <code>file and files exclude each other</code>, <code>scope.allowMutable[&lt;i&gt;].files[&lt;j&gt;]: &lt;x&gt;</code>, <code>matches no file in scope</code></td>
 <td>give each entry a <code>ref</code>, a <code>reason</code> and, if needed, a <code>file</code> as the finding prints it or <code>files</code> globs (not both) that each match a file in the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> (<a href="../../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>)</td>
 </tr>
 <tr>
@@ -2469,8 +2469,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>one known <code>kind: reference</code> per entry, no credentials (<a href="../../resolve/">Resolve references</a>)</td>
 </tr>
 <tr>
-<td><code>scope.contracts[&lt;i&gt;]: &lt;x&gt;</code>, <code>must be slash-separated</code>, <code>must be a clean relative path</code>, <code>must name a contract file</code>, <code>is listed twice</code></td>
-<td>a relative path to a <code>.yaml</code> <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, listed once (<a href="../depend-on-a-contract/">Depend on another part of the repo</a>)</td>
+<td><code>scope.contracts[&lt;i&gt;]: &lt;x&gt;</code>, <code>must be slash-separated</code>, <code>must be a clean relative path</code>, <code>must name a contract file</code>, <code>is listed twice</code>, <code>scope.root: &lt;x&gt; must be '..' segments only</code></td>
+<td>a relative path to a <code>.yaml</code> <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, listed once (<a href="../depend-on-a-contract/">Depend on another part of the repo</a>); <code>root: ..</code> or <code>../..</code> (<a href="../../contract/#contracts-in-a-subdirectory">Contracts in a subdirectory</a>)</td>
 </tr>
 <tr>
 <td><code>not a valid &lt;kind&gt; package name</code>, <code>is not a registry version, range or tag</code>, <code>want group:artifact:version</code></td>

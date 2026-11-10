@@ -1722,6 +1722,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#contracts-in-a-subdirectory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contracts in a subdirectory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#nested-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2274,6 +2285,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#contracts-in-a-subdirectory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contracts in a subdirectory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#nested-runs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2541,8 +2563,9 @@ do not declare is invisible to Aval. Format: <code>aval.trianalab.io/v1</code>, 
 fingerprints the same only when those paths are under <code>.aval/</code>.</p>
 <p>Diff the <code>aval explain</code> output of two machines to see which file, toolchain entry
 or variable differs. <code>-f</code> takes one path and defaults to <code>./aval.yaml</code>; the
-root is always the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file's directory. A file holds one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: give
-each shard of a split suite its own file
+root is the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file's directory, or the directory <code>scope.root</code> names
+above it (<a href="#contracts-in-a-subdirectory">Contracts in a subdirectory</a>). A
+file holds one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>: give each shard of a split suite its own file
 (<a href="../guides/shards-and-matrices/">Shards and matrices</a>).</p>
 <h2 id="fields">Fields<a class="headerlink" href="#fields" title="Anchor link">&para;</a></h2>
 <ul>
@@ -2606,7 +2629,7 @@ each shard of a split suite its own file
 <td><code>scope.allowMutable</code></td>
 <td>list of <code>{file, files, ref, reason}</code></td>
 <td>no</td>
-<td>Accepts a <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr> on purpose: <code>ref</code> exactly as Aval reports it, plus a non-blank <code>reason</code>. An optional <code>file</code> (an exact path relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or <code>runner.command</code>) limits it to that file; without <code>file</code> or <code>files</code>, a <code>ref</code> that several files report is not accepted. An optional <code>files</code>, a list of globs that excludes <code>file</code>, accepts the <code>ref</code> in every file in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> that a glob matches, never in <code>runner.command</code>; each glob must match a file in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, otherwise the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> is invalid (exit 2). See <a href="../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>.</td>
+<td>Accepts a <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr> on purpose: <code>ref</code> exactly as Aval reports it, plus a non-blank <code>reason</code>. An optional <code>file</code> (an exact path relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, or <code>runner.command</code>) limits it to that file; without <code>file</code> or <code>files</code>, a <code>ref</code> that several files report is not accepted. An optional <code>files</code>, a list of globs relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root that excludes <code>file</code>, accepts the <code>ref</code> in every file in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> that a glob matches, never in <code>runner.command</code>; each glob must match a file in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, otherwise the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> is invalid (exit 2). See <a href="../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>.</td>
 </tr>
 <tr>
 <td><code>scope.resolve</code></td>
@@ -2619,6 +2642,12 @@ each shard of a split suite its own file
 <td>list of paths</td>
 <td>no</td>
 <td>Other contracts this test depends on (<a href="../guides/depend-on-a-contract/">Depend on another part of the repo</a>). Each path is relative to this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory: clean (<code>..</code> only at the start), slash-separated, no spaces, ending in <code>.yaml</code> or <code>.yml</code>, listed once. At <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time the file must be a valid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> inside the git working tree of this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (the nearest directory at or above it with a <code>.git</code> entry), with no symlink on the path; if this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s own directory is a symlink, <code>..</code> is resolved from its real location. No cycles, at most 8 levels and 64 distinct contracts. A referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s mutable references block reuse here too, unless its own <code>scope.allowMutable</code> accepts them.</td>
+</tr>
+<tr>
+<td><code>scope.root</code></td>
+<td>string</td>
+<td>no</td>
+<td>The path from this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory up to the root of its tree: <code>..</code> segments only (<code>..</code>, <code>../..</code>). Globs, <code>outputs</code>, <code>allowMutable[].file</code> and <code>files</code>, <code>runner.command</code> and <code>environment.probe</code> resolve from it; <code>scope.contracts</code> does not. The root must lie inside the git working tree of this <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, as for <code>scope.contracts</code>; otherwise <code>aval run</code>, <code>explain</code>, <code>verify</code> and <code>push</code> exit 2. See <a href="#contracts-in-a-subdirectory">Contracts in a subdirectory</a>.</td>
 </tr>
 <tr>
 <td><code>environment.toolchain</code></td>
@@ -2652,13 +2681,42 @@ each shard of a split suite its own file
 </tr>
 </tbody>
 </table>
+<h2 id="contracts-in-a-subdirectory">Contracts in a subdirectory<a class="headerlink" href="#contracts-in-a-subdirectory" title="Anchor link">&para;</a></h2>
+<p>A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> can live below the root of the tree it covers, such as
+<code>aval/unit.yaml</code> in a monorepo. <code>scope.root</code> says how far up the root is:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># aval/unit.yaml</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">root</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">..</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"src/**"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"go.mod"</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<p>The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> then behaves as if its file sat in the root:</p>
+<ul>
+<li>Globs, <code>outputs</code>, <code>allowMutable[].file</code> and <code>files</code>, manifest paths, finding paths
+  and restored output paths are relative to the root. The manifest lists the
+  same <code>source</code> and <code>dependency</code> lines as <code>aval.unit.yaml</code> at the root; only
+  the <code>contract</code> line differs.</li>
+<li><code>runner.command</code> and <code>environment.probe</code> run in the root.</li>
+<li><code>--result-file</code>, <code>--report-file</code> and <code>--stats-file</code> are skipped only when
+  they are Aval outputs under the root.</li>
+<li><code>scope.contracts</code> paths stay relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file's directory.
+  A referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> with its own <code>scope.root</code> uses its own root.</li>
+</ul>
+<p><code>aval explain</code> prints the resolved root after its header. That line is an
+absolute path that differs between checkouts; it is not part of the
+<abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. The root must lie
+inside the git working tree that holds the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (the nearest directory
+at or above it with a <code>.git</code> entry). If the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory is a
+symlink, <code>..</code> is resolved from its real location. A root above the working
+tree, or no working tree at all, exits 2 (<code>aval run</code>, <code>explain</code>, <code>verify</code>
+and <code>push</code>). Globs still cannot contain <code>..</code>.</p>
 <h2 id="nested-runs">Nested runs<a class="headerlink" href="#nested-runs" title="Anchor link">&para;</a></h2>
 <p><code>aval run</code> sets <code>AVAL_RUN_STACK</code> for <code>runner.command</code> and the probes: the
 absolute, symlink-resolved paths of the contracts of the enclosing runs plus
 its own, joined by the OS path list separator (<code>:</code> or <code>;</code>). A run whose
 <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> is already in the stack exits 2 before it probes, looks up or runs
 anything:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aval: aval.yaml is already running in an outer aval run (/repo/aval.yaml): runner.command must not start the same contract again
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aval: aval.yaml is already running in an outer aval run (/repo/aval.yaml): runner.command must not start the same contract again
 </span></code></pre></div>
 <p>The outer run then records a failed test (exit 3). This catches a make target
 that calls <code>aval run</code> and a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> whose <code>runner.command</code> calls that target,
@@ -2699,7 +2757,8 @@ same globs:</p>
 </tbody>
 </table>
 <ul>
-<li>Relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory; a glob cannot escape it.</li>
+<li>Relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root (<code>scope.root</code>, by default the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s
+  directory); a glob cannot escape it.</li>
 <li>Case-sensitive and byte-exact: <code>Makefile</code> is not <code>makefile</code>, NFC is not NFD.</li>
 <li>Order does not matter.</li>
 <li>Symlinks are never followed nor hashed. A symlink under which a <code>source</code>
@@ -2753,14 +2812,14 @@ does not accept is a miss, and its result is not published
 <p>The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>sha256:&lt;hex&gt;</code> of a line-oriented manifest (format
 <code>aval-fingerprint/v2</code>). <code>aval explain</code> prints the exact text that was
 hashed, in this order:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aval-fingerprint/v2
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>source &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>dependency &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>toolchain &lt;key&gt;=&lt;value&gt;
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>env &lt;NAME&gt; &lt;sha256 of value | unset&gt;
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aval-fingerprint/v2
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>source &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>dependency &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>toolchain &lt;key&gt;=&lt;value&gt;
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>env &lt;NAME&gt; &lt;sha256 of value | unset&gt;
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
 </span></code></pre></div>
 <table>
 <thead>
@@ -2908,7 +2967,7 @@ test and records nothing; <code>aval explain</code>, <code>aval verify</code> an
 </tr>
 <tr>
 <td><code>scope.contracts &lt;path&gt;: &lt;reason&gt;</code></td>
-<td>any error above in the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or: missing or invalid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, <code>leads outside the repository root</code>, <code>no git working tree (.git) at or above &lt;dir&gt;</code>, <code>&lt;path&gt; is a symlink</code>, <code>&lt;path&gt; is not a regular file</code>, <code>cycle: a/aval.yaml -&gt; b/aval.yaml -&gt; a/aval.yaml</code>, <code>more than 8 levels or 64 contracts</code></td>
+<td>any error above in the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or: missing or invalid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, <code>leads outside the repository root</code> (also its <code>scope.root</code>), <code>no git working tree (.git) at or above &lt;dir&gt;</code>, <code>&lt;path&gt; is a symlink</code>, <code>&lt;path&gt; is not a regular file</code>, <code>cycle: a/aval.yaml -&gt; b/aval.yaml -&gt; a/aval.yaml</code>, <code>more than 8 levels or 64 contracts</code></td>
 </tr>
 <tr>
 <td>any I/O error while walking or reading</td>
@@ -2918,17 +2977,17 @@ test and records nothing; <code>aval explain</code>, <code>aval verify</code> an
 </table>
 <h2 id="probe-the-toolchain">Probe the toolchain<a class="headerlink" href="#probe-the-toolchain" title="Anchor link">&para;</a></h2>
 <p><code>environment.toolchain</code> is a claim. <code>environment.probe</code> checks it: before the
-lookup, <code>aval run</code> runs each probe in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory, without a
+lookup, <code>aval run</code> runs each probe in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, without a
 shell, with a 10 s timeout and without <code>$SIGSTORE_ID_TOKEN</code>. The declared
 value must appear in the output (stdout and stderr) as a version token: not
 preceded by a digit or a dot, not followed by a digit. <code>3.13</code> matches
 <code>Python 3.13.1</code>; it does not match <code>Python 3.130</code>, and <code>3.1</code> does not match
 <code>Python 3.13</code>.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">environment</span><span class="p">:</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
 <p>On a mismatch, a probe that cannot start, a non-zero exit, a timeout or
 output over 4 KiB (it is signed into the predicate),
