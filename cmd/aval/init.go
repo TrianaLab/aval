@@ -26,6 +26,20 @@ import (
 // defaultPolicy is the trust policy aval init writes.
 const defaultPolicy = "policy.yaml"
 
+// setPolicy is the trust policy aval init --set writes.
+const setPolicy = ".github/aval/policy.yaml"
+
+// setFragment is the fragment aval init --set puts the source globs in.
+const setFragment = "sources"
+
+// placeholderSubject is the anchored subjectRegexp of the identity aval init
+// --set writes: it matches no real signer until <OWNER>/<REPO> is replaced, so
+// nothing is reused before the user edits it (fail closed, invariant 3).
+// Angle brackets are invalid in GitHub logins and repository names, so no
+// one can register a matching owner. It is a GitHub Actions example; other
+// issuers go in by hand (docs/guides/trust-policy.md).
+const placeholderSubject = `^https://github\.com/<OWNER>/<REPO>/\.github/workflows/ci\.yaml@refs/heads/main$`
+
 // cacheabilities are the classes init offers, in prompt order.
 var cacheabilities = []contract.Cacheability{contract.Hermetic, contract.ControlledEnvironment, contract.ExternalDependencies, contract.NonDeterministic}
 
@@ -34,7 +48,7 @@ var cacheabilities = []contract.Cacheability{contract.Hermetic, contract.Control
 type initOpts struct {
 	name, cacheability, key string
 	sources, command        []string
-	keyless, force          bool
+	keyless, force, set     bool
 }
 
 // missing lists the flags with no value, in prompt order.
@@ -48,7 +62,7 @@ func (o *initOpts) missing() []string {
 		{"-- <command>", len(o.command) == 0},
 		{"--source", len(o.sources) == 0},
 		{"--cacheability", o.cacheability == ""},
-		{"--key or --keyless", o.key == "" && !o.keyless},
+		{"--key or --keyless", o.needKey()},
 	} {
 		if v.unset {
 			m = append(m, v.flag)
@@ -57,10 +71,14 @@ func (o *initOpts) missing() []string {
 	return m
 }
 
+// needKey: neither --key nor --keyless was given and init needs one (--set
+// writes a keyless placeholder policy instead).
+func (o *initOpts) needKey() bool { return o.key == "" && !o.keyless && !o.set }
+
 func newInitCmd() *cobra.Command {
 	var o initOpts
 	cmd := &cobra.Command{
-		Use:   "init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless [--force] -- <command>",
+		Use:   "init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless|--set [--force] -- <command>",
 		Short: "Write aval.yaml, a signing key and a trust policy for a test",
 		Long: `init writes aval.yaml for one test, validated before it is written. With
 --key NAME it also writes the signing key pair (NAME.key and NAME.pub, as
@@ -73,12 +91,19 @@ glob that matches nothing. It never replaces aval.yaml, ` + defaultPolicy + ` or
 without --force. If a write fails after the key pair was written, init
 removes the key pair again.
 
+--set writes a two-file starting layout instead: aval.yaml as a kind: TestSet
+with the test and one fragment that holds the source globs, and
+` + setPolicy + ` with one placeholder keyless identity (an anchored
+subjectRegexp with a placeholder owner and repository that matches nothing
+until you edit it). It writes no key. Both files are validated before they
+are written; on an existing file it exits 2 unless --force.
+
 When a value is missing and both stdin and stdout are terminals, init asks for
 it. Otherwise it exits 2 and names the missing flags.
 
 Exit codes: 0 written, 1 error (a file exists without --force, or cannot be
 written), 2 usage (a missing value, an invalid contract, a glob that matches
-nothing, or init cancelled).`,
+nothing, init cancelled, or with --set a file exists without --force).`,
 		Args: func(c *cobra.Command, args []string) error {
 			if c.ArgsLenAtDash() != 0 && len(args) > 0 {
 				return usageError{fmt.Errorf("unexpected argument %q: the test command goes after --", args[0])}
@@ -96,16 +121,28 @@ nothing, or init cancelled).`,
 	f.StringVar(&o.cacheability, "cacheability", "", "hermetic, controlled-environment, external-dependencies or non-deterministic")
 	f.StringVar(&o.key, "key", "", "signing key pair NAME.key and NAME.pub to create and trust in "+defaultPolicy+"; a trailing .key is dropped")
 	f.BoolVar(&o.keyless, "keyless", false, "sign keyless with Sigstore: no key and no policy are written")
-	f.BoolVar(&o.force, "force", false, "replace existing aval.yaml, "+defaultPolicy+" and key files")
+	f.BoolVar(&o.set, "set", false, "write aval.yaml as a kind: TestSet and "+setPolicy+" with a placeholder identity, no key")
+	f.BoolVar(&o.force, "force", false, "replace existing aval.yaml, "+defaultPolicy+" and key files ("+setPolicy+" with --set)")
 	return cmd
 }
 
-func runInit(cmd *cobra.Command, o *initOpts) error {
+// checkFlags rejects flags that exclude each other and a bad --key.
+func checkFlags(o *initOpts) error {
 	if o.key != "" && o.keyless {
 		return usageError{errors.New("--key and --keyless exclude each other")}
 	}
+	if o.set && (o.key != "" || o.keyless) {
+		return usageError{errors.New("--set writes a placeholder keyless policy; it excludes --key and --keyless")}
+	}
 	if err := checkKeyPath(o.key); err != nil {
 		return usageError{err}
+	}
+	return nil
+}
+
+func runInit(cmd *cobra.Command, o *initOpts) error {
+	if err := checkFlags(o); err != nil {
+		return err
 	}
 	out := cmd.OutOrStdout()
 	if m := o.missing(); len(m) > 0 {
@@ -133,7 +170,10 @@ func runInit(cmd *cobra.Command, o *initOpts) error {
 		return err
 	}
 	next := "next: export AVAL_REGISTRY=<oci repository> AVAL_POLICY=" + defaultPolicy + ", then aval run --push --key " + cliout.OneLine(o.keyName()) + ".key"
-	if o.keyless {
+	switch {
+	case o.set:
+		next = "next: replace <OWNER>/<REPO> in " + setPolicy + " with your CI's signer, check the set with aval explain --all, export AVAL_REGISTRY=<oci repository> AVAL_POLICY=" + setPolicy + ", then aval run --push in CI"
+	case o.keyless:
 		next = "next: write a trust policy for your OIDC identity (docs: guides/trust-policy), export AVAL_REGISTRY=<oci repository> AVAL_POLICY=<policy file>, then aval run --push"
 	}
 	if o.cacheability == string(contract.NonDeterministic) {
@@ -171,7 +211,15 @@ func checkInit(o *initOpts) ([]byte, []string, error) {
 		Scope:        contract.Scope{Source: o.sources},
 		Cacheability: contract.Cacheability(o.cacheability),
 	})
-	if _, err := contract.Parse(doc); err != nil {
+	if o.set {
+		doc = marshalYAML(setDoc{
+			APIVersion: contract.APIVersion, Kind: contract.KindTestSet,
+			Defaults:  setEntry{Cacheability: o.cacheability},
+			Fragments: map[string]setEntry{setFragment: {Scope: &contract.Scope{Source: o.sources}}},
+			Tests:     []setEntry{{Metadata: &contract.Metadata{Name: o.name}, Use: []string{setFragment}, Runner: &contract.Runner{Command: o.command}}},
+		})
+	}
+	if _, err := contract.ParseAll(doc); err != nil {
 		return nil, nil, usageError{listError{"init: invalid contract:", err}}
 	}
 	files, err := matched(o.sources)
@@ -179,14 +227,23 @@ func checkInit(o *initOpts) ([]byte, []string, error) {
 		return nil, nil, usageError{err}
 	}
 	paths := []string{contract.DefaultFile}
-	if !o.keyless {
+	switch {
+	case o.set:
+		paths = append(paths, setPolicy)
+	case !o.keyless:
 		paths = append(paths, defaultPolicy, o.keyName()+".key", o.keyName()+".pub")
 	}
 	if err := checkAbsent(paths, o.force); err != nil {
+		if o.set && errors.Is(err, errExists) {
+			err = usageError{err}
+		}
 		return nil, nil, err
 	}
 	return doc, files, nil
 }
+
+// errExists is a file init would replace without --force.
+var errExists = errors.New("already exists")
 
 // checkAbsent fails when one of paths exists and force is not set.
 func checkAbsent(paths []string, force bool) error {
@@ -197,7 +254,7 @@ func checkAbsent(paths []string, force bool) error {
 		case err != nil:
 			return err
 		case !force:
-			return fmt.Errorf("%s already exists; pass --force to replace it", cliout.OneLine(p))
+			return fmt.Errorf("%s %w; pass --force to replace it", cliout.OneLine(p), errExists)
 		}
 	}
 	return nil
@@ -221,10 +278,32 @@ func writeFile(p string, data []byte, force bool) error {
 
 // writeInit writes the key pair and policy (unless keyless), the contract
 // and the .gitignore lines, reporting each through line. A failure after the
-// key pair was written removes it, so a rerun needs no --force for it.
+// key pair was written removes it, so a rerun needs no --force for it. With
+// --force a failed write leaves neither the old nor the new policy, and the
+// directories it created stay: harmless and rerun-safe.
 func writeInit(o *initOpts, doc []byte, line func(glyph, s string)) (err error) {
 	ignore := []string{fingerprint.OutputDir + "/"}
-	if !o.keyless {
+	if o.set {
+		pol := append([]byte("# Placeholder: replace <OWNER>/<REPO>, the workflow file and the branch with\n# the identity your CI signs with. Until then no result is trusted.\n"),
+			marshalYAML(policyDoc{contract.APIVersion, policy.Kind, "runner", []policyIdentity{{Issuer: "https://token.actions.githubusercontent.com", SubjectRegexp: placeholderSubject, TrustLevel: "runner"}}})...)
+		_, err = policy.Parse(pol, ".")
+		if err == nil {
+			err = os.MkdirAll(filepath.Dir(setPolicy), 0o755)
+		}
+		if err == nil {
+			err = writeFile(setPolicy, pol, o.force)
+		}
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err != nil {
+				_ = os.Remove(setPolicy)
+			}
+		}()
+		line(cliout.GlyphDone, "wrote "+setPolicy+": a placeholder identity for <OWNER>/<REPO> at trust level runner")
+	}
+	if !o.keyless && !o.set {
 		name := o.keyName()
 		var kid string
 		if kid, err = attest.WriteKeyPair(name, o.force); err != nil {
@@ -238,7 +317,7 @@ func writeInit(o *initOpts, doc []byte, line func(glyph, s string)) (err error) 
 		}()
 		shown := cliout.OneLine(name)
 		line(cliout.GlyphDone, fmt.Sprintf("wrote %[1]s.key (private: keep it secret, do not commit it) and %[1]s.pub, key id %[2]s", shown, kid))
-		pol := marshalYAML(policyDoc{contract.APIVersion, policy.Kind, "developer", []policyIdentity{{name + ".pub", "developer"}}})
+		pol := marshalYAML(policyDoc{contract.APIVersion, policy.Kind, "developer", []policyIdentity{{PublicKey: name + ".pub", TrustLevel: "developer"}}})
 		_, err = policy.Parse(pol, ".")
 		if err == nil {
 			err = writeFile(defaultPolicy, pol, o.force)
@@ -271,9 +350,29 @@ type policyDoc struct {
 	Identities    []policyIdentity `yaml:"identities"`
 }
 
+// setDoc is the TestSet init --set writes, in this field order.
+type setDoc struct {
+	APIVersion string              `yaml:"apiVersion"`
+	Kind       string              `yaml:"kind"`
+	Defaults   setEntry            `yaml:"defaults"`
+	Fragments  map[string]setEntry `yaml:"fragments"`
+	Tests      []setEntry          `yaml:"tests"`
+}
+
+// setEntry is defaults, a fragment or a test of setDoc.
+type setEntry struct {
+	Metadata     *contract.Metadata `yaml:"metadata,omitempty"`
+	Use          []string           `yaml:"use,omitempty"`
+	Runner       *contract.Runner   `yaml:"runner,omitempty"`
+	Scope        *contract.Scope    `yaml:"scope,omitempty"`
+	Cacheability string             `yaml:"cacheability,omitempty"`
+}
+
 type policyIdentity struct {
-	PublicKey  string `yaml:"publicKey"`
-	TrustLevel string `yaml:"trustLevel"`
+	Issuer        string `yaml:"issuer,omitempty"`
+	SubjectRegexp string `yaml:"subjectRegexp,omitempty"`
+	PublicKey     string `yaml:"publicKey,omitempty"`
+	TrustLevel    string `yaml:"trustLevel"`
 }
 
 // marshalYAML encodes v with two-space indentation. ponytail: v is always one
@@ -400,7 +499,7 @@ func prompt(in *bufio.Reader, out io.Writer, o *initOpts) error {
 			o.cacheability = string(cacheabilities[i-1])
 			return nil
 		}},
-		{o.key == "" && !o.keyless, "Signing key file to create (e.g. aval.key), or keyless", func(s string) error {
+		{o.needKey(), "Signing key file to create (e.g. aval.key), or keyless", func(s string) error {
 			if s == "keyless" {
 				o.keyless = true
 				return nil

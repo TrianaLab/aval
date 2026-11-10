@@ -358,3 +358,147 @@ func TestInitPreviewEscapes(t *testing.T) {
 		t.Fatalf("exit %d, %q", code, out)
 	}
 }
+
+var setArgs = []string{"init", "--set", "--name", "unit", "--source", "src/**", "--cacheability", "hermetic", "--", "grep", "-q", "a", "src/a.txt"}
+
+// --set writes a TestSet with one test and one fragment plus a placeholder
+// keyless policy, golden byte for byte, that aval explain --all accepts.
+func TestInitSet(t *testing.T) {
+	initProject(t)
+	terminals(t, false, false)
+	code, out, errOut := runInitCLI("", setArgs...)
+	if code != ExitOK || errOut != "" {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	golden(t, "init-set.golden.txt", out)
+	for f, g := range map[string]string{"aval.yaml": "init-set-aval.golden.yaml", setPolicy: "init-set-policy.golden.yaml"} {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		golden(t, g, string(b))
+	}
+	if code, out, errOut := runCLI("explain", "--all"); code != ExitOK {
+		t.Fatalf("explain --all: exit %d\n%s%s", code, out, errOut)
+	}
+	cs, err := contract.LoadAll("aval.yaml")
+	if err != nil || len(cs) != 1 || cs[0].Metadata.Name != "unit" || cs[0].Cacheability != contract.Hermetic || strings.Join(cs[0].Scope.Source, " ") != "src/**" {
+		t.Fatalf("set %+v, %v", cs, err)
+	}
+	for _, f := range []string{"aval.key", "aval.pub", defaultPolicy} {
+		if _, err := os.Lstat(f); err == nil {
+			t.Errorf("--set wrote %s", f)
+		}
+	}
+	if gi, _ := os.ReadFile(".gitignore"); string(gi) != ".aval/\n" {
+		t.Fatalf(".gitignore %q", gi)
+	}
+}
+
+// False hits: the placeholder identity --set writes trusts no real signer,
+// not even one whose subject only contains the placeholder.
+func TestInitSetPlaceholderTrustsNothing(t *testing.T) {
+	initProject(t)
+	terminals(t, false, false)
+	if code, _, errOut := runInitCLI("", setArgs...); code != ExitOK {
+		t.Fatalf("exit %d, %s", code, errOut)
+	}
+	p, err := policy.Load(setPolicy)
+	if err != nil || len(p.Identities) != 1 {
+		t.Fatalf("policy %+v, %v", p, err)
+	}
+	ids := p.Identities
+	for _, s := range []string{
+		"https://github.com/TrianaLab/aval/.github/workflows/ci.yaml@refs/heads/main",
+		// GitHub logins are case-insensitive and the org "owner" exists, so the
+		// placeholder must not be a valid login in any case.
+		"https://github.com/OWNER/REPO/.github/workflows/ci.yaml@refs/heads/main",
+		"https://github.com/owner/REPO/.github/workflows/ci.yaml@refs/heads/main",
+		"https://github.com/OWNER/REPO/.github/workflows/ci.yaml@refs/heads/main-evil",
+		"https://evil.example/https://github.com/OWNER/REPO/.github/workflows/ci.yaml@refs/heads/main",
+		"https://githubXcom/OWNER/REPO/.github/workflows/ci.yaml@refs/heads/main",
+	} {
+		if _, ok := evidence.MatchIdentity(ids, "https://token.actions.githubusercontent.com", s); ok {
+			t.Errorf("placeholder trusts %q", s)
+		}
+	}
+}
+
+// --set refuses to replace either file (exit 2) unless --force.
+func TestInitSetNoOverwrite(t *testing.T) {
+	for _, f := range []string{"aval.yaml", setPolicy} {
+		initProject(t)
+		terminals(t, false, false)
+		if err := os.MkdirAll(filepath.Dir(setPolicy), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(f, []byte("mine\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		code, out, errOut := runInitCLI("", setArgs...)
+		if code != ExitUsage || out != "" || !strings.Contains(errOut, f+" already exists; pass --force") {
+			t.Fatalf("%s: exit %d, %s", f, code, errOut)
+		}
+		if b, _ := os.ReadFile(f); string(b) != "mine\n" {
+			t.Fatalf("%s overwritten", f)
+		}
+		if code, _, errOut = runInitCLI("", append([]string{"init", "--force"}, setArgs[1:]...)...); code != ExitOK {
+			t.Fatalf("%s --force: exit %d, %s", f, code, errOut)
+		}
+		if b, _ := os.ReadFile(f); string(b) == "mine\n" {
+			t.Fatalf("%s not replaced with --force", f)
+		}
+	}
+}
+
+// --set excludes --key and --keyless and never asks for a key.
+func TestInitSetFlags(t *testing.T) {
+	for _, extra := range []string{"--key=k.key", "--keyless"} {
+		initProject(t)
+		if code, _, errOut := runInitCLI("", append([]string{"init", extra}, setArgs[1:]...)...); code != ExitUsage || !strings.Contains(errOut, "excludes --key and --keyless") {
+			t.Fatalf("%s: exit %d, %s", extra, code, errOut)
+		}
+	}
+	initProject(t)
+	if code, _, errOut := runInitCLI("", "init", "--set"); code != ExitUsage || !strings.Contains(errOut, "missing --name, -- <command>, --source, --cacheability;") {
+		t.Fatalf("missing: exit %d, %s", code, errOut)
+	}
+	initProject(t)
+	terminals(t, true, true)
+	code, out, _ := runInitCLI("unit\ntrue\nsrc/**\n1\n", "init", "--set")
+	if code != ExitOK || !strings.Contains(out, "4/4 Cacheability") || strings.Contains(out, "Signing key") {
+		t.Fatalf("prompts: exit %d\n%s", code, out)
+	}
+}
+
+// A failed write after the policy removes the policy again (exit 1).
+func TestInitSetWriteError(t *testing.T) {
+	initProject(t)
+	terminals(t, false, false)
+	if err := os.MkdirAll("aval.yaml/x", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errOut := runInitCLI("", append([]string{"init", "--force"}, setArgs[1:]...)...); code != ExitError {
+		t.Fatalf("exit %d, %s", code, errOut)
+	}
+	if _, err := os.Lstat(setPolicy); err == nil {
+		t.Fatal("policy left behind")
+	}
+	initProject(t)
+	if err := os.WriteFile(".github", nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errOut := runInitCLI("", setArgs...); code != ExitError {
+		t.Fatalf(".github is a file: exit %d, %s", code, errOut)
+	}
+	initProject(t)
+	if err := os.MkdirAll(".github", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("missing", ".github/aval"); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errOut := runInitCLI("", setArgs...); code != ExitError {
+		t.Fatalf(".github/aval is a dangling symlink: exit %d, %s", code, errOut)
+	}
+}

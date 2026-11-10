@@ -1,0 +1,20 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  cacheability: hermetic
+fragments:
+  sources:
+    scope:
+      source:
+        - src/**
+tests:
+  - metadata:
+      name: unit
+    use:
+      - sources
+    runner:
+      command:
+        - grep
+        - -q
+        - a
+        - src/a.txt
