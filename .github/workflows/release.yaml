@@ -204,7 +204,9 @@ jobs:
         env:
           AVAL_RELEASE_DIST: ${{ github.workspace }}/dist
           AVAL_RELEASE_TAG: ${{ github.ref_name }}
-        run: go test -count=1 -v ./tests/release/...
+        # The pin check downloads the pinned release's checksums.txt; pin-actions
+        # runs it after the release, so a download error cannot block one.
+        run: go test -count=1 -v -skip '^TestActionPinsMatchReleaseChecksums$' ./tests/release/...
       - name: Release notes from CHANGELOG.md
         env:
           TAG: ${{ github.ref_name }}
