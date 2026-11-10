@@ -29,7 +29,8 @@ Verifiable test execution reuse: signed test results as OCI artifacts.
 
 --registry and --policy fall back to $AVAL_REGISTRY and $AVAL_POLICY; a flag
 wins, and an empty value counts as unset (an empty flag too: use --no-reuse
-to turn reuse off). There is no config file.
+to turn reuse off). run and verify then take the registry from the trust
+policy's registry field. There is no config file.
 
 ```text
 Usage:
@@ -292,7 +293,7 @@ Flags:
       --no-reuse                    always run, never reuse (excludes --shadow)
       --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
       --push                        sign and publish the result after running (needs --registry)
-      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --report-file string          also write the lookup decision as a verify report (JSON) to this file
       --result-file string          where to record the result for 'aval push' (default ".aval/result.json")
@@ -433,7 +434,7 @@ Flags:
   -h, --help                        help for verify
   -o, --output string               output format: text or json (default "text")
       --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
-      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 
 Global Flags:

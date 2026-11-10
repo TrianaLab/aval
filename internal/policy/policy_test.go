@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -120,6 +121,7 @@ func TestLoadErrors(t *testing.T) {
 		// Invariant 7: the file itself is rejected, not only the attestation.
 		"non-deterministic allowed": {"[external-dependencies]", "[non-deterministic]", "never reusable"},
 		"unknown cacheability":      {"[external-dependencies]", "[sometimes]", "unknown class"},
+		"registry not a string":     {"kind: Policy", "kind: Policy\nregistry: [a]", "decoding policy"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -136,6 +138,35 @@ func TestLoadErrors(t *testing.T) {
 	empty := strings.Replace(validPolicy, validPolicy[strings.Index(validPolicy, "identities:"):strings.Index(validPolicy, "allowedCacheability")], "identities: []\n", 1)
 	if _, err := Load(writePolicy(t, empty)); err == nil || !strings.Contains(err.Error(), "at least one") {
 		t.Fatalf("empty identities: %v", err)
+	}
+}
+
+// registry is optional (#209): without it the policy loads as before, with
+// it the value is kept as written.
+func TestRegistry(t *testing.T) {
+	p, err := Load(writePolicy(t, validPolicy))
+	if err != nil || p.Registry != "" {
+		t.Fatalf("no registry: %+v %v", p, err)
+	}
+	p, err = Load(writePolicy(t, validPolicy+"registry: ghcr.io/acme/orders-aval\n"))
+	if err != nil || p.Registry != "ghcr.io/acme/orders-aval" {
+		t.Fatalf("registry: %+v %v", p, err)
+	}
+}
+
+// A registry with credentials (or a digest) rejects the whole policy with
+// ErrRegistryCredentials, and the error never echoes the secret.
+func TestRegistryCredentials(t *testing.T) {
+	for _, reg := range []string{
+		"user:s3cret@ghcr.io/acme/orders-aval",
+		"https://user:s3cret@ghcr.io/acme/orders-aval",
+		"s3cret@ghcr.io/acme/orders-aval",
+		"ghcr.io/acme/orders-aval@sha256:s3cret",
+	} {
+		p, err := Load(writePolicy(t, validPolicy+"registry: "+reg+"\n"))
+		if p != nil || !errors.Is(err, ErrRegistryCredentials) || strings.Contains(err.Error(), "s3cret") {
+			t.Errorf("%s: %+v %v", reg, p, err)
+		}
 	}
 }
 

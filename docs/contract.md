@@ -269,7 +269,8 @@ fingerprint; its output is not hashed, since it varies by build and platform.
 
 `aval.trianalab.io/v1` is frozen; policy files use the same value. Within v1
 the schema only gets new optional fields. An older `aval` rejects a field it
-does not know, which fails closed.
+does not know, which fails closed: a policy with the optional `registry`
+field (#209) fails to load in an older `aval`, so nothing is reused.
 
 `aval.dev/v1alpha1` is rejected: change that line. Rules:
 [artifact format](artifact-format.md#versioning-and-compatibility).
