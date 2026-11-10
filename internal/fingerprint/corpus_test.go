@@ -209,6 +209,9 @@ var corpus = []corpusCase{
 	{name: "scope.allowMutable reason changed", setup: func(f *fixture) {
 		f.c.Scope.AllowMutable = []contract.AllowMutable{{Ref: "postgres:16", Reason: "a"}}
 	}, change: func(f *fixture) { f.c.Scope.AllowMutable[0].Reason = "b" }, want: differ},
+	{name: "scope.allowMutable files changed", setup: func(f *fixture) {
+		f.c.Scope.AllowMutable = []contract.AllowMutable{{Files: []string{"compose.yaml"}, Ref: "postgres:16", Reason: "a"}}
+	}, change: func(f *fixture) { f.c.Scope.AllowMutable[0].Files = []string{"**/*.yaml"} }, want: differ},
 	// A result without outputs is never reused for a contract that restores them.
 	{name: "outputs added", change: func(f *fixture) { f.c.Outputs = []string{"coverage.xml"} }, want: differ},
 	{name: "outputs glob changed", setup: func(f *fixture) { f.c.Outputs = []string{"coverage.xml"} }, change: func(f *fixture) { f.c.Outputs = []string{"junit.xml"} }, want: differ},

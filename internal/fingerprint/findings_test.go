@@ -1,6 +1,7 @@
 package fingerprint
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -120,5 +121,92 @@ func TestCanonicalAllowMutableFile(t *testing.T) {
 	d.Scope.AllowMutable = []contract.AllowMutable{{File: "compose.yaml", Ref: "x", Reason: "r"}}
 	if string(canonicalContract(c)) == string(canonicalContract(d)) {
 		t.Fatal("file: does not change the canonical contract")
+	}
+}
+
+// TestComputeFindingsAllowMutableFiles: files: accepts its exact ref in
+// every in-scope file its globs match, and nowhere else: not the same ref
+// outside the globs, not another ref in a matched file, not runner.command.
+// file: stays a literal path, so a[1] is not a glob there.
+func TestComputeFindingsAllowMutableFiles(t *testing.T) {
+	one := "resources:\n- https://example.com/one.yaml\n"
+	two := "resources:\n- https://example.com/one.yaml\n- https://example.com/two.yaml\n"
+	for _, tc := range []struct {
+		name    string
+		allow   contract.AllowMutable
+		allowed []string // file ref, in findings order
+	}{
+		{"globs match two of three", contract.AllowMutable{Files: []string{"a/*", "b/*"}, Ref: "resources[0]", Reason: "r"},
+			[]string{"a/kustomization.yaml resources[0]", "b/kustomization.yaml resources[0]"}},
+		{"one glob, character class", contract.AllowMutable{Files: []string{"[ab]/kustomization.yaml"}, Ref: "resources[0]", Reason: "r"},
+			[]string{"a/kustomization.yaml resources[0]", "b/kustomization.yaml resources[0]"}},
+		{"different ref in a matched file", contract.AllowMutable{Files: []string{"a/*"}, Ref: "resources[1]", Reason: "r"},
+			[]string{"a/kustomization.yaml resources[1]"}},
+		{"** never reaches runner.command", contract.AllowMutable{Files: []string{"**"}, Ref: "a.io/b@latest", Reason: "r"}, nil},
+		{"file: is literal", contract.AllowMutable{File: "a[1]/kustomization.yaml", Ref: "resources[0]", Reason: "r"},
+			[]string{"a[1]/kustomization.yaml resources[0]"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			f.c.Scope.Source = append(f.c.Scope.Source, "*/kustomization.yaml")
+			f.c.Runner.Command = []string{"sh", "-c", "go install a.io/b@latest && go test ./..."}
+			f.write("a/kustomization.yaml", two)
+			f.write("b/kustomization.yaml", one)
+			f.write("c/kustomization.yaml", one)
+			f.write("a1/kustomization.yaml", one)
+			f.write("a[1]/kustomization.yaml", one)
+			f.c.Scope.AllowMutable = []contract.AllowMutable{tc.allow}
+			fp, err := f.compute()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var allowed []string
+			for _, x := range fp.Findings {
+				if x.Allowed != "" {
+					allowed = append(allowed, x.File+" "+x.Ref)
+				}
+			}
+			if len(fp.Findings) != 7 || strings.Join(allowed, ",") != strings.Join(tc.allowed, ",") {
+				t.Fatalf("allowed = %q, want %q; findings = %+v", allowed, tc.allowed, fp.Findings)
+			}
+		})
+	}
+}
+
+// TestComputeFindingsAllowMutableFilesUnmatched: a files glob must match a
+// file in scope; one that matches nothing, or only a file outside the
+// scope, is a contract error, never a silently unused entry.
+func TestComputeFindingsAllowMutableFilesUnmatched(t *testing.T) {
+	for _, glob := range []string{"deploy/*.yaml", "README.md"} {
+		f := newFixture(t)
+		f.write("README.md", "image: out-of-scope:1\n")
+		f.c.Scope.AllowMutable = []contract.AllowMutable{{Ref: "x", Reason: "r"}, {Files: []string{"compose.yaml", glob}, Ref: "x", Reason: "r"}}
+		_, err := f.compute()
+		if !errors.Is(err, ErrContract) || !strings.Contains(err.Error(), `scope.allowMutable[1].files[1]: glob "`+glob+`" matches no file in scope`) {
+			t.Fatalf("%s: got %v", glob, err)
+		}
+	}
+}
+
+// TestCanonicalAllowMutableFiles: files: is part of the canonical contract
+// as a set (order and repeats do not matter), and an empty list serializes,
+// and so hashes, as an entry without it.
+func TestCanonicalAllowMutableFiles(t *testing.T) {
+	canon := func(a ...contract.AllowMutable) string {
+		c := testContract()
+		c.Scope.AllowMutable = a
+		return string(canonicalContract(c))
+	}
+	if s := canon(contract.AllowMutable{Files: []string{}, Ref: "x", Reason: "r"}); !strings.Contains(s, `"allowMutable":[{"ref":"x","reason":"r"}]`) {
+		t.Fatalf("empty files serialized: %s", s)
+	}
+	ab := canon(contract.AllowMutable{Files: []string{"a", "b"}, Ref: "x", Reason: "r"})
+	if ab != canon(contract.AllowMutable{Files: []string{"b", "a", "b"}, Ref: "x", Reason: "r"}, contract.AllowMutable{Files: []string{"a", "b"}, Ref: "x", Reason: "r"}) {
+		t.Fatal("files order or a repeated entry changes the canonical contract")
+	}
+	for _, other := range []string{canon(contract.AllowMutable{Ref: "x", Reason: "r"}), canon(contract.AllowMutable{Files: []string{"a"}, Ref: "x", Reason: "r"})} {
+		if other == ab {
+			t.Fatal("files does not change the canonical contract")
+		}
 	}
 }
