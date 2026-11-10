@@ -22,6 +22,7 @@ flowchart LR
     |---|---|
     | `--push requires --registry`, `--stats requires --registry`, `--registry is required`, `a run record file is required` | add the flags it names, or set `AVAL_REGISTRY` |
     | `--shadow and --no-reuse exclude each other` | pick one |
+    | `registry: must not contain credentials (user:password@) or a digest; registry logins come from the credential store` | drop `user:password@` from the policy's `registry`, use `docker login`, and rotate the password if the file was shared |
     | `--registry <x> is not an OCI repository`, `drop <scheme>://: try --registry <host/name>` | use `host/name`, no `https://`, tag or digest |
     | `--registry-timeout must be positive`, `--output must be text or json`, `unknown command`, `unknown flag` | fix the value (the message names the closest command or flag, `did you mean "run"?`); see `aval <command> --help` |
     | `signing needs one of:` | pass `--key` (`aval keygen` makes one), set `SIGSTORE_ID_TOKEN`, or sign on a terminal or with `--login` ([Signing](signing.md)) |

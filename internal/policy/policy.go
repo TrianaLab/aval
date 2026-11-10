@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -33,7 +34,14 @@ type Policy struct {
 	// TrustedRoot is the path of the Sigstore trusted_root.json used for
 	// keyless signatures. Empty means the Sigstore public-good instance.
 	TrustedRoot string
+	// Registry is the OCI repository of attestations, used only when neither
+	// --registry nor AVAL_REGISTRY is set (#209). Empty means none.
+	Registry string
 }
+
+// ErrRegistryCredentials: the policy's registry holds credentials (or a
+// digest). The CLI exits 2 on it; the value is never echoed.
+var ErrRegistryCredentials = errors.New("registry: must not contain credentials (user:password@) or a digest; registry logins come from the credential store")
 
 // VerifyOptions converts the policy into evidence.VerifyOptions. The caller
 // sets the signature verifier per attestation.
@@ -52,6 +60,7 @@ type file struct {
 	APIVersion          string     `yaml:"apiVersion"`
 	Kind                string     `yaml:"kind"`
 	TrustedRoot         string     `yaml:"trustedRoot"`
+	Registry            string     `yaml:"registry"`
 	MinTrustLevel       string     `yaml:"minTrustLevel"`
 	Identities          []identity `yaml:"identities"`
 	AllowedCacheability []string   `yaml:"allowedCacheability"`
@@ -107,7 +116,10 @@ func Parse(data []byte, dir string) (*Policy, error) {
 	if f.Kind != Kind {
 		add("kind: got %q, want %q", f.Kind, Kind)
 	}
-	p := &Policy{TrustedRoot: resolve(dir, f.TrustedRoot)}
+	p := &Policy{TrustedRoot: resolve(dir, f.TrustedRoot), Registry: f.Registry}
+	if strings.Contains(f.Registry, "@") {
+		errs = append(errs, ErrRegistryCredentials)
+	}
 	var ok bool
 	if p.MinTrustLevel, ok = levels[f.MinTrustLevel]; !ok {
 		add("minTrustLevel: %q must be developer, runner or isolated", f.MinTrustLevel)

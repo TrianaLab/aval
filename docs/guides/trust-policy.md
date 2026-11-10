@@ -25,12 +25,20 @@ or set `AVAL_POLICY` once (the flag wins):
 aval verify --registry ghcr.io/acme/orders-aval --policy policy.yaml
 ```
 
+To skip `--registry`, add `registry: ghcr.io/acme/orders-aval` to the
+policy. The flag and `AVAL_REGISTRY` still win, and the `config:` line says
+which one was used. Never put `user:password@` in it: logins come from
+`docker login`.
+
 ## The fields
 
 --8<-- "docs/trust-model.md:policy-fields"
 
 ## Tips
 
+- Read the policy from a protected branch in CI, never from the PR's checkout
+  ([why](../trust-model.md#take-the-policy-from-a-protected-branch)): its
+  identities and its `registry` decide what is trusted.
 - Anchor the subject to one workflow file and one branch. A PR branch runs
   any code: never trust it as `runner`.
 - Give developer keys `developer`. Keep `minTrustLevel: runner` in CI, so CI

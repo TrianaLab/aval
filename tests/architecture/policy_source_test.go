@@ -15,7 +15,9 @@ import (
 )
 
 // trustScript sets AVAL_POLICY and AVAL_REGISTRY from main on pull requests
-// (#134); installScript installs the pinned, verified aval release.
+// (#134); installScript installs the pinned, verified aval release. The
+// registry may also come from the policy's registry field (#209): the policy
+// is main's copy too, so a step that relies on it needs no --registry.
 const (
 	trustScript   = ".github/aval/trust-from-base.sh"
 	installScript = ".github/aval/install.sh"
@@ -276,7 +278,8 @@ func TestPolicySourceCheckCatchesWorkingTreePolicies(t *testing.T) {
 		"  a:\n    steps: [" + pre + ", {run: \"aval run --registry \\\"$AVAL_REGISTRY\\\" --registry-timeout 1m \\\\\\n  --policy=\\\"${AVAL_POLICY}\\\"\"}, {run: 'aval stats --registry \"$STATS\"'}, {run: make test}]\n" +
 		"  b:\n    if: github.event_name == 'push'\n    env: {AVAL_POLICY: p.yaml}\n    steps: [{run: aval run --policy p.yaml}]\n" +
 		"  c:\n    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}\n    steps: [{run: aval run --policy p.yaml}]\n" +
-		"  d:\n    steps: [{run: make test}, {shell: pwsh, run: echo}]\n"
+		"  d:\n    steps: [{run: make test}, {shell: pwsh, run: echo}]\n" +
+		"  e:\n    steps: [" + pre + ", {run: 'aval verify --policy \"$AVAL_POLICY\"'}]\n"
 	if p, err := policySourceProblems([]byte(ok)); err != nil || len(p) != 0 {
 		t.Fatalf("valid workflow reported %v (%v)", p, err)
 	}
@@ -292,6 +295,7 @@ func TestPolicySourceCheckCatchesWorkingTreePolicies(t *testing.T) {
 		"job env policy":         "on: {pull_request: {}}\njobs:\n  a:\n    env: {AVAL_POLICY: .github/aval/pr.yaml}\n    steps: [" + pre + ", " + use + "]\n",
 		"step env registry":      pr(pre + ", {env: {AVAL_REGISTRY: evil.io/x}, run: 'aval run --policy \"$AVAL_POLICY\"'}"),
 		"literal registry":       pr(pre + ", {run: 'aval run --registry evil.io/x --policy \"$AVAL_POLICY\"'}"),
+		"registry over policy's": pr(pre + ", {run: 'aval verify --registry=evil.io/x --policy \"$AVAL_POLICY\"'}"),
 		"workflow env registry":  "on: {pull_request: {}}\nenv: {AVAL_REGISTRY: evil.io/x}\njobs:\n  a:\n    steps: [" + pre + ", " + use + "]\n",
 		"no trust step":          pr("{run: " + installScript + "}, " + use),
 		"trust step too late":    pr(use + ", " + step(trustStep)),
