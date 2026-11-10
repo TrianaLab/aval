@@ -204,6 +204,10 @@ fingerprint cannot be computed. `-o json` prints the same as
 `{"tests": [{"name", "fingerprint"} or {"name", "error"}]}`. A file that
 does not expand prints every problem on stderr and nothing on stdout.
 
+`aval init --set` writes a TestSet of one test and one fragment, plus
+`.github/aval/policy.yaml` with a placeholder identity, as a starting point
+([Write a contract](guides/write-a-contract.md)).
+
 ## Nested runs
 
 `aval run` sets `AVAL_RUN_STACK` for `runner.command` and the probes: the

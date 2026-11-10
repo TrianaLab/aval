@@ -1,0 +1,5 @@
+source matches 1 file: src/a.txt
+wrote .github/aval/policy.yaml: a placeholder identity for OWNER/REPO at trust level runner
+wrote aval.yaml
+added .aval/ to .gitignore
+next: replace OWNER/REPO in .github/aval/policy.yaml with your CI's signer, check the set with aval explain --all, export AVAL_REGISTRY=<oci repository> AVAL_POLICY=.github/aval/policy.yaml, then aval run --push in CI

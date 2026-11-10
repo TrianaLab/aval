@@ -147,28 +147,39 @@ glob that matches nothing. It never replaces aval.yaml, policy.yaml or the key
 without --force. If a write fails after the key pair was written, init
 removes the key pair again.
 
+--set writes a two-file starting layout instead: aval.yaml as a kind: TestSet
+with the test and one fragment that holds the source globs, and
+.github/aval/policy.yaml with one placeholder keyless identity (an anchored
+subjectRegexp for OWNER/REPO that matches nothing until you edit it). It
+writes no key. Both files are validated before they are written; on an
+existing file it exits 2 unless --force.
+
 When a value is missing and both stdin and stdout are terminals, init asks for
 it. Otherwise it exits 2 and names the missing flags.
 
 Exit codes: 0 written, 1 error (a file exists without --force, or cannot be
 written), 2 usage (a missing value, an invalid contract, a glob that matches
-nothing, or init cancelled).
+nothing, init cancelled, or with --set a file exists without --force).
 
 ```text
 Usage:
-  aval init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless [--force] -- <command> [flags]
+  aval init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless|--set [--force] -- <command> [flags]
 
 Examples:
   # Write aval.yaml, aval.key, aval.pub and policy.yaml
   aval init --name unit --source 'src/**' --source go.mod --cacheability hermetic --key aval.key -- go test ./...
 
+  # Start a TestSet: aval.yaml and .github/aval/policy.yaml with a placeholder identity
+  aval init --set --name unit --source 'src/**' --cacheability hermetic -- go test ./...
+
 Flags:
       --cacheability string   hermetic, controlled-environment, external-dependencies or non-deterministic
-      --force                 replace existing aval.yaml, policy.yaml and key files
+      --force                 replace existing aval.yaml, policy.yaml and key files (.github/aval/policy.yaml with --set)
   -h, --help                  help for init
       --key string            signing key pair NAME.key and NAME.pub to create and trust in policy.yaml; a trailing .key is dropped
       --keyless               sign keyless with Sigstore: no key and no policy are written
       --name string           test name (metadata.name): what the test checks
+      --set                   write aval.yaml as a kind: TestSet and .github/aval/policy.yaml with a placeholder identity, no key
       --source stringArray    source glob relative to the current directory (scope.source); repeat it for more
 
 Global Flags:
