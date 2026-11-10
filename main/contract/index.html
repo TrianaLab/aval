@@ -2702,6 +2702,12 @@ same globs:</p>
 <li>Relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory; a glob cannot escape it.</li>
 <li>Case-sensitive and byte-exact: <code>Makefile</code> is not <code>makefile</code>, NFC is not NFD.</li>
 <li>Order does not matter.</li>
+<li>Symlinks are never followed nor hashed. A symlink under which a <code>source</code>
+  or <code>dependencies</code> glob could match files is an error, unless <code>exclude</code>
+  covers both its name and its contents and no <code>dependencies</code> glob reaches
+  it: <code>**/node_modules/**</code> skips <code>pkg/web/node_modules/.bin/tool</code>, and
+  <code>["pkg/bin", "pkg/bin/**"]</code> skips a symlinked <code>pkg/bin</code>. <code>pkg/bin</code> or
+  <code>pkg/bin/**</code> alone does not.</li>
 </ul>
 <h2 id="test-identity-vs-execution-fingerprint">Test identity vs execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr><a class="headerlink" href="#test-identity-vs-execution-fingerprint" title="Anchor link">&para;</a></h2>
 <p><code>metadata.name</code> says what is checked. The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> says with which inputs.
@@ -2888,7 +2894,7 @@ test and records nothing; <code>aval explain</code>, <code>aval verify</code> an
 </tr>
 <tr>
 <td><code>"&lt;path&gt;" is a symlink a glob could match files under</code></td>
-<td>symlinks are not followed, and <code>exclude</code> does not lift this; the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory itself may be a symlink</td>
+<td>symlinks are not followed: remove it, or exclude its name and contents (<code>**/node_modules/**</code>, or <code>pkg/bin</code> plus <code>pkg/bin/**</code>) with no <code>dependencies</code> glob reaching it (<a href="#globs">Globs</a>); the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory itself may be a symlink</td>
 </tr>
 <tr>
 <td><code>control characters in path are not supported</code></td>
