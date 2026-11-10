@@ -393,6 +393,8 @@ jobs:
           # gh attestation verify (--require-provenance) needs a token.
           GH_TOKEN: ${{ github.token }}
         run: .github/aval/install.sh
+      # TODO(milestone-14): in the Publish step, replace the outcome check with
+      # aval push --report-file publish.json once the pinned release has it (#216).
       # --8<-- [start:gha-steps]
       - name: Log in to GHCR
         env:
@@ -629,6 +631,7 @@ jobs:
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           for pair in aval.yaml:engine aval.e2e.yaml:e2e; do
             contract=${pair%%:*} name=${pair##*:}
+            # TODO(milestone-14): replace with aval push --report-file once the pinned release has it (#216).
             if jq -e '.outcome == "verified"' "results/$name-report.json" > /dev/null; then
               echo "$contract: reused a verified result, nothing to push"
               continue

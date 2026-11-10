@@ -194,6 +194,8 @@ Global Flags:
 
 push signs the result recorded by 'aval run' and publishes it. The result
 must be for the current inputs: same test id, cacheability and fingerprint.
+--report-file names the report that run wrote with the result: when its
+outcome is verified (also under --shadow), push publishes nothing and exits 0.
 Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
 Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
 --login) opens the interactive Sigstore login in the browser; no token is
@@ -213,6 +215,7 @@ Flags:
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
+      --report-file string          report written by the same 'aval run'; push nothing when it reused a verified result
       --result-file string          result recorded by 'aval run' (default ".aval/result.json")
 
 Global Flags:

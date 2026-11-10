@@ -110,6 +110,7 @@ func TestOutputThatIsAnInputIsRejected(t *testing.T) {
 		{"run", "-f", c, "--report-file", in},
 		{"run", "-f", c, "--fingerprint-only", "--result-file", in},
 		{"push", "-f", c, "--registry", "reg.example/r", "--key", key, "--result-file", in},
+		{"push", "-f", c, "--registry", "reg.example/r", "--key", key, "--report-file", in},
 	} {
 		code, _, stderr := runCLI(args...)
 		if code != ExitUsage || ran() || !strings.Contains(stderr, "is an input of the test") {
