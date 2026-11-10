@@ -116,10 +116,11 @@ func TestPushRejectsReport(t *testing.T) {
 		for _, outcome := range []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerified} {
 			p := tc.report
 			r := readReportIfAny(p)
-			if r == nil && outcome != evidence.OutcomeMiss {
-				break // unreadable: the outcome cannot vary
-			}
-			if r != nil {
+			if r == nil {
+				if outcome == evidence.OutcomeVerified {
+					continue // unreadable: the outcome cannot vary
+				}
+			} else {
 				r.Outcome = outcome
 				p = reportJSON(t, r)
 			}
