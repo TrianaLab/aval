@@ -38,8 +38,8 @@ takes `test` (required), `file` (default `aval.yaml`) and `policy` (default
 4. Runs `aval run -f <file> --test <test>` with the CI run URL and the
    repository for the run record.
 5. Writes the outcome to the step summary and the `outcome` output. Exit 5
-   becomes an `aval SECURITY` error annotation and the step fails; a miss is
-   routine.
+   sets the outcome to `verification-failed`, becomes an `aval SECURITY`
+   error annotation and fails the step; a miss is routine.
 6. On a push to the default branch only, uploads `.aval/<test>/` as the
    artifact `aval-<test>`.
 7. Warns when the policy trusts a `refs/pull/` subject at or above
@@ -47,6 +47,9 @@ takes `test` (required), `file` (default `aval.yaml`) and `policy` (default
 
 The policy is a separate file on the default branch, so `publicKey` paths in
 it are not fetched; use keyless identities.
+
+The action runs on Linux and macOS runners that ship `/usr/bin/jq`
+(GitHub's Ubuntu images, macOS 15 and later).
 
 !!! note "Pinned release"
     The action needs `--test` and the policy's `registry`, which ship in the
