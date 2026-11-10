@@ -2341,10 +2341,10 @@ it are not fetched; use keyless identities.</p>
 (GitHub's Ubuntu images, macOS 15 and later).</p>
 <div class="admonition note">
 <p class="admonition-title">Pinned release</p>
-<p>The run and publish actions need <code>--test</code> and the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code>,
-which ship in the release after 0.7.0. Until their pins move there
-(milestone 14, #213), <code>aval run</code> and <code>aval push</code> exit 2 and the step
-fails.</p>
+<p>Pinning an action by commit SHA pins its aval release too (version and
+sha256, moved by a PR after each release). The actions need <code>--test</code> and
+the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code>, which ship after 0.7.0; until that pin merges
+(milestone 14), <code>aval run</code> and <code>aval push</code> exit 2 and the step fails.</p>
 </div>
 <h2 id="split-credentials">Split credentials<a class="headerlink" href="#split-credentials" title="Anchor link">&para;</a></h2>
 <p>One job signs what the suite jobs uploaded, with the workflow's identity:</p>
