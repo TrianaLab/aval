@@ -248,6 +248,10 @@ func (o runFlags) preflight() (string, error) {
 	}
 	if o.test != "" && !o.fingerprintOnly {
 		// o.test is the metadata.name of a loaded test: one path segment.
+		// A symlinked .aval would make RemoveAll delete outside the tree.
+		if fi, err := os.Lstat(fingerprint.OutputDir); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("removing the outputs of the last run: %s is a symlink", fingerprint.OutputDir)
+		}
 		if err := os.RemoveAll(filepath.Join(fingerprint.OutputDir, o.test)); err != nil {
 			return "", fmt.Errorf("removing the outputs of the last run: %w", err)
 		}
@@ -800,7 +804,11 @@ func newPushCmd() *cobra.Command {
 		Long: `push signs the result recorded by 'aval run' and publishes it. The result
 must be for the current inputs: same test id, cacheability and fingerprint.
 --report-file names the report that run wrote with the result: when its
-outcome is verified (also under --shadow), push publishes nothing and exits 0.
+outcome is verified (also under --shadow), push publishes nothing and exits 0;
+when it records a security event (outcome verification-failed, or a rejected
+attestation that failed verification), push publishes nothing and exits 5.
+A non-deterministic test is never pushed: push publishes nothing and exits 0.
+With --test, the result and the report must both be for that test.
 Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 ` + loginHelp + `.`,
 		Args: noArgs,
@@ -826,6 +834,11 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 					fmt.Fprintf(cmd.OutOrStdout(), "nothing to push: %s reused a verified result (%s)\n", c.Metadata.Name, ref)
 					return nil
 				}
+			}
+			// Never reusable, so a published result could only mislead (invariant 7).
+			if c.Cacheability == contract.NonDeterministic {
+				fmt.Fprintf(cmd.OutOrStdout(), "nothing to push: %s is %s, never reusable\n", c.Metadata.Name, c.Cacheability)
+				return nil
 			}
 			if err := mutable(c, fp); err != nil {
 				return fmt.Errorf("result not published: %s", err)
@@ -859,7 +872,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 	f.StringVar(&key, "key", "", "signing key path (default: keyless OIDC)")
 	f.BoolVar(&interactive, "login", false, loginFlagHelp)
 	f.StringVar(&resultFile, "result-file", defaultResult, "result recorded by 'aval run'")
-	f.StringVar(&reportFile, "report-file", "", "report written by the same 'aval run'; push nothing when it reused a verified result")
+	f.StringVar(&reportFile, "report-file", "", "report written by the same 'aval run'; push nothing when it reused a verified result, and exit 5 when it records a security event")
 	alias(cmd, "result-file", "result") // TODO(milestone-13): remove (deprecated in 0.7.0, #165), not before 0.8.0.
 	return cmd
 }
@@ -867,7 +880,9 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 // reusedByRun reads the report that 'aval run --report-file' wrote and
 // reports whether that run reused a verified result, with its reference. The
 // report is unsigned: it must be for the current test id and fingerprint, and
-// it can only make push publish less, never more.
+// it can only make push publish less, never more. A report that records a
+// security event is a verification error: push publishes nothing and exits 5
+// (invariant 4).
 func reusedByRun(file string, c *contract.Contract, fp fingerprint.Fingerprint) (string, bool, error) {
 	raw, err := os.ReadFile(file)
 	if err != nil {
@@ -883,6 +898,9 @@ func reusedByRun(file string, c *contract.Contract, fp fingerprint.Fingerprint) 
 	if r.TestID != c.Metadata.Name || r.Fingerprint != fp.Digest {
 		return "", false, fmt.Errorf("report is for test %q with fingerprint %s; the contract is %q with fingerprint %s: run the test again",
 			r.TestID, r.Fingerprint, c.Metadata.Name, fp.Digest)
+	}
+	if n := securityCount(r); n > 0 {
+		return "", false, &evidence.VerificationError{Reason: fmt.Sprintf("report %s records %d attestation(s) for %s that failed verification: nothing pushed; investigate before publishing", file, n, r.TestID)}
 	}
 	if r.Outcome == evidence.OutcomeVerified && r.Reference == "" {
 		return "", false, fmt.Errorf("report %s: verified without a reference: run the test again", file)

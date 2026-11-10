@@ -301,3 +301,22 @@ func TestRunTestFlagStaleNotRemovable(t *testing.T) {
 		t.Fatalf("exit %d, %q, %s", code, stdout, stderr)
 	}
 }
+
+// A symlinked .aval is never followed: the run stops before it removes
+// anything, so the target's <name>/ survives (exit 1).
+func TestRunTestFlagSymlinkedOutputDir(t *testing.T) {
+	testSetProject(t)
+	outside := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(outside, "a"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, ".aval"); err != nil {
+		t.Fatal(err)
+	}
+	if code, stdout, stderr := runCLI("run", "-f", "ok.yaml", "--no-reuse", "-t", "a"); code != ExitError || stdout != "" || !strings.Contains(stderr, ".aval is a symlink") {
+		t.Fatalf("exit %d, %q, %s", code, stdout, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "a")); err != nil {
+		t.Fatalf("target removed: %v", err)
+	}
+}

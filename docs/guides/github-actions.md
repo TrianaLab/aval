@@ -51,18 +51,31 @@ The publishing job downloads them and runs one command per result:
 aval push -f "$CONTRACT" --registry "$AVAL_REGISTRY" --result-file R --report-file P
 ```
 
+With a [TestSet](../contract.md#select-a-test), upload one artifact per test
+and name the test it holds with `--test`:
+
+```sh
+aval push -f "$CONTRACT" --registry "$AVAL_REGISTRY" --test unit --result-file R --report-file P
+```
+
 - When the report's outcome is `verified` (also under `--shadow`), push prints
   `nothing to push: ...`, signs nothing and exits 0, even if a stale result
   file is present.
-- Any other outcome publishes the result, as `aval run --push` would. Failing
-  results are published on purpose: on a tie in trust level a failure
-  outranks a pass, so a later flaky pass cannot become reusable.
+- A `miss` or an `error` publishes the result, as `aval run --push` would.
+  Failing results are published on purpose: on a tie in trust level a
+  failure outranks a pass, so a later flaky pass cannot become reusable.
 - The result and the report come from an unprivileged job and are unsigned.
-  Push checks that both match the test id and the fingerprint it computes
-  now, then signs the result's claims with the publishing identity. Decide
-  which job may supply which files in your workflow.
-- A verification failure stays the suite job's security event: it already
-  exits 5. Push does not repeat it.
+  Push checks that both match the test id (the `--test` name, if given) and
+  the fingerprint it computes now from the checkout, then signs the result's
+  claims with the publishing identity. A result or report for another test,
+  or for other inputs (a changed file or declared env value), exits 1 and
+  publishes nothing: an artifact can only publish the test it is named
+  after. Decide which job may supply which files in your workflow.
+- A report that records a security event (outcome `verification-failed`, or
+  a `rejected` entry that failed verification) signs nothing and exits 5. The
+  suite job already exited 5 for it: investigate before publishing.
+- A `non-deterministic` test is never pushed: push prints
+  `nothing to push: ...` and exits 0.
 
 ## Pull requests
 
