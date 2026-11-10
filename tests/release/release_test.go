@@ -444,7 +444,27 @@ func loadBundle(t *testing.T, path string) *bundle.Bundle {
 
 // The release job verifies dist/ (with the tag set) before it publishes, and
 // it is the workflow file whose identity TestTaggedReleaseIsSignedWithProvenance
-// requires; renaming it would only surface at release time.
+// requires; renaming it would only surface at release time. It needs the
+// e2e-gate job, which verifies the e2e attestation with the aval release
+// ci.yaml pins, the one that signed it: a binary built from the tag can
+// compute another fingerprint manifest version and miss (#234;
+// tests/architecture checks the pin).
+type releaseStep struct {
+	Run string            `yaml:"run"`
+	Env map[string]string `yaml:"env"`
+}
+
+// verifiesE2E: a step verifies aval.e2e.yaml under the main policy and checks
+// the report with summary.sh (#135: it fails on a verification failure among
+// the candidates, which verify exits 0 for beside a trusted result).
+func verifiesE2E(steps []releaseStep) bool {
+	return slices.ContainsFunc(steps, func(s releaseStep) bool {
+		return strings.Contains(s.Run, "aval verify -f aval.e2e.yaml") &&
+			strings.Contains(s.Run, "--policy .github/aval/main.yaml") &&
+			strings.Contains(s.Run, ".github/aval/summary.sh")
+	})
+}
+
 func TestReleaseWorkflowVerifiesBeforePublishing(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "release.yaml"))
 	if err != nil {
@@ -452,11 +472,9 @@ func TestReleaseWorkflowVerifiesBeforePublishing(t *testing.T) {
 	}
 	var wf struct {
 		Jobs map[string]struct {
-			If    string `yaml:"if"`
-			Steps []struct {
-				Run string            `yaml:"run"`
-				Env map[string]string `yaml:"env"`
-			} `yaml:"steps"`
+			If    string        `yaml:"if"`
+			Needs string        `yaml:"needs"`
+			Steps []releaseStep `yaml:"steps"`
 		} `yaml:"jobs"`
 	}
 	if err := yaml.Unmarshal(data, &wf); err != nil {
@@ -466,15 +484,12 @@ func TestReleaseWorkflowVerifiesBeforePublishing(t *testing.T) {
 	if job.If != "startsWith(github.ref, 'refs/tags/v')" {
 		t.Errorf("release job runs on %q, want tags only", job.If)
 	}
-	verified, published, e2e := false, false, false
+	// #28: no release without a verified e2e attestation for the commit,
+	// under the main policy.
+	e2e := job.Needs == "e2e-gate" && verifiesE2E(wf.Jobs["e2e-gate"].Steps) && wf.Jobs["e2e-gate"].If == job.If
+	verified, published := false, false
 	for _, s := range job.Steps {
 		switch {
-		// #28: no release without a verified e2e attestation for the commit,
-		// under the main policy.
-		case strings.Contains(s.Run, "aval verify -f aval.e2e.yaml") && strings.Contains(s.Run, "--policy .github/aval/main.yaml"):
-			// #135: summary.sh fails on a verification failure among the
-			// candidates, which verify exits 0 for beside a trusted result.
-			e2e = strings.Contains(s.Run, ".github/aval/summary.sh")
 		case strings.Contains(s.Run, "./tests/release/") && s.Env[envTag] != "" && s.Env[envDist] != "":
 			verified = true
 		case strings.Contains(s.Run, "gh release create"):
@@ -483,7 +498,7 @@ func TestReleaseWorkflowVerifiesBeforePublishing(t *testing.T) {
 				t.Error("release job publishes before tests/release verifies the tagged dist/")
 			}
 			if !e2e {
-				t.Error("release job publishes without verifying the e2e attestation (aval.e2e.yaml) for the commit and checking the report with .github/aval/summary.sh")
+				t.Error("release job publishes without needing e2e-gate, which verifies the e2e attestation (aval.e2e.yaml) for the commit and checks the report with .github/aval/summary.sh")
 			}
 			checkPublishedFiles(t, s.Run)
 		}
