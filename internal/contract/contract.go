@@ -296,20 +296,7 @@ func (s Scope) validate(add func(string, ...any)) {
 		add("scope.root: %q must be '..' segments only (.., ../..): the path up from the contract's directory to the root of its tree", s.Root)
 	}
 	for i, a := range s.AllowMutable {
-		if strings.TrimSpace(a.Ref) == "" || strings.TrimSpace(a.Reason) == "" {
-			add("scope.allowMutable[%d]: ref and reason are both required", i)
-		}
-		if a.File != "" && !fs.ValidPath(a.File) {
-			add("scope.allowMutable[%d]: file %q must be a slash-separated path relative to the contract root, as findings print it", i, a.File)
-		}
-		if a.File != "" && len(a.Files) > 0 {
-			add("scope.allowMutable[%d]: file and files exclude each other: file is one exact path, files are globs", i)
-		}
-		for j, g := range a.Files {
-			if err := ValidateGlob(g); err != nil {
-				add("scope.allowMutable[%d].files[%d]: %v", i, j, err)
-			}
-		}
+		a.validate(i, add)
 	}
 	for i, r := range s.Resolve {
 		if err := r.validate(); err != nil {
@@ -321,6 +308,24 @@ func (s Scope) validate(add func(string, ...any)) {
 			add("scope.contracts[%d]: %v", i, err)
 		} else if slices.Index(s.Contracts, p) < i {
 			add("scope.contracts[%d]: %q is listed twice", i, p)
+		}
+	}
+}
+
+// validate checks scope.allowMutable[i].
+func (a AllowMutable) validate(i int, add func(string, ...any)) {
+	if strings.TrimSpace(a.Ref) == "" || strings.TrimSpace(a.Reason) == "" {
+		add("scope.allowMutable[%d]: ref and reason are both required", i)
+	}
+	if a.File != "" && !fs.ValidPath(a.File) {
+		add("scope.allowMutable[%d]: file %q must be a slash-separated path relative to the contract root, as findings print it", i, a.File)
+	}
+	if a.File != "" && len(a.Files) > 0 {
+		add("scope.allowMutable[%d]: file and files exclude each other: file is one exact path, files are globs", i)
+	}
+	for j, g := range a.Files {
+		if err := ValidateGlob(g); err != nil {
+			add("scope.allowMutable[%d].files[%d]: %v", i, j, err)
 		}
 	}
 }
