@@ -59,7 +59,7 @@ nobody can audit. Build caches help only teams on a hermetic build system.
 
 | # | Milestone | Status | Done when |
 |---|---|---|---|
-| 1 | Fingerprint and contract | implemented | `aval.yaml` is validated with unknown fields rejected, and `aval explain` gives a deterministic `aval-fingerprint/v1` digest that fails closed on unprovable inputs |
+| 1 | Fingerprint and contract | implemented | `aval.yaml` is validated with unknown fields rejected, and `aval explain` gives a deterministic `aval-fingerprint` digest that fails closed on unprovable inputs |
 | 2 | Push and verify against a registry, with signing | implemented | `aval run --push` signs and publishes; `aval verify` and `aval run` reuse a trusted result (exit 0), report a miss (exit 4) and a tampered or untrusted one (exit 5); the policy format is defined |
 | 3 | End-to-end example in GitHub Actions | in progress ([CI quality gates](https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#ci-quality-gates)) | a public example where one run publishes, an unchanged run reuses, and a changed run misses, all visible in the logs |
 | 4 | False-hit suite | implemented ([false-hit suite](https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#false-hit-suite), [known gaps](contract.md#known-gaps)) | every known kind of relevant change is shown not to reuse a previous execution |

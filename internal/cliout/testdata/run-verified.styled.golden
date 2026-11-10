@@ -1,7 +1,7 @@
 === push=false shadow=false failed=false
 exit 0
 --- stdout
-↺ verified unit sha256:77ad8f66
+↺ verified unit sha256:8a2cd781
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
 ↺ reused passed result
@@ -10,7 +10,7 @@ unit: reused a verified passed result, saved 1.5s; nothing ran.
 === push=false shadow=false failed=true
 exit 3
 --- stdout
-↺ verified unit sha256:1a818124
+↺ verified unit sha256:889c3506
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
 ✗ reused failed result
@@ -19,7 +19,7 @@ unit: reused a verified failed result, saved 1.5s; nothing ran.
 === push=false shadow=true failed=false
 exit 0
 --- stdout
-↺ verified unit sha256:77ad8f66
+↺ verified unit sha256:8a2cd781
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
 · run unit: sh -c echo test output; exit 0
@@ -31,7 +31,7 @@ unit passed in D; a verified result exists, it was not reused.
 === push=false shadow=true failed=true
 exit 3
 --- stdout
-↺ verified unit sha256:1a818124
+↺ verified unit sha256:889c3506
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
 · run unit: sh -c echo test output; exit 1
@@ -43,7 +43,7 @@ unit failed in D; fix it, then aval run again.
 === push=true shadow=false failed=false
 exit 0
 --- stdout
-↺ verified unit sha256:77ad8f66
+↺ verified unit sha256:8a2cd781
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
 ↺ reused passed result
@@ -52,7 +52,7 @@ unit: reused a verified passed result, saved 1.5s; nothing ran.
 === push=true shadow=false failed=true
 exit 3
 --- stdout
-↺ verified unit sha256:1a818124
+↺ verified unit sha256:889c3506
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
 ✗ reused failed result
@@ -61,7 +61,7 @@ unit: reused a verified failed result, saved 1.5s; nothing ran.
 === push=true shadow=true failed=false
 exit 0
 --- stdout
-↺ verified unit sha256:77ad8f66
+↺ verified unit sha256:8a2cd781
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
 · run unit: sh -c echo test output; exit 0
@@ -74,7 +74,7 @@ unit passed in D; published for the next run with these inputs.
 === push=true shadow=true failed=true
 exit 3
 --- stdout
-↺ verified unit sha256:1a818124
+↺ verified unit sha256:889c3506
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
 · run unit: sh -c echo test output; exit 1

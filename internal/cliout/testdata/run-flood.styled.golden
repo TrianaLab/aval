@@ -1,7 +1,7 @@
 === push=false shadow=false failed=false
 exit 5
 --- stdout
-✗ verification-failed unit sha256:77ad8f66
+✗ verification-failed unit sha256:8a2cd781
   reason    listing referrers: more than 64 attestations
 · run unit: sh -c echo test output; exit 0
 test output
@@ -13,7 +13,7 @@ aval: SECURITY: more than 64 attestations for unit, none verified: possibly a fl
 === push=false shadow=false failed=true
 exit 5
 --- stdout
-✗ verification-failed unit sha256:1a818124
+✗ verification-failed unit sha256:889c3506
   reason    listing referrers: more than 64 attestations
 · run unit: sh -c echo test output; exit 1
 test output
@@ -25,7 +25,7 @@ aval: SECURITY: more than 64 attestations for unit, none verified: possibly a fl
 === push=false shadow=true failed=false
 exit 5
 --- stdout
-✗ verification-failed unit sha256:77ad8f66
+✗ verification-failed unit sha256:8a2cd781
   reason    listing referrers: more than 64 attestations
 · run unit: sh -c echo test output; exit 0
 test output
@@ -37,7 +37,7 @@ aval: SECURITY: more than 64 attestations for unit, none verified: possibly a fl
 === push=false shadow=true failed=true
 exit 5
 --- stdout
-✗ verification-failed unit sha256:1a818124
+✗ verification-failed unit sha256:889c3506
   reason    listing referrers: more than 64 attestations
 · run unit: sh -c echo test output; exit 1
 test output
@@ -49,7 +49,7 @@ aval: SECURITY: more than 64 attestations for unit, none verified: possibly a fl
 === push=true shadow=false failed=false
 exit 5
 --- stdout
-✗ verification-failed unit sha256:77ad8f66
+✗ verification-failed unit sha256:8a2cd781
   reason    listing referrers: more than 64 attestations
 · run unit: sh -c echo test output; exit 0
 test output
@@ -62,7 +62,7 @@ aval: SECURITY: more than 64 attestations for unit, none verified: possibly a fl
 === push=true shadow=false failed=true
 exit 5
 --- stdout
-✗ verification-failed unit sha256:1a818124
+✗ verification-failed unit sha256:889c3506
   reason    listing referrers: more than 64 attestations
 · run unit: sh -c echo test output; exit 1
 test output
@@ -75,7 +75,7 @@ aval: SECURITY: more than 64 attestations for unit, none verified: possibly a fl
 === push=true shadow=true failed=false
 exit 5
 --- stdout
-✗ verification-failed unit sha256:77ad8f66
+✗ verification-failed unit sha256:8a2cd781
   reason    listing referrers: more than 64 attestations
 · run unit: sh -c echo test output; exit 0
 test output
@@ -88,7 +88,7 @@ aval: SECURITY: more than 64 attestations for unit, none verified: possibly a fl
 === push=true shadow=true failed=true
 exit 5
 --- stdout
-✗ verification-failed unit sha256:1a818124
+✗ verification-failed unit sha256:889c3506
   reason    listing referrers: more than 64 attestations
 · run unit: sh -c echo test output; exit 1
 test output
