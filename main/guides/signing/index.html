@@ -2310,7 +2310,9 @@ a pasted code.</p>
 <li>Keys: unencrypted ECDSA P-256 in PEM (PKCS#8 or SEC1). Cosign keys are
   encrypted and do not work.</li>
 <li><code>aval push</code> signs later the result <code>aval run</code> saved in <code>.aval/result.json</code>.
-  It refuses a result whose inputs changed.</li>
+  It refuses a result whose inputs changed. With <code>--report-file</code> it publishes
+  nothing after a run that reused a verified result:
+  <a href="../github-actions/#split-credentials">split credentials</a>.</li>
 <li><code>--login</code> asks for the browser login without a terminal.
   <code>$SIGSTORE_OIDC_ISSUER</code> and <code>$SIGSTORE_OIDC_CLIENT_ID</code> override the defaults
   (<code>oauth2.sigstore.dev</code>, client <code>sigstore</code>).</li>
