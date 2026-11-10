@@ -161,11 +161,15 @@ func (r *Reference) UnmarshalYAML(n *yaml.Node) error {
 // for it, with the reason it is acceptable. File, when set, limits it to
 // the finding in that file (as findings print it: relative to the contract,
 // or runner.command); without it the ref must be reported in one file only.
-// File is omitted when empty, so contracts without it hash as before.
+// Files, globs that exclude File, accepts the ref in every in-scope file
+// they match (never in runner.command); each must match a file in scope.
+// File and Files are omitted when empty, so contracts without them hash as
+// before.
 type AllowMutable struct {
-	File   string `yaml:"file,omitempty" json:"file,omitempty"`
-	Ref    string `yaml:"ref" json:"ref"`
-	Reason string `yaml:"reason" json:"reason"`
+	File   string   `yaml:"file,omitempty" json:"file,omitempty"`
+	Files  []string `yaml:"files,omitempty" json:"files,omitempty"`
+	Ref    string   `yaml:"ref" json:"ref"`
+	Reason string   `yaml:"reason" json:"reason"`
 }
 
 // Environment declares execution conditions that are part of the fingerprint.
@@ -287,6 +291,14 @@ func (s Scope) validate(add func(string, ...any)) {
 		}
 		if a.File != "" && !fs.ValidPath(a.File) {
 			add("scope.allowMutable[%d]: file %q must be a slash-separated path relative to the contract, as findings print it", i, a.File)
+		}
+		if a.File != "" && len(a.Files) > 0 {
+			add("scope.allowMutable[%d]: file and files exclude each other: file is one exact path, files are globs", i)
+		}
+		for j, g := range a.Files {
+			if err := ValidateGlob(g); err != nil {
+				add("scope.allowMutable[%d].files[%d]: %v", i, j, err)
+			}
 		}
 	}
 	for i, r := range s.Resolve {

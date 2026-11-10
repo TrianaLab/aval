@@ -538,3 +538,27 @@ func TestVerifyFlagsCandidateFlood(t *testing.T) {
 		t.Fatalf("stderr %q; want a SECURITY line naming the cap", stderr)
 	}
 }
+
+// TestAllowMutableFilesUsage: every misuse of scope.allowMutable files exits
+// 2 before the test runs, including a glob that matches no file in scope.
+func TestAllowMutableFilesUsage(t *testing.T) {
+	for name, tc := range map[string]struct{ entry, want string }{
+		"file and files":  {`{file: in.txt, files: ["*.txt"], ref: a, reason: r}`, "file and files exclude each other"},
+		"files no ref":    {`{files: ["*.txt"], reason: r}`, "ref and reason are both required"},
+		"files no reason": {`{files: ["*.txt"], ref: a, reason: " "}`, "ref and reason are both required"},
+		"glob no match":   {`{files: ["*.yaml"], ref: a, reason: r}`, `scope.allowMutable[0].files[0]: glob "*.yaml" matches no file in scope`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := writeContract(t, "hermetic")
+			body := strings.Replace(strings.Replace(testContract, "CLASS", "hermetic", 1), `source: ["*.txt"]`, "source: [\"*.txt\"]\n  allowMutable: ["+tc.entry+"]", 1)
+			if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			for _, args := range [][]string{{"run", "-f", p, "--result-file", filepath.Join(t.TempDir(), "r.json")}, {"explain", "-f", p}} {
+				if code, stdout, stderr := runCLI(args...); code != ExitUsage || strings.Contains(stdout, "ran unit") || !strings.Contains(stderr, tc.want) {
+					t.Fatalf("aval %v: exit %d, stdout %q, stderr %q; want %d and %q", args, code, stdout, stderr, ExitUsage, tc.want)
+				}
+			}
+		})
+	}
+}

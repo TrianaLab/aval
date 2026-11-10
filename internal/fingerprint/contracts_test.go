@@ -344,7 +344,8 @@ func TestContractsFindings(t *testing.T) {
 // TestContractsAllowMutableByFile: file: in a referenced contract's
 // scope.allowMutable is relative to that contract and acknowledges only that
 // file's finding; a ref-only entry is ambiguous when two of its own files
-// report the ref; the dependent's entries, with or without file:, never
+// report the ref; files: in either contract covers that contract's own
+// files only; the dependent's entries, with or without file:, never
 // reach the referenced contract's findings, nor count toward its ambiguity.
 func TestContractsAllowMutableByFile(t *testing.T) {
 	remote := "resources:\n- https://example.com/remote.yaml\n"
@@ -359,6 +360,10 @@ func TestContractsAllowMutableByFile(t *testing.T) {
 		{"ref-only in the referenced contract is ambiguous", `allowMutable: [{ref: "resources[0]", reason: r}]`, "", nil, 2},
 		{"the dependent's file entry does not reach", "", `allowMutable: [{file: api/a/kustomization.yaml, ref: "resources[0]", reason: r}]`, nil, 0},
 		{"the dependent's ref-only entry covers its own file only", "", `allowMutable: [{ref: "resources[0]", reason: r}]`,
+			[]string{"src/kustomization.yaml"}, 0},
+		{"files in the referenced contract stays in its scope", `allowMutable: [{files: ["**/kustomization.yaml"], ref: "resources[0]", reason: r}]`, "",
+			[]string{"../backend/api/a/kustomization.yaml", "../backend/api/b/kustomization.yaml"}, 0},
+		{"the dependent's files entry does not reach", "", `allowMutable: [{files: ["**"], ref: "resources[0]", reason: r}]`,
 			[]string{"src/kustomization.yaml"}, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
