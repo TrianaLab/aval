@@ -224,16 +224,21 @@ earlier one. `aval verify` verifies every candidate:
 - If nothing is reused: `verification-failed` beats `error` beats `miss`.
 
 Unused candidates are listed in the report's `rejected`; any that failed
-verification add one `aval: SECURITY: ...` line on stderr.
+verification add one `aval: SECURITY: ...` line on stderr. Such a candidate
+is a security event even beside a verified one: the report keeps outcome
+`verified` and its `reference`, but `aval verify` exits 5 and `aval run` does
+not reuse, runs the test and exits 5.
 
 ### The 64-candidate cap and cleanup
 
 Every push adds one execution, even for the same inputs (hostname and
 timestamps differ), and Aval never deletes one. Past 64 executions, every
-lookup for that fingerprint is `error` and the test always runs; every push
-still adds one, then exits 1. Nothing past the cap is verified, so the lookup
-also prints an `aval: SECURITY:` line naming the cap: someone with push
-access may be flooding the fingerprint to hide an untrusted attestation.
+lookup for that fingerprint is `verification-failed` (the reason names the
+cap): nothing is verified, so trust cannot be proven and someone with push
+access may be flooding the fingerprint to hide an untrusted attestation. The
+lookup prints an `aval: SECURITY:` line naming the cap, `aval run` runs the
+test and `aval verify` and `aval run` exit 5; every push still adds one, then
+exits 1.
 Other fingerprints are not affected, so the next input change also ends it.
 
 Push from one place (for example CI on the main branch). `aval run --push`
@@ -302,7 +307,7 @@ limit, publishing a record fails with a warning; prune old records (see
 | `version` | string | always | `aval.trianalab.io/run-record/v1`. |
 | `testId` | string | always | `metadata.name` from the contract. |
 | `fingerprint` | string | always | `sha256:<hex>`; empty when the fingerprint could not be computed. |
-| `outcome` | string | always | The lookup decision, as in the verify report. |
+| `outcome` | string | always | The lookup decision, as in the verify report, except a `verified` lookup beside a rejected `verification-failed` candidate: the run did not reuse, so it records `verification-failed`. |
 | `reused` | bool | always | `true` when a verified result was reused and the test did not run. With `--shadow`, or when `--report-file` cannot be written, it is `false`. |
 | `result` | string | when known | The reused or the real `passed` / `failed`; omitted when `runner.command` could not start. |
 | `verifiedResult` | string | when `outcome` is `verified` | The result of the verified attestation. With `reused` `false` and the test run (`--shadow`), a `verifiedResult` that differs from `result` is a false hit. Records made before it was added (#88) lack it. |
@@ -542,7 +547,7 @@ Outcomes:
 |---|---|---|
 | `verified` | Valid attestation satisfies the policy. | Reuse `result`. |
 | `miss` | No attestation for this fingerprint that the policy can reuse: none found, or only authentic ones whose signer the policy lists below `minTrustLevel`. | Run the test. |
-| `verification-failed` | Attestation exists but fails signature or policy. | Run the test **and** alert. Never hide this. |
+| `verification-failed` | Attestation exists but fails signature or policy, or the fingerprint holds more than 64 attestations (none verified). | Run the test **and** alert. Never hide this. |
 | `error` | Aval could not decide (registry unreachable, bad policy file, trusted root unavailable). | Treat as a miss: run the test (fail closed). |
 
 <!-- --8<-- [end:verify-report] -->

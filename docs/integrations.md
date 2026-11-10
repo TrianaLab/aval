@@ -79,9 +79,6 @@ set -e
 outcome=$(jq -r '.outcome // "error"' <<<"$report")
 case "$code:$outcome" in
   0:verified)
-    if jq -e '[.rejected[]? | select(.outcome == "verification-failed")] | length > 0' <<<"$report" >/dev/null; then
-      ./notify-security.sh "$report" # a rejected candidate failed verification
-    fi
     echo "reusing $(jq -r .reference <<<"$report") (result: $(jq -r .result <<<"$report"))"
     [ "$(jq -r .result <<<"$report")" = passed ] || exit 1
     ;;
@@ -89,8 +86,8 @@ case "$code:$outcome" in
     echo "no attestation for $(jq -r .fingerprint <<<"$report"), running test"
     ./run-tests.sh
     ;;
-  5:verification-failed)
-    echo "::error::untrusted attestation for $(jq -r .testId <<<"$report"): $(jq -r .reason <<<"$report")"
+  5:verification-failed | 5:verified) # 5:verified: a rejected candidate failed verification
+    echo "::error::untrusted attestation for $(jq -r .testId <<<"$report")"
     ./notify-security.sh "$report"
     ./run-tests.sh
     ;;
@@ -101,7 +98,9 @@ case "$code:$outcome" in
 esac
 ```
 
-Check both the exit code and `outcome`; if they disagree, treat it as `error`.
+Check both the exit code and `outcome`. Exit 5 is a security event whatever the
+outcome: with `verified`, a rejected candidate failed verification. Treat any
+other disagreement as `error`.
 
 ## Guidance
 

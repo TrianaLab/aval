@@ -352,10 +352,10 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			"sha256:aa": {trust: evidence.TrustDeveloper, failed: true},
 			"sha256:bb": {trust: evidence.TrustIsolated},
 		}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", evidence.ResultPassed, nil},
-		{"later untrusted push does not replace a trusted result", nil, map[string]candidate{
+		{"later untrusted push does not replace a trusted result, and exits 5", nil, map[string]candidate{
 			"sha256:aa": {trust: evidence.TrustRunner},
 			"sha256:ff": {verifyErr: untrusted},
-		}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:aa", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
+		}, ExitVerificationFailed, evidence.OutcomeVerified, "reg.example/r@sha256:aa", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
 		{"error on a sibling fails closed", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: down},
 			"sha256:bb": {trust: evidence.TrustRunner},
@@ -401,10 +401,10 @@ func TestVerifyPicksAmongCandidates(t *testing.T) {
 			"sha256:aa": {fetchErr: malformed},
 			"sha256:bb": {fetchErr: malformed},
 		}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "reg.example/r@sha256:aa", "", []evidence.Outcome{evidence.OutcomeVerificationFailed, evidence.OutcomeVerificationFailed}},
-		{"malformed candidate is reported beside a verified one", nil, map[string]candidate{
+		{"malformed candidate beside a verified one exits 5", nil, map[string]candidate{
 			"sha256:aa": {fetchErr: malformed},
 			"sha256:bb": {trust: evidence.TrustRunner},
-		}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
+		}, ExitVerificationFailed, evidence.OutcomeVerified, "reg.example/r@sha256:bb", evidence.ResultPassed, []evidence.Outcome{evidence.OutcomeVerificationFailed}},
 		{"empty answer is a miss", nil, map[string]candidate{}, ExitMiss, evidence.OutcomeMiss, "", "", nil},
 	}
 	for _, tc := range cases {
@@ -488,7 +488,7 @@ func TestVerifyBelowMinTrust(t *testing.T) {
 		{"error outranks it", map[string]candidate{"sha256:aa": dev, "sha256:bb": {fetchErr: errors.New("registry down")}}, ExitError, evidence.OutcomeError, "reg.example/r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeError}},
 		{"beside a deleted manifest is still a miss", map[string]candidate{"sha256:aa": {fetchErr: fmt.Errorf("fetching manifest: 404 Not Found: %w", evidence.ErrNotFound)}, "sha256:bb": dev}, ExitMiss, evidence.OutcomeMiss, "reg.example/r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss}},
 		{"verification failure outranks it", map[string]candidate{"sha256:aa": dev, "sha256:ff": {verifyErr: untrusted}}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "reg.example/r@sha256:ff", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
-		{"verification failure stays visible beside a verified one", map[string]candidate{"sha256:aa": dev, "sha256:bb": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, ExitOK, evidence.OutcomeVerified, "reg.example/r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
+		{"verification failure beside a verified one exits 5", map[string]candidate{"sha256:aa": dev, "sha256:bb": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, ExitVerificationFailed, evidence.OutcomeVerified, "reg.example/r@sha256:bb", []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerificationFailed}},
 		{"signed cacheability lie stays a verification failure", map[string]candidate{"sha256:aa": {trust: evidence.TrustDeveloper, cacheability: "external-dependencies"}}, ExitVerificationFailed, evidence.OutcomeVerificationFailed, "reg.example/r@sha256:aa", []evidence.Outcome{evidence.OutcomeVerificationFailed}},
 	}
 	for _, tc := range cases {
@@ -521,9 +521,9 @@ func TestVerifyBelowMinTrust(t *testing.T) {
 	}
 }
 
-// #135: more attestations than the lookup cap is a possible flooding attempt
-// that hides any untrusted candidate. It stays an error (run the test, fail
-// closed) and prints a SECURITY line naming the cap, never a quiet error.
+// #135, #195: more attestations than the lookup cap is a possible flooding
+// attempt that hides any untrusted candidate. Trust cannot be proven, so it
+// is a verification failure (exit 5) with a SECURITY line naming the cap.
 func TestVerifyFlagsCandidateFlood(t *testing.T) {
 	fakeCandidates(t, fmt.Errorf("listing referrers: %w", registry.ErrTooManyCandidates), nil)
 	code, stdout, stderr := runCLI("verify", "-f", writeContract(t, "hermetic"), "--registry", "reg.example/r", "--policy", "p.yaml", "-o", "json")
@@ -531,8 +531,8 @@ func TestVerifyFlagsCandidateFlood(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &r); err != nil {
 		t.Fatal(err)
 	}
-	if code != ExitError || r.Outcome != evidence.OutcomeError || len(r.Rejected) != 0 {
-		t.Fatalf("exit %d report %+v; want exit %d outcome error", code, r, ExitError)
+	if code != ExitVerificationFailed || r.Outcome != evidence.OutcomeVerificationFailed || !strings.Contains(r.Reason, "more than 64 attestations") || len(r.Rejected) != 0 {
+		t.Fatalf("exit %d report %+v; want exit %d outcome verification-failed naming the cap", code, r, ExitVerificationFailed)
 	}
 	if !strings.Contains(stderr, "aval: SECURITY: more than 64 attestations for unit") || !strings.Contains(stderr, "flooding") {
 		t.Fatalf("stderr %q; want a SECURITY line naming the cap", stderr)

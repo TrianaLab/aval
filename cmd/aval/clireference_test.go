@@ -27,12 +27,12 @@ const exitCodes = `
 
 | Code | ` + "`aval run`" + ` | ` + "`aval verify`" + ` | ` + "`aval push`" + ` |
 |---|---|---|---|
-| 0 | the test passed, or a verified passing result was reused | a verified result exists (passing or failing) | pushed |
+| 0 | the test passed, or a verified passing result was reused | a verified result exists (passing or failing) and no attestation failed verification | pushed |
 | 1 | error (the test still runs when it can), or a false hit in ` + "`--shadow`" + ` | error: registry, policy, trusted root or fingerprint | error: signing, registry or a result that does not match the current inputs |
 | 2 | bad flags or invalid ` + "`aval.yaml`" + ` | bad flags or invalid ` + "`aval.yaml`" + ` | bad flags or invalid ` + "`aval.yaml`" + ` |
 | 3 | the test failed, or a verified failing result was reused | not used | not used |
 | 4 | not used: a miss runs the test | miss: no result the policy can reuse | not used |
-| 5 | verification failed, after running the test: a security event | verification failed: a security event | not used |
+| 5 | verification failed, after running the test: a security event, also beside a verified result (never reused then) or over the 64-attestation cap; wins over 3 and 1 | verification failed: a security event, also beside a verified result (the report keeps outcome ` + "`verified`" + `) or over the 64-attestation cap | not used |
 | 6 | reserved, never returned | reserved, never returned | reserved, never returned |
 
 A miss (4) is routine. A verification failure (5) means someone published a

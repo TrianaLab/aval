@@ -10,12 +10,12 @@ Every command, flag and exit code.
 
 | Code | `aval run` | `aval verify` | `aval push` |
 |---|---|---|---|
-| 0 | the test passed, or a verified passing result was reused | a verified result exists (passing or failing) | pushed |
+| 0 | the test passed, or a verified passing result was reused | a verified result exists (passing or failing) and no attestation failed verification | pushed |
 | 1 | error (the test still runs when it can), or a false hit in `--shadow` | error: registry, policy, trusted root or fingerprint | error: signing, registry or a result that does not match the current inputs |
 | 2 | bad flags or invalid `aval.yaml` | bad flags or invalid `aval.yaml` | bad flags or invalid `aval.yaml` |
 | 3 | the test failed, or a verified failing result was reused | not used | not used |
 | 4 | not used: a miss runs the test | miss: no result the policy can reuse | not used |
-| 5 | verification failed, after running the test: a security event | verification failed: a security event | not used |
+| 5 | verification failed, after running the test: a security event, also beside a verified result (never reused then) or over the 64-attestation cap; wins over 3 and 1 | verification failed: a security event, also beside a verified result (the report keeps outcome `verified`) or over the 64-attestation cap | not used |
 | 6 | reserved, never returned | reserved, never returned | reserved, never returned |
 
 A miss (4) is routine. A verification failure (5) means someone published a
@@ -261,7 +261,9 @@ covers lookup and fetch together; --push has its own. runner.command never
 sees $SIGSTORE_ID_TOKEN, $AVAL_REGISTRY or $AVAL_POLICY.
 
 Exit codes: 0 pass, 3 fail, 5 verification failed (a security event, after
-running the test), 1 error or false hit (--shadow), 2 usage.
+running the test: also a verified result beside a rejected verification-failed
+attestation, which is never reused, or more attestations than the lookup cap),
+1 error or false hit (--shadow), 2 usage. 5 wins over 3 and 1.
 
 ```text
 Usage:
@@ -409,8 +411,10 @@ verify computes the fingerprint, looks up the attestation and verifies its
 signature and the trust policy, without running anything. It needs a
 registry; without a trust policy every lookup is a miss.
 
-Exit codes: 0 verified, 4 miss, 5 verification failed (security event),
-1 error (registry, policy or fingerprint), 2 usage or invalid aval.yaml.
+Exit codes: 0 verified, 4 miss, 5 verification failed (security event:
+also a verified result beside a rejected verification-failed attestation, or
+more attestations than the lookup cap), 1 error (registry, policy or
+fingerprint), 2 usage or invalid aval.yaml.
 
 ```text
 Usage:

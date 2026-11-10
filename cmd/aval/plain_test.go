@@ -51,15 +51,16 @@ func runOutcomes() []plainOutcome {
 		{"verification-failed", evidence.OutcomeVerificationFailed, "hermetic", func(t *testing.T, _ bool) {
 			fakeCandidates(t, nil, map[string]candidate{"sha256:ff": {verifyErr: untrusted}})
 		}},
-		// Verified beside a rejected forged candidate: SECURITY, yet reused.
+		// Verified beside a rejected forged candidate: SECURITY, not reused,
+		// the test runs and exits 5 (#195).
 		{"verified-with-forged", evidence.OutcomeVerified, "hermetic", func(t *testing.T, failed bool) {
 			fakeCandidates(t, nil, map[string]candidate{
 				"sha256:aa": {trust: evidence.TrustRunner, failed: failed, took: 1500 * time.Millisecond},
 				"sha256:ff": {verifyErr: untrusted},
 			})
 		}},
-		// Flooding (#135): nothing verified, the outcome is error, the test runs.
-		{"flood", evidence.OutcomeError, "hermetic", func(t *testing.T, _ bool) {
+		// Flooding (#135, #195): nothing verified, a verification failure, the test runs.
+		{"flood", evidence.OutcomeVerificationFailed, "hermetic", func(t *testing.T, _ bool) {
 			fakeCandidates(t, fmt.Errorf("listing referrers: %w", registry.ErrTooManyCandidates), nil)
 		}},
 		{"non-deterministic", evidence.OutcomeMiss, "non-deterministic", func(t *testing.T, _ bool) { noLookup(t) }},
@@ -84,7 +85,7 @@ func checkGolden(t *testing.T, name, got string) {
 }
 
 // The SECURITY line is the last stderr line whatever else failed after it
-// (here the push), and also when a verified sibling is reused (exit 0).
+// (here the push), also beside a verified sibling, which is not reused.
 func TestSecurityLineIsLast(t *testing.T) {
 	untrusted := &evidence.VerificationError{Reason: "untrusted signer"}
 	cases := []struct {
@@ -94,7 +95,7 @@ func TestSecurityLineIsLast(t *testing.T) {
 		err   string
 	}{
 		{"push fails after a verification failure", map[string]candidate{"sha256:ff": {verifyErr: untrusted}}, ExitVerificationFailed, "aval: publishing: registry gone\n"},
-		{"reused beside an untrusted sibling", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, ExitOK, ""},
+		{"push fails beside an untrusted sibling", map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}, "sha256:ff": {verifyErr: untrusted}}, ExitVerificationFailed, "aval: publishing: registry gone\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -112,12 +113,12 @@ func TestSecurityLineIsLast(t *testing.T) {
 
 // Flooding the fingerprint (#135) is a security event in `aval run` too: no
 // reuse-off warning, SECURITY in the summary and as the last stderr line,
-// and the exit code stays the test's.
+// and exit 5 after the test ran (#195).
 func TestRunFloodIsSecurity(t *testing.T) {
 	fakeCandidates(t, fmt.Errorf("listing referrers: %w", registry.ErrTooManyCandidates), nil)
 	code, stdout, stderr := runCLI("run", "-f", contractWith(t, "hermetic", "true"), "--registry", "reg.example/r", "--policy", "p.yaml", "--result-file", filepath.Join(t.TempDir(), "r.json"))
 	flood := "aval: SECURITY: more than 64 attestations for unit, none verified: possibly a flooding attempt that hides an untrusted one; the test runs, see https://aval.run/latest/trust-model/\n"
-	if code != ExitOK || stderr != flood+flood || !regexp.MustCompile(`\nsummary: unit ran: passed in [^;]+; SECURITY\n$`).MatchString(stdout) {
+	if code != ExitVerificationFailed || stderr != flood+flood || !regexp.MustCompile(`\nsummary: unit ran: passed in [^;]+; SECURITY\n$`).MatchString(stdout) {
 		t.Fatalf("exit %d; stdout %q stderr %q", code, stdout, stderr)
 	}
 }

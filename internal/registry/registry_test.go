@@ -322,8 +322,9 @@ func TestLookupCapsCandidates(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := Lookup(ctx, repo, fpA)
-	if err == nil || errors.Is(err, evidence.ErrNotFound) || errors.Is(err, evidence.ErrVerification) || !errors.Is(err, ErrTooManyCandidates) || got != nil {
-		t.Fatalf("Lookup = %+v %v; want a plain error wrapping ErrTooManyCandidates", got, err)
+	if err == nil || errors.Is(err, evidence.ErrNotFound) || !errors.Is(err, evidence.ErrVerification) || !errors.Is(err, ErrTooManyCandidates) || got != nil ||
+		!strings.Contains(err.Error(), "more than 64 attestations") {
+		t.Fatalf("Lookup = %+v %v; want a verification failure wrapping ErrTooManyCandidates and naming the cap", got, err)
 	}
 }
 

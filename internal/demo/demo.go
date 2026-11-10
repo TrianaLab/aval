@@ -311,18 +311,18 @@ func (d *Demo) verifyCmd(output string, out, errw io.Writer) int {
 	}
 	r := d.verify(c, fp, cliout.Run{Err: errw})
 	_ = cliout.WriteReport(out, output, r) // ponytail: in-memory writers do not fail
-	switch r.Outcome {
-	case evidence.OutcomeVerified:
-		return exitOK
-	case evidence.OutcomeVerificationFailed:
+	switch {
+	case len(r.Rejected) > 0: // also beside a verified one, as in the CLI (#195)
 		return exitVerificationFailed
+	case r.Outcome == evidence.OutcomeVerified:
+		return exitOK
 	}
 	return exitMiss
 }
 
 // run is `aval run --push`: reuse a verified result, or run the (simulated)
-// test, sign the result and push it. A verification failure runs the test
-// and then exits 5.
+// test, sign the result and push it. A verification failure, even beside a
+// verified result, runs the test and then exits 5.
 func (d *Demo) run(explain, plain bool, out, errw io.Writer) int {
 	c, fp, code := d.fingerprint(errw)
 	if code != exitOK {
@@ -339,7 +339,7 @@ func (d *Demo) run(explain, plain bool, out, errw io.Writer) int {
 	sum := cliout.Summary{Test: c.Metadata.Name, Result: evidence.ResultPassed, Security: len(r.Rejected) > 0}
 	w.Security = sum.Security
 	code = exitOK
-	if r.Outcome == evidence.OutcomeVerified {
+	if r.Outcome == evidence.OutcomeVerified && !sum.Security {
 		// ponytail: the demo only signs passes and tamper breaks the
 		// signature, so a verified result here is always passed.
 		w.Reused(r.Result)
@@ -350,7 +350,7 @@ func (d *Demo) run(explain, plain bool, out, errw io.Writer) int {
 		w.End(c.Metadata.Name, evidence.ResultPassed, 0, testTook)
 		w.Pushed(d.push(c, fp, time.Now().UTC()))
 		sum.Took, sum.Pushed = testTook, true
-		if r.Outcome == evidence.OutcomeVerificationFailed {
+		if sum.Security {
 			code = exitVerificationFailed
 		}
 	}
