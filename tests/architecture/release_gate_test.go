@@ -71,6 +71,7 @@ func releaseGateProblems(release, ci []byte) ([]string, error) {
 		}
 	}
 	gate := wf.Jobs["e2e-gate"]
+	problems = append(problems, tokenEnvProblems("a job or workflow env", wf.Env, gate.Env)...)
 	if gate.If != "startsWith(github.ref, 'refs/tags/v')" {
 		problems = append(problems, "e2e-gate runs on "+gate.If)
 	}
@@ -102,6 +103,19 @@ func ciPinProblems(ci []byte, env map[string]string) []string {
 	return problems
 }
 
+// tokenEnvProblems reports each variable in envs that passes a token to aval.
+func tokenEnvProblems(where string, envs ...map[string]string) []string {
+	var problems []string
+	for _, env := range envs {
+		for k, v := range env {
+			if strings.Contains(v, "token") || strings.Contains(v, "secrets.") {
+				problems = append(problems, "e2e-gate: "+k+" in "+where+" reaches aval")
+			}
+		}
+	}
+	return problems
+}
+
 // gateStepProblems: the gate reads the pin before install.sh and runs aval
 // verify on the e2e contract with no token in its environment.
 func gateStepProblems(steps []step) []string {
@@ -116,11 +130,7 @@ func gateStepProblems(steps []step) []string {
 			installed = true
 		case strings.Contains(run, "aval verify -f aval.e2e.yaml"):
 			verify = true
-			for k, v := range s.Env {
-				if strings.Contains(v, "token") || strings.Contains(v, "secrets.") {
-					problems = append(problems, "e2e-gate: the verify step passes "+k+" to aval")
-				}
-			}
+			problems = append(problems, tokenEnvProblems("the verify step", s.Env)...)
 		}
 	}
 	if !pin {
@@ -175,6 +185,7 @@ func TestReleaseGateCheckCatchesDrift(t *testing.T) {
 		"no install":                   {rel("", readTok, cosign+pinStep+verify, release), ci},
 		"no verify":                    {rel("", readTok, cosign+pinStep+install, release), ci},
 		"token reaches aval":           {rel("", readTok, cosign+pinStep+install+"      - env: {GH_TOKEN: '${{ github.token }}'}\n        run: aval verify -f aval.e2e.yaml\n", release), ci},
+		"job env token":                {strings.Replace(rel("", readTok, cosign+pinStep+install+verify, release), "    steps:\n", "    env: {GH_TOKEN: '${{ github.token }}'}\n    steps:\n", 1), ci},
 		"write token":                  {rel("", "    permissions: {contents: write}\n", cosign+pinStep+install+verify, release), ci},
 		"release does not need gate":   {rel("", readTok, cosign+pinStep+install+verify, "  release: {}\n"), ci},
 		"ci declares version twice":    {good, ci + "other:\n  AVAL_VERSION: 0.3.0\n"},
