@@ -262,7 +262,7 @@ and records the result. Anything Aval cannot prove runs the test.
 
 Without a registry and a trust policy the test always runs. --registry-timeout
 covers lookup and fetch together; --push has its own. runner.command never
-sees $SIGSTORE_ID_TOKEN, $AVAL_REGISTRY or $AVAL_POLICY.
+sees $SIGSTORE_ID_TOKEN, $AVAL_REGISTRY, $AVAL_POLICY or $AVAL_MIN_TRUST_LEVEL.
 
 runner.command and the probes get $AVAL_RUN_STACK, the contracts of
 the enclosing aval runs. A run whose contract is already there exits 2 before
@@ -293,6 +293,7 @@ Flags:
   -h, --help                        help for run
       --key string                  signing key path for --push (default: keyless, from $SIGSTORE_ID_TOKEN or the interactive login; no token is stored and runner.command never sees it)
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
+      --min-trust-level string      raise the trust policy's minTrustLevel to developer, runner or isolated; a value below it exits 2 (default: $AVAL_MIN_TRUST_LEVEL)
       --no-reuse                    always run, never reuse (excludes --shadow)
       --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
       --push                        sign and publish the result after running (needs --registry)
@@ -435,6 +436,7 @@ Examples:
 Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
   -h, --help                        help for verify
+      --min-trust-level string      raise the trust policy's minTrustLevel to developer, runner or isolated; a value below it exits 2 (default: $AVAL_MIN_TRUST_LEVEL)
   -o, --output string               output format: text or json (default "text")
       --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)

@@ -192,3 +192,17 @@ func TestSubjectRegexpAgreesWithMatchIdentity(t *testing.T) {
 		}
 	}
 }
+
+// #214: only the three level names parse; case, numbers and empty do not.
+func TestParseTrustLevel(t *testing.T) {
+	for name, want := range map[string]evidence.TrustLevel{"developer": evidence.TrustDeveloper, "runner": evidence.TrustRunner, "isolated": evidence.TrustIsolated} {
+		if got, ok := ParseTrustLevel(name); !ok || got != want {
+			t.Errorf("%q: %v %v", name, got, ok)
+		}
+	}
+	for _, name := range []string{"", "Runner", "2", "unknown", " runner"} {
+		if _, ok := ParseTrustLevel(name); ok {
+			t.Errorf("%q parsed", name)
+		}
+	}
+}
