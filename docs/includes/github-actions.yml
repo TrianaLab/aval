@@ -1,5 +1,5 @@
 # docs/guides/github-actions.md includes the sections of this example;
-# tests/architecture/guides_test.go checks it against
+# tests/architecture/ci_test.go (TestGitHubActionExampleMatchesTheAction) checks it against
 # integrations/github/run/action.yml.
 name: ci
 on:

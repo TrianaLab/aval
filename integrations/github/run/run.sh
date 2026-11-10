@@ -92,7 +92,9 @@ if [ -f "$policy" ]; then
   ' "$policy")
 fi
 
-# Step 4.
+# Step 4. A report left by an earlier run in this workspace must not be read
+# as this run's outcome.
+/bin/rm -f ".aval/$INPUT_TEST/report.json"
 code=0
 "$AVAL" "${args[@]}" || code=$?
 
@@ -106,6 +108,8 @@ if [ -f "$report" ]; then
 fi
 case "$outcome" in verified | miss | verification-failed | error) ;; *) outcome=unknown ;; esac
 case "$result" in passed | failed | "") ;; *) result=unknown ;; esac
+# Exit 5 is a security event whatever the report's lookup outcome says (#195).
+if [ "$code" -eq 5 ]; then outcome=verification-failed; fi
 echo "outcome=$outcome" >> "$GITHUB_OUTPUT"
 echo "### aval $INPUT_TEST: \`$outcome\` $result (exit $code)" >> "$GITHUB_STEP_SUMMARY"
 if [ "$code" -eq 5 ]; then

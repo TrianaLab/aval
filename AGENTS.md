@@ -53,8 +53,6 @@ A change that breaks one of these is wrong, even if tests pass.
 - `internal/fingerprint` canonical manifest and hash.
 - `internal/attest`, `internal/registry`, `internal/policy` signing, ORAS,
   trust policy.
-- `integrations/github` GitHub composite actions on top of the CLI. Core
-  (`cmd/`, `internal/`, `pkg/`) never references them.
 - `tests/architecture` invariant gates about the repository itself.
 - `docs/` design and specs. `examples/go-compose` is its own Go module.
 

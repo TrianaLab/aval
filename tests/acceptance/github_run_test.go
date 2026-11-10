@@ -207,8 +207,8 @@ func TestGitHubRunActionStory(t *testing.T) {
 	s.write(t, "a\n")
 	tamper(t, s.repo, s.dir, func() {})
 	r := s.pr(t)
-	s.want(t, "tampered attestation", r, 5, 6, "verified", "::error title=aval SECURITY::story: ")
-	if !strings.Contains(r.summary, "(exit 5)") {
+	s.want(t, "tampered attestation", r, 5, 6, "verification-failed", "::error title=aval SECURITY::story: ")
+	if !strings.Contains(r.summary, "`verification-failed`") || !strings.Contains(r.summary, "(exit 5)") {
 		t.Fatalf("tampered: summary %q", r.summary)
 	}
 }
