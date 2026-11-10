@@ -61,8 +61,9 @@ fingerprints the same only when those paths are under `.aval/`.
 
 Diff the `aval explain` output of two machines to see which file, toolchain entry
 or variable differs. `-f` takes one path and defaults to `./aval.yaml`; the
-root is always the contract file's directory. A file holds one contract: give
-each shard of a split suite its own file
+root is the contract file's directory, or the directory `scope.root` names
+above it ([Contracts in a subdirectory](#contracts-in-a-subdirectory)). A
+file holds one contract: give each shard of a split suite its own file
 ([Shards and matrices](guides/shards-and-matrices.md)).
 
 ## Fields
@@ -80,14 +81,49 @@ each shard of a split suite its own file
 | `scope.source` | list of globs | yes | At least one glob. Each glob must match a file, and at least one file must remain after `exclude`. |
 | `scope.exclude` | list of globs | no | Removes files from the `source` set (not from `dependencies`). May match nothing. |
 | `scope.dependencies` | list of globs | no | Lockfiles and manifests. Each glob must match a file. |
-| `scope.allowMutable` | list of `{file, files, ref, reason}` | no | Accepts a mutable reference on purpose: `ref` exactly as Aval reports it, plus a non-blank `reason`. An optional `file` (an exact path relative to the contract, or `runner.command`) limits it to that file; without `file` or `files`, a `ref` that several files report is not accepted. An optional `files`, a list of globs that excludes `file`, accepts the `ref` in every file in scope that a glob matches, never in `runner.command`; each glob must match a file in scope, otherwise the contract is invalid (exit 2). See [Pin your dependencies](pinning.md#accept-a-reference-on-purpose). |
+| `scope.allowMutable` | list of `{file, files, ref, reason}` | no | Accepts a mutable reference on purpose: `ref` exactly as Aval reports it, plus a non-blank `reason`. An optional `file` (an exact path relative to the contract root, or `runner.command`) limits it to that file; without `file` or `files`, a `ref` that several files report is not accepted. An optional `files`, a list of globs relative to the contract root that excludes `file`, accepts the `ref` in every file in scope that a glob matches, never in `runner.command`; each glob must match a file in scope, otherwise the contract is invalid (exit 2). See [Pin your dependencies](pinning.md#accept-a-reference-on-purpose). |
 | `scope.resolve` | list of `kind: reference` | no | One `kind: reference` per entry. Kind is one of `image`, `npm`, `pypi`, `go`, `maven`, `crate`, `gem`, `git`, `url`. The reference must not contain credentials. See [Resolve references](resolve/index.md). |
 | `scope.contracts` | list of paths | no | Other contracts this test depends on ([Depend on another part of the repo](guides/depend-on-a-contract.md)). Each path is relative to this contract's directory: clean (`..` only at the start), slash-separated, no spaces, ending in `.yaml` or `.yml`, listed once. At fingerprint time the file must be a valid contract inside the git working tree of this contract (the nearest directory at or above it with a `.git` entry), with no symlink on the path; if this contract's own directory is a symlink, `..` is resolved from its real location. No cycles, at most 8 levels and 64 distinct contracts. A referenced contract's mutable references block reuse here too, unless its own `scope.allowMutable` accepts them. |
+| `scope.root` | string | no | The path from this contract's directory up to the root of its tree: `..` segments only (`..`, `../..`). Globs, `outputs`, `allowMutable[].file` and `files`, `runner.command` and `environment.probe` resolve from it; `scope.contracts` does not. The root must lie inside the git working tree of this contract, as for `scope.contracts`; otherwise `aval run`, `explain`, `verify` and `push` exit 2. See [Contracts in a subdirectory](#contracts-in-a-subdirectory). |
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
 | `environment.probe` | map string to list of strings | no | Each key must be an `environment.toolchain` key with a non-empty value; each value a non-empty argv, first element not blank. See [Probe the toolchain](#probe-the-toolchain). |
 | `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`, except `AVAL_RUN_STACK` in any case (set by `aval run`, not an input). |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
 | `outputs` | list of globs | no | Files the test writes that a reused result restores, such as `coverage.xml` ([Restore coverage and reports on reuse](guides/write-a-contract.md#restore-coverage-and-reports-on-reuse)). Same glob rules as `scope`. When publishing, each glob must match a regular file (no symlink) that is not the contract file, outside the scope, `.git` and `.aval`; at most 256 files, 16 MiB each, 64 MiB in total. Otherwise nothing is published (exit 1). Omitted from the fingerprint when empty, so existing contracts keep theirs; adding it changes the fingerprint, so a result without outputs is never reused for it. |
+
+## Contracts in a subdirectory
+
+A contract can live below the root of the tree it covers, such as
+`aval/unit.yaml` in a monorepo. `scope.root` says how far up the root is:
+
+```yaml
+# aval/unit.yaml
+scope:
+  root: ..
+  source: ["src/**"]
+  dependencies: ["go.mod"]
+```
+
+The contract then behaves as if its file sat in the root:
+
+- Globs, `outputs`, `allowMutable[].file` and `files`, manifest paths, finding paths
+  and restored output paths are relative to the root. The manifest lists the
+  same `source` and `dependency` lines as `aval.unit.yaml` at the root; only
+  the `contract` line differs.
+- `runner.command` and `environment.probe` run in the root.
+- `--result-file`, `--report-file` and `--stats-file` are skipped only when
+  they are Aval outputs under the root.
+- `scope.contracts` paths stay relative to the contract file's directory.
+  A referenced contract with its own `scope.root` uses its own root.
+
+`aval explain` prints the resolved root after its header. That line is an
+absolute path that differs between checkouts; it is not part of the
+fingerprint. The root must lie
+inside the git working tree that holds the contract (the nearest directory
+at or above it with a `.git` entry). If the contract's directory is a
+symlink, `..` is resolved from its real location. A root above the working
+tree, or no working tree at all, exits 2 (`aval run`, `explain`, `verify`
+and `push`). Globs still cannot contain `..`.
 
 ## Nested runs
 
@@ -120,7 +156,8 @@ same globs:
 | `**` | every file |
 | Rejected | `/a`, `./a`, `../a`, `a//b`, `a\b`, `foo**`, `**.go`, `[a-` |
 
-- Relative to the contract's directory; a glob cannot escape it.
+- Relative to the contract root (`scope.root`, by default the contract's
+  directory); a glob cannot escape it.
 - Case-sensitive and byte-exact: `Makefile` is not `makefile`, NFC is not NFD.
 - Order does not matter.
 - Symlinks are never followed nor hashed. A symlink under which a `source`
@@ -230,13 +267,13 @@ test and records nothing; `aval explain`, `aval verify` and `aval push` exit 1
 | `"<path>" is a symlink a glob could match files under` | symlinks are not followed: remove it, or exclude its name and contents (`**/node_modules/**`, or `pkg/bin` plus `pkg/bin/**`) with no `dependencies` glob reaching it ([Globs](#globs)); the contract directory itself may be a symlink |
 | `control characters in path are not supported` | rename the file (newline or carriage return) |
 | `resolve <kind> <reference>: <reason>` | see [When resolution fails](resolve/index.md#when-resolution-fails) |
-| `scope.contracts <path>: <reason>` | any error above in the referenced contract, or: missing or invalid contract, `leads outside the repository root`, `no git working tree (.git) at or above <dir>`, `<path> is a symlink`, `<path> is not a regular file`, `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`, `more than 8 levels or 64 contracts` |
+| `scope.contracts <path>: <reason>` | any error above in the referenced contract, or: missing or invalid contract, `leads outside the repository root` (also its `scope.root`), `no git working tree (.git) at or above <dir>`, `<path> is a symlink`, `<path> is not a regular file`, `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`, `more than 8 levels or 64 contracts` |
 | any I/O error while walking or reading | make the file or directory readable; the walk only enters directories a glob can match |
 
 ## Probe the toolchain
 
 `environment.toolchain` is a claim. `environment.probe` checks it: before the
-lookup, `aval run` runs each probe in the contract directory, without a
+lookup, `aval run` runs each probe in the contract root, without a
 shell, with a 10 s timeout and without `$SIGSTORE_ID_TOKEN`. The declared
 value must appear in the output (stdout and stderr) as a version token: not
 preceded by a digit or a dot, not followed by a digit. `3.13` matches

@@ -260,39 +260,63 @@ func noArgs(c *cobra.Command, args []string) error {
 	return nil
 }
 
-// loadAndFingerprint loads the contract and computes its fingerprint, rooted
-// at the contract's directory. When only the fingerprint fails it still
-// returns the contract, so run can execute the test. outputs are the files
-// the command writes or reads as Aval output (--result-file, --report-file,
-// --stats-file); inside the contract root they are not inputs.
-func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*contract.Contract, fingerprint.Fingerprint, error) {
+// loadAndFingerprint loads the contract, resolves its root (contractRoot)
+// and computes its fingerprint. When only the fingerprint fails it still
+// returns the contract and root, so run can execute the test. outputs are
+// the files the command writes or reads as Aval output (--result-file,
+// --report-file, --stats-file); inside the contract root they are not inputs.
+func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*contract.Contract, string, fingerprint.Fingerprint, error) {
 	c, err := contract.Load(file)
 	var fe *contract.FileError
 	if errors.As(err, &fe) {
-		return nil, fingerprint.Fingerprint{}, usageError{listError{fe.File + ": invalid contract:", fe.Err}}
+		return nil, "", fingerprint.Fingerprint{}, usageError{listError{fe.File + ": invalid contract:", fe.Err}}
 	}
 	if err != nil {
-		return nil, fingerprint.Fingerprint{}, usageError{err}
+		return nil, "", fingerprint.Fingerprint{}, usageError{err}
 	}
-	for _, o := range outputs {
-		if isInput(filepath.Dir(file), c, o) {
+	root, _, err := contractRoot(file, c)
+	if err != nil {
+		return nil, "", fingerprint.Fingerprint{}, err
+	}
+	check := outputs
+	if c.Scope.Root != "" {
+		check = fingerprint.RealPaths(outputs) // as Compute compares them with the root
+	}
+	for _, o := range check {
+		if isInput(root, c, o) {
 			// Skipping it would silently drop an input from the fingerprint.
-			return nil, fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result-file or --report-file) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract directory", o, fingerprint.OutputDir)}
+			return nil, "", fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result-file or --report-file) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract root", o, fingerprint.OutputDir)}
 		}
 	}
 	fp, err := fingerprint.Compute(ctx, filepath.Dir(file), c, os.LookupEnv, outputs...)
 	if errors.Is(err, fingerprint.ErrContract) {
-		return nil, fingerprint.Fingerprint{}, usageError{fmt.Errorf("%s: %w", file, err)}
+		return nil, "", fingerprint.Fingerprint{}, usageError{fmt.Errorf("%s: %w", file, err)}
 	}
 	if err != nil {
 		// Cannot prove input equivalence: callers must run the test.
-		return c, fingerprint.Fingerprint{}, fmt.Errorf("fingerprint: %w", err)
+		return c, root, fingerprint.Fingerprint{}, fmt.Errorf("fingerprint: %w", err)
 	}
-	return c, fp, nil
+	return c, root, fp, nil
+}
+
+// contractRoot returns the directory the scope of c, loaded from file, is
+// rooted at (fingerprint.Root) and file relative to it, slash-separated. A
+// root it cannot prove inside the git working tree is a usage error.
+func contractRoot(file string, c *contract.Contract) (string, string, error) {
+	root, err := fingerprint.Root(filepath.Dir(file), c)
+	if err != nil {
+		return "", "", usageError{fmt.Errorf("%s: %w", file, err)}
+	}
+	if c.Scope.Root == "" {
+		return root, filepath.Base(file), nil
+	}
+	rel, _ := filepath.Rel(root, fingerprint.RealPaths([]string{file})[0]) // both absolute, root an ancestor
+	return root, filepath.ToSlash(rel), nil
 }
 
 // isInput reports whether the output path p holds an input of the test that
-// fingerprint.Compute would skip: the scope of c, rooted at dir, includes p,
+// fingerprint.Compute would skip: the scope of c, rooted at dir (the
+// contract root), includes p,
 // and p holds something other than Aval's own result, report or run record
 // (a whole-tree scope finds those on the next run, #63).
 // ponytail: an input that is itself a valid Aval result, report or run record (a test
@@ -414,7 +438,7 @@ fingerprint), 2 usage or invalid aval.yaml.`,
 			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout)); err != nil {
 				return err
 			}
-			c, fp, err := loadAndFingerprint(cmd.Context(), file)
+			c, _, fp, err := loadAndFingerprint(cmd.Context(), file)
 			if err != nil {
 				return err
 			}

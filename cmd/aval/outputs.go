@@ -18,14 +18,14 @@ import (
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
-// collectOutputs reads the files the outputs globs of c, loaded from file,
-// match under its directory, sorted by path. Every glob must match a file; a
+// collectOutputs reads the files the outputs globs of c match under its
+// root dir (contractRoot; name is the contract file relative to it), sorted
+// by path. Every glob must match a file; a
 // match that is not a regular file (a symlink), that is an input (in scope)
 // or the contract file, or that breaks a cap is an error, so nothing is
 // published. .git entries (directory, file or symlink) and .aval directories
 // are skipped, as in the fingerprint.
-func collectOutputs(file string, c *contract.Contract) ([]registry.Output, error) {
-	dir := filepath.Dir(file)
+func collectOutputs(dir, name string, c *contract.Contract) ([]registry.Output, error) {
 	globs := splitGlobs(c.Outputs)
 	matched := make([]bool, len(globs))
 	var out []registry.Output
@@ -53,7 +53,7 @@ func collectOutputs(file string, c *contract.Contract) ([]registry.Output, error
 		if len(out) == registry.MaxOutputFiles {
 			return fmt.Errorf("more than %d output files", registry.MaxOutputFiles)
 		}
-		data, err := readOutput(file, c, rel, d)
+		data, err := readOutput(dir, name, c, rel, d)
 		if err != nil {
 			return err
 		}
@@ -72,11 +72,11 @@ func collectOutputs(file string, c *contract.Contract) ([]registry.Output, error
 	return out, nil
 }
 
-// readOutput reads the output rel, of at most one byte over the per-file
-// cap, unless it is not a regular file, has a path evidence.Parse rejects,
-// is an input or is the contract file.
-func readOutput(file string, c *contract.Contract, rel string, d fs.DirEntry) ([]byte, error) {
-	dir := filepath.Dir(file)
+// readOutput reads the output rel under the contract root dir, of at most
+// one byte over the per-file cap, unless it is not a regular file, has a
+// path evidence.Parse rejects, is an input or is the contract file (name,
+// relative to dir).
+func readOutput(dir, name string, c *contract.Contract, rel string, d fs.DirEntry) ([]byte, error) {
 	p := filepath.Join(dir, filepath.FromSlash(rel))
 	switch {
 	case !d.Type().IsRegular():
@@ -85,7 +85,7 @@ func readOutput(file string, c *contract.Contract, rel string, d fs.DirEntry) ([
 		return nil, fmt.Errorf("output %q: backslashes and control characters in a path are not supported", rel)
 	case inScope(dir, c, p):
 		return nil, fmt.Errorf("output %s is an input of the test (the scope includes it): exclude it from scope", rel)
-	case rel == filepath.Base(file):
+	case rel == name:
 		return nil, fmt.Errorf("output %s is the contract: narrow the outputs globs", rel)
 	}
 	f, err := os.Open(p)
@@ -110,13 +110,16 @@ func verifyOutputs(ctx context.Context, repo string, c *contract.Contract, file 
 		}
 		return nil, nil
 	}
-	dir := filepath.Dir(file)
+	dir, name, err := contractRoot(file, c)
+	if err != nil {
+		return nil, err
+	}
 	globs := splitGlobs(c.Outputs)
 	matched := make([]bool, len(globs))
 	for _, f := range o.Files {
 		segs := strings.Split(f.Path, "/")
 		reserved := slices.ContainsFunc(segs, func(s string) bool { return s == ".git" || s == fingerprint.OutputDir })
-		if !matchOutput(globs, matched, segs) || reserved || f.Path == filepath.Base(file) || inScope(dir, c, filepath.Join(dir, filepath.FromSlash(f.Path))) {
+		if !matchOutput(globs, matched, segs) || reserved || f.Path == name || inScope(dir, c, filepath.Join(dir, filepath.FromSlash(f.Path))) {
 			return nil, &evidence.VerificationError{Reason: fmt.Sprintf("output %q is not a declared output of the contract, or is an input", f.Path)}
 		}
 	}
@@ -126,7 +129,8 @@ func verifyOutputs(ctx context.Context, repo string, c *contract.Contract, file 
 	return fetchOutputs(ctx, repo, o)
 }
 
-// restore writes verified outputs under dir and prints one line each. Each
+// restore writes verified outputs under dir, the contract root, and prints
+// one line each. Each
 // is staged next to its target, and renamed into place only once all are
 // staged. It never writes through a symlink or over anything but a regular
 // file.

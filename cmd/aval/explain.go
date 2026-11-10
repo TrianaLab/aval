@@ -19,19 +19,23 @@ func newExplainCmd() *cobra.Command {
 header, then the fingerprint as the last line. --digest prints only the
 fingerprint. explain never looks up a result and never runs the test; the
 fingerprint is the one 'aval run' computes with its default --result-file and
-without --report-file or --stats-file inside the contract directory.
+without --report-file or --stats-file inside the contract root. With
+scope.root it prints the resolved root after the header.
 
 Exit codes: 0 printed, 1 the fingerprint cannot be computed (unprovable
 inputs), 2 usage or invalid aval.yaml.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			c, fp, err := loadAndFingerprint(cmd.Context(), file, defaultResult)
+			c, root, fp, err := loadAndFingerprint(cmd.Context(), file, defaultResult)
 			if err != nil {
 				return err
 			}
 			out := cmd.OutOrStdout()
 			if !digest {
 				fmt.Fprintf(out, "fingerprint manifest for %s (%s)\n", c.Metadata.Name, fingerprint.Version)
+				if c.Scope.Root != "" {
+					fmt.Fprintf(out, "root %s\n", root)
+				}
 			}
 			// ponytail: run's own printer, so explain and run --explain cannot drift;
 			// its error is always nil because fpErr is nil.

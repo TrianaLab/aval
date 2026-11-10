@@ -24,7 +24,7 @@ const (
 )
 
 // Output is one output file: its slash-separated path relative to the
-// contract directory, and its content.
+// contract root, and its content.
 type Output struct {
 	Path string
 	Data []byte

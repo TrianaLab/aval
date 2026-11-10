@@ -134,7 +134,7 @@ A contract with `outputs` publishes the files before the attestation, as one
 manifest with `artifactType` `application/vnd.trianalab.aval.outputs.v1`,
 the OCI empty config, one layer per file (media type
 `application/vnd.trianalab.aval.output.v1`, annotation
-`org.opencontainers.image.title` = the path relative to the contract) and
+`org.opencontainers.image.title` = the path relative to the contract root) and
 the fingerprint anchor as `subject`. The predicate's `execution.outputs`
 holds its digest and every file's path, digest and size, so the signature
 covers them. Lookup lists only execution manifests: an outputs manifest is
@@ -462,7 +462,7 @@ checked by `Predicate.Validate` (called by `evidence.Parse`).
 | `execution.exitCode` | integer | | Exit code of `runner.command`. |
 | `execution.outputs` | object | no (omitted without contract `outputs`) | The [outputs](#outputs) of the run. |
 | `execution.outputs.manifest` | string | yes, `sha256:<64 hex>` | Digest of the outputs manifest. |
-| `execution.outputs.files` | list of `{path, digest, size}` | yes, non-empty | In layer order. `path` is relative to the contract, slash-separated and clean (no `..`, `.`, empty segment, leading `/`, backslash or control character), listed once; `digest` is `sha256:<64 hex>`; `size` is not negative. |
+| `execution.outputs.files` | list of `{path, digest, size}` | yes, non-empty | In layer order. `path` is relative to the contract root (`scope.root`, default the contract's directory), slash-separated and clean (no `..`, `.`, empty segment, leading `/`, backslash or control character), listed once; `digest` is `sha256:<64 hex>`; `size` is not negative. |
 | `runner` | object | | Who produced the result, **as claimed**. |
 | `runner.identity` | string | yes | Claimed producer identity. |
 | `runner.issuer` | string | no (omitted when empty) | Claimed identity issuer, e.g. an OIDC issuer URL. |

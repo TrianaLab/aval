@@ -264,7 +264,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	if err := o.validate(token); err != nil {
 		return err
 	}
-	c, fp, fpErr := loadAndFingerprint(cmd.Context(), o.file, o.outputs()...)
+	c, root, fp, fpErr := loadAndFingerprint(cmd.Context(), o.file, o.outputs()...)
 	if c == nil {
 		return fpErr
 	}
@@ -280,7 +280,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 		}
 	}
 	w.Note(o.config.configLine())
-	observed, probeErr := probe(ctx, c, filepath.Dir(o.file), stack)
+	observed, probeErr := probe(ctx, c, root, stack)
 	r, files, lookupErr := decide(ctx, w, c, fp, cmp.Or(fpErr, probeErr), o)
 	// A rejected verification-failed candidate blocks reuse even beside a
 	// verified one: run the test, then exit 5 (invariants 3, 4, #195).
@@ -298,7 +298,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	}
 	if reusable(r, lookupErr) && !o.shadow && len(errs) == 0 {
 		// Outputs that cannot be written safely run the test instead.
-		if err := restore(out, filepath.Dir(o.file), files); err != nil {
+		if err := restore(out, root, files); err != nil {
 			errs = append(errs, fmt.Errorf("restoring outputs: %w", err))
 		} else {
 			return reuse(ctx, w, o, r, sum)
@@ -310,7 +310,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 		errs = append(errs, shown{lookupErr})
 	}
 	w.Start(c.Metadata.Name, c.Runner.Command)
-	p, err := execute(ctx, out, warn, c, filepath.Dir(o.file), stack, fp, observed)
+	p, err := execute(ctx, out, warn, c, root, stack, fp, observed)
 	if err != nil {
 		recordRun(ctx, out, warn, o, r, false, nil)
 		return errors.Join(append(errs, err)...)
@@ -569,7 +569,7 @@ func runStack(file string) (string, error) {
 	return strings.Join(append(stack, self), string(os.PathListSeparator)), nil
 }
 
-// execute runs runner.command in the contract's directory and returns the
+// execute runs runner.command in dir, the contract root, and returns the
 // unsigned predicate for the run, with the probe outputs (observed) in its
 // environment. A command that cannot start is an error, not a failed test.
 func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract, dir, stack string, fp fingerprint.Fingerprint, observed map[string]string) (*evidence.Predicate, error) {
@@ -735,7 +735,11 @@ func signAndPush(ctx context.Context, ui cliout.Run, p *evidence.Predicate, c *c
 	var files []registry.Output
 	var err error
 	if len(c.Outputs) > 0 {
-		if files, err = collectOutputs(file, c); err != nil {
+		dir, name, err := contractRoot(file, c)
+		if err == nil {
+			files, err = collectOutputs(dir, name, c)
+		}
+		if err != nil {
 			return "", fmt.Errorf("result not published: %w", err)
 		}
 	}
@@ -797,7 +801,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout), checkSigner(key, token, interactive)); err != nil {
 				return err
 			}
-			c, fp, err := loadAndFingerprint(cmd.Context(), file, resultFile, reportFile)
+			c, _, fp, err := loadAndFingerprint(cmd.Context(), file, resultFile, reportFile)
 			if err != nil {
 				return err
 			}

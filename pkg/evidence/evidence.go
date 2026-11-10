@@ -161,7 +161,8 @@ type Outputs struct {
 }
 
 // OutputFile is one output: its slash-separated path relative to the
-// contract directory, and the digest and size of its content.
+// contract root (scope.root, default the contract's directory), and the
+// digest and size of its content.
 type OutputFile struct {
 	Path   string `json:"path"`
 	Digest string `json:"digest"`

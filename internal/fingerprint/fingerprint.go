@@ -85,6 +85,23 @@ type Dependency struct {
 	// Name is the referenced contract's metadata.name.
 	Name string
 	Fingerprint
+	// root is the referenced contract's scope.root, which its findings'
+	// paths are relative to.
+	root string
+}
+
+const outside = "leads outside the repository root (the git working tree, or the project in the browser demo)"
+
+// below returns dir relative to top, an ancestor or dir itself (both
+// relative to the root).
+func below(dir, top string) string {
+	switch top {
+	case dir:
+		return "."
+	case ".":
+		return dir
+	}
+	return strings.TrimPrefix(dir, top+"/")
 }
 
 // Bounds on scope.contracts: how deep references may nest, and how many
@@ -118,34 +135,80 @@ type LookupEnv func(string) (string, bool)
 // directory with this name is skipped at any depth, like ".git".
 const OutputDir = ".aval"
 
-// Compute fingerprints the contract c rooted at dir. outputs are files Aval
-// itself writes (the --result-file and --report-file paths); the ones inside dir are
-// not inputs and are skipped, in c's own scope only. Empty entries are
-// ignored.
+// Compute fingerprints the contract c in dir, rooted at Root(dir, c).
+// outputs are files Aval itself writes (the --result-file and --report-file
+// paths); the ones inside the root are not inputs and are skipped, in c's
+// own scope only. Empty entries are ignored.
 //
-// A contract with scope.contracts is resolved inside the git working tree
-// that holds dir (see repoRoot): no reference may lead outside it.
+// A contract with scope.contracts or scope.root is resolved inside the git
+// working tree that holds dir (see repoRoot): no reference or root may lead
+// outside it.
 func Compute(ctx context.Context, dir string, c *contract.Contract, env LookupEnv, outputs ...string) (Fingerprint, error) {
 	root, rel := dir, "."
-	if len(c.Scope.Contracts) > 0 {
+	if len(c.Scope.Contracts) > 0 || c.Scope.Root != "" {
 		var err error
 		if root, rel, err = repoRoot(dir); err != nil {
 			return Fingerprint{}, err
 		}
 	}
 	// Outputs are taken relative to dir as given, not to the root repoRoot
-	// resolved through symlinks, then placed under rel.
+	// resolved through symlinks, then placed under rel. With scope.root
+	// both sides are real paths, as in Root.
+	base, scope := dir, rel
+	if c.Scope.Root != "" {
+		scope = path.Join(rel, c.Scope.Root) // compute rejects one outside root
+		base = filepath.Join(root, filepath.FromSlash(scope))
+		outputs = RealPaths(outputs)
+	}
 	skip := map[string]bool{}
-	for p := range outputsUnder(dir, outputs) {
-		skip[path.Join(rel, p)] = true
+	for p := range outputsUnder(base, outputs) {
+		skip[path.Join(scope, p)] = true
 	}
 	return newTree(ctx, os.DirFS(root), env, skip).compute(rel, c)
 }
 
+// Root returns the directory the scope of c, a contract in dir, is rooted
+// at: dir itself without scope.root; otherwise the real location of dir
+// (symlinks resolved) joined with scope.root, which must lie inside the git
+// working tree that holds dir.
+func Root(dir string, c *contract.Contract) (string, error) {
+	if c.Scope.Root == "" {
+		return dir, nil
+	}
+	top, rel, err := repoRoot(dir)
+	if err != nil {
+		return "", err
+	}
+	r := path.Join(rel, c.Scope.Root)
+	if !fs.ValidPath(r) {
+		return "", fmt.Errorf("scope.root %s leads outside the git working tree %s", c.Scope.Root, top)
+	}
+	return filepath.Join(top, filepath.FromSlash(r)), nil
+}
+
+// RealPaths returns each path absolute, with the symlinks in its directory
+// resolved, so it compares with Root. A path whose directory cannot be
+// resolved comes back absolute only; "" stays "".
+func RealPaths(paths []string) []string {
+	out := make([]string, len(paths))
+	for i, p := range paths {
+		abs, err := filepath.Abs(p)
+		if p == "" || err != nil {
+			out[i] = p
+			continue
+		}
+		out[i] = abs
+		if d, err := filepath.EvalSymlinks(filepath.Dir(abs)); err == nil {
+			out[i] = filepath.Join(d, filepath.Base(abs))
+		}
+	}
+	return out
+}
+
 // repoRoot returns the nearest directory at or above dir with a .git entry
 // (a directory, or the file of a worktree or submodule), and dir relative
-// to it, slash-separated. Without one, scope.contracts has no boundary, so
-// it fails closed.
+// to it, slash-separated. Without one, scope.contracts and scope.root have
+// no boundary, so it fails closed.
 func repoRoot(dir string) (string, string, error) {
 	abs, err := filepath.Abs(dir)
 	if err == nil {
@@ -162,7 +225,7 @@ func repoRoot(dir string) (string, string, error) {
 		}
 		root = parent
 	}
-	return "", "", fmt.Errorf("scope.contracts: no git working tree (.git) at or above %s: referenced contracts must lie inside one", dir)
+	return "", "", fmt.Errorf("no git working tree (.git) at or above %s: referenced contracts (scope.contracts) and the root (scope.root) must lie inside one", dir)
 }
 
 // ComputeFS fingerprints the contract c rooted at fsys, such as the
@@ -226,8 +289,13 @@ func (t *tree) sub(dir string) (fs.FS, map[string]bool) {
 }
 
 // compute fingerprints c, whose directory is dir (relative to the root).
+// Its scope is rooted at dir joined with scope.root.
 func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
-	fsys, skip := t.sub(dir)
+	top := path.Join(dir, c.Scope.Root)
+	if !fs.ValidPath(top) {
+		return Fingerprint{}, fmt.Errorf("scope.root %s %s", c.Scope.Root, outside)
+	}
+	fsys, skip := t.sub(top)
 	ctx, env := t.ctx, t.env
 	canon := canonicalContract(c)
 	source, exclude, deps := splitGlobs(c.Scope.Source), splitGlobs(c.Scope.Exclude), splitGlobs(c.Scope.Dependencies)
@@ -297,7 +365,8 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 		// A referenced contract's findings block this one too; its own
 		// scope.allowMutable already marked them, this one's never applies.
 		for _, f := range d.Findings {
-			f.File = path.Join(path.Dir(d.Path), f.File)
+			// From the referenced contract's root to this one's.
+			f.File = path.Join(below(dir, top), path.Dir(d.Path), d.root, f.File)
 			found = append(found, f)
 		}
 	}
@@ -325,7 +394,7 @@ func (t *tree) contracts(dir string, c *contract.Contract) ([]Dependency, error)
 // load parses and fingerprints the contract at file, relative to the root.
 func (t *tree) load(file string) (Dependency, error) {
 	if !fs.ValidPath(file) {
-		return Dependency{}, errors.New("leads outside the repository root (the git working tree, or the project in the browser demo)")
+		return Dependency{}, errors.New(outside)
 	}
 	if i := slices.Index(t.stack, file); i >= 0 {
 		return Dependency{}, fmt.Errorf("cycle: %s", strings.Join(append(slices.Clone(t.stack[i:]), file), " -> "))
@@ -364,7 +433,7 @@ func (t *tree) load(file string) (Dependency, error) {
 	if err != nil {
 		return Dependency{}, err
 	}
-	d := Dependency{Name: c.Metadata.Name, Fingerprint: fp}
+	d := Dependency{Name: c.Metadata.Name, Fingerprint: fp, root: c.Scope.Root}
 	t.done[file] = d
 	return d, nil
 }
