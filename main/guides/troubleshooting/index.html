@@ -2479,7 +2479,7 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <ul>
 <li><code>aval verify</code> exits 1.</li>
 <li><code>aval run</code> prints <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>, warns <code>aval: warning: reuse off: &lt;message&gt;</code>, runs the test and exits with its code.</li>
-<li><code>aval run</code> exits 1 only when the test cannot start, a probe fails or the result cannot be published.</li>
+<li><code>aval run</code> exits 1 only when the test cannot start or the result cannot be published. A failed <code>environment.probe</code> warns <code>result not recorded</code> and follows the test's code; with <code>--push</code> it exits 1 (<code>result not published</code>).</li>
 </ul>
 <details class="failure">
 <summary>Fingerprint and trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></summary>

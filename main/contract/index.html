@@ -2926,7 +2926,9 @@ preceded by a digit or a dot, not followed by a digit. <code>3.13</code> matches
 output over 4 KiB (it is signed into the predicate),
 <code>aval run</code> looks nothing up (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>; the reason names the probe, the
 declared and the observed value), runs the test, records and publishes
-nothing, and exits 1 (3 if the test failed). On a match, the output goes into
+nothing, warns <code>aval: warning: result not recorded: &lt;reason&gt;</code>, and exits with
+the test's code (0 passed, 3 failed). With <code>--push</code> it exits 1 instead
+(<code>result not published: &lt;reason&gt;</code>), or 3 if the test failed. On a match, the output goes into
 the predicate's <code>execution.environment</code> as <code>probe.&lt;key&gt;</code>.</p>
 <p>Only <code>aval run</code> executes probes. <code>aval verify</code>, <code>aval push</code>,
 <code>aval explain</code> and the browser demo never do: a consumer never executes
