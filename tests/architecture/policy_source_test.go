@@ -356,7 +356,7 @@ func TestCIDeclaresOneRegistry(t *testing.T) {
 
 // codeOwned lists the paths whose change can alter what CI trusts or what
 // the gates enforce (#134).
-var codeOwned = []string{"/.github/aval/", "/.github/workflows/", "/tests/architecture/", "/AGENTS.md", "/Makefile", "/aval*.yaml"}
+var codeOwned = []string{"/.github/aval/", "/integrations/", "/.github/workflows/", "/tests/architecture/", "/AGENTS.md", "/Makefile", "/aval*.yaml"}
 
 func TestCodeOwnersCoverTrust(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(root, ".github", "CODEOWNERS"))
@@ -515,10 +515,11 @@ func TestTrustStepReadsTheBaseBranch(t *testing.T) {
 
 // The scripts the trust step runs use /bin/bash and call their tools by
 // absolute path, so an earlier step that writes GITHUB_PATH cannot shim them
-// (#134). cosign comes from sigstore/cosign-installer, an allowed action.
+// (#134); so do the scripts of the aval run action (#211). cosign comes
+// from sigstore/cosign-installer, an allowed action.
 func TestTrustScriptsCallToolsByAbsolutePath(t *testing.T) {
-	bare := regexp.MustCompile(`(?m)^[^#\n]*(?:^|[^/\w-])(?:git|sed|sort|grep|curl|sha256sum|tar|mkdir|bash)\s`)
-	for _, f := range []string{trustScript, installScript} {
+	bare := regexp.MustCompile(`(?m)^[^#\n]*(?:^|[^/\w-])(?:git|sed|sort|grep|curl|sha256sum|tar|mkdir|bash|jq|awk|rm)\s`)
+	for _, f := range []string{trustScript, installScript, "integrations/github/run/guard.sh", "integrations/github/run/run.sh"} {
 		data, err := os.ReadFile(filepath.Join(root, f))
 		if err != nil {
 			t.Fatal(err)

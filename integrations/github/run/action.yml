@@ -1,0 +1,78 @@
+# Runs one test through Aval in a GitHub Actions job (#211). The trust
+# policy, and the registry inside it, come from the default branch, never
+# from the checkout; a job that could sign (id-token: write) is refused.
+# GitHub specifics live here, outside core (AGENTS.md invariant 8).
+# docs/guides/github-actions.md documents it; tests/acceptance/github_run_test.go
+# runs guard.sh and run.sh.
+name: aval run
+description: Reuse a verified test result or run the test, with the trust policy from the default branch.
+inputs:
+  test:
+    description: The test to run, by metadata.name (aval run --test).
+    required: true
+  file:
+    description: The contract file.
+    default: aval.yaml
+  policy:
+    description: Path of the trust policy in the default branch.
+    default: .github/aval/policy.yaml
+outputs:
+  outcome:
+    description: verified, miss, verification-failed or error, from the report.
+    value: ${{ steps.run.outputs.outcome }}
+runs:
+  using: composite
+  steps:
+    - name: Refuse unsafe events and signing credentials
+      shell: bash
+      run: /bin/bash "$GITHUB_ACTION_PATH/guard.sh"
+    - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      with:
+        cosign-release: v3.0.6
+    # The pinned release, checked against its per-platform sha256 and the
+    # release workflow's signature and provenance by this commit's
+    # scripts/get-aval.sh (#202).
+    # TODO(milestone-14): pin the first release with --test and the policy's registry; #213 bumps these pins after each release.
+    - name: Install the pinned aval release (verified)
+      id: install
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        DESIRED_VERSION: v0.7.0
+        AVAL_SHA256: >-
+          linux_amd64=ca69a546f50902f12a7b22f65f520f3b9ed6ec296bdc576085aff35aa94102d8
+          linux_arm64=a3507bd1196aee616fbd083b3407f411f526534cdf942d475bd076f20511387d
+          darwin_amd64=ca1a365a04e805c5fff0c81ad4136df22fdecc956a10b82e1909255f4c3bb1ed
+          darwin_arm64=9f7e62dca94f2bdb49e5e3a1041e338d732953aa9b22b8f52f0881969ebc5142
+        AVAL_REQUIRE_VERIFY: "1"
+        AVAL_REQUIRE_PROVENANCE: "1"
+        AVAL_NO_VERIFY: ""
+        AVAL_DOWNLOAD_URL: ""
+        USE_SUDO: "false"
+      run: |
+        dir="$RUNNER_TEMP/aval-$DESIRED_VERSION"
+        # PATH is cut to the system tools, cosign and gh, so an earlier step
+        # that wrote GITHUB_PATH cannot shim them.
+        cosign=$(command -v cosign)
+        gh=$(command -v gh)
+        PATH="/usr/bin:/bin:${cosign%/*}:${gh%/*}" AVAL_INSTALL_DIR="$dir" \
+          /bin/bash "$GITHUB_ACTION_PATH/../../../scripts/get-aval.sh" --version "$DESIRED_VERSION"
+        echo "aval=$dir/aval" >> "$GITHUB_OUTPUT"
+    - name: aval run
+      id: run
+      shell: bash
+      env:
+        AVAL: ${{ steps.install.outputs.aval }}
+        INPUT_TEST: ${{ inputs.test }}
+        INPUT_FILE: ${{ inputs.file }}
+        INPUT_POLICY: ${{ inputs.policy }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        GH_TOKEN: ${{ github.token }}
+      run: /bin/bash "$GITHUB_ACTION_PATH/run.sh"
+    - if: ${{ !cancelled() && steps.run.outputs.upload == 'true' }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: aval-${{ inputs.test }}
+        path: .aval/${{ inputs.test }}/
+        include-hidden-files: true
+        if-no-files-found: ignore

@@ -6,6 +6,7 @@
 - [golangci-lint](https://golangci-lint.run) at the exact version `GOLANGCI_LINT_VERSION` in the `Makefile` (CI installs the same one; `make lint` refuses any other). Config in `.golangci.yml`, including the cyclomatic complexity cap of 15.
 - For `make test-release`: [syft](https://github.com/anchore/syft) on `PATH` (CI pins the version). GoReleaser is installed into `bin/` at `GORELEASER_VERSION`.
 - For `make docs-lint`: Node.js (`npx` fetches markdownlint-cli2 at the pinned `MARKDOWNLINT_CLI2_VERSION`) and [Vale](https://vale.sh) at the exact `VALE_VERSION` in the `Makefile`.
+- For `make lint-actions` (part of `ci-static`): shellcheck and zizmor at `ZIZMOR_VERSION`, `pip install --require-hashes -r .github/requirements-lint.txt` (command to regenerate in `.github/requirements-lint.in`). actionlint is installed into `bin/` by the target.
 - For `make docs-site`: Python 3.12 and the hash-pinned tools, `pip install --require-hashes -r docs/requirements.txt` (regenerate that file from `docs/requirements.in`, command in its header). It also builds the home page's "Try it" terminal with Go (`make docs-wasm`).
 - For `make docs-demo-smoke`: Node.js and Chrome or Chromium (`CHROME=<path>` picks one).
 - For `make test-acceptance` (and `ci-e2e`): [uv](https://docs.astral.sh/uv/) on `PATH` (CI pins the version) and network access to PyPI, for `examples/uv-monorepo`. The test fails without uv instead of skipping, so a passing e2e result always includes it.
@@ -226,7 +227,7 @@ rather than relying on a `major` bump from 0.x.
 
 | Leg | What it checks |
 |---|---|
-| `ci-static` | gofmt, `go vet`, golangci-lint |
+| `ci-static` | gofmt, `go vet`, golangci-lint, shellcheck, actionlint, zizmor |
 | `ci-gates` | level 3 |
 | `ci-engine` | level 1 with `-race`, the `examples/go-compose` module |
 | `ci-false-hit` | the false-hit corpus, glob tables, the manifest golden and the append-only check on goldens: a change to the golden tree's manifests fails unless `fingerprint.Version` is bumped |
