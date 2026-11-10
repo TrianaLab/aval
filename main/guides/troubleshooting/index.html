@@ -2384,6 +2384,10 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>pick one</td>
 </tr>
 <tr>
+<td><code>registry: must not contain credentials (user:password@) or a digest; registry logins come from the credential store</code></td>
+<td>drop <code>user:password@</code> from the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code>, use <code>docker login</code>, and rotate the password if the file was shared</td>
+</tr>
+<tr>
 <td><code>--registry &lt;x&gt; is not an OCI repository</code>, <code>drop &lt;scheme&gt;://: try --registry &lt;host/name&gt;</code></td>
 <td>use <code>host/name</code>, no <code>https://</code>, tag or digest</td>
 </tr>

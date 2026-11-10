@@ -2945,7 +2945,8 @@ argv is part of the <abbr title="aval.yaml: what the test is, how to run it and 
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Anchor link">&para;</a></h2>
 <p><code>aval.trianalab.io/v1</code> is frozen; <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> files use the same value. Within v1
 the schema only gets new optional fields. An older <code>aval</code> rejects a field it
-does not know, which fails closed.</p>
+does not know, which fails closed: a <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> with the optional <code>registry</code>
+field (#209) fails to load in an older <code>aval</code>, so nothing is reused.</p>
 <p><code>aval.dev/v1alpha1</code> is rejected: change that line. Rules:
 <a href="../artifact-format/#versioning-and-compatibility">artifact format</a>.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Anchor link">&para;</a></h2>

@@ -2647,6 +2647,10 @@ verification already accepts its pinned <code>trustedRoot</code>).</p>
 <td><code>trustedRoot</code></td>
 <td>a pinned Sigstore trusted root for keyless signatures; without it, the public-good root is fetched.</td>
 </tr>
+<tr>
+<td><code>registry</code></td>
+<td>optional: the OCI repository of attestations (<code>host/name</code>), used by <code>aval run</code> and <code>aval verify</code> when neither <code>--registry</code> nor <code>AVAL_REGISTRY</code> is set. No credentials: a value with <code>user:password@</code> (or any <code>@</code>) exits 2. Logins come from the credential store.</td>
+</tr>
 </tbody>
 </table>
 <p>Relative <code>publicKey</code> and <code>trustedRoot</code> paths are read from the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> file's
@@ -2708,13 +2712,17 @@ runs. A miss or a key-based result never fetches it.</p>
 <p>A pull request can change any file in its checkout. If its CI job reads
 <code>--policy</code> (or <code>--registry</code>) from that checkout, the PR can add its own
 signing identity, sign a passing result for its own inputs, and get a green
-check it wrote itself. Read the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> and the registry from the default
-branch instead. Not from <code>github.base_ref</code>: a PR can target any branch,
+check it wrote itself. Read the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, and with it the registry, from the
+default branch instead. Not from <code>github.base_ref</code>: a PR can target any branch,
 including one its author controls.</p>
 <p><code>AVAL_POLICY</code> and <code>AVAL_REGISTRY</code> count the same as the flags (a flag wins;
 empty is unset). Set them in the step, or from the default branch as below,
-never from a file in the checkout. Aval reads them from no file: there is no
-config file and no <code>aval.yaml</code> field.</p>
+never from a file in the checkout. The registry has one more source, the
+<abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code> field: <code>--registry</code> &gt; <code>AVAL_REGISTRY</code> &gt; <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, and the
+<code>config:</code> line names the source that won (<code>registry=&lt;x&gt; (policy &lt;file&gt;)</code>).
+The <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> is trusted only because it comes from the protected branch, so its
+registry is too. Nothing else names them: there is no config file and no
+<code>aval.yaml</code> or TestSet field.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pull_request</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">permissions</span><span class="p">:</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
@@ -2731,10 +2739,12 @@ config file and no <code>aval.yaml</code> field.</p>
 </span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">          </span><span class="no">git fetch --no-tags --depth=1 origin "+refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"</span>
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">          </span><span class="no">git show "origin/$DEFAULT_BRANCH:.aval/policy.yaml" &gt; "$RUNNER_TEMP/policy.yaml"</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval run --registry ghcr.io/acme/orders-aval --policy "$RUNNER_TEMP/policy.yaml"</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval run --policy "$RUNNER_TEMP/policy.yaml"</span>
 </span></code></pre></div>
-<p>Keep the registry out of files the PR can change for its own run, too: write
-it in the step, or read it from the default branch the same way. A
+<p>Here the registry is the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code> field, read from the default
+branch with the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>. Keep it out of files the PR can change for its own
+run: put it in that <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, write it in the step, or read it from the default
+branch the same way. A
 <code>trustedRoot</code> path in the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> resolves next to the temp file, so read that
 file from the default branch as well, or use the default root.</p>
 <p>Run a pinned <code>aval</code> release, and take any script the step runs from the
@@ -2893,7 +2903,7 @@ copied into the predicate as <code>test.cacheability</code>.</p>
 </tr>
 <tr>
 <td>Pull request that edits the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or registry its own CI reads</td>
-<td>Read both from the default branch (<a href="#take-the-policy-from-a-protected-branch">Take the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from a protected branch</a>) and verify with a pinned <code>aval</code> release. The workflow file still comes from the PR, so a hostile PR can make its own check green; required code-owner review keeps it off the default branch, which trusts only its own CI.</td>
+<td>Read both from the default branch (the registry can live in the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code> field, so one file read from the protected branch carries both; <code>aval.yaml</code>, TestSets and config files cannot name it) (<a href="#take-the-policy-from-a-protected-branch">Take the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from a protected branch</a>) and verify with a pinned <code>aval</code> release. The workflow file still comes from the PR, so a hostile PR can make its own check green; required code-owner review keeps it off the default branch, which trusts only its own CI.</td>
 </tr>
 <tr>
 <td>Dishonest but trusted <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> (ran a modified test and signed "passed")</td>

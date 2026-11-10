@@ -2280,6 +2280,10 @@
 or set <code>AVAL_POLICY</code> once (the flag wins):</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>aval<span class="w"> </span>verify<span class="w"> </span>--registry<span class="w"> </span>ghcr.io/acme/orders-aval<span class="w"> </span>--policy<span class="w"> </span>policy.yaml
 </span></code></pre></div>
+<p>To skip <code>--registry</code>, add <code>registry: ghcr.io/acme/orders-aval</code> to the
+<abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>. The flag and <code>AVAL_REGISTRY</code> still win, and the <code>config:</code> line says
+which one was used. Never put <code>user:password@</code> in it: logins come from
+<code>docker login</code>.</p>
 <h2 id="the-fields">The fields<a class="headerlink" href="#the-fields" title="Anchor link">&para;</a></h2>
 <table>
 <thead>
@@ -2309,10 +2313,17 @@ or set <code>AVAL_POLICY</code> once (the flag wins):</p>
 <td><code>trustedRoot</code></td>
 <td>a pinned Sigstore trusted root for keyless signatures; without it, the public-good root is fetched.</td>
 </tr>
+<tr>
+<td><code>registry</code></td>
+<td>optional: the OCI repository of attestations (<code>host/name</code>), used by <code>aval run</code> and <code>aval verify</code> when neither <code>--registry</code> nor <code>AVAL_REGISTRY</code> is set. No credentials: a value with <code>user:password@</code> (or any <code>@</code>) exits 2. Logins come from the credential store.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="tips">Tips<a class="headerlink" href="#tips" title="Anchor link">&para;</a></h2>
 <ul>
+<li>Read the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from a protected branch in CI, never from the PR's checkout
+  (<a href="../../trust-model/#take-the-policy-from-a-protected-branch">why</a>): its
+  identities and its <code>registry</code> decide what is trusted.</li>
 <li>Anchor the subject to one workflow file and one branch. A PR branch runs
   any code: never trust it as <code>runner</code>.</li>
 <li>Give developer keys <code>developer</code>. Keep <code>minTrustLevel: runner</code> in CI, so CI

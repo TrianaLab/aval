@@ -2546,7 +2546,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <p>Verifiable test execution reuse: signed test results as OCI artifacts.</p>
 <p>--registry and --<abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> fall back to $AVAL_REGISTRY and $AVAL_POLICY; a flag
 wins, and an empty value counts as unset (an empty flag too: use --no-reuse
-to turn reuse off). There is no config file.</p>
+to turn reuse off). run and verify then take the registry from the trust
+<abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s registry field. There is no config file.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Usage:
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  aval [flags]
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  aval [command]
@@ -2770,7 +2771,7 @@ running the test: also a verified result beside a rejected verification-failed
 </span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>      --no-reuse                    always run, never reuse (excludes --shadow)
 </span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
 </span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>      --push                        sign and publish the result after running (needs --registry)
-</span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+</span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)
 </span><span id="__span-7-23"><a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 </span><span id="__span-7-24"><a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>      --report-file string          also write the lookup decision as a verify report (JSON) to this file
 </span><span id="__span-7-25"><a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a>      --result-file string          where to record the result for 'aval push' (default ".aval/result.json")
@@ -2890,7 +2891,7 @@ more attestations than the lookup cap), 1 error (registry, <abbr title="Your fil
 </span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>  -h, --help                        help for verify
 </span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>  -o, --output string               output format: text or json (default "text")
 </span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
-</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)
 </span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 </span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>
 </span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>Global Flags:

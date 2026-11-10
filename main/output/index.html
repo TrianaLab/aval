@@ -2274,8 +2274,9 @@
 </span></code></pre></div>
 <ul>
 <li>The first line is <code>&lt;outcome&gt; &lt;test&gt; &lt;digest&gt;</code>.</li>
-<li>When a value came from <code>AVAL_REGISTRY</code> or <code>AVAL_POLICY</code>, a <code>config:</code> line shows
-  the registry and <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> in use and where each came from.</li>
+<li>When a value came from <code>AVAL_REGISTRY</code>, <code>AVAL_POLICY</code> or the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s
+  <code>registry</code> field, a <code>config:</code> line shows the registry and <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> in use and
+  where each came from (<code>flag</code>, <code>env AVAL_REGISTRY</code>, <code>policy &lt;file&gt;</code>).</li>
 <li>The test's own output sits between <code>--- run</code> and <code>--- end</code>, untouched.</li>
 <li><code>summary:</code> may add <code>; saved &lt;time&gt;</code> (display only), <code>; result pushed</code>,
   <code>; reuse was off</code> and <code>; SECURITY</code>.</li>
