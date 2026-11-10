@@ -54,7 +54,8 @@ function Assert-Installed([string]$name, [hashtable]$envs, [string[]]$want) {
   $code = Invoke-Installer $name $envs
   $log = Get-Content -Raw (Join-Path $work "$name.log")
   if ($code -ne 0) { throw "${name}: install failed ($code):`n$log" }
-  foreach ($w in $want) { if (-not $log.Contains($w)) { throw "${name}: output lacks '$w':`n$log" } }
+  # Windows PowerShell 5.1 wraps error records at console width, so match without whitespace.
+  foreach ($w in $want) { if (-not ($log -replace '\s', '').Contains(($w -replace '\s', ''))) { throw "${name}: output lacks '$w':`n$log" } }
   Write-Host "ok   $name"
 }
 
@@ -62,7 +63,7 @@ function Assert-Refused([string]$name, [hashtable]$envs, [string]$want) {
   $code = Invoke-Installer $name $envs
   $log = Get-Content -Raw (Join-Path $work "$name.log")
   if ($code -eq 0) { throw "${name}: install succeeded:`n$log" }
-  if (-not $log.Contains($want)) { throw "${name}: output lacks '$want':`n$log" }
+  if (-not ($log -replace '\s', '').Contains(($want -replace '\s', ''))) { throw "${name}: output lacks '$want':`n$log" }
   if (Test-Path (Join-Path $work "$name\aval.exe")) { throw "${name}: aval.exe was installed" }
   Write-Host "ok   $name"
 }
@@ -75,6 +76,7 @@ try {
   # Usage errors, refused before anything is downloaded.
   Assert-Refused 'require-verify-no-verify' @{ DESIRED_VERSION = $OldVersion; AVAL_REQUIRE_VERIFY = '1'; AVAL_NO_VERIFY = '1' } 'exclude AVAL_NO_VERIFY'
   Assert-Refused 'require-verify-latest' @{ AVAL_REQUIRE_VERIFY = '1' } 'need DESIRED_VERSION'
+  Assert-Refused 'require-provenance-latest' @{ AVAL_REQUIRE_PROVENANCE = '1' } 'need DESIRED_VERSION'
   Assert-Refused 'bad-sha256' @{ AVAL_SHA256 = 'abc' } 'AVAL_SHA256 wants'
 
   # Local mirror: <case>\<tag>\<file>.
