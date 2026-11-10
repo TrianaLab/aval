@@ -981,6 +981,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Split credentials">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-a-composite-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a composite action
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2158,6 +2175,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Split credentials">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-a-composite-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a composite action
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2256,13 +2290,13 @@
 
 
 <h1 id="use-github-actions">Use GitHub Actions<a class="headerlink" href="#use-github-actions" title="Anchor link">&para;</a></h1>
-<p>Goal: each CI job runs its test through Aval in three lines of YAML, and only
-a job on <code>main</code> signs and publishes results.</p>
+<p>Goal: each CI job runs its test through Aval in three lines of YAML, and one
+job on <code>main</code> signs and publishes every result.</p>
 <pre class="aval-mermaid"><code>flowchart LR
   job([unit job]) --&gt; act[aval run action]
   act -- verified --&gt; skip([reuse]):::ok
   act -- anything else --&gt; test[run the test]
-  test -- "push to main" --&gt; art([artifact aval-unit]) --&gt; pub[publish job: aval push] --&gt; reg([registry]):::muted
+  test -- "push to main" --&gt; art([artifact aval-unit]) --&gt; pub[publish action: aval push] --&gt; reg([registry]):::muted
   act -- "exit 5" --&gt; fail([step fails, SECURITY]):::err</code></pre>
 <h2 id="the-example">The example<a class="headerlink" href="#the-example" title="Anchor link">&para;</a></h2>
 <p>A suite job:</p>
@@ -2307,59 +2341,65 @@ it are not fetched; use keyless identities.</p>
 (GitHub's Ubuntu images, macOS 15 and later).</p>
 <div class="admonition note">
 <p class="admonition-title">Pinned release</p>
-<p>The action needs <code>--test</code> and the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code>, which ship in the
-release after 0.7.0. Until its pin moves there (milestone 14, #213),
-<code>aval run</code> exits 2 and the step fails.</p>
+<p>The run and publish actions need <code>--test</code> and the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code>,
+which ship in the release after 0.7.0. Until their pins move there
+(milestone 14, #213), <code>aval run</code> and <code>aval push</code> exit 2 and the step
+fails.</p>
 </div>
 <h2 id="split-credentials">Split credentials<a class="headerlink" href="#split-credentials" title="Anchor link">&para;</a></h2>
-<p>The publishing job signs with the workflow's identity and pushes what the
-suite job uploaded:</p>
+<p>One job signs what the suite jobs uploaded, with the workflow's identity:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="w">  </span><span class="nt">publish</span><span class="p">:</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unit</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ !cancelled() &amp;&amp; github.event_name == 'push' &amp;&amp; github.ref == 'refs/heads/main' }}</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ !cancelled() &amp;&amp; github.event_name == 'push' &amp;&amp; github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">      </span><span class="nt">packages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">      </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@&lt;sha&gt;</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">          </span><span class="nt">persist-credentials</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/download-artifact@&lt;sha&gt;</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval-unit</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">          </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.aval/unit</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">      </span><span class="c1"># Install aval as on the install page, then:</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sign and push</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">        </span><span class="nt">env</span><span class="p">:</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">          </span><span class="nt">GH_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.token }}</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">          </span><span class="no">echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">          </span><span class="no">SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">            </span><span class="no">"$ACTIONS_ID_TOKEN_REQUEST_URL&amp;audience=sigstore" | jq -r .value)</span>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">          </span><span class="no">export SIGSTORE_ID_TOKEN</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">          </span><span class="no">aval push -f aval.yaml --test unit --registry ghcr.io/acme/app-aval</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TrianaLab/aval/integrations/github/publish@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
 </span></code></pre></div>
+<p>The action <a href="https://github.com/TrianaLab/aval/blob/main/integrations/github/publish/action.yml"><code>integrations/github/publish</code></a>
+takes <code>file</code>, <code>policy</code>, <code>registry-username</code>, <code>registry-password</code> (default
+<code>github.actor</code> and <code>github.token</code>), <code>stats</code> and <code>allow-unprotected</code> (both
+default <code>false</code>). In order, it:</p>
+<ol>
+<li>Refuses a ref other than the default branch unless <code>allow-unprotected:
+   true</code>, always refuses <code>pull_request_target</code> and <code>workflow_run</code>, and fails
+   without <code>id-token: write</code>.</li>
+<li>Installs the same pinned, verified aval release as the run action.</li>
+<li>Fetches the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from the default branch and logs in to the host of its
+   <code>registry</code>, where results go. No <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or no <code>registry</code> fails the step.</li>
+<li>Downloads this run's <code>aval-*</code> artifacts (so name no other artifact
+   <code>aval-*</code>) into <code>$RUNNER_TEMP</code>. For each <code>aval-&lt;name&gt;</code>, fetches a fresh OIDC
+   token (audience <code>sigstore</code>) and runs <code>aval push --test &lt;name&gt;</code>. It tries
+   them all, then exits with the worst code; 5 is <code>aval SECURITY</code>, never downgraded.</li>
+<li>With <code>stats: true</code>, publishes each pushed test's run record; a failure
+   is a warning.</li>
+</ol>
+<p>What <code>aval push</code> does with each artifact:</p>
 <ul>
-<li>The OIDC token is fetched in the publishing job, which runs no tests.</li>
-<li><code>--test</code> names the test the artifact holds, so a report for another test
-  cannot be published under this one.</li>
-<li>A report whose <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is <code>verified</code> (also under <code>--shadow</code>) makes push
-  print <code>nothing to push: ...</code>, sign nothing and exit 0. So does a
-  <code>non-deterministic</code> test.</li>
-<li>A <code>miss</code> or an <code>error</code> publishes the result. Failing results are published
-  on purpose: on a tie in <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> a failure outranks a pass, so a later
-  flaky pass cannot become reusable.</li>
-<li>The result and the report come from an unprivileged job and are unsigned.
-  Push checks that both match the test id and the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> it computes
-  now from the checkout, then signs the result's claims with the publishing
-  identity. A mismatch exits 1 and publishes nothing.</li>
-<li>A report that records a security event (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verification-failed</code>, or
-  a <code>rejected</code> entry that failed verification) signs nothing and exits 5. The
-  suite job already exited 5 for it: investigate before publishing.</li>
+<li>An artifact <code>aval-a</code> that holds test <code>b</code>, or a result that does not match
+  the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> push computes from the checkout, exits 1 and publishes
+  nothing; the other artifacts are still pushed.</li>
+<li>A reused result (report <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>, also under <code>--shadow</code>) and a
+  <code>non-deterministic</code> test print <code>nothing to push: ...</code> and exit 0.</li>
+<li>A <code>miss</code> or an <code>error</code> publishes the result, failures included: on a tie
+  in <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> a failure outranks a later flaky pass.</li>
+<li>A report that records a security event signs nothing and exits 5.</li>
 <li>Trust only this workflow on <code>main</code>: <a href="../trust-policy/#the-example">Write a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></a>.</li>
 </ul>
+<h3 id="why-a-composite-action">Why a composite action<a class="headerlink" href="#why-a-composite-action" title="Anchor link">&para;</a></h3>
+<p>The publish action is a composite action, not a reusable workflow
+(<code>workflow_call</code>). The steps of a composite action run inside the caller's
+job, so the Fulcio certificate names the calling workflow, for example
+<code>https://github.com/acme/app/.github/workflows/ci.yaml@refs/heads/main</code>.
+A reusable workflow would put Aval's workflow in the certificate of every
+repository that calls it, and a <code>subjectRegexp</code> for it would trust them all.
+Aval's CI checks the certificates its <code>main</code> signs this way.</p>
 <h2 id="pull-requests">Pull requests<a class="headerlink" href="#pull-requests" title="Anchor link">&para;</a></h2>
 <p>A pull request runs the same suite job and reuses what <code>main</code> published. Its
 own <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> edits change nothing, because the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> comes from the default
