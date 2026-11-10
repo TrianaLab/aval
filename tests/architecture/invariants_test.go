@@ -114,6 +114,31 @@ func TestNoGoCodeNamesPacto(t *testing.T) {
 	}
 }
 
+// Invariant 8: vendor integrations (integrations/, e.g. the GitHub actions)
+// sit on top of the CLI; core code never references them (#211).
+var integrationsRe = regexp.MustCompile(`(^|[^\w-])integrations/`)
+
+func TestCoreNeverReferencesIntegrations(t *testing.T) {
+	for _, f := range trackedFiles(t, "cmd", "internal", "pkg") {
+		if integrationsRe.MatchString(readFile(t, f)) {
+			t.Errorf("%s references integrations/ (invariant 8: vendor specifics stay outside core)", f)
+		}
+	}
+}
+
+func TestIntegrationsCheckCatchesReferences(t *testing.T) {
+	for text, want := range map[string]bool{
+		`"integrations/github/run/action.yml"`: true,
+		"see ../integrations/github":           true,
+		"myintegrations/x":                     false,
+		"integrations":                         false,
+	} {
+		if got := integrationsRe.MatchString(text); got != want {
+			t.Errorf("%q: reported %v, want %v", text, got, want)
+		}
+	}
+}
+
 // AGENTS.md "Work tracking": every TODO names a roadmap milestone. Markdown is
 // prose about the convention and is not scanned; .claude/skills holds symlinks;
 // docs/javascripts/vendor holds third-party files kept byte-identical to

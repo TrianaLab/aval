@@ -1,0 +1,50 @@
+# docs/guides/github-actions.md includes the sections of this example;
+# tests/architecture/guides_test.go checks it against
+# integrations/github/run/action.yml.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  # --8<-- [start:run]
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@<sha> # pin by commit SHA
+        with:
+          persist-credentials: false
+      - uses: TrianaLab/aval/integrations/github/run@<sha> # pin by commit SHA
+        with:
+          test: unit
+  # --8<-- [end:run]
+  # --8<-- [start:publish]
+  publish:
+    needs: unit
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@<sha>
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@<sha>
+        with:
+          name: aval-unit
+          path: .aval/unit
+      # Install aval as on the install page, then:
+      - name: Sign and push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
+          export SIGSTORE_ID_TOKEN
+          aval push -f aval.yaml --test unit --registry ghcr.io/acme/app-aval
+  # --8<-- [end:publish]

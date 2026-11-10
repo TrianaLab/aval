@@ -53,6 +53,8 @@ A change that breaks one of these is wrong, even if tests pass.
 - `internal/fingerprint` canonical manifest and hash.
 - `internal/attest`, `internal/registry`, `internal/policy` signing, ORAS,
   trust policy.
+- `integrations/github` GitHub composite actions on top of the CLI. Core
+  (`cmd/`, `internal/`, `pkg/`) never references them.
 - `tests/architecture` invariant gates about the repository itself.
 - `docs/` design and specs. `examples/go-compose` is its own Go module.
 
@@ -62,7 +64,8 @@ A change that breaks one of these is wrong, even if tests pass.
 
 | Target | What it runs |
 |---|---|
-| `make ci-static` | gofmt check, `go vet`, golangci-lint |
+| `make ci-static` | gofmt check, `go vet`, golangci-lint, shellcheck, `make lint-actions` |
+| `make lint-actions` | actionlint on the workflows and zizmor (offline) on `integrations/github`; needs `pip install --require-hashes -r .github/requirements-lint.txt` |
 | `make ci-gates` | level 3: architecture/invariant tests (`make test-architecture`) |
 | `make ci-engine` | level 1: unit tests with `-race` and the 100% coverage gate (`make coverage-check`), the example modules (`examples/go-compose`, `examples/evidence-consumer`) |
 | `make ci-false-hit` | false-hit suite: `internal/fingerprint` and `internal/contract` tests, uncached (corpus, manifest golden per `aval-fingerprint/vN`, append-only goldens against `AVAL_GOLDEN_BASE` or `origin/main`, glob tables) |

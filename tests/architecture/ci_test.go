@@ -236,6 +236,12 @@ func TestActionsArePinnedBySHA(t *testing.T) {
 	if len(files) == 0 {
 		t.Fatal("no workflows found")
 	}
+	// The composite actions (#211) pin their dependencies the same way.
+	actions, err := filepath.Glob(filepath.Join("..", "..", "integrations", "github", "*", "action.yml"))
+	if err != nil || len(actions) == 0 {
+		t.Fatalf("no actions under integrations/github: %v", err)
+	}
+	files = append(files, actions...)
 	for _, f := range files {
 		data, err := os.ReadFile(f)
 		if err != nil {
@@ -453,5 +459,87 @@ func TestDispatchCheckCatchesLooseGuards(t *testing.T) {
 		if p, err := dispatchProblems([]byte(wf)); err != nil || len(p) == 0 {
 			t.Errorf("%s: no problem reported (%v)", name, err)
 		}
+	}
+}
+
+// runActionRef is how a workflow uses the aval run action (#211).
+const runActionRef = "TrianaLab/aval/integrations/github/run@"
+
+// actionExampleProblems checks the workflow docs/guides/github-actions.md
+// shows against the action: every input it passes exists, every required
+// input is passed, and no job that uses the action can sign (id-token), at
+// job or workflow level.
+func actionExampleProblems(example, action []byte) ([]string, error) {
+	var a struct {
+		Inputs map[string]struct {
+			Required bool `yaml:"required"`
+		} `yaml:"inputs"`
+	}
+	var wf struct {
+		Permissions map[string]string `yaml:"permissions"`
+		Jobs        map[string]struct {
+			Permissions map[string]string `yaml:"permissions"`
+			Steps       []step            `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(action, &a); err != nil {
+		return nil, err
+	}
+	if err := yaml.Unmarshal(example, &wf); err != nil {
+		return nil, err
+	}
+	var problems []string
+	uses := 0
+	for name, j := range wf.Jobs {
+		for _, s := range j.Steps {
+			if !strings.HasPrefix(s.Uses, runActionRef) {
+				continue
+			}
+			uses++
+			if _, ok := j.Permissions["id-token"]; ok || wf.Permissions["id-token"] != "" {
+				problems = append(problems, name+": a job that uses the run action must not have id-token")
+			}
+			for in := range s.With {
+				if _, ok := a.Inputs[in]; !ok {
+					problems = append(problems, name+": input "+in+" is not in action.yml")
+				}
+			}
+			for in, spec := range a.Inputs {
+				if _, ok := s.With[in]; spec.Required && !ok {
+					problems = append(problems, name+": required input "+in+" is missing")
+				}
+			}
+		}
+	}
+	if uses == 0 {
+		problems = append(problems, "no job uses "+runActionRef)
+	}
+	slices.Sort(problems)
+	return problems, nil
+}
+
+func TestGitHubActionExampleMatchesTheAction(t *testing.T) {
+	p, err := actionExampleProblems([]byte(readFile(t, "docs/includes/github-actions.yml")), []byte(readFile(t, "integrations/github/run/action.yml")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range p {
+		t.Error(s)
+	}
+}
+
+func TestActionExampleCheckCatchesDrift(t *testing.T) {
+	action := "inputs:\n  test: {required: true}\n  file: {default: aval.yaml}\n"
+	bad := "permissions: {id-token: write}\njobs:\n  a:\n    steps:\n      - uses: " + runActionRef + "x\n        with: {tests: u}\n"
+	got, err := actionExampleProblems([]byte(bad), []byte(action))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"a: a job that uses the run action must not have id-token", "a: input tests is not in action.yml", "a: required input test is missing"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if got, _ := actionExampleProblems([]byte("jobs: {}\n"), []byte(action)); len(got) != 1 {
+		t.Errorf("no use of the action: got %q", got)
 	}
 }

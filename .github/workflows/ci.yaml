@@ -91,6 +91,11 @@ jobs:
         with:
           version: v2.15.0
           install-only: true
+      # zizmor for `make lint-actions`, pinned by sha256.
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - run: pip install --require-hashes -r .github/requirements-lint.txt
       - run: make ci-static
 
   ci-gates:
@@ -368,13 +373,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    # docs/guides/github-actions.md includes the gha-* sections.
-    # --8<-- [start:gha-permissions]
     permissions:
       contents: read
       packages: write
       id-token: write
-    # --8<-- [end:gha-permissions]
     env:
       REPO: ghcr.io/trianalab/aval-example-go-compose
       CONTRACT: examples/go-compose/aval.yaml
@@ -395,7 +397,6 @@ jobs:
         run: .github/aval/install.sh
       # TODO(milestone-14): in the Publish step, replace the outcome check with
       # aval push --report-file publish.json once the pinned release has it (#216).
-      # --8<-- [start:gha-steps]
       - name: Log in to GHCR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -415,7 +416,6 @@ jobs:
             aval push -f "$CONTRACT" --registry "$REPO"
           fi
           echo "| publish | \`$(jq -r .outcome publish.json)\` |" >> "$GITHUB_STEP_SUMMARY"
-      # --8<-- [end:gha-steps]
       - name: Unchanged scope reuses (hit)
         run: |
           aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report-file hit.json

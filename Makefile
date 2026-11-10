@@ -1,5 +1,5 @@
 .PHONY: build test test-unit coverage coverage-check test-integration test-architecture test-acceptance test-release \
-	lint fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-false-hit ci-e2e ci-release ci-fuzz ci-security \
+	lint lint-actions fmt fmt-check example fuzz vuln goreleaser release-snapshot ci ci-static ci-gates ci-engine ci-false-hit ci-e2e ci-release ci-fuzz ci-security \
 	docs-lint docs-cli docs-wasm docs-site docs-demo-smoke docs-deploy-test docs-nav-smoke docs-demos ci-docs brand
 
 # Level 1 runs every package outside tests/; levels 2-5 live in tests/<level>.
@@ -99,7 +99,22 @@ lint:
 	GOOS=js GOARCH=wasm go vet ./cmd/aval-wasm
 	GOOS=js GOARCH=wasm golangci-lint run ./cmd/aval-wasm
 	cd examples/evidence-consumer && golangci-lint run ./...
-	shellcheck scripts/*.sh docs/assets/tapes/*.sh
+	shellcheck scripts/*.sh docs/assets/tapes/*.sh integrations/github/*/*.sh
+
+# The workflows (actionlint, with shellcheck on their run: scripts) and the
+# GitHub actions under integrations/ (zizmor; offline, so no network audits).
+# actionlint is installed into bin/ like govulncheck; zizmor comes from
+# `pip install --require-hashes -r .github/requirements-lint.txt` and must be
+# this version.
+ACTIONLINT_VERSION := v1.7.12
+ZIZMOR_VERSION := 1.32.0
+
+lint-actions:
+	GOBIN=$(CURDIR)/bin go install github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
+	bin/actionlint
+	@v=$$(zizmor --version 2>/dev/null | awk '{print $$2}'); if [ "$$v" != "$(ZIZMOR_VERSION)" ]; then \
+		echo "zizmor $(ZIZMOR_VERSION) required, found $${v:-none}"; exit 1; fi
+	zizmor --offline integrations/github
 
 fmt:
 	gofmt -w .
@@ -215,7 +230,7 @@ example:
 # the `required` job (tests/architecture/ci_test.go enforces both).
 ci: ci-static ci-gates ci-engine ci-false-hit ci-e2e ci-release ci-fuzz ci-security ci-docs
 
-ci-static: fmt-check lint
+ci-static: fmt-check lint lint-actions
 ci-gates: test-architecture
 ci-engine: coverage-check example
 # The false-hit suite (#15) as its own gate, never cached: the corpus of
