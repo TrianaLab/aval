@@ -63,8 +63,8 @@ Diff the `aval explain` output of two machines to see which file, toolchain entr
 or variable differs. `-f` takes one path and defaults to `./aval.yaml`; the
 root is the contract file's directory, or the directory `scope.root` names
 above it ([Contracts in a subdirectory](#contracts-in-a-subdirectory)). A
-file holds one contract: give each shard of a split suite its own file
-([Shards and matrices](guides/shards-and-matrices.md)).
+`kind: Test` file holds one test; a `kind: TestSet` file holds many
+([Many tests in one file](#many-tests-in-one-file-testset)).
 
 ## Fields
 
@@ -75,7 +75,7 @@ file holds one contract: give each shard of a split suite its own file
 | Field | Type | Required | Rules |
 |---|---|---|---|
 | `apiVersion` | string | yes | Must be `aval.trianalab.io/v1`. |
-| `kind` | string | yes | Must be `Test`. |
+| `kind` | string | yes | `Test`, or `TestSet` for [many tests in one file](#many-tests-in-one-file-testset). |
 | `metadata.name` | string | yes | 1-64 chars of `[a-z0-9._-]`, starting and ending with `[a-z0-9]`. |
 | `runner.command` | list of strings | yes | Non-empty argv, first element not blank. No shell. It must not start `aval run` on the same contract again, directly or through other contracts: see [Nested runs](#nested-runs). |
 | `scope.source` | list of globs | yes | At least one glob. Each glob must match a file, and at least one file must remain after `exclude`. |
@@ -124,6 +124,59 @@ at or above it with a `.git` entry). If the contract's directory is a
 symlink, `..` is resolved from its real location. A root above the working
 tree, or no working tree at all, exits 2 (`aval run`, `explain`, `verify`
 and `push`). Globs still cannot contain `..`.
+
+## Many tests in one file: TestSet
+
+A `kind: TestSet` declares every test of a project in one file, without
+repeating shared scope and environment:
+
+```yaml
+--8<-- "internal/fingerprint/testdata/testset/aval.yaml:set"
+```
+
+Top-level keys besides `apiVersion` and `kind`:
+
+| Key | Holds | May set |
+|---|---|---|
+| `defaults` | what every test inherits | `scope.*`, `environment.*`, `cacheability` |
+| `fragments` | named blocks a test pulls in with `use` | `scope.*` except `exclude`, `environment.*` |
+| `tests` | a list of tests, at least one | the body of a `kind: Test` (`metadata`, `runner`, `scope`, `environment`, `outputs`, `cacheability`), plus `use` and `matrix` |
+
+Each test expands to a standalone `kind: Test` and is fingerprinted exactly
+as that file would be: the set above fingerprints `shard-1` like a
+`kind: Test` named `shard-1` with the merged scope. Paths, globs and
+`scope.root` resolve from the TestSet file's directory.
+
+Merge rules, in the order `defaults`, each used fragment, then the test:
+
+- Lists (`source`, `exclude`, `dependencies`, `allowMutable`, `resolve`,
+  `contracts`, `env`) are merged as a set union. Nothing inherited can be
+  removed, so a merge can only widen a test's inputs. `exclude` is the one
+  way to narrow them, and it is only allowed in `defaults` or in the test
+  itself, where it is visible.
+- A key of `environment.toolchain` or `environment.probe`, or `scope.root`,
+  set twice with different values is an error that names both sources.
+- `metadata`, `runner` and `outputs` belong to a test only. The test's
+  `cacheability` overrides the one in `defaults`.
+- The order of `use` does not change the result. A fragment cannot `use`
+  another fragment.
+
+`matrix` maps variables to lists of strings and creates one test per
+combination. It substitutes `{var}` into `metadata.name` and
+`runner.command` only, so each value is part of the fingerprinted argv. In a
+test with a matrix, every `{name}` in those two fields must be a matrix
+variable: write a shell variable as `$VAR`, not `${VAR}`. A set expands to
+at most 1024 tests.
+
+Each of these exits 2 and names the problem: an unknown fragment, a fragment
+no test uses, a fragment with `use`, `exclude`, `runner`, `metadata`,
+`outputs`, `matrix` or `cacheability`, a conflicting key, an unknown
+`{var}`, two tests with the same expanded name, and a `scope.contracts`
+entry that points at a TestSet (share scope with fragments instead).
+
+`aval run`, `explain`, `verify` and `push` take a TestSet of one test. A
+TestSet of more tests exits 2 and lists their names: selecting a test by
+name is not built yet (#207).
 
 ## Nested runs
 
@@ -309,7 +362,9 @@ fingerprint; its output is not hashed, since it varies by build and platform.
 `aval.trianalab.io/v1` is frozen; policy files use the same value. Within v1
 the schema only gets new optional fields. An older `aval` rejects a field it
 does not know, which fails closed: a policy with the optional `registry`
-field (#209) fails to load in an older `aval`, so nothing is reused.
+field (#209) fails to load in an older `aval`, so nothing is reused. The
+same holds for a kind it does not know: an older `aval` rejects a
+`kind: TestSet` file with exit 2.
 
 `aval.dev/v1alpha1` is rejected: change that line. Rules:
 [artifact format](artifact-format.md#versioning-and-compatibility).

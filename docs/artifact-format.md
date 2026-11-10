@@ -623,6 +623,8 @@ contract or policy file with `aval.dev/v1alpha1` is invalid.
 - A new key under `annotations`.
 - A new optional contract field. Older `aval` binaries reject a contract
   that uses it (unknown fields are rejected), which fails closed.
+- A new contract `kind` whose tests expand to `kind: Test` contracts that
+  fingerprint as before. Older `aval` binaries reject it, which fails closed.
 - A new manifest section that only a new optional contract field brings.
   Every contract without the field keeps its manifest byte for byte, and a
   contract with it cannot have had a fingerprint before, so no fingerprint
@@ -706,3 +708,6 @@ version adds a new file. The tests that enforce this:
       stopped being hashed, like a `.git` directory. Every existing
       attestation is a miss once and the tests run again; there is no
       lookup by v1.
+    - Within `aval.trianalab.io/v1` (#206), the contract gained
+      `kind: TestSet`. Each of its tests fingerprints byte for byte like the
+      same `kind: Test`, so the manifest version stays `aval-fingerprint/v2`.

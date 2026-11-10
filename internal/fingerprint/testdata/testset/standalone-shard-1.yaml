@@ -1,0 +1,12 @@
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata: {name: shard-1}
+runner: {command: [go, test, "-shard=1/2", ./...]}
+scope:
+  source: ["VERSION", "db/**"]
+  exclude: ["**/testdata/**"]
+  dependencies: ["go.sum"]
+environment:
+  toolchain: {go: "1.25", postgres: "16"}
+  env: [CI, DB_URL]
+cacheability: hermetic

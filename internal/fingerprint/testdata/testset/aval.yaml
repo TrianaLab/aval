@@ -1,0 +1,36 @@
+# Fixture for TestTestSetGolden: every test of this TestSet must fingerprint
+# byte for byte like its standalone-<name>.yaml. Any edit changes the golden
+# manifest: make one only together with a fingerprint.Version bump.
+# --8<-- [start:set]
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    source: ["VERSION"]
+    exclude: ["**/testdata/**"]
+    dependencies: ["go.sum"]
+  environment:
+    toolchain: {go: "1.25"}
+    env: [CI]
+  cacheability: hermetic
+fragments:
+  db:
+    scope: {source: ["db/**"]}
+    environment:
+      toolchain: {postgres: "16"}
+      env: [DB_URL]
+  web:
+    scope: {source: ["web/**", "VERSION"]}
+tests:
+  - metadata: {name: unit}
+    runner: {command: [go, test, ./src/...]}
+    scope: {source: ["src/**"]}
+  - metadata: {name: integration}
+    use: [web, db]
+    runner: {command: [go, test, -tags=integration, ./...]}
+    cacheability: controlled-environment
+  - metadata: {name: "shard-{index}"}
+    use: [db]
+    runner: {command: [go, test, "-shard={index}/2", ./...]}
+    matrix: {index: ["1", "2"]}
+# --8<-- [end:set]

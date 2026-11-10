@@ -100,7 +100,7 @@ func yamlPath(msg string, nodes []spot) string {
 var fieldsOf = map[string]reflect.Type{}
 
 func init() {
-	for _, v := range []any{Contract{}, Metadata{}, Runner{}, Scope{}, Environment{}, AllowMutable{}} {
+	for _, v := range []any{Contract{}, Metadata{}, Runner{}, Scope{}, Environment{}, AllowMutable{}, testSet{}, entry{}} {
 		fieldsOf[reflect.TypeOf(v).String()] = reflect.TypeOf(v)
 	}
 }

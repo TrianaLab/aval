@@ -192,3 +192,40 @@ func TestDeprecatedAliases(t *testing.T) {
 		})
 	}
 }
+
+// A kind: TestSet of one test explains like the standalone kind: Test; a
+// TestSet of many, an invalid one, or one that scope.contracts points at
+// exits 2 (#206).
+func TestExplainTestSet(t *testing.T) {
+	dir := t.TempDir()
+	test := "apiVersion: aval.trianalab.io/v1\nkind: Test\nmetadata: {name: unit}\nrunner: {command: [x]}\nscope: {source: [in.txt]}\ncacheability: hermetic\n"
+	set := "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {scope: {source: [in.txt]}, cacheability: hermetic}\ntests:\n- {metadata: {name: unit}, runner: {command: [x]}}\n"
+	for name, data := range map[string]string{
+		".git/HEAD": "ref: refs/heads/main\n", "in.txt": "in\n", "test.yaml": test, "one.yaml": set,
+		"many.yaml": set + "- {metadata: {name: other}, runner: {command: [y]}}\n",
+		"bad.yaml":  set + "- {metadata: {name: other}, runner: {command: [y]}, use: [nope]}\n",
+		"ref.yaml":  strings.Replace(test, "source: [in.txt]", "source: [in.txt], contracts: [one.yaml]", 1),
+	} {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f := func(name string) string { return filepath.Join(dir, name) }
+	_, want, _ := runCLI("explain", "-f", f("test.yaml"), "--digest")
+	if code, got, stderr := runCLI("explain", "-f", f("one.yaml"), "--digest"); code != ExitOK || got != want {
+		t.Fatalf("one-test TestSet: exit %d, %q (stderr %q), want %q", code, got, stderr, want)
+	}
+	for file, msg := range map[string]string{
+		"many.yaml": "the TestSet holds 2 tests (unit, other)",
+		"bad.yaml":  `use: unknown fragment "nope"`,
+		"ref.yaml":  "one.yaml is a kind: TestSet; scope.contracts takes a kind: Test",
+	} {
+		if code, _, stderr := runCLI("explain", "-f", f(file)); code != ExitUsage || !strings.Contains(stderr, msg) {
+			t.Errorf("%s: exit %d, stderr %q; want exit 2 with %q", file, code, stderr, msg)
+		}
+	}
+}

@@ -15,19 +15,7 @@ import (
 // each change the fingerprint, so two shards never share a result.
 func TestShardFingerprints(t *testing.T) {
 	example := filepath.Join("..", "..", "examples", "uv-monorepo")
-	dir := t.TempDir()
-	if err := os.CopyFS(filepath.Join(dir, "packages"), os.DirFS(filepath.Join(example, "packages"))); err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range []string{"pyproject.toml", "uv.lock", ".python-version"} {
-		b, err := os.ReadFile(filepath.Join(example, f))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, f), b, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	dir := uvTree(t, example)
 	fp := func(file string, env map[string]string) string {
 		t.Helper()
 		c, err := contract.Load(file)
@@ -73,5 +61,45 @@ func TestShardFingerprints(t *testing.T) {
 		if fp(patternB, env) == want {
 			t.Errorf("pattern B: %s left the fingerprint unchanged (false hit)", name)
 		}
+	}
+}
+
+// uvTree copies the inputs of examples/uv-monorepo to a temporary directory.
+func uvTree(t *testing.T, example string) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.CopyFS(filepath.Join(dir, "packages"), os.DirFS(filepath.Join(example, "packages"))); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"pyproject.toml", "uv.lock", ".python-version"} {
+		b, err := os.ReadFile(filepath.Join(example, f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, f), b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+// Pattern C, a TestSet matrix: the shard is in the argv, so each shard has
+// its own fingerprint without any variable.
+func TestShardMatrixFingerprints(t *testing.T) {
+	dir := uvTree(t, filepath.Join("..", "..", "examples", "uv-monorepo"))
+	cs, err := contract.LoadAll(filepath.Join("testdata", "shards", "pattern-c.yaml"))
+	if err != nil || len(cs) != 2 {
+		t.Fatalf("pattern C: %d tests, %v", len(cs), err)
+	}
+	var c [2]string
+	for i := range cs {
+		got, err := Compute(context.Background(), dir, cs[i], func(string) (string, bool) { return "", false })
+		if err != nil {
+			t.Fatal(err)
+		}
+		c[i] = got.Digest
+	}
+	if c[0] == c[1] {
+		t.Error("pattern C: two matrix shards share a fingerprint (false hit)")
 	}
 }

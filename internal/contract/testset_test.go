@@ -1,0 +1,207 @@
+package contract
+
+import (
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+)
+
+// set is a TestSet with defaults, two fragments, a plain test and a matrix
+// test. The Go fingerprint tests use the same shape on disk.
+const set = `
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    source: ["go.mod"]
+    exclude: ["**/testdata/**"]
+    dependencies: ["go.sum"]
+  environment:
+    toolchain: {go: "1.25"}
+  cacheability: hermetic
+fragments:
+  db:
+    scope: {source: ["db/**"]}
+    environment:
+      toolchain: {postgres: "16"}
+      probe: {postgres: [postgres, --version]}
+      env: [DB_URL]
+  web:
+    scope: {source: ["web/**", "go.mod"]}
+tests:
+  - metadata: {name: unit}
+    runner: {command: [go, test, ./...]}
+    scope: {source: ["**/*.go"]}
+  - metadata: {name: "shard-{index}-of-{total}"}
+    use: [web, db]
+    runner: {command: [go, test, "-shard={index}/{total}", "{literal x}"]}
+    matrix: {index: ["1", "2"], total: ["2"]}
+    cacheability: controlled-environment
+`
+
+func TestParseAllTestSet(t *testing.T) {
+	cs, err := ParseAll([]byte(set))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, c := range cs {
+		names = append(names, c.Metadata.Name)
+	}
+	if want := []string{"unit", "shard-1-of-2", "shard-2-of-2"}; !reflect.DeepEqual(names, want) {
+		t.Fatalf("names %q, want %q", names, want)
+	}
+	unit := Contract{
+		APIVersion: APIVersion, Kind: Kind, Metadata: Metadata{Name: "unit"},
+		Runner:       Runner{Command: []string{"go", "test", "./..."}},
+		Scope:        Scope{Source: []string{"go.mod", "**/*.go"}, Exclude: []string{"**/testdata/**"}, Dependencies: []string{"go.sum"}},
+		Environment:  Environment{Toolchain: map[string]string{"go": "1.25"}},
+		Cacheability: Hermetic,
+	}
+	if !reflect.DeepEqual(*cs[0], unit) {
+		t.Fatalf("unit:\n got %+v\nwant %+v", *cs[0], unit)
+	}
+	s := cs[2]
+	if want := []string{"go", "test", "-shard=2/2", "{literal x}"}; !reflect.DeepEqual(s.Runner.Command, want) {
+		t.Errorf("command %q, want %q", s.Runner.Command, want)
+	}
+	// Fragments in sorted order (db, web) after defaults; go.mod once.
+	if want := []string{"go.mod", "db/**", "web/**"}; !reflect.DeepEqual(s.Scope.Source, want) {
+		t.Errorf("source %q, want %q", s.Scope.Source, want)
+	}
+	if s.Cacheability != ControlledEnvironment || s.Environment.Toolchain["postgres"] != "16" || s.Environment.Env[0] != "DB_URL" || len(s.Environment.Probe["postgres"]) != 2 {
+		t.Errorf("merged %+v", s)
+	}
+	// A kind: Test parses to itself.
+	cs, err = ParseAll([]byte(valid))
+	if err != nil || len(cs) != 1 || cs[0].Metadata.Name != "orders-integration" {
+		t.Fatalf("kind: Test: %v %v", cs, err)
+	}
+}
+
+// The order of use never changes the expanded test.
+func TestParseAllUseOrder(t *testing.T) {
+	a, err := ParseAll([]byte(set))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := ParseAll([]byte(strings.Replace(set, "use: [web, db]", "use: [db, web, db]", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(a, b) {
+		t.Fatalf("use order changed the tests:\n%+v\n%+v", a[1], b[1])
+	}
+}
+
+// A test cannot drop a list item it inherits: lists only grow.
+func TestParseAllInheritedListsStay(t *testing.T) {
+	cs, err := ParseAll([]byte(strings.Replace(set, `scope: {source: ["**/*.go"]}`, `scope: {source: ["**/*.go"], dependencies: []}
+    environment: {env: []}`, 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cs[0].Scope; !reflect.DeepEqual(got.Dependencies, []string{"go.sum"}) || !reflect.DeepEqual(got.Source, []string{"go.mod", "**/*.go"}) {
+		t.Fatalf("inherited items removed: %+v", got)
+	}
+}
+
+func TestParseAllTestSetInvalid(t *testing.T) {
+	cases := map[string]struct{ from, to, want string }{
+		"unknown fragment":   {"use: [web, db]", "use: [web, db, cache]", `tests[1] (shard-{index}-of-{total}): use: unknown fragment "cache"`},
+		"unused fragment":    {"use: [web, db]", "use: [db]", "fragments.web: not used by any test"},
+		"fragment uses":      {"web:\n    scope:", "web:\n    use: [db]\n    scope:", "fragments.web: use is not allowed here: a fragment cannot use another fragment"},
+		"fragment exclude":   {`scope: {source: ["db/**"]}`, `scope: {source: ["db/**"], exclude: [x]}`, "fragments.db: scope.exclude is not allowed here"},
+		"fragment runner":    {"web:\n", "web:\n    runner: {command: [x]}\n", "fragments.web: runner is not allowed here"},
+		"fragment metadata":  {"web:\n", "web:\n    metadata: {name: x}\n", "fragments.web: metadata is not allowed here"},
+		"fragment cache":     {"web:\n", "web:\n    cacheability: hermetic\n", "fragments.web: cacheability is not allowed here"},
+		"fragment outputs":   {"web:\n", "web:\n    outputs: [x]\n", "fragments.web: outputs is not allowed here"},
+		"fragment matrix":    {"web:\n", "web:\n    matrix: {a: [b]}\n", "fragments.web: matrix is not allowed here"},
+		"fragment name":      {"web:", "Web:", "fragments.Web: the name must be"},
+		"defaults runner":    {"  cacheability: hermetic\nfragments", "  runner: {command: [x]}\n  cacheability: hermetic\nfragments", "defaults: runner is not allowed here"},
+		"defaults use":       {"  cacheability: hermetic\nfragments", "  use: [db]\n  cacheability: hermetic\nfragments", "defaults: use is not allowed here: it belongs to a test only"},
+		"toolchain conflict": {`toolchain: {postgres: "16"}`, `toolchain: {postgres: "16", go: "1.24"}`, `environment.toolchain.go: "1.25" from defaults conflicts with "1.24" from fragment db`},
+		"probe conflict":     {"[web, db]\n", "[web, db]\n    environment: {probe: {postgres: [pg, -V]}}\n", `environment.probe.postgres: ["postgres" "--version"] from fragment db conflicts with ["pg" "-V"] from the test`},
+		"unknown var":        {`"{literal x}"`, `"{totl}"`, `unknown matrix variable {totl} in "{totl}" (the matrix has index, total)`},
+		"duplicate expanded": {`index: ["1", "2"]`, `index: ["1", "1"]`, `metadata.name "shard-1-of-2" is also the name of tests[1]`},
+		"duplicate name":     {"name: unit}", "name: shard-1-of-2}", `metadata.name "shard-1-of-2" is also the name of tests[0]`},
+		"empty matrix":       {`matrix: {index: ["1", "2"], total: ["2"]}`, `matrix: {}`, "matrix: at least one variable is required"},
+		"empty values":       {`total: ["2"]`, `total: []`, "matrix.total: at least one value is required"},
+		"bad var":            {`total: ["2"]}`, `total: ["2"], 1x: [a]}`, `matrix: invalid variable name "1x"`},
+		"invalid test":       {"name: unit}", "name: Unit}", `tests[0] (Unit): metadata.name: "Unit"`},
+		"apiVersion":         {"aval.trianalab.io/v1", "aval.trianalab.io/v2", "apiVersion"},
+		"typo":               {"fragments:", "fragmens:", "did you mean fragments?"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			doc := strings.Replace(set, tc.from, tc.to, 1)
+			if doc == set {
+				t.Fatalf("replacement %q not applied", tc.from)
+			}
+			_, err := ParseAll([]byte(doc))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("got %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseAllRootConflict(t *testing.T) {
+	doc := strings.Replace(set, `exclude: ["**/testdata/**"]`, `exclude: ["**/testdata/**"]
+    root: ..`, 1)
+	doc = strings.Replace(doc, `scope: {source: ["db/**"]}`, `scope: {source: ["db/**"], root: ../..}`, 1)
+	if _, err := ParseAll([]byte(doc)); err == nil || !strings.Contains(err.Error(), `scope.root: ".." from defaults conflicts with "../.." from fragment db`) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestParseAllTestSetEmpty(t *testing.T) {
+	_, err := ParseAll([]byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\n"))
+	if err == nil || !strings.Contains(err.Error(), "tests: at least one test is required") {
+		t.Fatalf("got %v", err)
+	}
+	// One decoding error, before any expansion.
+	if _, err := ParseAll([]byte("kind: TestSet\ntests: [1]\n")); err == nil {
+		t.Fatal("accepted a test that is not a mapping")
+	}
+}
+
+func TestParseAllMatrixLimit(t *testing.T) {
+	vals := strings.Repeat(`"x", `, 33)
+	doc := strings.Replace(set, `matrix: {index: ["1", "2"], total: ["2"]}`, "matrix: {a: ["+vals+`"y"], b: [`+vals+`"y"]}`, 1)
+	if _, err := ParseAll([]byte(doc)); err == nil || !strings.Contains(err.Error(), "more than 1024 tests") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+// Parse takes one test: a TestSet is ErrTestSet, which scope.contracts
+// reports.
+func TestParseRejectsTestSet(t *testing.T) {
+	if _, err := Parse([]byte(set)); err != ErrTestSet {
+		t.Fatalf("got %v, want ErrTestSet", err)
+	}
+}
+
+func TestLoadTestSet(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, data string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	if _, err := Load(write("many.yaml", set)); err == nil || !strings.Contains(err.Error(), "the TestSet holds 3 tests (unit, shard-1-of-2, shard-2-of-2)") {
+		t.Fatalf("got %v", err)
+	}
+	one := "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ntests:\n- {metadata: {name: unit}, runner: {command: [x]}, scope: {source: [a]}, cacheability: hermetic}\n"
+	c, err := Load(write("one.yaml", one))
+	if err != nil || c.Metadata.Name != "unit" {
+		t.Fatalf("got %v, %v", c, err)
+	}
+	if _, err := Load(write("bad.yaml", "kind: TestSet\n")); err == nil || !strings.Contains(err.Error(), "bad.yaml: ") {
+		t.Fatalf("got %v", err)
+	}
+}

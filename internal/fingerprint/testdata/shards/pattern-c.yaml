@@ -1,0 +1,17 @@
+# Every shard of examples/uv-monorepo in one TestSet. The matrix writes the
+# shard into runner.command, so each shard has its own fingerprint and no
+# variable can drift between the job that runs it and the one that pushes.
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    source: ["packages/**/*.py"]
+    dependencies: [pyproject.toml, "packages/*/pyproject.toml", uv.lock, .python-version]
+  environment:
+    toolchain: {python: "3.12", uv: "0.9.18"}
+  cacheability: hermetic
+tests:
+  - metadata: {name: "uv-monorepo-shard-{index}"}
+    runner:
+      command: [uv, run, --locked, --all-packages, pytest, packages, "--shard-id={index}", --num-shards=2]
+    matrix: {index: ["0", "1"]}

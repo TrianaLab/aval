@@ -1,0 +1,12 @@
+apiVersion: aval.trianalab.io/v1
+kind: Test
+metadata: {name: integration}
+runner: {command: [go, test, -tags=integration, ./...]}
+scope:
+  source: ["web/**", "db/**", "VERSION"]
+  exclude: ["**/testdata/**"]
+  dependencies: ["go.sum"]
+environment:
+  toolchain: {postgres: "16", go: "1.25"}
+  env: [DB_URL, CI]
+cacheability: controlled-environment
