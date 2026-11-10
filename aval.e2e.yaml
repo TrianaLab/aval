@@ -25,6 +25,8 @@ scope:
     - "docs/quickstart.md"
     # tests/acceptance runs the history estimate script.
     - "scripts/estimate-reuse.sh"
+    # tests/acceptance runs the GitHub action's scripts (#211).
+    - "integrations/github/**"
   # Redundant since #63 (Aval never hashes .aval/), kept so the canonical
   # contract, and with it the published results, stay the same.
   exclude: ["**/.aval/**"]

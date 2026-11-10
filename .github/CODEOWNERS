@@ -4,6 +4,8 @@
 /.github/aval/ @edu-diaz
 /.github/workflows/ @edu-diaz
 /.github/CODEOWNERS @edu-diaz
+# The GitHub actions fetch the policy and enforce split credentials (#211).
+/integrations/ @edu-diaz
 /tests/architecture/ @edu-diaz
 /AGENTS.md @edu-diaz
 # The dogfood contracts and the Makefile targets they run: they decide what

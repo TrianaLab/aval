@@ -1,0 +1,5 @@
+# Workflow lint tools (make lint-actions, ci.yaml ci-static). This is the
+# input; requirements-lint.txt pins every package with sha256 hashes:
+#   uv pip compile --universal --python-version 3.12 --generate-hashes \
+#     --no-header .github/requirements-lint.in -o .github/requirements-lint.txt
+zizmor==1.32.0
