@@ -253,7 +253,9 @@ On a mismatch, a probe that cannot start, a non-zero exit, a timeout or
 output over 4 KiB (it is signed into the predicate),
 `aval run` looks nothing up (outcome `error`; the reason names the probe, the
 declared and the observed value), runs the test, records and publishes
-nothing, and exits 1 (3 if the test failed). On a match, the output goes into
+nothing, warns `aval: warning: result not recorded: <reason>`, and exits with
+the test's code (0 passed, 3 failed). With `--push` it exits 1 instead
+(`result not published: <reason>`), or 3 if the test failed. On a match, the output goes into
 the predicate's `execution.environment` as `probe.<key>`.
 
 Only `aval run` executes probes. `aval verify`, `aval push`,

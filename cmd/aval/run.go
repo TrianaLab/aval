@@ -609,10 +609,15 @@ func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract
 // fingerprint there is nothing a result could be reused for; with
 // unacknowledged mutable references (pinErr) nothing may reuse it, so it is
 // recorded but not published. After a failed probe it is not even recorded,
-// so 'aval push' cannot publish it.
+// so 'aval push' cannot publish it; only --push turns that into an error,
+// otherwise the suite's verdict decides the exit code (#197).
 func keep(ctx context.Context, w cliout.Run, sum *cliout.Summary, c *contract.Contract, p *evidence.Predicate, fpErr, probeErr, pinErr error, token string, o runFlags) []error {
 	if probeErr != nil {
-		return []error{fmt.Errorf("result not recorded: %w", probeErr)}
+		if o.push {
+			return []error{fmt.Errorf("result not published: %w", probeErr)}
+		}
+		fmt.Fprintf(w.Err, "aval: warning: result not recorded: %s\n", cliout.OneLine(probeErr.Error()))
+		return nil
 	}
 	if fpErr != nil {
 		if o.push {

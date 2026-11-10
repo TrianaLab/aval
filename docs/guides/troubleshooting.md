@@ -50,7 +50,7 @@ flowchart LR
 
 - `aval verify` exits 1.
 - `aval run` prints outcome `error`, warns `aval: warning: reuse off: <message>`, runs the test and exits with its code.
-- `aval run` exits 1 only when the test cannot start, a probe fails or the result cannot be published.
+- `aval run` exits 1 only when the test cannot start or the result cannot be published. A failed `environment.probe` warns `result not recorded` and follows the test's code; with `--push` it exits 1 (`result not published`).
 
 ??? failure "Fingerprint and trust policy"
     | Message | Fix |

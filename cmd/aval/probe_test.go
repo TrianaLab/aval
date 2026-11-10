@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TrianaLab/aval/internal/registry"
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
@@ -72,7 +74,9 @@ func TestProbeMatchRecordsObserved(t *testing.T) {
 }
 
 // Every probe failure: no lookup, the test runs, nothing is recorded or
-// published, exit 1, and the reason names the probe, declared and observed.
+// published, and the reason names the probe, declared and observed. Without
+// --push the suite's verdict is the exit code and a warning says the result
+// was not recorded; with --push it is exit 1, or 3 when the test failed (#197).
 func TestProbeFailureRunsAndPublishesNothing(t *testing.T) {
 	for name, tc := range map[string]struct {
 		probe []string
@@ -85,28 +89,81 @@ func TestProbeFailureRunsAndPublishesNothing(t *testing.T) {
 		"non-zero":    {[]string{"sh", "-c", "echo Python 3.13.1; exit 2"}, "exit status 2"},
 		"timeout":     {[]string{"sleep", "5"}, "timed out after 1s"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			if name == "timeout" {
-				old := probeTimeout
-				t.Cleanup(func() { probeTimeout = old })
-				probeTimeout = time.Second
-			}
-			noLookup(t)
-			signed := fakePublish(t, nil, nil)
-			argv, ran := marker(t, 0)
-			c := probeContract(t, `{tool: "3.13"}`, tc.probe, argv...)
-			dir := t.TempDir()
-			res, rep := filepath.Join(dir, "r.json"), filepath.Join(dir, "rep.json")
-			code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--push", "--result-file", res, "--report-file", rep)
-			r := readReport(t, rep)
-			if code != ExitError || !ran() || len(*signed) != 0 || r.Outcome != evidence.OutcomeError ||
-				!strings.Contains(r.Reason, "environment.probe tool") || !strings.Contains(r.Reason, tc.want) || !strings.Contains(stderr, "result not recorded") {
-				t.Fatalf("exit %d, ran %v, signed %d, report %+v\nstdout %q\nstderr %q", code, ran(), len(*signed), r, stdout, stderr)
-			}
-			if _, err := os.Stat(res); !os.IsNotExist(err) {
-				t.Fatalf("result recorded: %v", err)
-			}
-		})
+		for _, m := range []struct {
+			push       bool
+			testExit   int
+			code       int
+			stderrWant string
+		}{
+			{false, 0, ExitOK, "aval: warning: result not recorded: environment.probe tool"},
+			{false, 1, ExitTestFailed, "aval: warning: result not recorded: environment.probe tool"},
+			{true, 0, ExitError, "result not published: environment.probe tool"},
+			{true, 1, ExitTestFailed, "result not published: environment.probe tool"},
+		} {
+			t.Run(fmt.Sprintf("%s/push=%v/exit=%d", name, m.push, m.testExit), func(t *testing.T) {
+				if name == "timeout" {
+					old := probeTimeout
+					t.Cleanup(func() { probeTimeout = old })
+					probeTimeout = time.Second
+				}
+				noLookup(t)
+				signed := fakePublish(t, nil, nil)
+				argv, ran := marker(t, m.testExit)
+				c := probeContract(t, `{tool: "3.13"}`, tc.probe, argv...)
+				dir := t.TempDir()
+				res, rep := filepath.Join(dir, "r.json"), filepath.Join(dir, "rep.json")
+				args := []string{"run", "-f", c, "--registry", "reg.example/r", "--result-file", res, "--report-file", rep}
+				if m.push {
+					args = append(args, "--push")
+				}
+				code, stdout, stderr := runCLI(args...)
+				r := readReport(t, rep)
+				if code != m.code || !ran() || len(*signed) != 0 || r.Outcome != evidence.OutcomeError ||
+					!strings.Contains(r.Reason, "environment.probe tool") || !strings.Contains(r.Reason, tc.want) || !strings.Contains(stderr, m.stderrWant) {
+					t.Fatalf("exit %d, ran %v, signed %d, report %+v\nstdout %q\nstderr %q", code, ran(), len(*signed), r, stdout, stderr)
+				}
+				if _, err := os.Stat(res); !os.IsNotExist(err) {
+					t.Fatalf("result recorded: %v", err)
+				}
+			})
+		}
+	}
+}
+
+// Trust case: a probe-failed run leaves nothing for 'aval push' to publish,
+// even when the run itself exited 0.
+func TestProbeFailureLeavesNothingToPush(t *testing.T) {
+	noLookup(t)
+	signed := fakePublish(t, nil, nil)
+	c := probeContract(t, `{tool: "3.13"}`, []string{"sh", "-c", "echo Python 3.12.4"}, "true")
+	res := filepath.Join(t.TempDir(), "r.json")
+	if code, _, stderr := runCLI("run", "-f", c, "--result-file", res); code != ExitOK {
+		t.Fatalf("run: exit %d, stderr %q", code, stderr)
+	}
+	key, _ := devKey(t, t.TempDir(), "k")
+	code, _, stderr := runCLI("push", "-f", c, "--registry", "reg.example/r", "--key", key, "--result-file", res)
+	if code != ExitError || len(*signed) != 0 || !strings.Contains(stderr, "run aval run first") {
+		t.Fatalf("push: exit %d, signed %d, stderr %q", code, len(*signed), stderr)
+	}
+}
+
+// False-hit case: a valid, trusted attestation for the fingerprint is never
+// looked up, verified or reused after a probe failure; the test runs.
+func TestProbeFailureNeverReusesAVerifiedResult(t *testing.T) {
+	fakeCandidates(t, nil, map[string]candidate{"sha256:aa": {trust: evidence.TrustRunner}})
+	looked := false
+	lk := lookup
+	lookup = func(ctx context.Context, repo, fp string) ([]registry.Descriptor, error) {
+		looked = true
+		return lk(ctx, repo, fp)
+	}
+	argv, ran := marker(t, 0)
+	c := probeContract(t, `{tool: "3.13"}`, []string{"sh", "-c", "echo Python 3.12.4"}, argv...)
+	rep := filepath.Join(t.TempDir(), "rep.json")
+	code, stdout, stderr := runCLI("run", "-f", c, "--registry", "reg.example/r", "--policy", "p.yaml", "--report-file", rep, "--result-file", filepath.Join(t.TempDir(), "r.json"))
+	r := readReport(t, rep)
+	if code != ExitOK || looked || !ran() || r.Outcome != evidence.OutcomeError || strings.Contains(stdout, "reused") {
+		t.Fatalf("exit %d, looked up %v, ran %v, report %+v\nstdout %q\nstderr %q", code, looked, ran(), r, stdout, stderr)
 	}
 }
 
