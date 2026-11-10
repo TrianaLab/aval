@@ -79,6 +79,13 @@ var levels = map[string]evidence.TrustLevel{
 	"isolated":  evidence.TrustIsolated,
 }
 
+// ParseTrustLevel parses a trust level name as the policy writes it:
+// developer, runner or isolated.
+func ParseTrustLevel(name string) (evidence.TrustLevel, bool) {
+	l, ok := levels[name]
+	return l, ok
+}
+
 // Load reads a policy file. Relative trustedRoot and publicKey paths are
 // resolved against the file's directory.
 func Load(path string) (*Policy, error) {

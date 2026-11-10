@@ -51,6 +51,11 @@ import (
 // layout changes, so old and new fingerprints never collide.
 const Version = "aval-fingerprint/v2"
 
+// ErrContract marks a contract that is valid on its own but does not fit
+// the files in its scope, such as a scope.allowMutable files glob that
+// matches none. Like an invalid contract, it is the author's to fix.
+var ErrContract = errors.New("invalid contract")
+
 // Fingerprint is the result of Compute.
 type Fingerprint struct {
 	// Digest is "sha256:<hex>" over Manifest.
@@ -283,7 +288,10 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 	if err != nil {
 		return Fingerprint{}, err
 	}
-	found := findings(fsys, c, slices.Concat(src, dep))
+	found, err := findings(fsys, c, slices.Concat(src, dep))
+	if err != nil {
+		return Fingerprint{}, err
+	}
 	for _, d := range refs {
 		lines = append(lines, fmt.Sprintf("contract %s %s %s", d.Path, d.Name, d.Digest))
 		// A referenced contract's findings block this one too; its own
@@ -375,10 +383,13 @@ func canonicalResolve(refs []contract.Reference) []contract.Reference {
 // runner.command, and marks the findings scope.allowMutable acknowledges.
 // scope.resolve never clears a finding: it binds an id into the manifest,
 // but cannot prove that id is what runs (invariant 3).
-func findings(fsys fs.FS, c *contract.Contract, lines []string) []pinning.Finding {
+func findings(fsys fs.FS, c *contract.Contract, lines []string) ([]pinning.Finding, error) {
 	paths := make([]string, len(lines))
 	for i, l := range lines {
 		paths[i] = strings.SplitN(l, " ", 4)[3] // kind sum mode path
+	}
+	if err := unmatchedFiles(c.Scope.AllowMutable, paths); err != nil {
+		return nil, err
 	}
 	out := pinning.Scan(fsys, paths, c.Runner.Command)
 	files := map[string]map[string]bool{} // ref -> files reporting it
@@ -394,19 +405,47 @@ func findings(fsys fs.FS, c *contract.Contract, lines []string) []pinning.Findin
 		}
 		ambiguous := false
 		for _, a := range c.Scope.AllowMutable {
-			switch {
-			case a.Ref != out[i].Ref || a.File != "" && a.File != out[i].File:
-			case a.File == "" && len(files[a.Ref]) > 1: // which file it means is unprovable: fail closed
-				ambiguous = true
-			default:
+			ok, amb := accepts(a, out[i], len(files[a.Ref]))
+			if ok {
 				out[i].Allowed = a.Reason
 			}
+			ambiguous = ambiguous || amb
 		}
 		if ambiguous && out[i].Allowed == "" {
 			out[i].Fix += fmt.Sprintf("; scope.allowMutable lists this ref without file:, and %d files report it: add file: %s to the entry", len(files[out[i].Ref]), out[i].File)
 		}
 	}
-	return out
+	return out, nil
+}
+
+// accepts reports whether the entry a accepts the finding f, whose ref
+// reporting files report, or whether it names f's ref ambiguously.
+func accepts(a contract.AllowMutable, f pinning.Finding, reporting int) (ok, ambiguous bool) {
+	switch {
+	case a.Ref != f.Ref:
+		return false, false
+	case len(a.Files) > 0: // in-scope files only: runner.command is not one
+		return f.File != pinning.CommandFile && slices.ContainsFunc(a.Files, func(g string) bool { return contract.Match(g, f.File) }), false
+	case a.File != "":
+		return a.File == f.File, false
+	}
+	// Without file or files, which file it means is unprovable when several
+	// report the ref: fail closed.
+	return reporting == 1, reporting > 1
+}
+
+// unmatchedFiles rejects a scope.allowMutable files glob that matches none
+// of paths, the files in scope: like an unmatched scope glob, it is a typo
+// or a stale entry.
+func unmatchedFiles(allow []contract.AllowMutable, paths []string) error {
+	for i, a := range allow {
+		for j, g := range a.Files {
+			if !slices.ContainsFunc(paths, func(p string) bool { return contract.Match(g, p) }) {
+				return fmt.Errorf("%w: scope.allowMutable[%d].files[%d]: glob %q matches no file in scope", ErrContract, i, j, g)
+			}
+		}
+	}
+	return nil
 }
 
 // canonicalContract serializes the contract so that formatting, comments and
@@ -431,10 +470,15 @@ func canonicalContract(c *contract.Contract) []byte {
 	cc.Scope.Dependencies = sorted(c.Scope.Dependencies)
 	cc.Environment.Env = sorted(c.Environment.Env)
 	cc.Scope.AllowMutable = slices.Clone(c.Scope.AllowMutable)
+	for i := range cc.Scope.AllowMutable {
+		cc.Scope.AllowMutable[i].Files = sorted(cc.Scope.AllowMutable[i].Files)
+	}
 	slices.SortFunc(cc.Scope.AllowMutable, func(a, b contract.AllowMutable) int {
-		return cmp.Or(strings.Compare(a.File, b.File), strings.Compare(a.Ref, b.Ref), strings.Compare(a.Reason, b.Reason))
+		return cmp.Or(strings.Compare(a.File, b.File), slices.Compare(a.Files, b.Files), strings.Compare(a.Ref, b.Ref), strings.Compare(a.Reason, b.Reason))
 	})
-	cc.Scope.AllowMutable = slices.Compact(cc.Scope.AllowMutable)
+	cc.Scope.AllowMutable = slices.CompactFunc(cc.Scope.AllowMutable, func(a, b contract.AllowMutable) bool {
+		return a.File == b.File && slices.Equal(a.Files, b.Files) && a.Ref == b.Ref && a.Reason == b.Reason
+	})
 	cc.Scope.Resolve = canonicalResolve(c.Scope.Resolve)
 	cc.Scope.Contracts = sorted(c.Scope.Contracts)
 	cc.Outputs = sorted(c.Outputs)
