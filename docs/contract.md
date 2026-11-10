@@ -157,11 +157,11 @@ does not accept is a miss, and its result is not published
 ## What goes into the fingerprint
 
 The fingerprint is `sha256:<hex>` of a line-oriented manifest (format
-`aval-fingerprint/v1`). `aval explain` prints the exact text that was
+`aval-fingerprint/v2`). `aval explain` prints the exact text that was
 hashed, in this order:
 
 ```text
-aval-fingerprint/v1
+aval-fingerprint/v2
 contract <sha256 of canonical contract JSON>
 source <sha256> <mode> <path>
 dependency <sha256> <mode> <path>
@@ -173,7 +173,7 @@ contract <path> <name> <fingerprint>
 
 | Line | Holds | Not affected by |
 |---|---|---|
-| header | `aval-fingerprint/v1`, bumped when an existing contract's manifest would change | |
+| header | `aval-fingerprint/v2`, bumped when an existing contract's manifest would change | |
 | `contract` | sha256 of the parsed contract as JSON | comments, formatting, key order, the order and duplicates of set-like lists (argv order counts; an empty list equals an omitted one) |
 | `source`, `dependency` | sha256 of the content, `x` (any exec bit) or `-`, path. A file in both sets appears twice | owner, timestamps, other permission bits |
 | `toolchain` | `key=value` as written; checked against the installed tools only by `environment.probe` | |
@@ -190,7 +190,7 @@ executable file fingerprints differently there than on Unix.
 | Not hashed | Note |
 |---|---|
 | files no `source` or `dependencies` glob matches | the main risk: keep the scope honest |
-| `.git` directories | exact name; a regular `.git` file is hashed |
+| `.git` (directory, file or symlink) | exact name, at any depth; covers linked worktrees and submodules. An exact glob such as `pkg/.git` matches no file and fails |
 | `.aval/` directories and the command's `--result-file`/`--report-file` files | so `["**"]` stays stable; keep them under `.aval/`. A path in scope that holds a real input exits 2. In a `scope.contracts` reference they stay inputs (a miss, never a false hit) |
 | commit, branch, VCS metadata | two commits with the same scope share a result |
 | environment variables not in `environment.env` | |
@@ -208,6 +208,8 @@ depends on one of these can reuse a result it should not:
   network service: use `scope.resolve` or `external-dependencies`
 - the installed toolchain, OS and architecture, unless `environment.probe`
   checks the toolchain entry
+- git state the test reads (log, worktree or submodule layout), the same as
+  commit and branch
 
 Mitigation: review the contract, use `aval run --shadow`, pick the right
 cacheability class.
@@ -269,7 +271,8 @@ fingerprint; its output is not hashed, since it varies by build and platform.
 
 `aval.trianalab.io/v1` is frozen; policy files use the same value. Within v1
 the schema only gets new optional fields. An older `aval` rejects a field it
-does not know, which fails closed.
+does not know, which fails closed: a policy with the optional `registry`
+field (#209) fails to load in an older `aval`, so nothing is reused.
 
 `aval.dev/v1alpha1` is rejected: change that line. Rules:
 [artifact format](artifact-format.md#versioning-and-compatibility).

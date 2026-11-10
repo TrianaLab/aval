@@ -209,7 +209,7 @@ func goldenResolve(_ context.Context, refs []contract.Reference) ([]resolve.Resu
 // manifest version; goldens of older versions stay as a record.
 var resolveGolden = filepath.Join(filepath.Dir(goldenFile(Version)), "resolve-"+filepath.Base(goldenFile(Version)))
 
-// TestResolveManifestGolden pins the resolve lines of aval-fingerprint/v1:
+// TestResolveManifestGolden pins the resolve lines of the current manifest version:
 // one per reference, sorted by kind and reference, after the env lines. The
 // manifests without scope.resolve are pinned by TestManifestGolden.
 func TestResolveManifestGolden(t *testing.T) {

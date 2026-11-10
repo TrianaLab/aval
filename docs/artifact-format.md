@@ -33,7 +33,7 @@ The bundle layer uses the Sigstore media type
 annotation `io.trianalab.aval.fingerprint` (informational, frozen: verification
 reads the fingerprint from the signed predicate); the stats anchor carries
 `io.trianalab.aval.test` (provisional) with the test id. The contract
-`apiVersion` and the `aval-fingerprint/v1` manifest version are also frozen
+`apiVersion` and the `aval-fingerprint/v2` manifest version are also frozen
 (see the table under [Versioning](#versioning-and-compatibility)).
 
 ## OCI layout
@@ -150,7 +150,7 @@ reading. Each of these is a verification failure, never a miss:
 - the manifest's layers differ from the predicate's list (extra, missing,
   renamed or reordered)
 - a path that matches no `outputs` glob, is the contract file, is in scope
-  or under `.git` or `.aval`; a glob that matches no path; a predicate without outputs for a
+  or is or lies under a `.git` entry (directory or file) or `.aval`; a glob that matches no path; a predicate without outputs for a
   contract with `outputs`, or the reverse
 
 `aval run` then writes the files: each is staged next to its target and
@@ -457,7 +457,7 @@ checked by `Predicate.Validate` (called by `evidence.Parse`).
 | `result` | string | yes | `passed` or `failed`. |
 | `execution` | object | | This run: its inputs and conditions. |
 | `execution.fingerprint` | string | yes, `sha256:<64 hex>` | Fingerprint over the declared inputs. |
-| `execution.fingerprintVersion` | string | | Manifest format, e.g. `aval-fingerprint/v1`. |
+| `execution.fingerprintVersion` | string | | Manifest format, e.g. `aval-fingerprint/v2`. |
 | `execution.environment` | map string to string | no (omitted when empty) | Conditions of the run (toolchain, OS/arch). Only keys declared under `environment.toolchain` in `aval.yaml` are part of the fingerprint; anything else here is informational. `os` and `arch` are always the real values, whatever the toolchain declares; `probe.<key>` is the output of an `environment.probe`. |
 | `execution.exitCode` | integer | | Exit code of `runner.command`. |
 | `execution.outputs` | object | no (omitted without contract `outputs`) | The [outputs](#outputs) of the run. |
@@ -500,7 +500,7 @@ put secrets there: the predicate is published to the registry.
   "result": "passed",
   "execution": {
     "fingerprint": "sha256:3f9a7c2e1b4d5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7",
-    "fingerprintVersion": "aval-fingerprint/v1",
+    "fingerprintVersion": "aval-fingerprint/v2",
     "environment": {
       "go": "1.25",
       "os": "linux",
@@ -607,7 +607,7 @@ These rules apply to every frozen format:
 | Run record and stats anchor | `RunRecordVersion`, `ArtifactTypeRun`, `MediaTypeRun`, `ArtifactTypeStats` | `run-record/v1`, `run.v1`, `stats.v1` (provisional) |
 | Stats report | `StatsReportVersion` | `aval.trianalab.io/stats-report/v1` (provisional) |
 | Contract and policy file | `apiVersion` | `aval.trianalab.io/v1` |
-| Fingerprint manifest | header line, `execution.fingerprintVersion` | `aval-fingerprint/v1` |
+| Fingerprint manifest | header line, `execution.fingerprintVersion` | `aval-fingerprint/v2` |
 
 The predicate keeps `v2`: `v1` was used before and an identifier is never
 recycled, and `v2` is already under `aval.trianalab.io` and is what v0.1.0
@@ -701,3 +701,8 @@ version adds a new file. The tests that enforce this:
       and the outputs manifest (`outputs.v1`, `output.v1`) was added; the
       contract gained `outputs`, omitted when empty, so no existing
       fingerprint changes.
+    - `aval-fingerprint/v1` became `aval-fingerprint/v2` (#199) when a
+      `.git` file or symlink (the gitfile of a linked worktree or submodule)
+      stopped being hashed, like a `.git` directory. Every existing
+      attestation is a miss once and the tests run again; there is no
+      lookup by v1.

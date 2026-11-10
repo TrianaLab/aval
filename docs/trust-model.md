@@ -86,6 +86,7 @@ allowedCacheability: [external-dependencies]
 | `minTrustLevel` | the lowest level a result needs to be reused. |
 | `allowedCacheability` | classes reused besides `hermetic` and `controlled-environment`; only `external-dependencies` has an effect, and `non-deterministic` is rejected. |
 | `trustedRoot` | a pinned Sigstore trusted root for keyless signatures; without it, the public-good root is fetched. |
+| `registry` | optional: the OCI repository of attestations (`host/name`), used by `aval run` and `aval verify` when neither `--registry` nor `AVAL_REGISTRY` is set. No credentials: a value with `user:password@` (or any `@`) exits 2. Logins come from the credential store. |
 
 <!-- --8<-- [end:policy-fields] -->
 
@@ -160,14 +161,18 @@ Policies with only `publicKey` identities never fetch anything.
 A pull request can change any file in its checkout. If its CI job reads
 `--policy` (or `--registry`) from that checkout, the PR can add its own
 signing identity, sign a passing result for its own inputs, and get a green
-check it wrote itself. Read the policy and the registry from the default
-branch instead. Not from `github.base_ref`: a PR can target any branch,
+check it wrote itself. Read the policy, and with it the registry, from the
+default branch instead. Not from `github.base_ref`: a PR can target any branch,
 including one its author controls.
 
 `AVAL_POLICY` and `AVAL_REGISTRY` count the same as the flags (a flag wins;
 empty is unset). Set them in the step, or from the default branch as below,
-never from a file in the checkout. Aval reads them from no file: there is no
-config file and no `aval.yaml` field.
+never from a file in the checkout. The registry has one more source, the
+policy's `registry` field: `--registry` > `AVAL_REGISTRY` > policy, and the
+`config:` line names the source that won (`registry=<x> (policy <file>)`).
+The policy is trusted only because it comes from the protected branch, so its
+registry is too. Nothing else names them: there is no config file and no
+`aval.yaml` or TestSet field.
 
 ```yaml
 on: pull_request
@@ -186,11 +191,13 @@ jobs:
         run: |
           git fetch --no-tags --depth=1 origin "+refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
           git show "origin/$DEFAULT_BRANCH:.aval/policy.yaml" > "$RUNNER_TEMP/policy.yaml"
-      - run: aval run --registry ghcr.io/acme/orders-aval --policy "$RUNNER_TEMP/policy.yaml"
+      - run: aval run --policy "$RUNNER_TEMP/policy.yaml"
 ```
 
-Keep the registry out of files the PR can change for its own run, too: write
-it in the step, or read it from the default branch the same way. A
+Here the registry is the policy's `registry` field, read from the default
+branch with the policy. Keep it out of files the PR can change for its own
+run: put it in that policy, write it in the step, or read it from the default
+branch the same way. A
 `trustedRoot` path in the policy resolves next to the temp file, so read that
 file from the default branch as well, or use the default root.
 
@@ -282,5 +289,5 @@ contract's is a verification failure.
 | Content behind a declared name changed (repushed image tag, new upstream release, changed remote script) | The scanner reports the mutable references it recognizes in the scope and `runner.command`; for `hermetic` and `controlled-environment` an unaccepted one makes the lookup a `miss` and blocks publishing. Accepting one needs `scope.allowMutable`, which changes the fingerprint and shows in review. References it does not recognize stay a known gap ([Pin your dependencies](pinning.md)). |
 | Registry compromise (attacker can write arbitrary manifests and tags) | Cannot forge signatures, so it cannot produce reuse on its own; injected attestations show up as `verification-failed`, or, when another candidate verifies, as a `rejected` entry with an `aval: SECURITY: ...` line on stderr that blocks reuse and exits 5. It can delete attestations (forcing re-runs) or deny service (re-run), for example by pushing more than 64 attestations for a fingerprint, which is `verification-failed` (exit 5) with an `aval: SECURITY:` line as a possible flooding attempt. Availability is out of scope. |
 | Forged or tampered run records (anyone with push access) | Unsigned statistics, never read by `aval run` or `aval verify`; `aval stats` skips malformed records and caps how many it reads. |
-| Pull request that edits the policy or registry its own CI reads | Read both from the default branch ([Take the policy from a protected branch](#take-the-policy-from-a-protected-branch)) and verify with a pinned `aval` release. The workflow file still comes from the PR, so a hostile PR can make its own check green; required code-owner review keeps it off the default branch, which trusts only its own CI. |
+| Pull request that edits the policy or registry its own CI reads | Read both from the default branch (the registry can live in the policy's `registry` field, so one file read from the protected branch carries both; `aval.yaml`, TestSets and config files cannot name it) ([Take the policy from a protected branch](#take-the-policy-from-a-protected-branch)) and verify with a pinned `aval` release. The workflow file still comes from the PR, so a hostile PR can make its own check green; required code-owner review keeps it off the default branch, which trusts only its own CI. |
 | Dishonest but trusted signer (ran a modified test and signed "passed") | Out of scope for Aval. A signature proves who claims it, not that the test ran honestly. Limit which identities get which level; level 3 (isolated) exists for this. |

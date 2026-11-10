@@ -1,0 +1,20 @@
+aval-fingerprint/v2
+contract 837aeaaffb4d19562f1a30007fecc11cffd3a7c066b93598054ed59a21fab912
+source fa6ccea1ca4e3a031d9e99f25cc05db803aa9bac642c000ddab14f6d9da54b52 - compose.yaml
+source df1d036cbbf3df46e2045071e082245ece204c7f53ecf0a4e022bff9bb228f47 - main.go
+source 7b39baa38a2ec2b8d111bbbd8e448e80226477ab40105d9d2123d4dc18067438 - pkg/a/a.go
+dependency d4e972075031dd5d2bb756563d9fd6043ae8bb5210214b70436f0a3fde885cd7 - go.sum
+toolchain docker=27
+toolchain go=1.25
+env DB_IMAGE 59ab5ab3c94d2f5bf4f2895b2c7d1ee62ccb27127ac7f9da36862593d17ed34e
+env MODE unset
+resolve crate crate-ref 1.0.0 sha256:017b6364c4b2c09c0e73e6aed610f577eda2cf6c053b593e9b9569df8685ae12
+resolve gem gem-ref 1.0.0 sha256:fa3490614052224fc9c80de4057d8002ac8903878a64ae7cff0e10ebcb60af82
+resolve git git-ref 1.0.0 sha256:712dfa95bc62f9143a7f231a4f216806aeab15602fd551d8ed30d2458a83e30d
+resolve go go-ref 1.0.0 sha256:d91ab92e6b781270dfe72fa45812479f451785947b1e9e46a8844301ff257f7d
+resolve image image-ref 1.0.0 sha256:c5f6e6910e8488b2a91bd2fa208c9f3df739ec13f3429f48792945f40b11179d
+resolve maven maven-ref 1.0.0 sha256:92c619d03b72c3f0ee39396a2a25f72b6fcfba8e8e3e0756b2789bebae9d6263
+resolve npm a@^1 1.0.0 sha256:0402472d528d630f0237493ad92fc49d6a9c5fbbf446d41b871bcfc9334868d5
+resolve npm npm-ref 1.0.0 sha256:0a0d54a2734ace1f423c95644322efc5b576775107ee3a3f42203784da93f71a
+resolve pypi pypi-ref 1.0.0 sha256:b41d69e11ad0f2d8c738639ff5cc7ba6eebc671c2225de449c05f06cce3ea38c
+resolve url url-ref 1.0.0 sha256:988dc1d4e255647f82c10ac4519c9178f1d38bf4be1fde865092da3395e6cbbe
