@@ -186,4 +186,5 @@ docker rm -f aval-registry
 ```
 
 Next: [write a contract](guides/write-a-contract.md), then
-[use GitHub Actions](guides/github-actions.md).
+[use GitHub Actions](guides/github-actions.md). Already have CI for a
+monorepo? [Integrate Aval in 5 files](guides/integrate-in-5-files.md).

@@ -243,6 +243,12 @@ func TestActionsArePinnedBySHA(t *testing.T) {
 		t.Fatalf("no actions under integrations/github: %v", err)
 	}
 	files = append(files, actions...)
+	// So do the example workflows readers copy (#217).
+	examples, err := filepath.Glob(filepath.Join("..", "..", "examples", "*", ".github", "workflows", "*.y*ml"))
+	if err != nil || len(examples) == 0 {
+		t.Fatalf("no example workflows: %v", err)
+	}
+	files = append(files, examples...)
 	for _, f := range files {
 		data, err := os.ReadFile(f)
 		if err != nil {

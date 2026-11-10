@@ -99,10 +99,11 @@ lint:
 	GOOS=js GOARCH=wasm go vet ./cmd/aval-wasm
 	GOOS=js GOARCH=wasm golangci-lint run ./cmd/aval-wasm
 	cd examples/evidence-consumer && golangci-lint run ./...
-	shellcheck scripts/*.sh docs/assets/tapes/*.sh integrations/github/*/*.sh
+	shellcheck scripts/*.sh docs/assets/tapes/*.sh integrations/github/*/*.sh examples/github-monorepo/*/*.sh
 
 # The workflows (actionlint, with shellcheck on their run: scripts) and the
-# GitHub actions under integrations/ (zizmor; offline, so no network audits).
+# GitHub actions under integrations/ (zizmor; offline, so no network audits),
+# plus the workflow of examples/github-monorepo, which readers copy (#217).
 # actionlint is installed into bin/ like govulncheck; zizmor comes from
 # `pip install --require-hashes -r .github/requirements-lint.txt` and must be
 # this version.
@@ -112,9 +113,10 @@ ZIZMOR_VERSION := 1.32.0
 lint-actions:
 	GOBIN=$(CURDIR)/bin go install github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 	bin/actionlint
+	bin/actionlint examples/github-monorepo/.github/workflows/ci.yml
 	@v=$$(zizmor --version 2>/dev/null | awk '{print $$2}'); if [ "$$v" != "$(ZIZMOR_VERSION)" ]; then \
 		echo "zizmor $(ZIZMOR_VERSION) required, found $${v:-none}"; exit 1; fi
-	zizmor --offline integrations/github
+	zizmor --offline integrations/github examples/github-monorepo/.github
 
 fmt:
 	gofmt -w .

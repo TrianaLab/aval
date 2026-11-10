@@ -1,0 +1,4 @@
+# A workload the end-to-end suite deploys next to the app.
+name: podinfo
+image: ghcr.io/stefanprodan/podinfo:6.5.0
+replicas: 1

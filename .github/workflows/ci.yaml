@@ -550,6 +550,77 @@ jobs:
             bin/aval verify -f integrations/github/publish/testdata/aval.yaml --test "$t" --policy integrations/github/publish/testdata/policy.yaml
           done
 
+  # The run action on examples/github-monorepo (#217), on every event
+  # against the real contents API: the PR edits the example's trust policy
+  # to trust any GitHub workflow, registry included, and the action must
+  # still use the default branch's copy (or none, before it exists there),
+  # so nothing the edit trusts is reused. bin/aval is built from the commit,
+  # because the action's pinned release has no --test yet.
+  # TODO(milestone-14): uses: ./integrations/github/run once its pin has --test (#213, #216).
+  example-github-monorepo:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/github-monorepo
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Build aval
+        working-directory: .
+        run: go build -o "$RUNNER_TEMP/aval" ./cmd/aval
+      - name: The pull request edits the trust policy
+        run: |
+          cat > .github/aval/policy.yaml <<'EOF'
+          apiVersion: aval.trianalab.io/v1
+          kind: Policy
+          registry: ghcr.io/attacker/results
+          minTrustLevel: developer
+          identities:
+            - issuer: https://token.actions.githubusercontent.com
+              subjectRegexp: https://github\.com/.*
+              trustLevel: isolated
+          EOF
+      - name: The run action's scripts
+        id: run
+        env:
+          INPUT_TEST: unit
+          INPUT_FILE: aval.yaml
+          INPUT_POLICY: examples/github-monorepo/.github/aval/policy.yaml
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          AVAL="$RUNNER_TEMP/aval" /bin/bash ../../integrations/github/run/guard.sh
+          AVAL="$RUNNER_TEMP/aval" /bin/bash ../../integrations/github/run/run.sh | tee "$RUNNER_TEMP/run.log"
+      - name: The policy edited in the PR was ignored
+        env:
+          OUTCOME: ${{ steps.run.outputs.outcome }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          fetched="$RUNNER_TEMP/aval-policy-unit.yaml"
+          path=examples/github-monorepo/.github/aval/policy.yaml
+          /usr/bin/git fetch --no-tags --depth=1 origin "+refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          if /usr/bin/git show "origin/$DEFAULT_BRANCH:$path" > "$RUNNER_TEMP/main-policy.yaml" 2> /dev/null; then
+            cmp "$fetched" "$RUNNER_TEMP/main-policy.yaml"
+          else
+            test ! -e "$fetched"
+            grep -q "no trust policy at $path in the default branch" "$RUNNER_TEMP/run.log"
+          fi
+          if [ -e "$fetched" ] && cmp -s "$fetched" .github/aval/policy.yaml; then
+            echo "::error::the run action used the policy from the checkout"
+            exit 1
+          fi
+          if grep -q attacker "$RUNNER_TEMP/run.log" || [ "$OUTCOME" = verified ]; then
+            echo "::error::the run action trusted the PR's policy (outcome $OUTCOME)"
+            exit 1
+          fi
+          echo "outcome $OUTCOME: the PR's policy was ignored"
+
   # Dogfooding M1 (#28): Aval's own contract must fingerprint identically on
   # every OS and checkout path. Any difference is a determinism bug. CI-only
   # (needs several OSes), so it has no `make` leg.
@@ -873,6 +944,7 @@ jobs:
       - example-go-compose
       - publish-action-suite
       - publish-action
+      - example-github-monorepo
       - dogfood-fingerprint
       - dogfood-compare
       - dogfood-shadow
