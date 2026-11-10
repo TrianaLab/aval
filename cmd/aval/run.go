@@ -248,6 +248,10 @@ func (o runFlags) preflight() (string, error) {
 	}
 	if o.test != "" && !o.fingerprintOnly {
 		// o.test is the metadata.name of a loaded test: one path segment.
+		// A symlinked .aval would make RemoveAll delete outside the tree.
+		if fi, err := os.Lstat(fingerprint.OutputDir); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("removing the outputs of the last run: %s is a symlink", fingerprint.OutputDir)
+		}
 		if err := os.RemoveAll(filepath.Join(fingerprint.OutputDir, o.test)); err != nil {
 			return "", fmt.Errorf("removing the outputs of the last run: %w", err)
 		}
