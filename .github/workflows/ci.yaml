@@ -30,7 +30,8 @@ permissions:
   contents: read
 
 # The aval release that jobs using Aval as a user would (the heavy suite ci-e2e, the demo and the dogfood shadow, publish and
-# record jobs) install with .github/aval/install.sh,
+# record jobs) install with .github/aval/install.sh (main's
+# scripts/get-aval.sh with --sha256 and --require-verify, #202),
 # verified before use. The sha256 is that of aval_<version>_linux_amd64.tar.gz
 # as checksums.txt lists it, so a re-tagged release cannot change what runs.
 # Jobs that test the PR's code build from source (CONTRIBUTING.md "Which aval
@@ -637,6 +638,10 @@ jobs:
   installer:
     needs: changes
     if: needs.changes.outputs.code == 'true'
+    # The installers read AVAL_SHA256 (#202); the workflow-level pin is for
+    # .github/aval/install.sh, not for these tests.
+    env:
+      AVAL_SHA256: ""
     strategy:
       fail-fast: false
       matrix:

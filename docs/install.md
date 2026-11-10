@@ -20,6 +20,9 @@ Installs into `/usr/local/bin` (`sudo` only if needed). Needs `curl` or
 | `USE_SUDO=false` | `--no-sudo` | no | never use `sudo` |
 | `AVAL_NO_VERIFY=1` | `--no-verify` | yes | skip the cosign and gh checks (sha256 still runs) |
 | `AVAL_DOWNLOAD_URL=<url>` | | yes | download from a mirror; the signer stays pinned |
+| `AVAL_SHA256=<hex>` | `--sha256 <hex>` | yes | the archive must have this sha256; `<os>_<arch>=<hex>` pins one platform (repeat the flag, or separate with spaces) |
+| `AVAL_REQUIRE_VERIFY=1` | `--require-verify` | yes | fail if `cosign` is missing; needs a version, excludes `--no-verify` |
+| `AVAL_REQUIRE_PROVENANCE=1` | `--require-provenance` | yes | fail if `gh` 2.49 or later is missing; needs a version, excludes `--no-verify` |
 
 Piped, pass flags after `bash -s --`:
 
@@ -43,10 +46,37 @@ Installs into `%LOCALAPPDATA%\Programs\aval` and adds it to your user
 | Check | Runs |
 |---|---|
 | the archive's sha256 matches `checksums.txt` | always |
-| `checksums.txt` has a Sigstore signature from Aval's release workflow at that tag | if `cosign` is on `PATH` |
-| the archive matches the release's SLSA provenance | if `gh` 2.49 or later is on `PATH` (no login) |
+| the archive's sha256 is the pinned one | with `--sha256` |
+| `checksums.txt` has a Sigstore signature from Aval's release workflow at that tag | if `cosign` is on `PATH`; required with `--require-verify` |
+| the archive matches the release's SLSA provenance | if `gh` 2.49 or later is on `PATH` (no login); required with `--require-provenance` |
 
-A failed check installs nothing. A check that cannot run is reported.
+A failed check installs nothing. A check that cannot run is reported, or is
+an error with `--require-verify` / `--require-provenance`.
+
+## In CI
+
+Install one exact release and nothing you cannot verify. Vendor the
+installer at a release tag, so a change on `main` cannot alter your pipeline,
+then pin the version and the archive's sha256 (from that release's
+`checksums.txt`):
+
+```sh
+curl -fsSLo .ci/get-aval.sh https://raw.githubusercontent.com/TrianaLab/aval/v0.8.0/scripts/get-aval.sh
+```
+
+```sh
+# cosign (and gh for --require-provenance) must be on PATH.
+bash .ci/get-aval.sh --version v0.8.0 \
+  --sha256 linux_amd64=<sha256 of aval_0.8.0_linux_amd64.tar.gz> \
+  --sha256 darwin_arm64=<sha256 of aval_0.8.0_darwin_arm64.tar.gz> \
+  --require-verify --require-provenance
+```
+
+The entry for the runner's platform is required. A re-tagged release, a
+mirror serving another build, or a missing `cosign` fails the install.
+`--sha256`, `--require-verify` and `--require-provenance` first ship in the
+release after 0.7.0. Aval's own CI does the same with `main`'s copy
+(`.github/aval/install.sh`).
 
 ## Upgrade
 

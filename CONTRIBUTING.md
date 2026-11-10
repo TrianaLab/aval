@@ -257,7 +257,8 @@ PR's base branch), so a PR cannot change them by editing those files, and
 the jobs that pass `--policy` verify with the pinned release (see below),
 not with an `aval` or a `Makefile` from the PR. Those jobs run `main`'s copies of
 `trust-from-base.sh` and `install.sh` with `/bin/bash`, and both scripts call
-their tools by absolute path; if `main` has no `trust-from-base.sh` yet, no
+their tools by absolute path (`install.sh` runs `main`'s `scripts/get-aval.sh`
+with a fixed `PATH`); if `main` has no `trust-from-base.sh` yet, no
 policy is set and nothing is reused. `tests/architecture/policy_source_test.go`
 fails if a pull request job names `AVAL_POLICY` or `AVAL_REGISTRY` anywhere
 but the trust step and the `--policy`/`--registry` values, runs anything but
@@ -309,12 +310,15 @@ code; only the `aval` that looks up, verifies, records and pushes results is
 the release.
 
 `ci.yaml` pins the release as `AVAL_VERSION` and `AVAL_SHA256` (the sha256 of
-`aval_<version>_linux_amd64.tar.gz`). `.github/aval/install.sh` checks the
-archive against that sha256, so a re-tagged release cannot change what runs,
-verifies the keyless signature of `checksums.txt` with cosign for the exact
-release workflow identity at that tag, and checks that `checksums.txt` lists
-the archive with the same sha256. Any failure fails the job before `aval` is
-installed. To move the pin, take the sha256 from the new release's verified
+`aval_<version>_linux_amd64.tar.gz`). `.github/aval/install.sh` runs
+`main`'s `scripts/get-aval.sh` with `--version`, `--sha256`,
+`--require-verify` and `--require-provenance` (PATH limited to `/usr/bin`,
+`/bin` and cosign's directory): the archive must have that sha256, so a
+re-tagged release cannot change what runs; `checksums.txt` must carry a
+keyless signature from the release workflow at that tag and list the archive
+with the same sha256; and the archive must match the release's SLSA
+provenance. A missing cosign or gh, or any failed check, fails the job before
+`aval` is installed. To move the pin, take the sha256 from the new release's verified
 `checksums.txt` (see [Changesets and releases](#changesets-and-releases)) and
 update both values; `tests/architecture` checks that the version has a
 `CHANGELOG.md` section and that each of these jobs installs the release and
