@@ -281,6 +281,9 @@ func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*c
 		}
 	}
 	fp, err := fingerprint.Compute(ctx, filepath.Dir(file), c, os.LookupEnv, outputs...)
+	if errors.Is(err, fingerprint.ErrContract) {
+		return nil, fingerprint.Fingerprint{}, usageError{fmt.Errorf("%s: %w", file, err)}
+	}
 	if err != nil {
 		// Cannot prove input equivalence: callers must run the test.
 		return c, fingerprint.Fingerprint{}, fmt.Errorf("fingerprint: %w", err)

@@ -83,17 +83,21 @@ metadata:
 runner:
   command: ["docker", "compose", "run", "--rm", "tests"]
 scope:
-  source: ["**/*.go", "compose.yaml"]
+  source: ["**/*.go", "compose.yaml", "deploy/**", "charts/**"]
   allowMutable:
     - ref: postgres:16          # exactly as Aval prints it
       reason: rebuilt and scanned nightly; the tag is ours
     - file: deploy/kustomization.yaml   # only the finding in this file
       ref: resources[0]
       reason: vendored upstream base, reviewed on update
+    - files: ["charts/*/values.yaml"]   # every matched file in scope
+      ref: ghcr.io/stefanprodan/podinfo:6.5.0
+      reason: public demo image, same tag in every chart
 cacheability: controlled-environment
 ```
 
-- `ref` is the text Aval prints; `file` limits the entry to one file.
+- `ref` is the text Aval prints; `file` limits the entry to one file,
+  `files` to the files its globs match.
 - It changes the fingerprint and shows in review.
 - `aval run` still prints the finding, marked `(allowed: <reason>)`.
 
