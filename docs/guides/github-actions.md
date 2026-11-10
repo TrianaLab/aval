@@ -76,10 +76,10 @@ default `false`). In order, it:
 2. Installs the same pinned, verified aval release as the run action.
 3. Fetches the policy from the default branch and logs in to the host of its
    `registry`, where results go. No policy or no `registry` fails the step.
-4. Downloads this run's `aval-*` artifacts into `$RUNNER_TEMP`. For each
-   `aval-<name>`, fetches a fresh OIDC token (audience `sigstore`) and runs
-   `aval push --test <name>` with its report and result. It tries them all,
-   then exits with the worst code; 5 is never downgraded (`aval SECURITY`).
+4. Downloads this run's `aval-*` artifacts (so name no other artifact
+   `aval-*`) into `$RUNNER_TEMP`. For each `aval-<name>`, fetches a fresh OIDC
+   token (audience `sigstore`) and runs `aval push --test <name>`. It tries
+   them all, then exits with the worst code; 5 is `aval SECURITY`, never downgraded.
 5. With `stats: true`, publishes each pushed test's run record; a failure
    is a warning.
 
