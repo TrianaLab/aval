@@ -16,6 +16,7 @@ import (
 func TestMain(m *testing.M) {
 	_ = os.Unsetenv(registryEnv)
 	_ = os.Unsetenv(policyEnv)
+	_ = os.Unsetenv(minTrustEnv)
 	os.Exit(m.Run())
 }
 
@@ -265,8 +266,9 @@ func TestChildEnvWithholdsTrustSettings(t *testing.T) {
 	t.Setenv(registryEnv, "reg.example/r")
 	t.Setenv(policyEnv, "p.yaml")
 	t.Setenv(idTokenEnv, "token")
+	t.Setenv(minTrustEnv, "runner")
 	for _, kv := range childEnv("") {
-		if k, _, _ := strings.Cut(kv, "="); k == registryEnv || k == policyEnv || k == idTokenEnv {
+		if k, _, _ := strings.Cut(kv, "="); k == registryEnv || k == policyEnv || k == idTokenEnv || k == minTrustEnv {
 			t.Errorf("child env has %s", kv)
 		}
 	}

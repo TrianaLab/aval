@@ -83,7 +83,7 @@ allowedCacheability: [external-dependencies]
 |---|---|
 | `identities` | the signers you accept: each is an OIDC `issuer` plus a `subjectRegexp` matched against the whole certificate subject, or a `publicKey` PEM file. At least one. |
 | `trustLevel` | the level an identity gets: `developer`, `runner` or `isolated`. |
-| `minTrustLevel` | the lowest level a result needs to be reused. |
+| `minTrustLevel` | the lowest level a result needs to be reused. `--min-trust-level` or `AVAL_MIN_TRUST_LEVEL` on `run` and `verify` can raise it for one run, never lower it (a lower or unknown level exits 2). |
 | `allowedCacheability` | classes reused besides `hermetic` and `controlled-environment`; only `external-dependencies` has an effect, and `non-deterministic` is rejected. |
 | `trustedRoot` | a pinned Sigstore trusted root for keyless signatures; without it, the public-good root is fetched. |
 | `registry` | optional: the OCI repository of attestations (`host/name`), used by `aval run` and `aval verify` when neither `--registry` nor `AVAL_REGISTRY` is set. No credentials: a value with `user:password@` (or any `@`) exits 2. Logins come from the credential store. |

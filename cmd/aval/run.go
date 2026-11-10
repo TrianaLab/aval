@@ -55,7 +55,8 @@ type runFlags struct {
 	push, noReuse, shadow, fingerprintOnly, explain     bool
 	record, login                                       bool
 	registryTimeout                                     time.Duration
-	config                                              *globalFlags // prints the config: line; nil prints none
+	minTrust                                            evidence.TrustLevel // --min-trust-level; 0 keeps the policy's
+	config                                              *globalFlags        // prints the config: line; nil prints none
 }
 
 func newRunCmd() *cobra.Command {
@@ -70,7 +71,7 @@ and records the result. Anything Aval cannot prove runs the test.
 
 Without a registry and a trust policy the test always runs. --registry-timeout
 covers lookup and fetch together; --push has its own. runner.command never
-sees $` + idTokenEnv + `, $` + registryEnv + ` or $` + policyEnv + `.
+sees $` + idTokenEnv + `, $` + registryEnv + `, $` + policyEnv + ` or $` + minTrustEnv + `.
 
 runner.command and the probes get $` + contract.RunStackEnv + `, the contracts of
 the enclosing aval runs. A run whose contract is already there exits 2 before
@@ -83,7 +84,7 @@ attestation, which is never reused, or more attestations than the lookup cap),
 1 error or false hit (--shadow), 2 usage. 5 wins over 3 and 1.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			o.file, o.repo, o.policyFile, o.registryTimeout, o.config = g.file, g.registry, g.policy, g.timeout, g
+			o.file, o.repo, o.policyFile, o.registryTimeout, o.minTrust, o.config = g.file, g.registry, g.policy, g.timeout, g.minLevel, g
 			return runTest(cmd, o)
 		},
 	}
@@ -487,7 +488,7 @@ func decide(ctx context.Context, w cliout.Run, c *contract.Contract, fp fingerpr
 	// The spinner is gone before announce prints and the runner starts.
 	warn, stop := spin(w.Err, w.ErrStyled, "looking up "+o.repo)
 	defer stop()
-	return lookupAndVerify(ctx, warn, c, o.file, fp, o.repo, o.policyFile) // announce prints the SECURITY block
+	return lookupAndVerify(ctx, warn, c, o.file, fp, o.repo, o.policyFile, o.minTrust) // announce prints the SECURITY block
 }
 
 // probeTimeout bounds each environment.probe command.
@@ -536,13 +537,13 @@ func hasVersion(out, want string) bool {
 }
 
 // childEnv is the environment of commands Aval runs, without the signing
-// token, the registry and the trust policy: the code under test must not be
+// token, the registry and the trust policy (and its minimum): the code under test must not be
 // able to sign results as this workload, nor reuse or publish against the
 // operator's trust settings. $AVAL_RUN_STACK is set to stack (see runStack).
 func childEnv(stack string) []string {
 	return append(slices.DeleteFunc(os.Environ(), func(kv string) bool {
 		k, _, _ := strings.Cut(kv, "=")
-		return k == idTokenEnv || k == registryEnv || k == policyEnv || k == contract.RunStackEnv
+		return k == idTokenEnv || k == registryEnv || k == policyEnv || k == minTrustEnv || k == contract.RunStackEnv
 	}), contract.RunStackEnv+"="+stack)
 }
 

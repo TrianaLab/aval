@@ -30,6 +30,20 @@ policy. The flag and `AVAL_REGISTRY` still win, and the `config:` line says
 which one was used. Never put `user:password@` in it: logins come from
 `docker login`.
 
+## One policy for PRs and main
+
+A policy that also trusts developer keys sets `minTrustLevel: developer`, so
+PRs reuse them. On `main`, raise the minimum for that run only:
+
+```sh
+aval run --policy policy.yaml --min-trust-level runner
+```
+
+`AVAL_MIN_TRUST_LEVEL=runner` does the same (the flag wins). Both work on
+`aval run` and `aval verify` and can only raise the policy's minimum: a lower
+or unknown level exits 2. A developer result is then a miss (exit 4), never
+exit 5. A policy that trusts only main's CI identity does not need this.
+
 ## The fields
 
 --8<-- "docs/trust-model.md:policy-fields"

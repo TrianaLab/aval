@@ -416,7 +416,7 @@ fingerprint), 2 usage or invalid aval.yaml.`,
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 			defer cancel()
-			report, _, err := verify(ctx, cmd.ErrOrStderr(), c, file, fp, repo, g.policy)
+			report, _, err := verify(ctx, cmd.ErrOrStderr(), c, file, fp, repo, g.policy, g.minLevel)
 			if msg := unreachable(repo, err); msg != "" && report.Outcome == evidence.OutcomeError {
 				fmt.Fprintln(cmd.ErrOrStderr(), "aval:", cliout.OneLine(msg)) // the report keeps the raw error
 			}
@@ -440,8 +440,8 @@ fingerprint), 2 usage or invalid aval.yaml.`,
 // wrapping evidence.ErrVerification, even beside a verified candidate
 // (invariant 4, #195); the reasons are in the report. It does so too when
 // the fingerprint holds more attestations than lookup lists.
-func verify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
-	r, files, err := lookupAndVerify(ctx, warn, c, file, fp, repo, policyFile)
+func verify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string, minTrust evidence.TrustLevel) (evidence.Report, []registry.Output, error) {
+	r, files, err := lookupAndVerify(ctx, warn, c, file, fp, repo, policyFile, minTrust)
 	if line := securityLineFor(r, err); line != "" {
 		fmt.Fprintln(warn, line)
 	}
@@ -496,7 +496,9 @@ func securityCount(r evidence.Report) int {
 	return n
 }
 
-func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string) (evidence.Report, []registry.Output, error) {
+// minTrust raises the policy's minTrustLevel (--min-trust-level); it never
+// lowers it.
+func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, file string, fp fingerprint.Fingerprint, repo, policyFile string, minTrust evidence.TrustLevel) (evidence.Report, []registry.Output, error) {
 	r := newReport(c, fp)
 	fail := func(err error) (evidence.Report, []registry.Output, error) {
 		r, err := failReport(r, err)
@@ -519,6 +521,7 @@ func lookupAndVerify(ctx context.Context, warn io.Writer, c *contract.Contract, 
 	if err != nil {
 		return fail(err)
 	}
+	pol.MinTrustLevel = max(pol.MinTrustLevel, minTrust)
 	// A class the policy does not allow is routine non-reuse, not a security
 	// event, so do not look (invariant 4).
 	if !c.Cacheability.ReusableByDefault() && !slices.Contains(pol.AllowedCacheability, string(c.Cacheability)) {
