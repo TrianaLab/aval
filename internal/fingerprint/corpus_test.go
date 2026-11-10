@@ -243,6 +243,22 @@ var corpus = []corpusCase{
 		f.do(os.WriteFile(filepath.Join(out, "b.go"), []byte("package b\n"), 0o644))
 		f.symlink(out, "sub")
 	}, want: same},
+	// A tool symlink (node_modules/.bin, .venv/bin) under a broad glob is
+	// skipped when exclude covers its name and its contents (#198).
+	{name: "symlink excluded by name and contents", setup: func(f *fixture) {
+		nodeModulesTool(f)
+	}, change: func(f *fixture) { f.write("pkg/web/node_modules/tool/bin/cli.js", "#!/bin/sh\necho b\n") }, want: same},
+	{name: "symlinked directory excluded by name and contents", setup: func(f *fixture) {
+		f.c.Scope.Source = []string{"main.go", "pkg/**", "compose.yaml"}
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "pkg/bin", "pkg/bin/**")
+		out := f.t.TempDir()
+		f.do(os.WriteFile(filepath.Join(out, "b.go"), []byte("package b\n"), 0o644))
+		f.symlink(out, "pkg/bin")
+	}, change: func(f *fixture) {
+		out, err := os.Readlink(f.path("pkg/bin"))
+		f.do(err)
+		f.do(os.WriteFile(filepath.Join(out, "b.go"), []byte("package b // edited\n"), 0o644))
+	}, want: same},
 	{name: "file under .git added", change: func(f *fixture) { f.write(".git/objects/x.go", "package x\n") }, want: same},
 	{name: "file under a nested .git added", change: func(f *fixture) { f.write("pkg/a/.git/x.go", "package x\n") }, want: same},
 	// Only the exact name .git is skipped: a case-insensitive match would drop
@@ -323,12 +339,40 @@ var corpus = []corpusCase{
 	}, want: failClosed},
 	{name: "symlinked directory excluded by name", change: func(f *fixture) {
 		// exclude matches names only and does not prune the walk, so
-		// excluding sub would drop sub/b.go unhashed.
+		// excluding sub alone would drop sub/b.go unhashed: the contents
+		// must be excluded too (sub/**).
 		f.c.Scope.Source = []string{"**"}
 		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "sub")
 		out := f.t.TempDir()
 		f.do(os.WriteFile(filepath.Join(out, "b.go"), []byte("package b\n"), 0o644))
 		f.symlink(out, "sub")
+	}, want: failClosed},
+	// The rows below use the default source **/*.go, which matches no
+	// symlink name, so nothing but the walk can refuse them.
+	// "sub/**" matches sub itself only by its zero-segment form, which does
+	// not exclude a file (or symlink) named sub.
+	{name: "symlinked directory excluded only by its contents", change: func(f *fixture) {
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "sub/**")
+		symlinkDir(f, "sub")
+	}, want: failClosed},
+	// exclude does not apply to dependencies, so a dependency glob that
+	// could match files under the symlink still needs them.
+	{name: "excluded symlink a dependency glob reaches", setup: func(f *fixture) {
+		f.write("pkg/web/index.js", "x\n")
+		f.c.Scope.Dependencies = append(f.c.Scope.Dependencies, "pkg/web/**/*.js")
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "**/node_modules/**")
+	}, change: func(f *fixture) {
+		f.do(os.MkdirAll(f.path("pkg/web/node_modules"), 0o755))
+		symlinkDir(f, "pkg/web/node_modules/lib")
+	}, want: failClosed},
+	{name: "symlink excluded by name, contents in scope", change: func(f *fixture) {
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "**/tool")
+		symlinkDir(f, "pkg/tool")
+	}, want: failClosed},
+	{name: "symlink whose parent no exclude glob matches", change: func(f *fixture) {
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "**/node_modules/*.go")
+		f.do(os.MkdirAll(f.path("pkg/node_modules"), 0o755))
+		symlinkDir(f, "pkg/node_modules/lib")
 	}, want: failClosed},
 	{name: "source replaced by symlink", change: func(f *fixture) {
 		f.rename("main.go", "real.txt")
@@ -374,6 +418,29 @@ var corpus = []corpusCase{
 	{name: "repushed tag in runner.command", setup: func(f *fixture) {
 		f.c.Runner.Command = []string{"docker", "run", "--rm", "postgres:16"}
 	}, change: func(*fixture) {}, want: refused},
+}
+
+// symlinkTool adds pkg/web/node_modules/.bin/tool -> ../tool/bin/cli.js,
+// as npm ci does.
+func symlinkTool(f *fixture) {
+	f.write("pkg/web/node_modules/tool/bin/cli.js", "#!/bin/sh\necho a\n")
+	f.do(os.MkdirAll(f.path("pkg/web/node_modules/.bin"), 0o755))
+	f.symlink("../tool/bin/cli.js", "pkg/web/node_modules/.bin/tool")
+}
+
+// symlinkDir adds name -> a directory outside the root holding b.go.
+func symlinkDir(f *fixture, name string) {
+	out := f.t.TempDir()
+	f.do(os.WriteFile(filepath.Join(out, "b.go"), []byte("package b\n"), 0o644))
+	f.symlink(out, name)
+}
+
+// nodeModulesTool is symlinkTool under source pkg/** with node_modules
+// excluded by name and contents.
+func nodeModulesTool(f *fixture) {
+	f.c.Scope.Source = []string{"main.go", "pkg/**", "compose.yaml"}
+	f.c.Scope.Exclude = append(f.c.Scope.Exclude, "**/node_modules/**")
+	symlinkTool(f)
 }
 
 func TestFalseHitCorpus(t *testing.T) {
