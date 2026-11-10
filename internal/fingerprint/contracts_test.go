@@ -63,7 +63,7 @@ func writeTree(t *testing.T, files map[string]string) string {
 // computeFile loads the contract at root/file and fingerprints it.
 func computeFile(root, file string, outputs ...string) (Fingerprint, error) {
 	p := filepath.Join(root, filepath.FromSlash(file))
-	c, err := contract.Load(p)
+	c, err := contract.Load(p, "")
 	if err != nil {
 		return Fingerprint{}, err
 	}

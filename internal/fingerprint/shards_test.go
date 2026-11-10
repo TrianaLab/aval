@@ -18,7 +18,7 @@ func TestShardFingerprints(t *testing.T) {
 	dir := uvTree(t, example)
 	fp := func(file string, env map[string]string) string {
 		t.Helper()
-		c, err := contract.Load(file)
+		c, err := contract.Load(file, "")
 		if err != nil {
 			t.Fatal(err)
 		}

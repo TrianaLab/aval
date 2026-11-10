@@ -45,7 +45,7 @@ func TestComputeFSMatchesGolden(t *testing.T) {
 	fsys := mapFS(t, dir)
 	var fps []Fingerprint
 	for _, name := range goldenContracts {
-		c, err := contract.Load(filepath.Join(dir, name))
+		c, err := contract.Load(filepath.Join(dir, name), "")
 		if err != nil {
 			t.Fatal(err)
 		}

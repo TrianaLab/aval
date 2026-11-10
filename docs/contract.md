@@ -174,9 +174,35 @@ no test uses, a fragment with `use`, `exclude`, `runner`, `metadata`,
 `{var}`, two tests with the same expanded name, and a `scope.contracts`
 entry that points at a TestSet (share scope with fragments instead).
 
-`aval run`, `explain`, `verify` and `push` take a TestSet of one test. A
-TestSet of more tests exits 2 and lists their names: selecting a test by
-name is not built yet (#207).
+### Select a test
+
+`aval run`, `explain`, `verify` and `push` take `-t/--test <name>`, the
+expanded `metadata.name` of one test:
+
+```sh
+aval run --test shard-1
+aval push --test shard-1
+```
+
+- On a TestSet of more than one test, a missing `--test` exits 2 and lists
+  the names. Nothing runs every test of a set at once.
+- On a `kind: Test` file, or a TestSet of one test, `--test` is optional; a
+  name that matches no test exits 2.
+- With `--test`, the output files default to `.aval/<name>/result.json`,
+  `report.json` and `record.json` (`--result-file`, `--report-file`,
+  `--stats-file`), so tests never overwrite each other's outputs and
+  `aval push --test <name>` finds the result and report of the run.
+  `aval run --test <name>` removes a stale `.aval/<name>/` before it runs.
+  A flag you pass wins. Without `--test` the defaults are unchanged.
+
+`aval explain --test <name> --expand` prints the test as the standalone
+`kind: Test` it expands to. `aval explain --all` checks every test of the
+file without running anything (no probe, no command): it prints one
+`name fingerprint` line per test, reports every failing test by name instead
+of stopping at the first, and exits 2 if any is invalid, else 1 if any
+fingerprint cannot be computed. `-o json` prints the same as
+`{"tests": [{"name", "fingerprint"} or {"name", "error"}]}`. A file that
+does not expand prints every problem on stderr and nothing on stdout.
 
 ## Nested runs
 

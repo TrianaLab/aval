@@ -50,13 +50,13 @@ const (
 )
 
 type runFlags struct {
-	file, repo, policyFile, resultFile, reportFile, key string
-	recordFile, ciRunURL, repository                    string
-	push, noReuse, shadow, fingerprintOnly, explain     bool
-	record, login                                       bool
-	registryTimeout                                     time.Duration
-	minTrust                                            evidence.TrustLevel // --min-trust-level; 0 keeps the policy's
-	config                                              *globalFlags        // prints the config: line; nil prints none
+	file, test, repo, policyFile, resultFile, reportFile, key string
+	recordFile, ciRunURL, repository                          string
+	push, noReuse, shadow, fingerprintOnly, explain           bool
+	record, login                                             bool
+	registryTimeout                                           time.Duration
+	minTrust                                                  evidence.TrustLevel // --min-trust-level; 0 keeps the policy's
+	config                                                    *globalFlags        // prints the config: line; nil prints none
 }
 
 func newRunCmd() *cobra.Command {
@@ -84,7 +84,10 @@ attestation, which is never reused, or more attestations than the lookup cap),
 1 error or false hit (--shadow), 2 usage. 5 wins over 3 and 1.`,
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			o.file, o.repo, o.policyFile, o.registryTimeout, o.minTrust, o.config = g.file, g.registry, g.policy, g.timeout, g.minLevel, g
+			o.file, o.test, o.repo, o.policyFile, o.registryTimeout, o.minTrust, o.config = g.file, g.test, g.registry, g.policy, g.timeout, g.minLevel, g
+			testOutputs(cmd, o.test, testOutput{&o.resultFile, "result.json", []string{"result-file", "result"}},
+				testOutput{&o.reportFile, "report.json", []string{"report-file", "report"}},
+				testOutput{&o.recordFile, "record.json", []string{"stats-file", "record-file"}})
 			return runTest(cmd, o)
 		},
 	}
@@ -235,12 +238,19 @@ func (o runFlags) checkOutputs() error {
 	return nil
 }
 
-// preflight refuses a run nested in its own runner.command and outputs Aval
-// would not overwrite, and returns $AVAL_RUN_STACK for the commands it starts.
+// preflight refuses a run nested in its own runner.command, removes the
+// stale .aval/<test>/ of a run with --test, refuses outputs Aval would not
+// overwrite, and returns $AVAL_RUN_STACK for the commands it starts.
 func (o runFlags) preflight() (string, error) {
 	stack, err := runStack(o.file)
 	if err != nil {
 		return "", err
+	}
+	if o.test != "" && !o.fingerprintOnly {
+		// o.test is the metadata.name of a loaded test: one path segment.
+		if err := os.RemoveAll(filepath.Join(fingerprint.OutputDir, o.test)); err != nil {
+			return "", fmt.Errorf("removing the outputs of the last run: %w", err)
+		}
 	}
 	return stack, o.checkOutputs()
 }
@@ -264,7 +274,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	if err := o.validate(token); err != nil {
 		return err
 	}
-	c, root, fp, fpErr := loadAndFingerprint(cmd.Context(), o.file, o.outputs()...)
+	c, root, fp, fpErr := loadAndFingerprint(cmd.Context(), o.file, o.test, o.outputs()...)
 	if c == nil {
 		return fpErr
 	}
@@ -796,12 +806,14 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			file, repo, timeout := g.file, g.registry, g.timeout
+			testOutputs(cmd, g.test, testOutput{&resultFile, "result.json", []string{"result-file", "result"}},
+				testOutput{&reportFile, "report.json", []string{"report-file"}})
 			g.printConfig(cmd.ErrOrStderr())
 			token := os.Getenv(idTokenEnv)
 			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout), checkSigner(key, token, interactive)); err != nil {
 				return err
 			}
-			c, _, fp, err := loadAndFingerprint(cmd.Context(), file, resultFile, reportFile)
+			c, _, fp, err := loadAndFingerprint(cmd.Context(), file, g.test, resultFile, reportFile)
 			if err != nil {
 				return err
 			}

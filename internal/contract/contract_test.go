@@ -542,20 +542,20 @@ func TestLoad(t *testing.T) {
 		}
 		return p
 	}
-	if _, err := Load(write("ok.yaml", valid)); err != nil {
+	if _, err := Load(write("ok.yaml", valid), ""); err != nil {
 		t.Fatal(err)
 	}
 	bad := write("bad.yaml", "kind: Test\n")
-	_, err := Load(bad)
+	_, err := Load(bad, "")
 	var fe *FileError
 	if !errors.As(err, &fe) || fe.File != bad || err.Error() != bad+": "+errors.Unwrap(err).Error() {
 		t.Fatalf("invalid contract error must name the file, got %v", err)
 	}
 	// A missing contract is still ErrNotExist, plus a next step.
-	if _, err := Load(filepath.Join(dir, "missing.yaml")); !errors.Is(err, fs.ErrNotExist) || !strings.Contains(err.Error(), "pass its path with -f") {
+	if _, err := Load(filepath.Join(dir, "missing.yaml"), ""); !errors.Is(err, fs.ErrNotExist) || !strings.Contains(err.Error(), "pass its path with -f") {
 		t.Fatalf("missing file: got %v", err)
 	}
-	if _, err := Load(dir); err == nil || strings.Contains(err.Error(), "-f") {
+	if _, err := Load(dir, ""); err == nil || strings.Contains(err.Error(), "-f") {
 		t.Fatalf("unreadable contract: got %v", err)
 	}
 }

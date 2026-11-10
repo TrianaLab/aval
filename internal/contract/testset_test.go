@@ -1,11 +1,14 @@
 package contract
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 // set is a TestSet with defaults, two fragments, a plain test and a matrix
@@ -176,6 +179,46 @@ func TestParseAllMatrixLimit(t *testing.T) {
 	}
 }
 
+// maxTests bounds plain tests too, not only matrix expansion (#207): 1024
+// plain tests expand, 1025 do not, and nothing past the limit is expanded.
+func TestParseAllPlainTestLimit(t *testing.T) {
+	doc := func(n int) []byte {
+		var b strings.Builder
+		b.WriteString("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {scope: {source: [a]}, cacheability: hermetic}\ntests:\n")
+		for i := range n {
+			fmt.Fprintf(&b, "- {metadata: {name: t%d}, runner: {command: [x]}}\n", i)
+		}
+		return []byte(b.String())
+	}
+	if cs, err := ParseAll(doc(maxTests)); err != nil || len(cs) != maxTests {
+		t.Fatalf("%d tests: %d, %v", maxTests, len(cs), err)
+	}
+	if _, err := ParseAll(doc(maxTests + 1)); err == nil || !strings.Contains(err.Error(), "tests[1024] (t1024): the set expands to more than 1024 tests") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+// Every expanded test marshals back to a standalone kind: Test that parses
+// to the same contract: what 'aval explain --expand' prints (#207).
+func TestExpandedTestRoundTrips(t *testing.T) {
+	cs, err := ParseAll([]byte(set))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cs {
+		c.Scope.Resolve = []Reference{{Kind: "npm", Ref: "react@^18"}}
+		c.Scope.AllowMutable = []AllowMutable{{Ref: "react@^18", Reason: "pinned by the lockfile"}}
+		raw, err := yaml.Marshal(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		back, err := Parse(raw)
+		if err != nil || !reflect.DeepEqual(back, c) {
+			t.Fatalf("%s:\n%s\ngot %+v, %v\nwant %+v", c.Metadata.Name, raw, back, err, c)
+		}
+	}
+}
+
 // Parse takes one test: a TestSet is ErrTestSet, which scope.contracts
 // reports.
 func TestParseRejectsTestSet(t *testing.T) {
@@ -184,6 +227,9 @@ func TestParseRejectsTestSet(t *testing.T) {
 	}
 }
 
+// Load selects a test by name (#207). Without a name a file of one test
+// loads it and a file of more fails listing the names; a name selects that
+// test of a TestSet and must equal metadata.name on a kind: Test.
 func TestLoadTestSet(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, data string) string {
@@ -193,15 +239,28 @@ func TestLoadTestSet(t *testing.T) {
 		}
 		return p
 	}
-	if _, err := Load(write("many.yaml", set)); err == nil || !strings.Contains(err.Error(), "the TestSet holds 3 tests (unit, shard-1-of-2, shard-2-of-2)") {
-		t.Fatalf("got %v", err)
-	}
-	one := "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ntests:\n- {metadata: {name: unit}, runner: {command: [x]}, scope: {source: [a]}, cacheability: hermetic}\n"
-	c, err := Load(write("one.yaml", one))
-	if err != nil || c.Metadata.Name != "unit" {
-		t.Fatalf("got %v, %v", c, err)
-	}
-	if _, err := Load(write("bad.yaml", "kind: TestSet\n")); err == nil || !strings.Contains(err.Error(), "bad.yaml: ") {
-		t.Fatalf("got %v", err)
+	many, test := write("many.yaml", set), write("test.yaml", valid)
+	one := write("one.yaml", "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ntests:\n- {metadata: {name: unit}, runner: {command: [x]}, scope: {source: [a]}, cacheability: hermetic}\n")
+	for _, tc := range []struct{ file, test, name, err string }{
+		{many, "", "", "the TestSet holds 3 tests (unit, shard-1-of-2, shard-2-of-2); select one with --test"},
+		{many, "shard-2-of-2", "shard-2-of-2", ""},
+		{many, "shard-3-of-2", "", `many.yaml: no test named "shard-3-of-2"; its tests: unit, shard-1-of-2, shard-2-of-2`},
+		// False hits: a prefix or another case never selects a test.
+		{many, "shard-1", "", `no test named "shard-1"`},
+		{many, "UNIT", "", `no test named "UNIT"`},
+		{one, "", "unit", ""},
+		{one, "unit", "unit", ""},
+		{test, "", "orders-integration", ""},
+		{test, "orders-integration", "orders-integration", ""},
+		{test, "orders", "", `no test named "orders"; its tests: orders-integration`},
+		{write("bad.yaml", "kind: TestSet\n"), "x", "", "bad.yaml: "},
+	} {
+		c, err := Load(tc.file, tc.test)
+		switch {
+		case tc.err == "" && (err != nil || c.Metadata.Name != tc.name):
+			t.Errorf("%s --test %q: %v, %v; want %s", tc.file, tc.test, c, err, tc.name)
+		case tc.err != "" && (err == nil || !strings.Contains(err.Error(), tc.err)):
+			t.Errorf("%s --test %q: %v; want %q", tc.file, tc.test, err, tc.err)
+		}
 	}
 }

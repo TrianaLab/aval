@@ -55,9 +55,15 @@ is the same as pattern B, since the shards share one scope. Rules:
 --8<-- "internal/fingerprint/testdata/shards/pattern-c.yaml"
 ```
 
-!!! note "Not runnable yet"
-    The set has two tests, and `aval run` takes a TestSet of one test until
-    a test can be selected by name (#207).
+Run one shard by its name; its result goes to `.aval/<name>/`, so shards
+never overwrite each other's outputs:
+
+```sh
+aval run --test uv-monorepo-shard-0
+```
+
+`aval explain --all` checks every shard and prints its fingerprint
+([Select a test](../contract.md#select-a-test)).
 
 ## The matrix
 

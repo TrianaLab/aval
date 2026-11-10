@@ -101,7 +101,7 @@ func goldenTree(t *testing.T) []Fingerprint {
 	dir := goldenDir(t)
 	var fps []Fingerprint
 	for _, name := range goldenContracts {
-		c, err := contract.Load(filepath.Join(dir, name))
+		c, err := contract.Load(filepath.Join(dir, name), "")
 		if err != nil {
 			t.Fatal(err)
 		}

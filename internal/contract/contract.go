@@ -149,6 +149,9 @@ type Reference struct {
 	Ref  string `json:"ref"`
 }
 
+// MarshalYAML writes the one-key form `npm: react@^18`.
+func (r Reference) MarshalYAML() (any, error) { return map[string]string{r.Kind: r.Ref}, nil }
+
 // UnmarshalYAML reads the one-key form `npm: react@^18`.
 func (r *Reference) UnmarshalYAML(n *yaml.Node) error {
 	var m map[string]string
@@ -199,20 +202,27 @@ var (
 	rootRe    = regexp.MustCompile(`^\.\.(/\.\.)*$`)
 )
 
-// Load reads and validates a contract file of one test: a kind: Test, or a
-// kind: TestSet that expands to exactly one test.
-func Load(file string) (*Contract, error) {
+// Load reads and validates a contract file and returns its test named test.
+// An empty test selects the only test of the file; a file of more tests
+// then fails and lists their names (there is no implicit run-all). On a
+// kind: Test a non-empty test must equal metadata.name.
+func Load(file, test string) (*Contract, error) {
 	cs, err := LoadAll(file)
 	if err != nil {
 		return nil, err
 	}
-	if len(cs) > 1 {
-		names := make([]string, len(cs))
-		for i, c := range cs {
-			names[i] = c.Metadata.Name
+	names := make([]string, len(cs))
+	for i, c := range cs {
+		if test != "" && c.Metadata.Name == test {
+			return c, nil
 		}
-		// TODO(milestone-1): select a test by name (#207).
-		return nil, fmt.Errorf("%s: the TestSet holds %d tests (%s); this aval runs a TestSet of one test only", file, len(cs), strings.Join(names, ", "))
+		names[i] = c.Metadata.Name
+	}
+	switch {
+	case test != "":
+		return nil, fmt.Errorf("%s: no test named %q; its tests: %s", file, test, strings.Join(names, ", "))
+	case len(cs) > 1:
+		return nil, fmt.Errorf("%s: the TestSet holds %d tests (%s); select one with --test", file, len(cs), strings.Join(names, ", "))
 	}
 	return cs[0], nil
 }

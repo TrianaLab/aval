@@ -260,20 +260,42 @@ func noArgs(c *cobra.Command, args []string) error {
 	return nil
 }
 
-// loadAndFingerprint loads the contract, resolves its root (contractRoot)
+// loadContract loads the test named test (any test of a one-test file when
+// empty) of the contract file; a contract that does not load is a usage error.
+func loadContract(file, test string) (*contract.Contract, error) {
+	c, err := contract.Load(file, test)
+	if err != nil {
+		return nil, contractErr(err)
+	}
+	return c, nil
+}
+
+// contractErr is the usage error for a contract file that does not load:
+// every problem of an invalid one listed under its name.
+func contractErr(err error) error {
+	var fe *contract.FileError
+	if errors.As(err, &fe) {
+		return usageError{listError{fe.File + ": invalid contract:", fe.Err}}
+	}
+	return usageError{err}
+}
+
+// loadAndFingerprint loads the test named test of the contract (loadContract), resolves its root (contractRoot)
 // and computes its fingerprint. When only the fingerprint fails it still
 // returns the contract and root, so run can execute the test. outputs are
 // the files the command writes or reads as Aval output (--result-file,
 // --report-file, --stats-file); inside the contract root they are not inputs.
-func loadAndFingerprint(ctx context.Context, file string, outputs ...string) (*contract.Contract, string, fingerprint.Fingerprint, error) {
-	c, err := contract.Load(file)
-	var fe *contract.FileError
-	if errors.As(err, &fe) {
-		return nil, "", fingerprint.Fingerprint{}, usageError{listError{fe.File + ": invalid contract:", fe.Err}}
-	}
+func loadAndFingerprint(ctx context.Context, file, test string, outputs ...string) (*contract.Contract, string, fingerprint.Fingerprint, error) {
+	c, err := loadContract(file, test)
 	if err != nil {
-		return nil, "", fingerprint.Fingerprint{}, usageError{err}
+		return nil, "", fingerprint.Fingerprint{}, err
 	}
+	return rootAndFingerprint(ctx, file, c, outputs...)
+}
+
+// rootAndFingerprint resolves the root of c, loaded from file, and computes its
+// fingerprint, as loadAndFingerprint.
+func rootAndFingerprint(ctx context.Context, file string, c *contract.Contract, outputs ...string) (*contract.Contract, string, fingerprint.Fingerprint, error) {
 	root, _, err := contractRoot(file, c)
 	if err != nil {
 		return nil, "", fingerprint.Fingerprint{}, err
@@ -438,7 +460,7 @@ fingerprint), 2 usage or invalid aval.yaml.`,
 			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout)); err != nil {
 				return err
 			}
-			c, _, fp, err := loadAndFingerprint(cmd.Context(), file)
+			c, _, fp, err := loadAndFingerprint(cmd.Context(), file, g.test)
 			if err != nil {
 				return err
 			}

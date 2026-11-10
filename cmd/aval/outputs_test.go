@@ -57,7 +57,7 @@ func TestCollectOutputs(t *testing.T) {
 		for rel, body := range files {
 			write(t, filepath.Dir(p), rel, body)
 		}
-		c, err := contract.Load(p)
+		c, err := contract.Load(p, "")
 		if err != nil {
 			t.Fatal(err)
 		}
