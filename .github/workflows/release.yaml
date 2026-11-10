@@ -15,7 +15,9 @@ name: release
 # can still push a tag by hand. The release job builds, signs and attests,
 # verifies dist/ with tests/release, and only then creates the GitHub Release.
 # A tag that does not match package.json fails verification and publishes
-# nothing.
+# nothing. After the release, pin-actions opens a PR (branch
+# release-pins/main) that moves the GitHub actions' aval pins to it, and
+# pin-actions-ci dispatches ci.yaml on that branch.
 #
 # Write scopes only on push to main, on a tag, or on a successful ci run of a
 # push to main (workflow_run runs this file from main and checks out only that
@@ -202,7 +204,9 @@ jobs:
         env:
           AVAL_RELEASE_DIST: ${{ github.workspace }}/dist
           AVAL_RELEASE_TAG: ${{ github.ref_name }}
-        run: go test -count=1 -v ./tests/release/...
+        # The pin check downloads the pinned release's checksums.txt; pin-actions
+        # runs it after the release, so a download error cannot block one.
+        run: go test -count=1 -v -skip '^TestActionPinsMatchReleaseChecksums$' ./tests/release/...
       - name: Release notes from CHANGELOG.md
         env:
           TAG: ${{ github.ref_name }}
@@ -229,3 +233,88 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: gh workflow run docs.yaml --ref "$TAG"
+
+  # After each release, a PR moves the aval pins of the GitHub actions
+  # (integrations/github/{run,publish}/action.yml) to it, from the published
+  # checksums.txt (#213), so pinning an action by commit SHA pins the binary
+  # too. The branch release-pins/main is force-pushed from main; nothing is
+  # pinned when main already pins this release or a newer one. tests/release
+  # checks the result before the push (TestActionPinsMatchReleaseChecksums).
+  # Only contents and pull-requests write: no signing, attestation or
+  # dispatch scope.
+  pin-actions:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push release-pins/main
+      pull-requests: write # open the pin PR
+    outputs:
+      pushed: ${{ steps.pr.outputs.pushed }}
+    steps:
+      # The write token stays out of .git/config and out of the step that
+      # runs code from the checkout; only the push step gets it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Pin the actions to this release
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          pinned=$(sed -n 's/^ *DESIRED_VERSION: *//p' integrations/github/run/action.yml)
+          if [ "$(printf '%s\n%s\n' "$pinned" "$TAG" | sort -V | tail -1)" != "$TAG" ]; then
+            echo "main pins $pinned, newer than $TAG: nothing to pin"; exit 0
+          fi
+          curl -fsSL -o "$RUNNER_TEMP/checksums.txt" \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/checksums.txt"
+          scripts/pin-actions.sh "$TAG" "$RUNNER_TEMP/checksums.txt" \
+            integrations/github/run/action.yml integrations/github/publish/action.yml
+          go test -count=1 -run TestActionPinsMatchReleaseChecksums ./tests/release/
+      - name: Open or update the pin PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if git diff --quiet; then echo "nothing to pin"; exit 0; fi
+          title="chore: pin aval $TAG in the GitHub actions"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C release-pins/main
+          git commit -qam "$title"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            push --force origin release-pins/main
+          body="Moves DESIRED_VERSION and AVAL_SHA256 of integrations/github/run and integrations/github/publish to $TAG, from its checksums.txt. Opened by the pin-actions job of release.yaml (#213)."
+          if [ -n "$(gh pr list --head release-pins/main --state open --json number --jq '.[].number')" ]; then
+            gh pr edit release-pins/main --title "$title" --body "$body"
+          else
+            gh pr create --base main --head release-pins/main --title "$title" --body "$body"
+          fi
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+  # The pin PR's push used GITHUB_TOKEN and started no ci run; a dispatch
+  # does, as version-pr-ci does for the version PR.
+  pin-actions-ci:
+    needs: pin-actions
+    if: needs.pin-actions.outputs.pushed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Run ci on the pin PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for _ in 1 2 3; do
+            gh workflow run ci.yaml --ref release-pins/main && exit 0
+            sleep 15
+          done
+          exit 1

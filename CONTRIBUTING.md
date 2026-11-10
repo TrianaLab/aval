@@ -548,6 +548,19 @@ nothing is published. `make test-release` runs the same build as an unsigned
 snapshot and the same tests; CI runs it on every PR that changes code
 (`ci-release`).
 
+Once the GitHub Release exists, the `pin-actions` job opens a `chore: pin aval
+<tag> in the GitHub actions` PR from the branch `release-pins/main`:
+`scripts/pin-actions.sh` sets `DESIRED_VERSION` and the per-platform
+`AVAL_SHA256` of `integrations/github/{run,publish}/action.yml` from the
+release's `checksums.txt`. It holds only `contents: write` and
+`pull-requests: write`, and pins nothing when `main` already pins that
+release or a newer one. `pin-actions-ci` dispatches `ci` on the branch, as
+`version-pr-ci` does for the version PR; if it failed, run `gh workflow run
+ci.yaml --ref release-pins/main`. Review and merge the PR like any other.
+`TestActionPinsMatchReleaseChecksums` in `tests/release` downloads the
+pinned release's `checksums.txt` and fails when a pin does not match it, so
+a pin moved to a version with no `checksums.txt` fails `ci-release`.
+
 To verify a downloaded release (`<tag>` is e.g. `v0.1.0`):
 
 ```sh

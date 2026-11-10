@@ -32,7 +32,9 @@ runs:
     # The pinned release, checked against its per-platform sha256 and the
     # release workflow's signature and provenance by this commit's
     # scripts/get-aval.sh (#202).
-    # TODO(milestone-14): pin the first release with --test and the policy's registry; #213 bumps these pins after each release.
+    # The pin-actions job of release.yaml moves DESIRED_VERSION and AVAL_SHA256
+    # to each new release (#213); tests/release checks them against its checksums.txt.
+    # TODO(milestone-14): drop this line once a pin PR moves to the first release with --test and the policy's registry.
     - name: Install the pinned aval release (verified)
       id: install
       shell: bash

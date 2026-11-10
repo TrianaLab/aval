@@ -36,12 +36,26 @@ const versionPRDispatch = `for _ in 1 2 3; do
 done
 exit 1`
 
+// pinPRPermissions: pin-actions pushes the pin branch and opens its PR,
+// nothing else (#213).
+var pinPRPermissions = map[string]string{"contents": "write", "pull-requests": "write"}
+
+// pinPRDispatch is the one step of pin-actions-ci: it dispatches ci.yaml on
+// the pin PR branch, like versionPRDispatch.
+const pinPRDispatch = `for _ in 1 2 3; do
+  gh workflow run ci.yaml --ref release-pins/main && exit 0
+  sleep 15
+done
+exit 1`
+
 // releaseWorkflowProblems: release.yaml's auto-tag job tags and dispatches
 // only after ci passed on a push to main, holds only contents and actions
 // write, and runs no code from its checkout; version-pr and release keep
 // their push-only and tag-only conditions, version-pr holds only
 // versionPRPermissions, and version-pr-ci holds only actions write, needs
-// version-pr and runs only versionPRDispatch, with no action.
+// version-pr and runs only versionPRDispatch, with no action. pin-actions
+// runs after release only, holds only pinPRPermissions, and pin-actions-ci
+// is to it what version-pr-ci is to version-pr, with pinPRDispatch.
 func releaseWorkflowProblems(data []byte) ([]string, error) {
 	var wf struct {
 		Jobs map[string]permJob `yaml:"jobs"`
@@ -79,25 +93,43 @@ func releaseWorkflowProblems(data []byte) ([]string, error) {
 	if !maps.Equal(wf.Jobs["version-pr"].Permissions, versionPRPermissions) {
 		problems = append(problems, "version-pr: permissions must be exactly contents and pull-requests write")
 	}
-	problems = append(problems, versionPRCIProblems(wf.Jobs["version-pr-ci"], needs.Jobs["version-pr-ci"].Needs)...)
+	problems = append(problems, dispatchJobProblems("version-pr-ci", wf.Jobs["version-pr-ci"], needs.Jobs["version-pr-ci"].Needs, "version-pr", versionPRDispatch)...)
 	if c := wf.Jobs["release"].If; c != "startsWith(github.ref, 'refs/tags/v')" {
 		problems = append(problems, "release runs on "+c)
 	}
+	problems = append(problems, pinActionsProblems(wf.Jobs["pin-actions"], needs.Jobs["pin-actions"].Needs)...)
+	problems = append(problems, dispatchJobProblems("pin-actions-ci", wf.Jobs["pin-actions-ci"], needs.Jobs["pin-actions-ci"].Needs, "pin-actions", pinPRDispatch)...)
 	return problems, nil
 }
 
-// versionPRCIProblems: version-pr-ci holds only actions write, needs
-// version-pr only and runs only versionPRDispatch, with no action.
-func versionPRCIProblems(ci permJob, needs []string) []string {
+// pinActionsProblems: pin-actions runs on a tag after release only and
+// holds only pinPRPermissions.
+func pinActionsProblems(job permJob, needs []string) []string {
+	var problems []string
+	if job.If != "startsWith(github.ref, 'refs/tags/v')" {
+		problems = append(problems, "pin-actions runs on "+job.If)
+	}
+	if len(needs) != 1 || needs[0] != "release" {
+		problems = append(problems, "pin-actions must need release only")
+	}
+	if !maps.Equal(job.Permissions, pinPRPermissions) {
+		problems = append(problems, "pin-actions: permissions must be exactly contents and pull-requests write")
+	}
+	return problems
+}
+
+// dispatchJobProblems: a job that dispatches ci.yaml holds only actions
+// write, needs one job only and runs only the dispatch script, with no action.
+func dispatchJobProblems(name string, ci permJob, needs []string, after, script string) []string {
 	var problems []string
 	if !maps.Equal(ci.Permissions, map[string]string{"actions": "write"}) {
-		problems = append(problems, "version-pr-ci: permissions must be exactly actions write")
+		problems = append(problems, name+": permissions must be exactly actions write")
 	}
-	if len(needs) != 1 || needs[0] != "version-pr" {
-		problems = append(problems, "version-pr-ci must need version-pr only")
+	if len(needs) != 1 || needs[0] != after {
+		problems = append(problems, name+" must need "+after+" only")
 	}
-	if len(ci.Steps) != 1 || ci.Steps[0].Uses != "" || strings.TrimSpace(ci.Steps[0].Run) != versionPRDispatch {
-		problems = append(problems, "version-pr-ci: one step, no action, run exactly: "+versionPRDispatch)
+	if len(ci.Steps) != 1 || ci.Steps[0].Uses != "" || strings.TrimSpace(ci.Steps[0].Run) != script {
+		problems = append(problems, name+": one step, no action, run exactly: "+script)
 	}
 	return problems
 }
@@ -123,6 +155,10 @@ func TestReleaseWorkflowCheckCatchesLooseAutoTag(t *testing.T) {
 		"  version-pr-ci:\n    needs: version-pr\n    permissions: {actions: write}\n" +
 		"    steps:\n      - run: " + strconv.Quote(versionPRDispatch) + "\n" +
 		"  release:\n    if: startsWith(github.ref, 'refs/tags/v')\n" +
+		"  pin-actions:\n    needs: release\n    if: startsWith(github.ref, 'refs/tags/v')\n" +
+		"    permissions: {contents: write, pull-requests: write}\n" +
+		"  pin-actions-ci:\n    needs: pin-actions\n    permissions: {actions: write}\n" +
+		"    steps:\n      - run: " + strconv.Quote(pinPRDispatch) + "\n" +
 		"  auto-tag:\n    if: >-\n      " + strings.Join(autoTagGuards, " &&\n      ") + "\n" +
 		"    permissions: {contents: write, actions: write}\n" +
 		"    steps:\n" +
@@ -145,6 +181,11 @@ func TestReleaseWorkflowCheckCatchesLooseAutoTag(t *testing.T) {
 		"ci job release":     {"run ci.yaml", "run release.yaml"},
 		"ci job extra step":  {"    steps:\n      - run: \"for", "    steps:\n      - uses: actions/checkout@x\n      - run: \"for"},
 		"ci job no needs":    {"    needs: version-pr\n", ""},
+		"pin on push":        {"needs: release\n    if: startsWith(github.ref, 'refs/tags/v')", "needs: release\n    if: github.event_name == 'push'"},
+		"pin before release": {"needs: release\n", "needs: version-pr\n"},
+		"pin signs":          {"contents: write, pull-requests: write}\n  pin", "contents: write, pull-requests: write, id-token: write}\n  pin"},
+		"pin ci other ref":   {"--ref release-pins/main", "--ref main"},
+		"pin ci contents":    {"needs: pin-actions\n    permissions: {actions: write}", "needs: pin-actions\n    permissions: {actions: write, contents: write}"},
 	}
 	for name, c := range cases {
 		wf := strings.Replace(ok, c[0], c[1], 1)
