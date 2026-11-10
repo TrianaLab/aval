@@ -19,6 +19,18 @@ A Go test against Redis from Docker Compose,
 ```
 
 `aval init` writes a first one ([Quickstart](../quickstart.md)).
+For a project that will hold many tests, `aval init --set` starts from two
+files instead: `aval.yaml` as a `kind: TestSet` with your test and a
+`sources` fragment for the globs, and `.github/aval/policy.yaml` with one
+placeholder keyless identity:
+
+```sh
+aval init --set --name unit --source 'src/**' --cacheability hermetic -- go test ./...
+```
+
+The identity's `subjectRegexp` names `<OWNER>/<REPO>`, so it trusts no signer
+until you replace it with your CI's
+([Trust policy](trust-policy.md)). `aval explain --all` checks the set.
 
 ## Step by step
 
