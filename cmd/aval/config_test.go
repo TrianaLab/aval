@@ -191,7 +191,7 @@ func TestChildEnvWithholdsTrustSettings(t *testing.T) {
 	t.Setenv(registryEnv, "reg.example/r")
 	t.Setenv(policyEnv, "p.yaml")
 	t.Setenv(idTokenEnv, "token")
-	for _, kv := range childEnv() {
+	for _, kv := range childEnv("") {
 		if k, _, _ := strings.Cut(kv, "="); k == registryEnv || k == policyEnv || k == idTokenEnv {
 			t.Errorf("child env has %s", kv)
 		}

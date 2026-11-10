@@ -452,6 +452,11 @@ func credentialQuery(ref string) bool {
 var credentialKeys = []string{"token", "private_token", "access_token", "security_token", "x_amz_security_token", "key", "apikey", "api_key",
 	"sig", "signature", "x_amz_signature", "x_goog_signature", "auth", "password", "secret", "client_secret", "credential", "session", "sessionid"}
 
+// RunStackEnv names the variable `aval run` sets for runner.command: the
+// contracts of the enclosing runs. It differs between an outer and a nested
+// run of the same inputs, so it may not appear in environment.env.
+const RunStackEnv = "AVAL_RUN_STACK"
+
 func (e Environment) validate(add func(string, ...any)) {
 	for k := range e.Toolchain {
 		if !toolKeyRe.MatchString(k) {
@@ -471,6 +476,8 @@ func (e Environment) validate(add func(string, ...any)) {
 	for i, v := range e.Env {
 		if !envRe.MatchString(v) {
 			add("environment.env[%d]: invalid variable name %q", i, v)
+		} else if strings.EqualFold(v, RunStackEnv) {
+			add("environment.env[%d]: %s is set by aval run and is not an input", i, v)
 		}
 	}
 }
