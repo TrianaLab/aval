@@ -2434,9 +2434,14 @@ scanned.</p>
 <li><code>file</code> is the path Aval prints before the line number, relative to the
   <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (<code>runner.command</code> for the command), and limits the entry to that
   file. Without it, a <code>ref</code> that two files report (<code>resources[0]</code> repeats) is
-  not accepted, and the finding asks for <code>file</code>. With
-  <a href="../guides/depend-on-a-contract/"><code>scope.contracts</code></a>, each <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s entries
-  apply to its own findings.</li>
+  not accepted, and the finding asks for <code>file</code>.</li>
+<li><code>files</code> is a list of globs, matched like <code>scope.source</code>, instead of
+  <code>file</code> (not both). The entry accepts its exact <code>ref</code> in every file in
+  <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> that a glob matches, never in <code>runner.command</code>. Each glob must match
+  a file in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, or the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> is invalid (exit 2). There is no <code>ref</code>
+  wildcard: every accepted reference is one somebody wrote down.</li>
+<li>With <a href="../guides/depend-on-a-contract/"><code>scope.contracts</code></a>, each <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s
+  entries apply to its own findings.</li>
 <li>It is part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, so it changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and shows in
   review.</li>
 <li><code>aval run</code> still prints the finding, marked <code>(allowed: &lt;reason&gt;)</code>.</li>

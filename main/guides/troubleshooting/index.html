@@ -2461,8 +2461,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>lower case tool names, valid variable names other than <code>AVAL_RUN_STACK</code>; probe only declared, non-empty toolchain keys, each with an argv</td>
 </tr>
 <tr>
-<td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code>, <code>file &lt;x&gt; must be a slash-separated path relative to the contract</code></td>
-<td>give each entry a <code>ref</code>, a <code>reason</code> and, if needed, a <code>file</code> as the finding prints it (<a href="../../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>)</td>
+<td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code>, <code>file &lt;x&gt; must be a slash-separated path relative to the contract</code>, <code>file and files exclude each other</code>, <code>scope.allowMutable[&lt;i&gt;].files[&lt;j&gt;]: &lt;x&gt;</code>, <code>matches no file in scope</code></td>
+<td>give each entry a <code>ref</code>, a <code>reason</code> and, if needed, a <code>file</code> as the finding prints it or <code>files</code> globs (not both) that each match a file in the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> (<a href="../../pinning/#accept-a-reference-on-purpose">Pin your dependencies</a>)</td>
 </tr>
 <tr>
 <td><code>scope.resolve[&lt;i&gt;]: &lt;x&gt;</code>, <code>unknown kind &lt;x&gt;</code>, <code>the reference must be non-empty</code>, <code>credentials in the reference are not allowed</code>, <code>a scope.resolve entry is one</code></td>
