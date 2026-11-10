@@ -3,8 +3,9 @@
 # Lists are unsorted and repeated so the golden pins canonical sort and dedup;
 # the last argv entry pins argv order and JSON escaping (&, <, >, non-ASCII).
 # The test sets DB_IMAGE, sets EMPTY to "" and leaves MODE unset. pkg/.git is
-# a regular file the test creates (a worktree gitfile): it is an input, unlike
-# a .git directory. crlf.txt pins raw content bytes (no EOL normalization).
+# a regular file the test creates (a worktree gitfile): pkg/** matches it, but
+# like a .git directory it is never an input (aval-fingerprint/v2). crlf.txt
+# pins raw content bytes (no EOL normalization).
 apiVersion: aval.trianalab.io/v1
 kind: Test
 metadata:
@@ -12,7 +13,7 @@ metadata:
 runner:
   command: ["./run.sh", "-v", "a && b <c> é"]
 scope:
-  source: ["run.sh", "hook.sh", "owner.sh", "other.sh", "suid.txt", "crlf.txt", "contract.yaml", "**/*.go", ".hidden/*", "pkg/.git", "run.sh"]
+  source: ["run.sh", "hook.sh", "owner.sh", "other.sh", "suid.txt", "crlf.txt", "contract.yaml", "**/*.go", ".hidden/*", "pkg/**", "run.sh"]
   exclude: ["vendor/**", "notes.txt", "vendor/**"]
   dependencies: [go.sum, deps.lock, go.sum]
 environment:

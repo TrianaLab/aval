@@ -42,7 +42,7 @@ func TestExplainMatchesRunExplain(t *testing.T) {
 	_, digest, _ := runCLI("run", "-f", c, "--fingerprint-only")
 	code, stdout, stderr := runCLI("explain", "-f", c)
 	lines := strings.SplitAfter(manifest, "\n")
-	want := "fingerprint manifest for unit (aval-fingerprint/v1)\n" + strings.Join(lines[:len(lines)-2], "") + "fingerprint " + digest
+	want := "fingerprint manifest for unit (aval-fingerprint/v2)\n" + strings.Join(lines[:len(lines)-2], "") + "fingerprint " + digest
 	if code != ExitOK || stdout != want || stderr != "" {
 		t.Fatalf("explain: exit %d, stdout %q, stderr %q; want stdout %q", code, stdout, stderr, want)
 	}
@@ -63,12 +63,29 @@ func TestExplainErrors(t *testing.T) {
 	if err := os.Remove(filepath.Join(filepath.Dir(noSource), "in.txt")); err != nil {
 		t.Fatal(err)
 	}
+	// An exact glob naming a .git file matches nothing: .git is never an
+	// input (#199), and the glob fails like any other that matches no file.
+	gitfile := writeContract(t, "hermetic")
+	data, err := os.ReadFile(gitfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(gitfile, []byte(strings.Replace(string(data), `["*.txt"]`, `["*.txt", "pkg/.git"]`, 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(filepath.Dir(gitfile), "pkg"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(gitfile), "pkg", ".git"), []byte("gitdir: ../.git/modules/pkg\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		args   []string
 		code   int
 		stderr string
 	}{
 		{[]string{"explain", "-f", noSource}, ExitError, "aval: fingerprint: "},
+		{[]string{"explain", "-f", gitfile}, ExitError, `aval: fingerprint: source glob "pkg/.git" matched no files`},
 		{[]string{"explain", "-f", noSource, "--digest"}, ExitError, "aval: fingerprint: "},
 		{[]string{"run", "-f", noSource, "--explain"}, ExitError, "aval: fingerprint: "},
 		{[]string{"explain", "-f", filepath.Join(t.TempDir(), "aval.yaml")}, ExitUsage, "aval: "},

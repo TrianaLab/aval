@@ -50,7 +50,7 @@ func signedFor(t *testing.T, contractFile, keyFile string, edit func(*evidence.P
 		Subject:       evidence.Subject{Name: "git+https://example.com/repo", Digest: map[string]string{"gitCommit": "abc"}},
 		Test:          evidence.Test{ID: c.Metadata.Name, Cacheability: string(c.Cacheability)},
 		Result:        evidence.ResultPassed,
-		Execution:     evidence.Execution{Fingerprint: fp.Digest, FingerprintVersion: "aval-fingerprint/v1"},
+		Execution:     evidence.Execution{Fingerprint: fp.Digest, FingerprintVersion: "aval-fingerprint/v2"},
 		StartedAt:     start,
 		FinishedAt:    start.Add(time.Second),
 	}

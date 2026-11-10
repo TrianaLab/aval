@@ -1,7 +1,7 @@
 === push=false shadow=false failed=false
 exit 5
 --- stdout
-↺ verified unit sha256:77ad8f66
+↺ verified unit sha256:8a2cd781
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
   REJECTED  reg.example/r@sha256:ff verification-failed: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
@@ -15,7 +15,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=false shadow=false failed=true
 exit 5
 --- stdout
-↺ verified unit sha256:1a818124
+↺ verified unit sha256:889c3506
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
   REJECTED  reg.example/r@sha256:ff verification-failed: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
@@ -29,7 +29,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=false shadow=true failed=false
 exit 5
 --- stdout
-↺ verified unit sha256:77ad8f66
+↺ verified unit sha256:8a2cd781
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
   REJECTED  reg.example/r@sha256:ff verification-failed: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
@@ -44,7 +44,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=false shadow=true failed=true
 exit 5
 --- stdout
-↺ verified unit sha256:1a818124
+↺ verified unit sha256:889c3506
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
   REJECTED  reg.example/r@sha256:ff verification-failed: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
@@ -59,7 +59,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=true shadow=false failed=false
 exit 5
 --- stdout
-↺ verified unit sha256:77ad8f66
+↺ verified unit sha256:8a2cd781
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
   REJECTED  reg.example/r@sha256:ff verification-failed: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
@@ -74,7 +74,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=true shadow=false failed=true
 exit 5
 --- stdout
-↺ verified unit sha256:1a818124
+↺ verified unit sha256:889c3506
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
   REJECTED  reg.example/r@sha256:ff verification-failed: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
@@ -89,7 +89,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=true shadow=true failed=false
 exit 5
 --- stdout
-↺ verified unit sha256:77ad8f66
+↺ verified unit sha256:8a2cd781
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
   REJECTED  reg.example/r@sha256:ff verification-failed: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)
@@ -105,7 +105,7 @@ aval: SECURITY: 1 attestation(s) for unit failed signature or policy verificatio
 === push=true shadow=true failed=true
 exit 5
 --- stdout
-↺ verified unit sha256:1a818124
+↺ verified unit sha256:889c3506
   signer     (issuer https://issuer.example), trust level runner
   reference reg.example/r@sha256:aa
   REJECTED  reg.example/r@sha256:ff verification-failed: attestation verification failed: untrusted signer \x1b[31m\u2028forged (trust policy p.yaml)

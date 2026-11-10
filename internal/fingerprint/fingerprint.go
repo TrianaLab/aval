@@ -3,7 +3,7 @@
 //
 // The fingerprint is built from a canonical, line-oriented manifest:
 //
-//	aval-fingerprint/v1
+//	aval-fingerprint/v2
 //	contract <sha256 of canonical contract JSON>
 //	source <sha256> <mode> <path>
 //	dependency <sha256> <mode> <path>
@@ -49,7 +49,7 @@ import (
 
 // Version is the manifest format version. Bump it whenever the manifest
 // layout changes, so old and new fingerprints never collide.
-const Version = "aval-fingerprint/v1"
+const Version = "aval-fingerprint/v2"
 
 // Fingerprint is the result of Compute.
 type Fingerprint struct {
@@ -497,8 +497,17 @@ func listFiles(fsys fs.FS, skip map[string]bool, source, deps, exclude []contrac
 		}
 		f := file{rel, strings.Split(rel, "/")}
 		mayContain := slices.ContainsFunc(include, func(g contract.Glob) bool { return g.MayContain(f.segs) })
+		// .git is VCS metadata whatever its type: a directory, or the gitfile
+		// of a linked worktree or submodule (a machine-specific pointer git
+		// never versions), or a symlink. The name is exact (.GIT is an input).
+		if d.Name() == ".git" {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
 		if d.IsDir() {
-			if d.Name() == ".git" || d.Name() == OutputDir {
+			if d.Name() == OutputDir {
 				return fs.SkipDir
 			}
 			// WalkDir calls this before reading the directory, so a pruned

@@ -135,6 +135,8 @@ func TestInScope(t *testing.T) {
 		{".aval/r.json", false},
 		{"sub/.aval/r.json", false},
 		{".git/r.json", false},
+		{".git", false}, // a gitfile is never an input (#199)
+		{"sub/.git", false},
 		{".aval", true}, // a file named .aval is not a skipped directory
 		{"../r.json", false},
 	}
@@ -157,7 +159,7 @@ func validResult(t *testing.T) *evidence.Predicate {
 		Subject:       evidence.Subject{Name: "unit", Digest: map[string]string{"sha256": strings.Repeat("a", 64)}},
 		Test:          evidence.Test{ID: "unit", Cacheability: "hermetic"},
 		Result:        evidence.ResultPassed,
-		Execution:     evidence.Execution{Fingerprint: "sha256:" + strings.Repeat("a", 64), FingerprintVersion: "aval-fingerprint/v1"},
+		Execution:     evidence.Execution{Fingerprint: "sha256:" + strings.Repeat("a", 64), FingerprintVersion: "aval-fingerprint/v2"},
 		Runner:        evidence.Runner{Identity: "host"},
 		StartedAt:     time.Unix(1, 0).UTC(),
 		FinishedAt:    time.Unix(2, 0).UTC(),

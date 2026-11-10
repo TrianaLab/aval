@@ -62,7 +62,7 @@ This is the plain output, as in CI. A terminal shows glyph lines instead.
 
 ```text
 config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
-miss hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+miss hello sha256:640f5db75fa5b71422b1afaffb4c645194aaccb223dae9070968e375bccbaf42
 reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
 --- run hello: grep -q hello src/hello.txt
 --- end hello: passed (exit 0) in ...
@@ -84,7 +84,7 @@ echo "exit code: $?"
 
 ```text
 config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
-verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+verified hello sha256:640f5db75fa5b71422b1afaffb4c645194aaccb223dae9070968e375bccbaf42
 signer: key ..., trust level developer
 reference: localhost:5001/demo/hello-aval@sha256:...
 exit code: 0
@@ -98,7 +98,7 @@ aval run
 
 ```text
 config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
-verified hello sha256:fb3906f246f9255cf129e24de1256ac47b85e33cc548f3f517e94e237db0de06
+verified hello sha256:640f5db75fa5b71422b1afaffb4c645194aaccb223dae9070968e375bccbaf42
 signer: key ..., trust level developer
 reference: localhost:5001/demo/hello-aval@sha256:...
 reused passed result
@@ -118,7 +118,7 @@ aval run
 
 ```text
 config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
-miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
+miss hello sha256:944c02c002bb6830480c64e44594d52265970351501f2372947e054795c37fc0
 reason: localhost:5001/demo/hello-aval: no attestation found for fingerprint
 --- run hello: grep -q hello src/hello.txt
 --- end hello: passed (exit 0) in ...
@@ -146,7 +146,7 @@ wrote other.key (private: keep it secret, do not commit it) and other.pub
 key id: ...
 next: trust other.pub in your policy (publicKey: other.pub) and sign with --key other.key
 config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY)
-miss hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
+miss hello sha256:944c02c002bb6830480c64e44594d52265970351501f2372947e054795c37fc0
 reason: reuse off: no trust policy (set AVAL_POLICY or --policy)
 --- run hello: grep -q hello src/hello.txt
 --- end hello: passed (exit 0) in ...
@@ -155,7 +155,7 @@ pushed localhost:5001/demo/hello-aval@sha256:...
 summary: hello ran: passed in ...; result pushed; reuse was off
 config: registry=localhost:5001/demo/hello-aval (env AVAL_REGISTRY) policy=policy.yaml (env AVAL_POLICY)
 aval: SECURITY: 1 attestation(s) for hello failed signature or policy verification; treat it as a security event, see https://aval.run/.../trust-model/
-verification-failed hello sha256:d52167b48089d3c3add62a6e81c6bfb0aa8d90baa98a69235c48bd892297170b
+verification-failed hello sha256:944c02c002bb6830480c64e44594d52265970351501f2372947e054795c37fc0
 reference: localhost:5001/demo/hello-aval@sha256:...
 reason: attestation verification failed: signature: signer key id "..." is not in the trust policy (trust policy policy.yaml)
 --- run hello: grep -q hello src/hello.txt
