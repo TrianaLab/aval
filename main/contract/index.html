@@ -2883,6 +2883,9 @@ of stopping at the first, and exits 2 if any is invalid, else 1 if any
 <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> cannot be computed. <code>-o json</code> prints the same as
 <code>{"tests": [{"name", "fingerprint"} or {"name", "error"}]}</code>. A file that
 does not expand prints every problem on stderr and nothing on stdout.</p>
+<p><code>aval init --set</code> writes a TestSet of one test and one fragment, plus
+<code>.github/aval/policy.yaml</code> with a placeholder identity, as a starting point
+(<a href="../guides/write-a-contract/">Write a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr></a>).</p>
 <h2 id="nested-runs">Nested runs<a class="headerlink" href="#nested-runs" title="Anchor link">&para;</a></h2>
 <p><code>aval run</code> sets <code>AVAL_RUN_STACK</code> for <code>runner.command</code> and the probes: the
 absolute, symlink-resolved paths of the contracts of the enclosing runs plus

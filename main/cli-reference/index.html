@@ -2648,29 +2648,39 @@ never traces the test. It lists the files the source globs match and rejects a
 glob that matches nothing. It never replaces aval.yaml, <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>.yaml or the key
 without --force. If a write fails after the key pair was written, init
 removes the key pair again.</p>
+<p>--set writes a two-file starting layout instead: aval.yaml as a kind: TestSet
+with the test and one fragment that holds the source globs, and
+.github/aval/<abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>.yaml with one placeholder keyless identity (an anchored
+subjectRegexp with a placeholder owner and repository that matches nothing
+until you edit it). It writes no key. Both files are validated before they
+are written; on an existing file it exits 2 unless --force.</p>
 <p>When a value is missing and both stdin and stdout are terminals, init asks for
 it. Otherwise it exits 2 and names the missing flags.</p>
 <p>Exit codes: 0 written, 1 error (a file exists without --force, or cannot be
 written), 2 usage (a missing value, an invalid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, a glob that matches
-nothing, or init cancelled).</p>
+nothing, init cancelled, or with --set a file exists without --force).</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Usage:
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  aval init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless [--force] -- &lt;command&gt; [flags]
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  aval init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless|--set [--force] -- &lt;command&gt; [flags]
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>Examples:
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  # Write aval.yaml, aval.key, aval.pub and policy.yaml
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  aval init --name unit --source 'src/**' --source go.mod --cacheability hermetic --key aval.key -- go test ./...
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>Flags:
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>      --cacheability string   hermetic, controlled-environment, external-dependencies or non-deterministic
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>      --force                 replace existing aval.yaml, policy.yaml and key files
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>  -h, --help                  help for init
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>      --key string            signing key pair NAME.key and NAME.pub to create and trust in policy.yaml; a trailing .key is dropped
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>      --keyless               sign keyless with Sigstore: no key and no policy are written
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>      --name string           test name (metadata.name): what the test checks
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>      --source stringArray    source glob relative to the current directory (scope.source); repeat it for more
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>Global Flags:
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  # Start a TestSet: aval.yaml and .github/aval/policy.yaml with a placeholder identity
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  aval init --set --name unit --source 'src/**' --cacheability hermetic -- go test ./...
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>Flags:
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>      --cacheability string   hermetic, controlled-environment, external-dependencies or non-deterministic
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>      --force                 replace existing aval.yaml, policy.yaml and key files (.github/aval/policy.yaml with --set)
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>  -h, --help                  help for init
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>      --key string            signing key pair NAME.key and NAME.pub to create and trust in policy.yaml; a trailing .key is dropped
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>      --keyless               sign keyless with Sigstore: no key and no policy are written
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>      --name string           test name (metadata.name): what the test checks
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>      --set                   write aval.yaml as a kind: TestSet and .github/aval/policy.yaml with a placeholder identity, no key
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>      --source stringArray    source glob relative to the current directory (scope.source); repeat it for more
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>Global Flags:
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-keygen">aval keygen<a class="headerlink" href="#aval-keygen" title="Anchor link">&para;</a></h2>
 <p>keygen writes a new ECDSA P-256 signing key to name.key (unencrypted PKCS#8
