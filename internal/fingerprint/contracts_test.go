@@ -191,7 +191,7 @@ func TestContractsFailClosed(t *testing.T) {
 			f["frontend/aval.yaml"] = avalYAML("frontend", "src/**", []string{"../../elsewhere/aval.yaml"})
 		}, "scope.contracts ../../elsewhere/aval.yaml: leads outside the repository root"},
 		{"no git working tree", func(f map[string]string) { delete(f, ".git/HEAD") },
-			"scope.contracts: no git working tree (.git) at or above"},
+			"no git working tree (.git) at or above"},
 		{"deep chain", chain(maxContractDepth + 1), fmt.Sprintf("more than %d levels or %d contracts", maxContractDepth, maxContracts)},
 		{"many contracts", func(f map[string]string) {
 			var refs []string

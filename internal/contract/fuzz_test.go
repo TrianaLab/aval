@@ -23,6 +23,8 @@ func FuzzParse(f *testing.F) {
 	f.Add([]byte(valid + "\n---\nfoo: bar\n"))
 	f.Add([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   allowMutable: [{files: ["deploy/**/*.yaml", "a[1].yaml"], ref: "nginx:1.27", reason: r}]`, 1)))
+	f.Add([]byte(strings.Replace(valid, "scope:\n", "scope:\n  root: ../..\n", 1)))
+	f.Add([]byte(strings.Replace(valid, "scope:\n", "scope:\n  root: ../x\n", 1)))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		c, err := Parse(data)
 		if err != nil {
@@ -30,6 +32,11 @@ func FuzzParse(f *testing.F) {
 		}
 		if err := c.Validate(); err != nil {
 			t.Fatalf("Parse accepted an invalid contract: %v", err)
+		}
+		for _, seg := range strings.Split(c.Scope.Root, "/") {
+			if c.Scope.Root != "" && seg != ".." {
+				t.Fatalf("Parse accepted scope.root %q", c.Scope.Root)
+			}
 		}
 		globs := append(append(append([]string{}, c.Scope.Source...), c.Scope.Exclude...), c.Scope.Dependencies...)
 		for _, a := range c.Scope.AllowMutable {

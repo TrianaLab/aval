@@ -105,7 +105,8 @@ type Runner struct {
 }
 
 // Scope declares the inputs of the test. Paths are slash-separated globs
-// relative to the contract directory; `**` matches any number of segments.
+// relative to the contract root (Root, by default the contract's
+// directory); `**` matches any number of segments.
 type Scope struct {
 	// Source globs select files whose content is part of the fingerprint.
 	Source []string `yaml:"source" json:"source"`
@@ -131,6 +132,11 @@ type Scope struct {
 	// this one's manifest. Omitted when empty, so contracts without it
 	// hash as before.
 	Contracts []string `yaml:"contracts,omitempty" json:"contracts,omitempty"`
+	// Root is the path from the contract's directory up to the root of its
+	// tree: only ".." segments (.., ../..). Globs, outputs, findings,
+	// runner.command and environment.probe all resolve from it; Contracts
+	// do not. Omitted when empty, so contracts without it hash as before.
+	Root string `yaml:"root,omitempty" json:"root,omitempty"`
 }
 
 // ResolveKinds are the ecosystems scope.resolve accepts, one resolver each.
@@ -159,12 +165,12 @@ func (r *Reference) UnmarshalYAML(n *yaml.Node) error {
 
 // AllowMutable accepts one mutable reference, by the exact text Aval reports
 // for it, with the reason it is acceptable. File, when set, limits it to
-// the finding in that file (as findings print it: relative to the contract,
-// or runner.command); without it the ref must be reported in one file only.
-// Files, globs that exclude File, accepts the ref in every in-scope file
-// they match (never in runner.command); each must match a file in scope.
-// File and Files are omitted when empty, so contracts without them hash as
-// before.
+// the finding in that file (as findings print it: relative to the contract
+// root, or runner.command); without it the ref must be reported in one file
+// only. Files, globs relative to the contract root that exclude File, accepts
+// the ref in every in-scope file they match (never in runner.command); each
+// must match a file in scope. File and Files are omitted when empty, so
+// contracts without them hash as before.
 type AllowMutable struct {
 	File   string   `yaml:"file,omitempty" json:"file,omitempty"`
 	Files  []string `yaml:"files,omitempty" json:"files,omitempty"`
@@ -189,6 +195,7 @@ var (
 	nameRe    = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$`)
 	envRe     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	toolKeyRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
+	rootRe    = regexp.MustCompile(`^\.\.(/\.\.)*$`)
 )
 
 // Load reads and validates a contract file.
@@ -282,15 +289,18 @@ func (c *Contract) Validate() error {
 	return errors.Join(errs...)
 }
 
-// validate checks scope.allowMutable and scope.resolve; Validate checks
-// the globs.
+// validate checks scope.root, scope.allowMutable, scope.resolve and
+// scope.contracts; Validate checks the globs.
 func (s Scope) validate(add func(string, ...any)) {
+	if s.Root != "" && !rootRe.MatchString(s.Root) {
+		add("scope.root: %q must be '..' segments only (.., ../..): the path up from the contract's directory to the root of its tree", s.Root)
+	}
 	for i, a := range s.AllowMutable {
 		if strings.TrimSpace(a.Ref) == "" || strings.TrimSpace(a.Reason) == "" {
 			add("scope.allowMutable[%d]: ref and reason are both required", i)
 		}
 		if a.File != "" && !fs.ValidPath(a.File) {
-			add("scope.allowMutable[%d]: file %q must be a slash-separated path relative to the contract, as findings print it", i, a.File)
+			add("scope.allowMutable[%d]: file %q must be a slash-separated path relative to the contract root, as findings print it", i, a.File)
 		}
 		if a.File != "" && len(a.Files) > 0 {
 			add("scope.allowMutable[%d]: file and files exclude each other: file is one exact path, files are globs", i)
@@ -503,7 +513,7 @@ func ValidateName(name string) error {
 	return nil
 }
 
-// ValidateGlob rejects globs that could escape the contract directory or are
+// ValidateGlob rejects globs that could escape the contract root or are
 // malformed. `**` is only allowed as a whole path segment.
 func ValidateGlob(g string) error {
 	if g == "" {

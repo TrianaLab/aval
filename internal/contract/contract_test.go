@@ -204,6 +204,37 @@ func TestParseContracts(t *testing.T) {
 	}
 }
 
+// TestParseRoot: scope.root is optional and accepts only ".." segments; a
+// path that goes down, ".", absolute, backslashes and mixed paths are
+// rejected (exit 2 in the CLI).
+func TestParseRoot(t *testing.T) {
+	with := func(root string) string {
+		return strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
+  root: `+root, 1)
+	}
+	for _, root := range []string{"..", "../..", "../../.."} {
+		c, err := Parse([]byte(with(root)))
+		if err != nil || c.Scope.Root != root {
+			t.Fatalf("root %q: %v, %+v", root, err, c)
+		}
+	}
+	if c, _ := Parse([]byte(valid)); c.Scope.Root != "" {
+		t.Fatalf("omitted root = %q, want empty", c.Scope.Root)
+	}
+	for _, root := range []string{`"."`, "x", "../x", "x/..", "../../x", "/..", `"..\\.."`, "../", "./..", "...", "..//..", `"../..\n"`, "'.. '", `""`} {
+		_, err := Parse([]byte(with(root)))
+		if root == `""` {
+			if err != nil {
+				t.Fatalf("empty root (omitted): %v", err)
+			}
+			continue
+		}
+		if err == nil || !strings.Contains(err.Error(), "scope.root:") {
+			t.Fatalf("root %s: want a scope.root error, got %v", root, err)
+		}
+	}
+}
+
 // TestParseResolve: scope.resolve is optional and keeps each `kind: ref`
 // entry; a user in a URL is fine, a password is not echoed.
 func TestParseResolve(t *testing.T) {
@@ -272,7 +303,7 @@ func TestParseYAMLErrors(t *testing.T) {
 	lines := []string{
 		"line 7: runner.command: got a string `go test...`, want a list of strings",
 		"line 9: scope.sources: unknown field; did you mean source?",
-		"line 10: scope.src\x1b: unknown field; known fields: source, exclude, dependencies, allowMutable, resolve, contracts", // the caller escapes it
+		"line 10: scope.src\x1b: unknown field; known fields: source, exclude, dependencies, allowMutable, resolve, contracts, root", // the caller escapes it
 		"line 16: metadata2: unknown field; did you mean metadata?",
 		"line 17: zzzzzzzz: unknown field; known fields: apiVersion, kind, metadata, runner, scope, environment, cacheability, outputs",
 	}

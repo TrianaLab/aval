@@ -49,7 +49,7 @@ func reportJSON(t *testing.T, v any) string {
 // fingerprintOf is the current fingerprint of contract c.
 func fingerprintOf(t *testing.T, c string) string {
 	t.Helper()
-	_, fp, err := loadAndFingerprint(context.Background(), c)
+	_, _, fp, err := loadAndFingerprint(context.Background(), c)
 	if err != nil {
 		t.Fatal(err)
 	}

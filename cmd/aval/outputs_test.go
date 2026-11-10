@@ -64,7 +64,7 @@ func TestCollectOutputs(t *testing.T) {
 		return p, c
 	}
 	file, c := load(t, `["**/*.xml"]`, map[string]string{"coverage.xml": "cov", "reports/junit.xml": "junit", ".git/x.xml": "git", ".aval/y.xml": "aval", "notes.md": "n"})
-	got, err := collectOutputs(file, c)
+	got, err := collect(t, file, c)
 	if err != nil || fmt.Sprint(got) != fmt.Sprint([]registry.Output{{Path: "coverage.xml", Data: []byte("cov")}, {Path: "reports/junit.xml", Data: []byte("junit")}}) {
 		t.Fatalf("collectOutputs = %v %v", got, err)
 	}
@@ -111,7 +111,7 @@ func TestCollectOutputs(t *testing.T) {
 			if tc.setup != nil {
 				tc.setup(t, filepath.Dir(file))
 			}
-			if got, err := collectOutputs(file, c); err == nil || !strings.Contains(err.Error(), tc.want) || got != nil {
+			if got, err := collect(t, file, c); err == nil || !strings.Contains(err.Error(), tc.want) || got != nil {
 				t.Fatalf("got %v %v, want error ~%q", got, err, tc.want)
 			}
 		})
