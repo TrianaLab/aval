@@ -28,7 +28,7 @@ placeholder keyless identity:
 aval init --set --name unit --source 'src/**' --cacheability hermetic -- go test ./...
 ```
 
-The identity's `subjectRegexp` names `OWNER/REPO`, so it trusts no signer
+The identity's `subjectRegexp` names `<OWNER>/<REPO>`, so it trusts no signer
 until you replace it with your CI's
 ([Trust policy](trust-policy.md)). `aval explain --all` checks the set.
 

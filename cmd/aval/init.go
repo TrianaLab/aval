@@ -33,9 +33,12 @@ const setPolicy = ".github/aval/policy.yaml"
 const setFragment = "sources"
 
 // placeholderSubject is the anchored subjectRegexp of the identity aval init
-// --set writes: it matches no real signer until OWNER/REPO is replaced, so
+// --set writes: it matches no real signer until <OWNER>/<REPO> is replaced, so
 // nothing is reused before the user edits it (fail closed, invariant 3).
-const placeholderSubject = `^https://github\.com/OWNER/REPO/\.github/workflows/ci\.yaml@refs/heads/main$`
+// Angle brackets are invalid in GitHub logins and repository names, so no
+// one can register a matching owner. It is a GitHub Actions example; other
+// issuers go in by hand (docs/guides/trust-policy.md).
+const placeholderSubject = `^https://github\.com/<OWNER>/<REPO>/\.github/workflows/ci\.yaml@refs/heads/main$`
 
 // cacheabilities are the classes init offers, in prompt order.
 var cacheabilities = []contract.Cacheability{contract.Hermetic, contract.ControlledEnvironment, contract.ExternalDependencies, contract.NonDeterministic}
@@ -91,9 +94,9 @@ removes the key pair again.
 --set writes a two-file starting layout instead: aval.yaml as a kind: TestSet
 with the test and one fragment that holds the source globs, and
 ` + setPolicy + ` with one placeholder keyless identity (an anchored
-subjectRegexp for OWNER/REPO that matches nothing until you edit it). It
-writes no key. Both files are validated before they are written; on an
-existing file it exits 2 unless --force.
+subjectRegexp with a placeholder owner and repository that matches nothing
+until you edit it). It writes no key. Both files are validated before they
+are written; on an existing file it exits 2 unless --force.
 
 When a value is missing and both stdin and stdout are terminals, init asks for
 it. Otherwise it exits 2 and names the missing flags.
@@ -169,7 +172,7 @@ func runInit(cmd *cobra.Command, o *initOpts) error {
 	next := "next: export AVAL_REGISTRY=<oci repository> AVAL_POLICY=" + defaultPolicy + ", then aval run --push --key " + cliout.OneLine(o.keyName()) + ".key"
 	switch {
 	case o.set:
-		next = "next: replace OWNER/REPO in " + setPolicy + " with your CI's signer, check the set with aval explain --all, export AVAL_REGISTRY=<oci repository> AVAL_POLICY=" + setPolicy + ", then aval run --push in CI"
+		next = "next: replace <OWNER>/<REPO> in " + setPolicy + " with your CI's signer, check the set with aval explain --all, export AVAL_REGISTRY=<oci repository> AVAL_POLICY=" + setPolicy + ", then aval run --push in CI"
 	case o.keyless:
 		next = "next: write a trust policy for your OIDC identity (docs: guides/trust-policy), export AVAL_REGISTRY=<oci repository> AVAL_POLICY=<policy file>, then aval run --push"
 	}
@@ -275,11 +278,13 @@ func writeFile(p string, data []byte, force bool) error {
 
 // writeInit writes the key pair and policy (unless keyless), the contract
 // and the .gitignore lines, reporting each through line. A failure after the
-// key pair was written removes it, so a rerun needs no --force for it.
+// key pair was written removes it, so a rerun needs no --force for it. With
+// --force a failed write leaves neither the old nor the new policy, and the
+// directories it created stay: harmless and rerun-safe.
 func writeInit(o *initOpts, doc []byte, line func(glyph, s string)) (err error) {
 	ignore := []string{fingerprint.OutputDir + "/"}
 	if o.set {
-		pol := append([]byte("# Placeholder: replace OWNER/REPO, the workflow file and the branch with\n# the identity your CI signs with. Until then no result is trusted.\n"),
+		pol := append([]byte("# Placeholder: replace <OWNER>/<REPO>, the workflow file and the branch with\n# the identity your CI signs with. Until then no result is trusted.\n"),
 			marshalYAML(policyDoc{contract.APIVersion, policy.Kind, "runner", []policyIdentity{{Issuer: "https://token.actions.githubusercontent.com", SubjectRegexp: placeholderSubject, TrustLevel: "runner"}}})...)
 		_, err = policy.Parse(pol, ".")
 		if err == nil {
@@ -296,7 +301,7 @@ func writeInit(o *initOpts, doc []byte, line func(glyph, s string)) (err error) 
 				_ = os.Remove(setPolicy)
 			}
 		}()
-		line(cliout.GlyphDone, "wrote "+setPolicy+": a placeholder identity for OWNER/REPO at trust level runner")
+		line(cliout.GlyphDone, "wrote "+setPolicy+": a placeholder identity for <OWNER>/<REPO> at trust level runner")
 	}
 	if !o.keyless && !o.set {
 		name := o.keyName()

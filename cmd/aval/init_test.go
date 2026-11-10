@@ -410,6 +410,10 @@ func TestInitSetPlaceholderTrustsNothing(t *testing.T) {
 	ids := p.Identities
 	for _, s := range []string{
 		"https://github.com/TrianaLab/aval/.github/workflows/ci.yaml@refs/heads/main",
+		// GitHub logins are case-insensitive and the org "owner" exists, so the
+		// placeholder must not be a valid login in any case.
+		"https://github.com/OWNER/REPO/.github/workflows/ci.yaml@refs/heads/main",
+		"https://github.com/owner/REPO/.github/workflows/ci.yaml@refs/heads/main",
 		"https://github.com/OWNER/REPO/.github/workflows/ci.yaml@refs/heads/main-evil",
 		"https://evil.example/https://github.com/OWNER/REPO/.github/workflows/ci.yaml@refs/heads/main",
 		"https://githubXcom/OWNER/REPO/.github/workflows/ci.yaml@refs/heads/main",

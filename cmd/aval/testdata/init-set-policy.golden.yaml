@@ -1,9 +1,9 @@
-# Placeholder: replace OWNER/REPO, the workflow file and the branch with
+# Placeholder: replace <OWNER>/<REPO>, the workflow file and the branch with
 # the identity your CI signs with. Until then no result is trusted.
 apiVersion: aval.trianalab.io/v1
 kind: Policy
 minTrustLevel: runner
 identities:
   - issuer: https://token.actions.githubusercontent.com
-    subjectRegexp: ^https://github\.com/OWNER/REPO/\.github/workflows/ci\.yaml@refs/heads/main$
+    subjectRegexp: ^https://github\.com/<OWNER>/<REPO>/\.github/workflows/ci\.yaml@refs/heads/main$
     trustLevel: runner

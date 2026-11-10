@@ -150,9 +150,9 @@ removes the key pair again.
 --set writes a two-file starting layout instead: aval.yaml as a kind: TestSet
 with the test and one fragment that holds the source globs, and
 .github/aval/policy.yaml with one placeholder keyless identity (an anchored
-subjectRegexp for OWNER/REPO that matches nothing until you edit it). It
-writes no key. Both files are validated before they are written; on an
-existing file it exits 2 unless --force.
+subjectRegexp with a placeholder owner and repository that matches nothing
+until you edit it). It writes no key. Both files are validated before they
+are written; on an existing file it exits 2 unless --force.
 
 When a value is missing and both stdin and stdout are terminals, init asks for
 it. Otherwise it exits 2 and names the missing flags.
