@@ -85,10 +85,9 @@ for dir in "$ARTIFACTS"/aval-*/; do
     pushed=$((pushed + 1))
     args=(push -f "$INPUT_FILE" --test "$name" --registry "$registry" --report-file "${dir}report.json" --result-file "${dir}result.json")
     # aval push checks every file under outputs/ against the contract's
-    # outputs globs and refuses anything else (#236).
-    if [ -e "${dir}outputs" ] || [ -L "${dir}outputs" ]; then
-      args+=(--outputs-dir "${dir}outputs")
-    fi
+    # outputs globs and refuses anything else, or a missing outputs/ when
+    # the contract declares outputs (#236).
+    args+=(--outputs-dir "${dir}outputs")
     SIGSTORE_ID_TOKEN="$token" "$AVAL" "${args[@]}" || code=$?
   fi
   echo "| $name | exit $code |" >> "$GITHUB_STEP_SUMMARY"

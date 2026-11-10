@@ -238,19 +238,25 @@ func saveOutputs(dst, file string, c *contract.Contract) error {
 			err = os.WriteFile(p, f.Data, 0o644)
 		}
 		if err != nil {
+			_ = os.RemoveAll(dst) // fail closed: no partial set; dst was empty or missing (preflight)
 			break
 		}
 	}
 	return err
 }
 
-// outputsFrom checks --outputs-dir of push: the contract declares outputs
-// and dir is a directory, not a symlink to one.
+// outputsFrom checks --outputs-dir of push: dir is a directory, not a
+// symlink to one, and the contract declares outputs. A missing dir is fine
+// only for a contract without outputs; with outputs, push never falls back
+// to the checkout.
 func outputsFrom(dir string, c *contract.Contract) error {
+	fi, err := os.Lstat(dir)
 	if len(c.Outputs) == 0 {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
 		return fmt.Errorf("--outputs-dir %s: the contract declares no outputs: nothing is published", dir)
 	}
-	fi, err := os.Lstat(dir)
 	if err == nil && !fi.IsDir() {
 		err = errors.New("not a directory (symlinks are not followed)")
 	}

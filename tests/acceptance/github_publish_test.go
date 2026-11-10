@@ -378,8 +378,9 @@ func TestGitHubActionsCarryOutputs(t *testing.T) {
 	}
 }
 
-// An artifact with anything outside its layout, or an outputs/ entry that
-// is not a declared output, is refused for that test with exit 1 and
+// An artifact with anything outside its layout, an outputs/ entry that
+// is not a declared output, or no outputs/ for a contract that declares
+// outputs (never the checkout's), is refused for that test with exit 1 and
 // nothing is pushed.
 func TestGitHubActionsRefuseBadOutputs(t *testing.T) {
 	s, artifact := outputsStory(t)
@@ -408,5 +409,14 @@ func TestGitHubActionsRefuseBadOutputs(t *testing.T) {
 		if r := s.publish(t); r.code != 1 || !strings.Contains(r.out, tc.want) || s.verify(t, "cov") != 4 {
 			t.Fatalf("%s: exit %d, want 1, ~%q and nothing published\n%s", name, r.code, tc.want, r.out)
 		}
+	}
+
+	// No outputs/: the checkout's coverage.out is never signed instead.
+	artifact(t, func(dst string) { _ = os.RemoveAll(filepath.Join(dst, "outputs")) })
+	if err := os.WriteFile(filepath.Join(s.dir, "coverage.out"), []byte("committed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r := s.publish(t); r.code != 1 || !strings.Contains(r.out, "outputs: no such file or directory") || s.verify(t, "cov") != 4 {
+		t.Fatalf("no outputs/: exit %d, want 1 and nothing published\n%s", r.code, r.out)
 	}
 }

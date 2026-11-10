@@ -111,6 +111,24 @@ func TestOutputsDirRefuses(t *testing.T) {
 	}
 }
 
+// A missing --outputs-dir is fine for a contract without outputs: the
+// publish action always passes outputs/, which run creates only for
+// outputs. The result is published.
+func TestOutputsDirMissingWithoutOutputs(t *testing.T) {
+	signed := fakePublish(t, nil, nil)
+	c, result, dir := outputsDirStory(t)
+	body, _ := os.ReadFile(c)
+	write(t, filepath.Dir(c), "aval.yaml", strings.Split(string(body), "outputs:")[0])
+	if code, _, stderr := runCLI("run", "-f", c, "--result-file", result); code != ExitOK {
+		t.Fatalf("run: exit %d, stderr %q", code, stderr)
+	}
+	_ = os.RemoveAll(dir)
+	t.Setenv(idTokenEnv, "token")
+	if code, _, stderr := runCLI("push", "-f", c, "--registry", "reg.example/r", "--result-file", result, "--outputs-dir", dir); code != ExitOK || len(*signed) != 1 {
+		t.Fatalf("exit %d, stderr %q, %d signed, want 0 and one published", code, stderr, len(*signed))
+	}
+}
+
 // run refuses a non-empty --outputs-dir, or a file, before the test runs, warns when
 // the outputs cannot be copied, and copies nothing for a contract without
 // outputs.

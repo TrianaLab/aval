@@ -93,8 +93,8 @@ What `aval push` does with each artifact:
 - A report that records a security event signs nothing and exits 5.
 - The artifact holds `result.json`, `report.json`, `record.json` and
   `outputs/<path>`, the files the `outputs` globs matched; push publishes
-  those (`--outputs-dir`), not the checkout's. Any other entry, or a symlink,
-  extra file, input, `.git` or `.aval` in `outputs/`, exits 1 and publishes nothing.
+  those, never the checkout's. No `outputs/` for a test with outputs, or a
+  symlink, extra file, input, `.git` or `.aval` in it, exits 1, publishing nothing.
 - Trust only this workflow on `main`: [Write a trust policy](trust-policy.md#the-example).
 
 ### Why a composite action

@@ -831,6 +831,7 @@ With --test, the result and the report must both be for that test.
 --outputs-dir reads the contract's outputs from the directory that
 'aval run --outputs-dir' filled, not from the contract root: any entry in it
 that is not a regular file matched by an outputs glob publishes nothing.
+The directory may be missing only when the contract declares no outputs.
 Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 ` + loginHelp + `.`,
 		Args: noArgs,

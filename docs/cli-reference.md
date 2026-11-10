@@ -226,6 +226,7 @@ With --test, the result and the report must both be for that test.
 --outputs-dir reads the contract's outputs from the directory that
 'aval run --outputs-dir' filled, not from the contract root: any entry in it
 that is not a regular file matched by an outputs glob publishes nothing.
+The directory may be missing only when the contract declares no outputs.
 Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
 Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
 --login) opens the interactive Sigstore login in the browser; no token is
