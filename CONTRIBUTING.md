@@ -319,7 +319,12 @@ run (`dogfood-shadow`) and the publish steps (`dogfood-publish`,
 code; only the `aval` that looks up, verifies, records and pushes results is
 the release. The jobs that test the GitHub actions (`publish-action`,
 `example-github-monorepo`) run the actions' scripts with `aval` built from
-source until the actions' pin has `--test` (milestone 14).
+source until the actions' pin has `--test` (milestone 14). The release gate
+(`e2e-gate` in `release.yaml`) runs the same pinned release: it reads
+`AVAL_VERSION` and `AVAL_SHA256` from the tag's `ci.yaml`, so it verifies
+with the `aval` that signed the result. A binary built from the tag can
+compute a newer fingerprint manifest (`aval-fingerprint/vN`), and its lookup
+would miss every time (#234).
 
 `ci.yaml` pins the release as `AVAL_VERSION` and `AVAL_SHA256` (the sha256 of
 `aval_<version>_linux_amd64.tar.gz`). `.github/aval/install.sh` runs
@@ -333,8 +338,9 @@ provenance. A missing cosign or gh, or any failed check, fails the job before
 `aval` is installed. To move the pin, take the sha256 from the new release's verified
 `checksums.txt` (see [Changesets and releases](#changesets-and-releases)) and
 update both values; `tests/architecture` checks that the version has a
-`CHANGELOG.md` section and that each of these jobs installs the release and
-builds nothing.
+`CHANGELOG.md` section, that each of these jobs installs the release and
+builds nothing, and that `release.yaml` declares no pin of its own and reads
+`ci.yaml`'s single declaration.
 
 Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
 marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint
@@ -520,10 +526,13 @@ the version; Aval is not an npm package. To release:
    tags nothing when the tag exists, the version is older than the newest
    `v*` tag, the commit is no longer on `main`, or a `.changeset/*.md` entry
    is pending. A feature merge does not change the version, so its tag
-   already exists and nothing is released. The `release` job refuses to
-   publish without a verified, passing e2e attestation for that commit
-   (`aval verify -f aval.e2e.yaml --registry
-   ghcr.io/trianalab/aval-attestations --policy .github/aval/main.yaml`).
+   already exists and nothing is released. The `release` job needs
+   `e2e-gate`, which refuses a tag without a verified, passing e2e
+   attestation for that commit (`aval verify -f aval.e2e.yaml --registry
+   ghcr.io/trianalab/aval-attestations --policy .github/aval/main.yaml`). The
+   gate runs the `aval` release `ci.yaml` pins, installed with
+   `.github/aval/install.sh`, because `dogfood-publish` signed the result with
+   that release ([Which aval a CI job runs](#which-aval-a-ci-job-runs)).
    A maintainer can still tag by hand: push the tag, or re-run a failed
    release with Actions > release > Run workflow on the tag (and Actions >
    docs > Run workflow on the tag if the docs deploy did not run). If a
