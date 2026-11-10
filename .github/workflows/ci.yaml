@@ -186,6 +186,9 @@ jobs:
       # is still the PR's own ci.yaml: on pull_request a hostile PR can make
       # its own check green; required code-owner review is what protects main.
       - name: Trust policy, registry and pinned aval release, from main
+        env:
+          # gh attestation verify (--require-provenance) needs a token.
+          GH_TOKEN: ${{ github.token }}
         run: |
           /usr/bin/git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
           /usr/bin/git show origin/main:.github/aval/install.sh > "$RUNNER_TEMP/install.sh"
@@ -386,6 +389,9 @@ jobs:
         with:
           cosign-release: v3.0.6
       - name: Install the pinned aval release (verified)
+        env:
+          # gh attestation verify (--require-provenance) needs a token.
+          GH_TOKEN: ${{ github.token }}
         run: .github/aval/install.sh
       # --8<-- [start:gha-steps]
       - name: Log in to GHCR
@@ -533,6 +539,9 @@ jobs:
       # is still the PR's own ci.yaml: on pull_request a hostile PR can make
       # its own check green; required code-owner review is what protects main.
       - name: Trust policy, registry and pinned aval release, from main
+        env:
+          # gh attestation verify (--require-provenance) needs a token.
+          GH_TOKEN: ${{ github.token }}
         run: |
           /usr/bin/git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
           /usr/bin/git show origin/main:.github/aval/install.sh > "$RUNNER_TEMP/install.sh"
@@ -608,6 +617,9 @@ jobs:
         with:
           cosign-release: v3.0.6
       - name: Install the pinned aval release (verified)
+        env:
+          # gh attestation verify (--require-provenance) needs a token.
+          GH_TOKEN: ${{ github.token }}
         run: .github/aval/install.sh
       - name: Sign and push results that were not reused
         env:
@@ -707,6 +719,9 @@ jobs:
           cosign-release: v3.0.6
       - name: Install the pinned aval release (verified)
         continue-on-error: true
+        env:
+          # gh attestation verify (--require-provenance) needs a token.
+          GH_TOKEN: ${{ github.token }}
         run: .github/aval/install.sh
       - name: Publish run records
         continue-on-error: true
