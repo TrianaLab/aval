@@ -32,7 +32,7 @@ func pushWith(t *testing.T, c, result, report string) (int, string, string) {
 	return runCLI("push", "-f", c, "--registry", "reg.example/r", "--result-file", result, "--report-file", report)
 }
 
-// writeJSON writes v as JSON to a new file and returns its path.
+// reportJSON writes v as JSON to a new file and returns its path.
 func reportJSON(t *testing.T, v any) string {
 	t.Helper()
 	raw, err := json.Marshal(v)
@@ -115,7 +115,11 @@ func TestPushRejectsReport(t *testing.T) {
 	for name, tc := range cases {
 		for _, outcome := range []evidence.Outcome{evidence.OutcomeMiss, evidence.OutcomeVerified} {
 			p := tc.report
-			if r := readReportIfAny(p); r != nil {
+			r := readReportIfAny(p)
+			if r == nil && outcome != evidence.OutcomeMiss {
+				break // unreadable: the outcome cannot vary
+			}
+			if r != nil {
 				r.Outcome = outcome
 				p = reportJSON(t, r)
 			}
@@ -152,9 +156,14 @@ func TestPushForgedVerifiedReport(t *testing.T) {
 	if code, _, stderr := runCLI("run", "-f", other, "--result-file", otherResult); code != ExitOK {
 		t.Fatalf("run: exit %d, stderr %q", code, stderr)
 	}
-	forged := reportJSON(t, evidence.Report{Version: evidence.ReportVersion, Outcome: evidence.OutcomeVerified, TestID: "unit", Fingerprint: fp})
+	forged := reportJSON(t, evidence.Report{Version: evidence.ReportVersion, Outcome: evidence.OutcomeVerified, TestID: "unit", Fingerprint: fp, Reference: "reg.example/r@sha256:aa"})
 	if code, _, stderr := pushWith(t, c, otherResult, forged); code > ExitError || len(*signed) != 0 || *writes != 0 {
 		t.Fatalf("forged verified report: exit %d, stderr %q, signed %d", code, stderr, len(*signed))
+	}
+	// A verified report without a reference was not written by aval run.
+	noRef := reportJSON(t, evidence.Report{Version: evidence.ReportVersion, Outcome: evidence.OutcomeVerified, TestID: "unit", Fingerprint: fp})
+	if code, _, stderr := pushWith(t, c, otherResult, noRef); code != ExitError || !strings.Contains(stderr, "verified without a reference") || len(*signed) != 0 || *writes != 0 {
+		t.Fatalf("verified report without reference: exit %d, stderr %q, signed %d", code, stderr, len(*signed))
 	}
 }
 

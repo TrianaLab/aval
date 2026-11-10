@@ -867,6 +867,9 @@ func reusedByRun(file string, c *contract.Contract, fp fingerprint.Fingerprint) 
 		return "", false, fmt.Errorf("report is for test %q with fingerprint %s; the contract is %q with fingerprint %s: run the test again",
 			r.TestID, r.Fingerprint, c.Metadata.Name, fp.Digest)
 	}
+	if r.Outcome == evidence.OutcomeVerified && r.Reference == "" {
+		return "", false, fmt.Errorf("report %s: verified without a reference: run the test again", file)
+	}
 	return r.Reference, r.Outcome == evidence.OutcomeVerified, nil
 }
 
