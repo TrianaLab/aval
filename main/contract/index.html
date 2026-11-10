@@ -1741,6 +1741,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Many tests in one file: TestSet">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#select-a-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select a test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2315,6 +2332,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Many tests in one file: TestSet">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#select-a-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select a test
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2823,16 +2857,39 @@ no test uses, a fragment with <code>use</code>, <code>exclude</code>, <code>runn
 <code>outputs</code>, <code>matrix</code> or <code>cacheability</code>, a conflicting key, an unknown
 <code>{var}</code>, two tests with the same expanded name, and a <code>scope.contracts</code>
 entry that points at a TestSet (share <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> with fragments instead).</p>
-<p><code>aval run</code>, <code>explain</code>, <code>verify</code> and <code>push</code> take a TestSet of one test. A
-TestSet of more tests exits 2 and lists their names: selecting a test by
-name is not built yet (#207).</p>
+<h3 id="select-a-test">Select a test<a class="headerlink" href="#select-a-test" title="Anchor link">&para;</a></h3>
+<p><code>aval run</code>, <code>explain</code>, <code>verify</code> and <code>push</code> take <code>-t/--test &lt;name&gt;</code>, the
+expanded <code>metadata.name</code> of one test:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--test<span class="w"> </span>shard-1
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>aval<span class="w"> </span>push<span class="w"> </span>--test<span class="w"> </span>shard-1
+</span></code></pre></div>
+<ul>
+<li>On a TestSet of more than one test, a missing <code>--test</code> exits 2 and lists
+  the names. Nothing runs every test of a set at once.</li>
+<li>On a <code>kind: Test</code> file, or a TestSet of one test, <code>--test</code> is optional; a
+  name that matches no test exits 2.</li>
+<li>With <code>--test</code>, the output files default to <code>.aval/&lt;name&gt;/result.json</code>,
+  <code>report.json</code> and <code>record.json</code> (<code>--result-file</code>, <code>--report-file</code>,
+  <code>--stats-file</code>), so tests never overwrite each other's outputs and
+  <code>aval push --test &lt;name&gt;</code> finds the result and report of the run.
+  <code>aval run --test &lt;name&gt;</code> removes a stale <code>.aval/&lt;name&gt;/</code> before it runs.
+  A flag you pass wins. Without <code>--test</code> the defaults are unchanged.</li>
+</ul>
+<p><code>aval explain --test &lt;name&gt; --expand</code> prints the test as the standalone
+<code>kind: Test</code> it expands to. <code>aval explain --all</code> checks every test of the
+file without running anything (no probe, no command): it prints one
+<code>name fingerprint</code> line per test, reports every failing test by name instead
+of stopping at the first, and exits 2 if any is invalid, else 1 if any
+<abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> cannot be computed. <code>-o json</code> prints the same as
+<code>{"tests": [{"name", "fingerprint"} or {"name", "error"}]}</code>. A file that
+does not expand prints every problem on stderr and nothing on stdout.</p>
 <h2 id="nested-runs">Nested runs<a class="headerlink" href="#nested-runs" title="Anchor link">&para;</a></h2>
 <p><code>aval run</code> sets <code>AVAL_RUN_STACK</code> for <code>runner.command</code> and the probes: the
 absolute, symlink-resolved paths of the contracts of the enclosing runs plus
 its own, joined by the OS path list separator (<code>:</code> or <code>;</code>). A run whose
 <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> is already in the stack exits 2 before it probes, looks up or runs
 anything:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aval: aval.yaml is already running in an outer aval run (/repo/aval.yaml): runner.command must not start the same contract again
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>aval: aval.yaml is already running in an outer aval run (/repo/aval.yaml): runner.command must not start the same contract again
 </span></code></pre></div>
 <p>The outer run then records a failed test (exit 3). This catches a make target
 that calls <code>aval run</code> and a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> whose <code>runner.command</code> calls that target,
@@ -2928,14 +2985,14 @@ does not accept is a miss, and its result is not published
 <p>The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>sha256:&lt;hex&gt;</code> of a line-oriented manifest (format
 <code>aval-fingerprint/v2</code>). <code>aval explain</code> prints the exact text that was
 hashed, in this order:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>aval-fingerprint/v2
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>source &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>dependency &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>toolchain &lt;key&gt;=&lt;value&gt;
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>env &lt;NAME&gt; &lt;sha256 of value | unset&gt;
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>aval-fingerprint/v2
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>source &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>dependency &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>toolchain &lt;key&gt;=&lt;value&gt;
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>env &lt;NAME&gt; &lt;sha256 of value | unset&gt;
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
 </span></code></pre></div>
 <table>
 <thead>
@@ -3099,11 +3156,11 @@ value must appear in the output (stdout and stderr) as a version token: not
 preceded by a digit or a dot, not followed by a digit. <code>3.13</code> matches
 <code>Python 3.13.1</code>; it does not match <code>Python 3.130</code>, and <code>3.1</code> does not match
 <code>Python 3.13</code>.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">environment</span><span class="p">:</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
 <p>On a mismatch, a probe that cannot start, a non-zero exit, a timeout or
 output over 4 KiB (it is signed into the predicate),
