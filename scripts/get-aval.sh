@@ -27,17 +27,32 @@
 #     to run them later. --no-verify (or AVAL_NO_VERIFY=1) skips the cosign and
 #     gh checks even when the tools are present, and prints a warning.
 #
+# For CI, which must install one exact release and nothing it cannot verify:
+#
+#   * --sha256 <hex> pins the archive's digest. The archive must have it and
+#     checksums.txt must list it for the archive, or nothing is installed.
+#     One script for several platforms: repeat --sha256 <os>_<arch>=<hex>;
+#     the entry for the detected platform is then required.
+#   * --require-verify makes a missing cosign an error instead of a note, and
+#     --require-provenance does the same for gh. Both need --version (CI
+#     never follows latest) and exclude --no-verify.
+#
 # Environment:
 #   DESIRED_VERSION    release to install, e.g. v0.2.0 (default: latest)
 #   AVAL_INSTALL_DIR   install directory (default: /usr/local/bin)
 #   USE_SUDO           "false" never uses sudo (default: sudo only when the
 #                      directory is not writable)
 #   AVAL_NO_VERIFY     "1" is the same as --no-verify
+#   AVAL_SHA256        --sha256 entries, separated by spaces
+#   AVAL_REQUIRE_VERIFY      "1" is the same as --require-verify
+#   AVAL_REQUIRE_PROVENANCE  "1" is the same as --require-provenance
 #   AVAL_DOWNLOAD_URL  release download base, for a mirror (default: GitHub
 #                      Releases). The signer identity stays pinned to
 #                      TrianaLab/aval, so a mirror cannot serve another build
 #                      when cosign or gh is present. The CI tamper test uses it.
 set -euo pipefail
+# No globbing: the --sha256 entries are split on spaces, never expanded.
+set -f
 
 REPO="TrianaLab/aval"
 # The identity GoReleaser's cosign step and attest-build-provenance sign with
@@ -51,6 +66,9 @@ ISSUER="https://token.actions.githubusercontent.com"
 DESIRED_VERSION="${DESIRED_VERSION:-}"
 NO_VERIFY="false"
 if [ "${AVAL_NO_VERIFY:-}" = "1" ]; then NO_VERIFY="true"; fi
+SHA256_PINS="${AVAL_SHA256:-}"
+REQUIRE_VERIFY="${AVAL_REQUIRE_VERIFY:-}"
+REQUIRE_PROVENANCE="${AVAL_REQUIRE_PROVENANCE:-}"
 
 TMP=""
 
@@ -61,10 +79,14 @@ fail() {
 }
 
 usage() {
-  say "Usage: get-aval.sh [--version <version>] [--no-sudo] [--no-verify] [--help]"
-  say "  --version, -v  release to install, e.g. v0.2.0 (default: latest)"
-  say "  --no-sudo      never use sudo"
-  say "  --no-verify    skip the cosign and gh checks (the sha256 is always checked)"
+  say "Usage: get-aval.sh [--version <version>] [--sha256 [<os>_<arch>=]<hex>]..."
+  say "                   [--require-verify] [--require-provenance] [--no-sudo] [--no-verify] [--help]"
+  say "  --version, -v         release to install, e.g. v0.2.0 (default: latest)"
+  say "  --sha256              the archive must have this sha256 (repeat per platform as <os>_<arch>=<hex>)"
+  say "  --require-verify      fail if cosign is not installed (needs --version)"
+  say "  --require-provenance  fail if gh 2.49 or later is not installed (needs --version)"
+  say "  --no-sudo             never use sudo"
+  say "  --no-verify           skip the cosign and gh checks (the sha256 is always checked)"
   say "See the header of this script for the environment variables."
 }
 
@@ -83,6 +105,13 @@ while [ $# -gt 0 ]; do
       DESIRED_VERSION="$2"
       shift
       ;;
+    --sha256)
+      [ -n "${2:-}" ] || fail "--sha256 needs a value"
+      SHA256_PINS="$SHA256_PINS $2"
+      shift
+      ;;
+    --require-verify) REQUIRE_VERIFY=1 ;;
+    --require-provenance) REQUIRE_PROVENANCE=1 ;;
     --no-sudo) USE_SUDO="false" ;;
     --no-verify) NO_VERIFY="true" ;;
     --help | -h)
@@ -96,6 +125,16 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+# Usage errors, before anything is downloaded.
+for pin in $SHA256_PINS; do
+  printf '%s\n' "$pin" | grep -Eq '^([a-z0-9]+_[a-z0-9]+=)?[0-9a-f]{64}$' \
+    || fail "--sha256 wants [<os>_<arch>=]<64 lowercase hex>, got '$pin'"
+done
+if [ "$REQUIRE_VERIFY" = "1" ] || [ "$REQUIRE_PROVENANCE" = "1" ]; then
+  [ "$NO_VERIFY" = "false" ] || fail "--require-verify and --require-provenance exclude --no-verify"
+  [ -n "$DESIRED_VERSION" ] || fail "--require-verify and --require-provenance need --version"
+fi
 
 if command -v curl >/dev/null 2>&1; then
   HAS_CURL=true
@@ -164,6 +203,19 @@ if ! printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?
   fail "not a release version: '$TAG'"
 fi
 VERSION="${TAG#v}"
+# The pins for this platform: bare ones apply everywhere. Pins for other
+# platforms only, and none for this one, is an error, not "unpinned".
+PINS=""
+for pin in $SHA256_PINS; do
+  case "$pin" in
+    "${OS}_${ARCH}="*) PINS="$PINS ${pin#*=}" ;;
+    *=*) ;;
+    *) PINS="$PINS $pin" ;;
+  esac
+done
+if [ -n "$SHA256_PINS" ] && [ -z "$PINS" ]; then
+  fail "no --sha256 for ${OS}_${ARCH}"
+fi
 ARCHIVE="aval_${VERSION}_${OS}_${ARCH}.tar.gz"
 BASE="$AVAL_DOWNLOAD_URL/$TAG"
 
@@ -186,21 +238,26 @@ if [ "$NO_VERIFY" = "false" ]; then
       --certificate-oidc-issuer "$ISSUER" --certificate-identity "$SIGNER/$TAG" >/dev/null 2>&1 \
       || fail "checksums.txt is not signed by $SIGNER/$TAG (cosign verify-blob failed)"
     say "  signature ok (cosign: checksums.txt signed by the release workflow)"
+  elif [ "$REQUIRE_VERIFY" = "1" ]; then
+    fail "--require-verify: cosign is not installed, so checksums.txt cannot be verified"
   else
     say "  signature not checked: cosign is not installed" >&2
   fi
 fi
 
-# 2. The archive matches checksums.txt. Exact match on the file name column:
-# a substring match would let aval_X_linux_amd64.tar.gz.sbom.json answer for
-# the archive.
+# 2. The archive has the pinned sha256, if any, and matches checksums.txt.
+# Exact match on the file name column: a substring match would let
+# aval_X_linux_amd64.tar.gz.sbom.json answer for the archive.
+actual=$(sha256_of "$TMP/$ARCHIVE")
+for pin in $PINS; do
+  [ "$pin" = "$actual" ] || fail "sha256 mismatch for $ARCHIVE: pinned $pin, got $actual"
+done
 expected=$(awk -v f="$ARCHIVE" '$2 == f {print $1}' "$TMP/checksums.txt")
 [ -n "$expected" ] || fail "checksums.txt does not list $ARCHIVE"
-actual=$(sha256_of "$TMP/$ARCHIVE")
 if [ "$expected" != "$actual" ]; then
   fail "checksum mismatch for $ARCHIVE: expected $expected, got $actual"
 fi
-say "  sha256 ok"
+if [ -n "$PINS" ]; then say "  sha256 ok (pinned)"; else say "  sha256 ok"; fi
 
 # 3. Who built the archive: the SLSA provenance from the release workflow.
 # `gh attestation` needs gh 2.49 or later; an older gh counts as absent.
@@ -212,6 +269,8 @@ if [ "$NO_VERIFY" = "false" ]; then
       --repo "$REPO" --cert-identity "$SIGNER/$TAG" --cert-oidc-issuer "$ISSUER" >/dev/null 2>&1 \
       || fail "$ARCHIVE does not match the provenance of $SIGNER/$TAG (gh attestation verify failed)"
     say "  provenance ok (gh: built by the release workflow)"
+  elif [ "$REQUIRE_PROVENANCE" = "1" ]; then
+    fail "--require-provenance: gh 2.49 or later is not installed, so the provenance cannot be verified"
   else
     say "  provenance not checked: gh (2.49 or later) is not installed" >&2
   fi
