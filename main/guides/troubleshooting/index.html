@@ -2392,8 +2392,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>use <code>host/name</code>, no <code>https://</code>, tag or digest</td>
 </tr>
 <tr>
-<td><code>--registry-timeout must be positive</code>, <code>--output must be text or json</code>, <code>unknown command</code>, <code>unknown flag</code></td>
-<td>fix the value (the message names the closest command or flag, <code>did you mean "run"?</code>); see <code>aval &lt;command&gt; --help</code></td>
+<td><code>--registry-timeout must be positive</code>, <code>--output must be text or json</code>, <code>--min-trust-level: &lt;x&gt; must be developer, runner or isolated</code>, <code>--min-trust-level &lt;x&gt; is below minTrustLevel &lt;y&gt; of the trust policy</code>, <code>unknown command</code>, <code>unknown flag</code></td>
+<td>fix the value (the message names the closest command or flag, <code>did you mean "run"?</code>; <code>--min-trust-level</code> and <code>AVAL_MIN_TRUST_LEVEL</code> only raise the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s minimum); see <code>aval &lt;command&gt; --help</code></td>
 </tr>
 <tr>
 <td><code>signing needs one of:</code></td>

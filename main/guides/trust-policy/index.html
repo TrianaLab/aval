@@ -1001,6 +1001,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#one-policy-for-prs-and-main" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One policy for PRs and main
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-fields" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2150,6 +2161,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#one-policy-for-prs-and-main" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One policy for PRs and main
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-fields" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2284,6 +2306,15 @@ or set <code>AVAL_POLICY</code> once (the flag wins):</p>
 <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>. The flag and <code>AVAL_REGISTRY</code> still win, and the <code>config:</code> line says
 which one was used. Never put <code>user:password@</code> in it: logins come from
 <code>docker login</code>.</p>
+<h2 id="one-policy-for-prs-and-main">One <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> for PRs and main<a class="headerlink" href="#one-policy-for-prs-and-main" title="Anchor link">&para;</a></h2>
+<p>A <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> that also trusts developer keys sets <code>minTrustLevel: developer</code>, so
+PRs reuse them. On <code>main</code>, raise the minimum for that run only:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--policy<span class="w"> </span>policy.yaml<span class="w"> </span>--min-trust-level<span class="w"> </span>runner
+</span></code></pre></div>
+<p><code>AVAL_MIN_TRUST_LEVEL=runner</code> does the same (the flag wins). Both work on
+<code>aval run</code> and <code>aval verify</code> and can only raise the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s minimum: a lower
+or unknown level exits 2. A developer result is then a miss (exit 4), never
+exit 5. A <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> that trusts only main's CI identity does not need this.</p>
 <h2 id="the-fields">The fields<a class="headerlink" href="#the-fields" title="Anchor link">&para;</a></h2>
 <table>
 <thead>
@@ -2303,7 +2334,7 @@ which one was used. Never put <code>user:password@</code> in it: logins come fro
 </tr>
 <tr>
 <td><code>minTrustLevel</code></td>
-<td>the lowest level a result needs to be reused.</td>
+<td>the lowest level a result needs to be reused. <code>--min-trust-level</code> or <code>AVAL_MIN_TRUST_LEVEL</code> on <code>run</code> and <code>verify</code> can raise it for one run, never lower it (a lower or unknown level exits 2).</td>
 </tr>
 <tr>
 <td><code>allowedCacheability</code></td>
