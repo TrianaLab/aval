@@ -33,6 +33,8 @@ and push:
 - The OIDC token is fetched after the test, so a slow test cannot outlive
   it. `runner.command` never sees it.
 - Trust only this workflow on `main`: [Write a trust policy](trust-policy.md#the-example).
+- The snippet keeps the outcome check until the pinned release has
+  `aval push --report-file` (see [Split credentials](#split-credentials)).
 
 ## Split credentials
 

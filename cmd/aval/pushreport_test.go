@@ -135,7 +135,10 @@ func TestPushRejectsReport(t *testing.T) {
 func otherContract(t *testing.T) string {
 	t.Helper()
 	other := writeContract(t, "hermetic")
-	body, _ := os.ReadFile(other)
+	body, err := os.ReadFile(other)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(other, []byte(strings.Replace(string(body), "name: unit", "name: other", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
