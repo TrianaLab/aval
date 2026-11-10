@@ -17,8 +17,9 @@ on:
     types: [opened, edited, synchronize, reopened]
   # release.yaml's version-pr-ci job dispatches this workflow on
   # changeset-release/main after changesets rewrites the version PR with
-  # GITHUB_TOKEN, a push that starts no run. The `changes` job fails any other
-  # dispatched ref. A dispatch run is treated as a PR against main: trust
+  # GITHUB_TOKEN, a push that starts no run, and its pin-actions-ci job on
+  # release-pins/main after each release (#213). The `changes` job fails any
+  # other dispatched ref. A dispatch run is treated as a PR against main: trust
   # policy and registry from main (trust-from-base.sh), AVAL_GOLDEN_BASE and
   # the API base origin/main, and every job with write scopes stays push-only.
   # pr-title and dependency-review are pull_request-only and skip on purpose:
@@ -60,12 +61,12 @@ jobs:
       # Hygiene, not a trust boundary. A dispatched ref runs its own ci.yaml,
       # so whoever can push that ref controls this check anyway; trust still
       # comes from main and write scopes stay push-only.
-      - name: Dispatch only on the version PR branch
-        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/changeset-release/main'
+      - name: Dispatch only on the version and pin PR branches
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/changeset-release/main' && github.ref != 'refs/heads/release-pins/main'
         env:
           REF: ${{ github.ref }}
         run: |
-          echo "::error::ci.yaml is dispatched only on refs/heads/changeset-release/main, not $REF"
+          echo "::error::ci.yaml is dispatched only on refs/heads/changeset-release/main or refs/heads/release-pins/main, not $REF"
           exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3

@@ -52,10 +52,10 @@ The action runs on Linux and macOS runners that ship `/usr/bin/jq`
 (GitHub's Ubuntu images, macOS 15 and later).
 
 !!! note "Pinned release"
-    The run and publish actions need `--test` and the policy's `registry`,
-    which ship in the release after 0.7.0. Until their pins move there
-    (milestone 14, #213), `aval run` and `aval push` exit 2 and the step
-    fails.
+    Pinning an action by commit SHA pins its aval release too (version and
+    sha256, moved by a PR after each release). The actions need `--test` and
+    the policy's `registry`, which ship after 0.7.0; until that pin merges
+    (milestone 14), `aval run` and `aval push` exit 2 and the step fails.
 
 ## Split credentials
 

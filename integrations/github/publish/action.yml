@@ -42,7 +42,9 @@ runs:
         cosign-release: v3.0.6
     # The same pinned release as integrations/github/run (tests/architecture
     # keeps the two install steps identical).
-    # TODO(milestone-14): pin the first release with --test and the policy's registry; #213 bumps these pins after each release.
+    # The pin-actions job of release.yaml moves DESIRED_VERSION and AVAL_SHA256
+    # to each new release (#213); tests/release checks them against its checksums.txt.
+    # TODO(milestone-14): drop this line once a pin PR moves to the first release with --test and the policy's registry.
     - name: Install the pinned aval release (verified)
       id: install
       shell: bash
