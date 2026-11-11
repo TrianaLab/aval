@@ -37,9 +37,23 @@ runs:
         ALLOW_UNPROTECTED: ${{ inputs.allow-unprotected }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       run: /bin/bash "$GITHUB_ACTION_PATH/guard.sh"
-    - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-      with:
-        cosign-release: v3.0.6
+    # cosign only verifies the aval release below. Installed off the job's
+    # PATH (no GITHUB_PATH, no GITHUB_ENV), so the test and later steps keep
+    # their own cosign or none (#248). To move the pin, copy the four lines of
+    # the new release's cosign_checksums.txt into both actions; tests/release
+    # (TestCosignPinMatchesRelease) checks them.
+    - name: Install the pinned cosign (verified, off PATH)
+      id: cosign
+      shell: bash
+      env:
+        COSIGN_VERSION: v3.0.6
+        COSIGN_SHA256: >-
+          cosign-linux-amd64=c956e5dfcac53d52bcf058360d579472f0c1d2d9b69f55209e256fe7783f4c74
+          cosign-linux-arm64=bedac92e8c3729864e13d4a17048007cfafa79d5deca993a43a90ffe018ef2b8
+          cosign-darwin-amd64=4c3e7af8372d3ca3296e62fa56f23fcbb5721cc6ac1827900d398f110d7cd280
+          cosign-darwin-arm64=5fadd012ae6381a6a29ff86a7d39aa873878852f1073fc90b15995961ecfb084
+        COSIGN_BASE_URL: https://github.com/sigstore/cosign/releases/download
+      run: /bin/bash "$GITHUB_ACTION_PATH/../get-cosign.sh"
     # The same pinned release as integrations/github/run (tests/architecture
     # keeps the two install steps identical).
     # The pin-actions job of release.yaml moves DESIRED_VERSION and AVAL_SHA256
@@ -61,13 +75,16 @@ runs:
         AVAL_NO_VERIFY: ""
         AVAL_DOWNLOAD_URL: ""
         USE_SUDO: "false"
+        COSIGN_DIR: ${{ steps.cosign.outputs.dir }}
       run: |
         dir="$RUNNER_TEMP/aval-$DESIRED_VERSION"
-        # PATH is cut to the system tools, cosign and gh, so an earlier step
-        # that wrote GITHUB_PATH cannot shim them.
-        cosign=$(command -v cosign)
+        # PATH is cut to the private cosign first, then the system tools and
+        # gh, so neither an earlier step that wrote GITHUB_PATH nor a cosign
+        # beside gh can shim them. An empty COSIGN_DIR would put the working
+        # directory on PATH: refuse it.
+        [ -x "$COSIGN_DIR/cosign" ] && [[ "$COSIGN_DIR" == /* ]] || { echo "no private cosign in '$COSIGN_DIR'" >&2; exit 1; }
         gh=$(command -v gh)
-        PATH="/usr/bin:/bin:${cosign%/*}:${gh%/*}" AVAL_INSTALL_DIR="$dir" \
+        PATH="$COSIGN_DIR:/usr/bin:/bin:${gh%/*}" AVAL_INSTALL_DIR="$dir" \
           /bin/bash "$GITHUB_ACTION_PATH/../../../scripts/get-aval.sh" --version "$DESIRED_VERSION"
         echo "aval=$dir/aval" >> "$GITHUB_OUTPUT"
     # Outside the checkout, so an artifact cannot overwrite a file push reads.

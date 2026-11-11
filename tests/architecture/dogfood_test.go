@@ -467,3 +467,61 @@ func TestDogfoodJobCheckCatchesDrift(t *testing.T) {
 		}
 	}
 }
+
+// cosignCheckProblems: the job records `command -v cosign` before the run
+// action and fails when it differs after (#248), so an action that writes
+// GITHUB_PATH breaks Aval's own CI first.
+func cosignCheckProblems(steps []step) []string {
+	action := slices.IndexFunc(steps, func(s step) bool { return s.Uses == runAction })
+	if action < 0 {
+		return []string{"no " + runAction + " step"}
+	}
+	var problems []string
+	if !slices.ContainsFunc(steps[:action], func(s step) bool {
+		return s.ID == "cosign-before" && strings.Contains(s.Run, "command -v cosign")
+	}) {
+		problems = append(problems, "no cosign-before step before "+runAction)
+	}
+	if !slices.ContainsFunc(steps[action+1:], func(s step) bool {
+		return s.If == "" && s.Env["BEFORE"] == "${{ steps.cosign-before.outputs.path }}" &&
+			strings.Contains(s.Run, "command -v cosign") && strings.Contains(s.Run, `"$now" != "$BEFORE"`) && strings.Contains(s.Run, "exit 1")
+	}) {
+		problems = append(problems, "no step after "+runAction+" that fails when cosign changed")
+	}
+	return problems
+}
+
+func TestDogfoodChecksTheJobPath(t *testing.T) {
+	var wf workflow
+	if err := yaml.Unmarshal(readCI(t), &wf); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range cosignCheckProblems(wf.Jobs["dogfood-shadow"].Steps) {
+		t.Error("dogfood-shadow: " + p)
+	}
+}
+
+func TestCosignCheckCatchesDrift(t *testing.T) {
+	before := step{ID: "cosign-before", Run: `echo "path=$(command -v cosign || echo none)" >> "$GITHUB_OUTPUT"`}
+	action := step{Uses: runAction}
+	after := step{Env: map[string]string{"BEFORE": "${{ steps.cosign-before.outputs.path }}"},
+		Run: "now=$(command -v cosign || echo none)\nif [ \"$now\" != \"$BEFORE\" ]; then exit 1; fi"}
+	if p := cosignCheckProblems([]step{before, action, after}); len(p) != 0 {
+		t.Fatalf("valid steps reported %v", p)
+	}
+	skipped := after
+	skipped.If = "false"
+	for name, steps := range map[string][]step{
+		"no action":      {before, after},
+		"no before":      {action, after},
+		"before after":   {action, before, after},
+		"no after":       {before, action},
+		"after before":   {before, after, action},
+		"after skipped":  {before, action, skipped},
+		"after compares": {before, action, {Env: after.Env, Run: "command -v cosign"}},
+	} {
+		if len(cosignCheckProblems(steps)) == 0 {
+			t.Errorf("%s: no problem reported", name)
+		}
+	}
+}
