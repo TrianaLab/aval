@@ -1,6 +1,6 @@
 #!/bin/bash
 # Steps 3 to 7 of the aval run action (#211). Reads INPUT_TEST, INPUT_FILE,
-# INPUT_POLICY, INPUT_SHADOW, INPUT_MIN_TRUST_LEVEL, AVAL (absolute path of
+# INPUT_POLICY, INPUT_SHADOW, INPUT_LOOKUP_ONLY, INPUT_MIN_TRUST_LEVEL, AVAL (absolute path of
 # the installed binary), DEFAULT_BRANCH, GH_TOKEN, REGISTRY_USERNAME,
 # REGISTRY_PASSWORD and the runner's GITHUB_* variables.
 #
@@ -37,6 +37,21 @@ case "${INPUT_SHADOW:-false}" in
     exit 2
     ;;
 esac
+# Lookup-only runs aval verify instead of aval run (#252): the same policy
+# and minimum, but nothing runs, uploads or writes .aval/. Its outcome only
+# lets a job skip setup steps; the run step after it still decides reuse.
+lookup=${INPUT_LOOKUP_ONLY:-false}
+case "$lookup" in
+  true | false) ;;
+  *)
+    echo "::error title=aval run::lookup-only: \"$lookup\" must be true or false"
+    exit 2
+    ;;
+esac
+if [ "$lookup" = true ] && [ "${INPUT_SHADOW:-false}" = true ]; then
+  echo "::error title=aval run::lookup-only: cannot be combined with shadow: true, which runs the test"
+  exit 2
+fi
 rank() { case "$1" in developer) echo 1 ;; runner) echo 2 ;; isolated) echo 3 ;; *) echo 9 ;; esac; }
 case "${INPUT_MIN_TRUST_LEVEL:-auto}" in
   auto | developer | runner | isolated) ;;
@@ -72,7 +87,7 @@ fi
 
 # Step 6: only a push to the default branch hands its result to a publish job.
 upload=false
-if [ "$GITHUB_EVENT_NAME" = push ] && [ "$on_default" = true ]; then
+if [ "$lookup" = false ] && [ "$GITHUB_EVENT_NAME" = push ] && [ "$on_default" = true ]; then
   upload=true
 fi
 echo "upload=$upload" >> "$GITHUB_OUTPUT"
@@ -92,6 +107,9 @@ fi
 # The test runs pull request code: it never sees the job token (#250).
 unset GH_TOKEN
 args=(run -f "$INPUT_FILE" --test "$INPUT_TEST" --source-repo "$GITHUB_REPOSITORY")
+if [ "$lookup" = true ]; then
+  args=(verify -f "$INPUT_FILE" --test "$INPUT_TEST" -o json)
+fi
 # The files the outputs globs matched travel in the artifact, for the
 # publish job's aval push --outputs-dir (#236); aval resolves them. A
 # release without the flag (v0.8.1 and older) still runs a test without
@@ -114,7 +132,7 @@ fi
 if [ "${INPUT_SHADOW:-false}" = true ]; then
   args+=(--shadow)
 fi
-if [ -n "${GITHUB_RUN_ID:-}" ]; then
+if [ "$lookup" = false ] && [ -n "${GITHUB_RUN_ID:-}" ]; then
   args+=(--ci-run-url "${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
 fi
 if [ "$status" = 200 ]; then
@@ -209,14 +227,25 @@ fi
 echo "trust minimum: $effective"
 
 # Step 4. A report left by an earlier run in this workspace must not be read
-# as this run's outcome.
-/bin/rm -f ".aval/$INPUT_TEST/report.json"
+# as this run's outcome. Lookup-only keeps its report in RUNNER_TEMP; with no
+# policy there is no registry to ask, and nothing is reused: a miss.
 code=0
-"$AVAL" "${args[@]}" || code=$?
+if [ "$lookup" = true ]; then
+  report="$RUNNER_TEMP/aval-lookup-$INPUT_TEST.json"
+  /bin/rm -f "$report"
+  if [ -f "$policy" ]; then
+    "$AVAL" "${args[@]}" > "$report" || code=$?
+  else
+    code=4
+  fi
+else
+  report=".aval/$INPUT_TEST/report.json"
+  /bin/rm -f "$report"
+  "$AVAL" "${args[@]}" || code=$?
+fi
 
 # Step 5: the summary prints only known values; the reason can carry text
 # from an untrusted attestation, so it stays in the report.
-report=".aval/$INPUT_TEST/report.json"
 outcome=unknown result=""
 if [ -f "$report" ]; then
   outcome=$(/usr/bin/jq -r '.outcome // ""' "$report" 2> /dev/null) || outcome=unknown
@@ -226,10 +255,15 @@ case "$outcome" in verified | miss | verification-failed | error) ;; *) outcome=
 case "$result" in passed | failed | "") ;; *) result=unknown ;; esac
 # Exit 5 is a security event whatever the report's lookup outcome says (#195).
 if [ "$code" -eq 5 ]; then outcome=verification-failed; fi
+if [ "$lookup" = true ] && [ "$code" -eq 4 ]; then outcome=miss; fi
 echo "outcome=$outcome" >> "$GITHUB_OUTPUT"
-echo "### aval $INPUT_TEST: \`$outcome\` $result (exit $code)" >> "$GITHUB_STEP_SUMMARY"
+mode=""
+if [ "$lookup" = true ]; then mode="lookup "; fi
+echo "### aval $mode$INPUT_TEST: \`$outcome\` $result (exit $code)" >> "$GITHUB_STEP_SUMMARY"
 echo "Trust minimum: $effective" >> "$GITHUB_STEP_SUMMARY"
 if [ "$code" -eq 5 ]; then
   echo "::error title=aval SECURITY::$INPUT_TEST: an attestation for this fingerprint failed signature or policy verification; see the SECURITY line in the log and the uploaded report"
 fi
+# A miss is routine, so the lookup step succeeds; exit 5 never becomes one.
+if [ "$lookup" = true ] && [ "$code" -eq 4 ]; then exit 0; fi
 exit "$code"

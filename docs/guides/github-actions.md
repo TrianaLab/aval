@@ -20,7 +20,7 @@ A suite job:
 --8<-- "docs/includes/github-actions.yml:run"
 ```
 
-The action [`integrations/github/run`](https://github.com/TrianaLab/aval/blob/main/integrations/github/run/action.yml) takes `test` (required), `file` (default `aval.yaml`), `policy` (default `.github/aval/policy.yaml`), `shadow` (`true` adds `--shadow`), `min-trust-level` (default `auto`), `registry-username` and `registry-password` (default empty: the registry is read anonymously; see [Private registry](#private-registry)). In order, it:
+The action [`integrations/github/run`](https://github.com/TrianaLab/aval/blob/main/integrations/github/run/action.yml) takes `test` (required), `file` (default `aval.yaml`), `policy` (default `.github/aval/policy.yaml`), `shadow` (`true` adds `--shadow`), `lookup-only` (see [Skip setup on a hit](#skip-setup-on-a-hit)), `min-trust-level` (default `auto`), `registry-username` and `registry-password` (default empty: the registry is read anonymously; see [Private registry](#private-registry)). In order, it:
 
 1. Refuses `pull_request_target` and `workflow_run`, and fails when the job has `id-token: write`: a suite job can never sign.
 2. Installs the aval release pinned in its `action.yml`, checked against the per-platform sha256, the release signature and the provenance ([Install](../install.md)). Pinning the action by commit SHA pins aval too.
@@ -36,6 +36,16 @@ The policy is a separate file on the default branch, so `publicKey` paths in it 
     Pinning an action by commit SHA pins its aval release too, moved by a PR
     after each release. Until a pin with `--outputs-dir` (after 0.8.1,
     milestone 14), a test with `outputs` fails with exit 1; others work.
+
+## Skip setup on a hit
+
+Setup steps (toolchains, caches, browsers) run before the test, also when its result is reused. A lookup-only step lets them be skipped:
+
+```yaml
+--8<-- "docs/includes/github-actions.yml:lookup"
+```
+
+With `lookup-only: "true"` the action does steps 1 to 3 and 7 (same default-branch policy, same trust minimum), then runs `aval verify -f <file> --test <test> -o json` instead of `aval run`: it never runs the test, uploads or writes `.aval/<test>/`. The `outcome` output is `verified`, `miss`, `verification-failed` or `error`. A miss (no policy, no attestation, a signer below the minimum) succeeds the step; exit 5 fails it with the `aval SECURITY` annotation; exits 1 and 2 fail it. A value other than `true` or `false`, or `shadow: true` beside it, exits 2. The final run step stays: it verifies again, restores `outputs` and gives the job its exit code. The lookup only skips setup, it never decides reuse: if it says `verified` and the run step then misses (a registry error, a result no longer trusted), the test runs without its setup and fails. The job goes red, never green by mistake.
 
 ## Private registry
 
