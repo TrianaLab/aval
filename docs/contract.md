@@ -168,9 +168,29 @@ and the values of `environment.toolchain` (inherited ones too), in one pass,
 so a value that holds `{x}` is not substituted again. Each value is part of
 the fingerprinted argv or toolchain lines. In a test with a matrix, every
 `{name}` in those fields must be a matrix variable: write a shell variable as
-`$VAR`, not `${VAR}`. In a test without a matrix, a `{name}` in a toolchain
-value is an error. Probe argv, `env`, `scope` and `outputs` are not
+`$VAR`, not `${VAR}`. In a TestSet test without a matrix, a `{name}` in a
+toolchain value is an error. A standalone `kind: Test` is not checked: it is
+also what `aval explain --expand` prints for a matrix leg, whose substituted
+value may hold `{x}`. Probe argv, `env`, `scope` and `outputs` are not
 substituted. A set expands to at most 1024 tests.
+
+A variable can also be `{count: N}`, with N an integer from 1 to 1024: it
+takes the values `"1"` to `"N"`, and `{v_count}` (here `{shard_count}`) is
+`N` in every test. `{v_count}` is substituted like any variable but adds no
+combinations. Shards then state the total once:
+
+```yaml
+tests:
+  - metadata: {name: "browser-{shard}"}
+    runner: {command: [make, test-browser, "PW_SHARD={shard}/{shard_count}"]}
+    matrix: {shard: {count: 3}}
+```
+
+This expands to `browser-1` to `browser-3` with `PW_SHARD=1/3` to `3/3`,
+the same tests and fingerprints as `shard: ["1", "2", "3"]` with
+`PW_SHARD={shard}/3`. Changing N changes the argv, so the fingerprint, of
+every test that uses `{shard_count}`. Only count variables have a
+`{v_count}`.
 
 One test per platform, each with its own fingerprint, so a result recorded
 on darwin is never reused on linux:
@@ -191,8 +211,10 @@ tests:
 Each of these exits 2 and names the problem: an unknown fragment, a fragment
 no test uses, a fragment with `use`, `exclude`, `runner`, `metadata`,
 `outputs`, `matrix` or `cacheability`, a conflicting key, an unknown
-`{var}`, a `{var}` in a toolchain value of a test without a matrix, two
-tests with the same expanded name, and a `scope.contracts` entry that points
+`{var}`, a `{var}` in a toolchain value of a test without a matrix, a
+`count` that is missing or not an integer from 1 to 1024, a key other than
+`count` in the mapping form, a variable `v_count` beside a count variable
+`v`, two tests with the same expanded name, and a `scope.contracts` entry that points
 at a TestSet (share scope with fragments instead).
 
 ### Select a test

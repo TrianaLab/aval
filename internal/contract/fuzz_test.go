@@ -134,6 +134,13 @@ func FuzzParseAll(f *testing.F) {
 	f.Add([]byte(strings.Replace(set, `total: ["2"]`, `total: ["{index}"]`, 1)))
 	f.Add([]byte(strings.Replace(set, `toolchain: {go: "1.25"}`, `toolchain: {go: "{index}"}`, 1)))
 	f.Add([]byte(strings.Replace(set, `toolchain: {postgres: "16"}`, `toolchain: {postgres: "{nope}"}`, 1)))
+	// Count form (#259): {count: N}, {v_count}, bad counts, extra keys, a
+	// clash with a v_count variable.
+	for _, m := range []string{"{count: 3}", "{count: 0}", "{count: 1.5}", `{count: "3"}`, "{count: 3, step: 1}", "{}"} {
+		f.Add([]byte(strings.Replace(set, `total: ["2"]`, "total: "+m, 1)))
+	}
+	f.Add([]byte(strings.Replace(set, `index: ["1", "2"], total: ["2"]`, `index: {count: 2}, total: ["{index_count}"], index_count: ["2"]`, 1)))
+	f.Add([]byte(strings.Replace(set, `"-shard={index}/{total}"`, `"-shard={index}/{index_count}"`, 1)))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cs, err := ParseAll(data)
 		if err != nil {
