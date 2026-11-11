@@ -975,6 +975,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#skip-setup-on-a-hit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skip setup on a hit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#private-registry" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2208,6 +2219,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#skip-setup-on-a-hit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skip setup on a hit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#private-registry" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2362,7 +2384,7 @@ job on <code>main</code> signs and publishes every result.</p>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">          </span><span class="nt">test</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unit</span>
 </span></code></pre></div>
-<p>The action <a href="https://github.com/TrianaLab/aval/blob/main/integrations/github/run/action.yml"><code>integrations/github/run</code></a> takes <code>test</code> (required), <code>file</code> (default <code>aval.yaml</code>), <code>policy</code> (default <code>.github/aval/policy.yaml</code>), <code>shadow</code> (<code>true</code> adds <code>--shadow</code>), <code>min-trust-level</code> (default <code>auto</code>), <code>registry-username</code> and <code>registry-password</code> (default empty: the registry is read anonymously; see <a href="#private-registry">Private registry</a>). In order, it:</p>
+<p>The action <a href="https://github.com/TrianaLab/aval/blob/main/integrations/github/run/action.yml"><code>integrations/github/run</code></a> takes <code>test</code> (required), <code>file</code> (default <code>aval.yaml</code>), <code>policy</code> (default <code>.github/aval/policy.yaml</code>), <code>shadow</code> (<code>true</code> adds <code>--shadow</code>), <code>lookup-only</code> (see <a href="#skip-setup-on-a-hit">Skip setup on a hit</a>), <code>min-trust-level</code> (default <code>auto</code>), <code>registry-username</code> and <code>registry-password</code> (default empty: the registry is read anonymously; see <a href="#private-registry">Private registry</a>). In order, it:</p>
 <ol>
 <li>Refuses <code>pull_request_target</code> and <code>workflow_run</code>, and fails when the job has <code>id-token: write</code>: a suite job can never sign.</li>
 <li>Installs the aval release pinned in its <code>action.yml</code>, checked against the per-platform sha256, the release signature and the provenance (<a href="../../install/">Install</a>). Pinning the action by commit SHA pins aval too.</li>
@@ -2379,6 +2401,26 @@ job on <code>main</code> signs and publishes every result.</p>
 after each release. Until a pin with <code>--outputs-dir</code> (after 0.8.1,
 milestone 14), a test with <code>outputs</code> fails with exit 1; others work.</p>
 </div>
+<h2 id="skip-setup-on-a-hit">Skip setup on a hit<a class="headerlink" href="#skip-setup-on-a-hit" title="Anchor link">&para;</a></h2>
+<p>Setup steps (toolchains, caches, browsers) run before the test, also when its result is reused. A lookup-only step lets them be skipped:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="w">  </span><span class="nt">ui</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">          </span><span class="nt">persist-credentials</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lookup</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TrianaLab/aval/integrations/github/run@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">          </span><span class="nt">test</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ui</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">          </span><span class="nt">lookup-only</span><span class="p">:</span><span class="w"> </span><span class="s">"true"</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">steps.lookup.outputs.outcome != 'verified'</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/setup-node@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TrianaLab/aval/integrations/github/run@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">          </span><span class="nt">test</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ui</span>
+</span></code></pre></div>
+<p>With <code>lookup-only: "true"</code> the action does steps 1 to 3 and 7 (same default-branch <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, same trust minimum), then runs <code>aval verify -f &lt;file&gt; --test &lt;test&gt; -o json</code> instead of <code>aval run</code>: it never runs the test, uploads or writes <code>.aval/&lt;test&gt;/</code>. The <code>outcome</code> output is <code>verified</code>, <code>miss</code>, <code>verification-failed</code> or <code>error</code>. A miss (no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, no <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>, a <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> below the minimum) succeeds the step; exit 5 fails it with the <code>aval SECURITY</code> annotation; exits 1 and 2 fail it. A value other than <code>true</code> or <code>false</code>, or <code>shadow: true</code> beside it, exits 2. The final run step stays: it verifies again, restores <code>outputs</code> and gives the job its exit code. The lookup only skips setup, it never decides reuse: if it says <code>verified</code> and the run step then misses (a registry error, a result no longer trusted), the test runs without its setup and fails. The job goes red, never green by mistake.</p>
 <h2 id="private-registry">Private registry<a class="headerlink" href="#private-registry" title="Anchor link">&para;</a></h2>
 <p>A private attestations package (GHCR creates them private) cannot be read anonymously: every lookup is <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code> (not <code>miss</code>, never <code>verification-failed</code>) and the test always runs. Pass <code>registry-username: ${{ github.actor }}</code> and <code>registry-password: ${{ github.token }}</code> to the run action, and set the suite job's <code>permissions</code> to <code>packages: read</code> (with <code>contents: read</code>): <code>github.token</code> has the job's permissions, so that is what makes it read-only. The action then writes the credentials for the host of the default-branch <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code> only, in a directory of the step under <code>$RUNNER_TEMP</code> that starts from the job's <code>auths</code> (not its <code>credsStore</code> or <code>credHelpers</code>) and is deleted when the step ends. aval reads it through <code>AVAL_DOCKER_CONFIG</code>, which the test never gets: the test keeps the job's <code>DOCKER_CONFIG</code>. No <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, no valid <code>registry</code>, or a pinned aval without <code>AVAL_DOCKER_CONFIG</code> (0.8.2 and older, milestone 15) writes none and warns.</p>
 <div class="admonition warning">
@@ -2387,19 +2429,19 @@ milestone 14), a test with <code>outputs</code> fails with exit 1; others work.<
 </div>
 <h2 id="split-credentials">Split credentials<a class="headerlink" href="#split-credentials" title="Anchor link">&para;</a></h2>
 <p>One job signs what the suite jobs uploaded, with the workflow's identity:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="w">  </span><span class="nt">publish</span><span class="p">:</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unit</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ !cancelled() &amp;&amp; github.event_name == 'push' &amp;&amp; github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">      </span><span class="nt">packages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">      </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">          </span><span class="nt">persist-credentials</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TrianaLab/aval/integrations/github/publish@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="w">  </span><span class="nt">publish</span><span class="p">:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">unit</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">ui</span><span class="p p-Indicator">]</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ !cancelled() &amp;&amp; github.event_name == 'push' &amp;&amp; github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">      </span><span class="nt">packages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">          </span><span class="nt">persist-credentials</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TrianaLab/aval/integrations/github/publish@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
 </span></code></pre></div>
 <p>The action <a href="https://github.com/TrianaLab/aval/blob/main/integrations/github/publish/action.yml"><code>integrations/github/publish</code></a>
 takes <code>file</code>, <code>policy</code>, <code>registry-username</code>, <code>registry-password</code> (default
