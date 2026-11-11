@@ -229,3 +229,21 @@ func TestExplainTestSet(t *testing.T) {
 		}
 	}
 }
+
+// explain names each scope.optionalSource glob that matched no file on
+// stderr, so a typo there stays visible; the manifest is unchanged (#257).
+func TestExplainUnmatchedOptional(t *testing.T) {
+	c := writeContract(t, "hermetic")
+	data, err := os.ReadFile(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(c, []byte(strings.Replace(string(data), `source: ["*.txt"]`, "source: [\"*.txt\"]\n  optionalSource: [\"*.yaml\", \"**/*testdata*.json\"]", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := runCLI("explain", "-f", c)
+	want := "optional: scope.optionalSource glob \"**/*testdata*.json\" matched no files yet\n"
+	if code != ExitOK || stderr != want || !strings.Contains(stdout, " - aval.yaml\n") {
+		t.Fatalf("explain: exit %d, stdout %q, stderr %q; want stderr %q", code, stdout, stderr, want)
+	}
+}

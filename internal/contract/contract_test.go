@@ -125,18 +125,23 @@ func TestParseInvalid(t *testing.T) {
   resolve: [{git: "https://ghp_tok@[::1/o/r@main"}]`, "credentials in the reference are not allowed"},
 		"resolve password in a URL that does not parse": {`dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   resolve: [{url: "ssh://u:s3cret@exa%zz.com/x"}]`, "credentials in the reference are not allowed"},
-		"contracts empty path":   {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [\"\"]", "scope.contracts[0]: \"\": must be a clean relative path"},
-		"contracts absolute":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [/repo/aval.yaml]", "clean relative path"},
-		"contracts inner ..":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [a/../b/aval.yaml]", "clean relative path"},
-		"contracts dot segment":  {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [./b/aval.yaml]", "clean relative path"},
-		"contracts backslash":    {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: ['..\\b\\aval.yaml']", "slash-separated"},
-		"contracts space":        {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [\"b c/aval.yaml\"]", "without spaces"},
-		"contracts not yaml":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../backend]", "must name a contract file"},
-		"contracts listed twice": {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../b/aval.yaml, ../b/aval.yaml]", "scope.contracts[1]: \"../b/aval.yaml\" is listed twice"},
-		"contracts not a list":   {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: ../b/aval.yaml", "scope.contracts: got a string `../b/av...`, want a list of strings"},
-		"outputs escaping":       {"cacheability:", "outputs: [../coverage.xml]\ncacheability:", "outputs[0]"},
-		"outputs absolute":       {"cacheability:", "outputs: [/tmp/junit.xml]\ncacheability:", "outputs[0]"},
-		"outputs empty":          {"cacheability:", "outputs: [\"\"]\ncacheability:", "outputs[0]: empty glob"},
+		"contracts empty path":          {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [\"\"]", "scope.contracts[0]: \"\": must be a clean relative path"},
+		"contracts absolute":            {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [/repo/aval.yaml]", "clean relative path"},
+		"contracts inner ..":            {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [a/../b/aval.yaml]", "clean relative path"},
+		"contracts dot segment":         {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [./b/aval.yaml]", "clean relative path"},
+		"contracts backslash":           {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: ['..\\b\\aval.yaml']", "slash-separated"},
+		"contracts space":               {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [\"b c/aval.yaml\"]", "without spaces"},
+		"contracts not yaml":            {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../backend]", "must name a contract file"},
+		"contracts listed twice":        {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: [../b/aval.yaml, ../b/aval.yaml]", "scope.contracts[1]: \"../b/aval.yaml\" is listed twice"},
+		"contracts not a list":          {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  contracts: ../b/aval.yaml", "scope.contracts: got a string `../b/av...`, want a list of strings"},
+		"outputs escaping":              {"cacheability:", "outputs: [../coverage.xml]\ncacheability:", "outputs[0]"},
+		"outputs absolute":              {"cacheability:", "outputs: [/tmp/junit.xml]\ncacheability:", "outputs[0]"},
+		"outputs empty":                 {"cacheability:", "outputs: [\"\"]\ncacheability:", "outputs[0]: empty glob"},
+		"optionalSource also in source": {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  optionalSource: [a/**, compose.yaml]", "scope.optionalSource[1]: \"compose.yaml\" is also in scope.source"},
+		"optionalSource escaping":       {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  optionalSource: [../x/**]", "scope.optionalSource[0]: \"../x/**\": empty, '.' or '..' segments"},
+		"optionalSource absolute":       {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  optionalSource: [/etc/*]", "scope.optionalSource[0]"},
+		"optionalSource partial **":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  optionalSource: [a**b]", "scope.optionalSource[0]"},
+		"optionalSource not a list":     {`dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  optionalSource: a/**", "scope.optionalSource: got a string"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -171,6 +176,21 @@ func TestParseAllowMutable(t *testing.T) {
 	}
 	if c, _ := Parse([]byte(valid)); c.Scope.AllowMutable != nil {
 		t.Fatalf("omitted allowMutable = %+v, want nil", c.Scope.AllowMutable)
+	}
+}
+
+// TestParseOptionalSource: scope.optionalSource is optional (contracts
+// without it still parse) and keeps each glob as written.
+func TestParseOptionalSource(t *testing.T) {
+	c, err := Parse([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, "dependencies: [\"go.sum\"]\n  optionalSource: [\"**/*testdata*.yaml\"]", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(c.Scope.OptionalSource) != "[**/*testdata*.yaml]" {
+		t.Fatalf("optionalSource = %q", c.Scope.OptionalSource)
+	}
+	if c, _ := Parse([]byte(valid)); c.Scope.OptionalSource != nil {
+		t.Fatalf("omitted optionalSource = %q, want nil", c.Scope.OptionalSource)
 	}
 }
 
@@ -303,7 +323,7 @@ func TestParseYAMLErrors(t *testing.T) {
 	lines := []string{
 		"line 7: runner.command: got a string `go test...`, want a list of strings",
 		"line 9: scope.sources: unknown field; did you mean source?",
-		"line 10: scope.src\x1b: unknown field; known fields: source, exclude, dependencies, allowMutable, resolve, contracts, root", // the caller escapes it
+		"line 10: scope.src\x1b: unknown field; known fields: source, optionalSource, exclude, dependencies, allowMutable, resolve, contracts, root", // the caller escapes it
 		"line 16: metadata2: unknown field; did you mean metadata?",
 		"line 17: zzzzzzzz: unknown field; known fields: apiVersion, kind, metadata, runner, scope, environment, cacheability, outputs",
 	}
