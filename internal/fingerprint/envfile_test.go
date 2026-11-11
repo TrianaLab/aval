@@ -125,6 +125,10 @@ func TestRecordedEnvWindows(t *testing.T) {
 	if _, err := recordedEnv([]string{"env Mode unset", "env app_a " + h}, entries); err == nil {
 		t.Fatal("lower-case pattern line accepted on Windows")
 	}
+	// A matching prefix with a mixed-case suffix reaches the envKey guard.
+	if _, err := recordedEnv([]string{"env APP_a " + h, "env Mode unset"}, entries); err == nil {
+		t.Fatal("mixed-case pattern line accepted on Windows")
+	}
 }
 
 func TestParseEnvFile(t *testing.T) {
