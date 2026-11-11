@@ -75,7 +75,9 @@ and records the result. Anything Aval cannot prove runs the test.
 
 Without a registry and a trust policy the test always runs. --registry-timeout
 covers lookup and fetch together; --push has its own. runner.command never
-sees $` + idTokenEnv + `, $` + registryEnv + `, $` + policyEnv + ` or $` + minTrustEnv + `.
+sees $` + idTokenEnv + `, $` + registryEnv + `, $` + policyEnv + `, $` + minTrustEnv + ` or
+$` + registry.DockerConfigEnv + `, a directory whose config.json Aval reads registry
+credentials from instead of $DOCKER_CONFIG's (the test keeps $DOCKER_CONFIG).
 
 runner.command and the probes get $` + contract.RunStackEnv + `, the contracts of
 the enclosing aval runs. A run whose contract is already there exits 2 before
@@ -581,13 +583,15 @@ func hasVersion(out, want string) bool {
 }
 
 // childEnv is the environment of commands Aval runs, without the signing
-// token, the registry and the trust policy (and its minimum): the code under test must not be
-// able to sign results as this workload, nor reuse or publish against the
-// operator's trust settings. $AVAL_RUN_STACK is set to stack (see runStack).
+// token, the registry, its credentials ($AVAL_DOCKER_CONFIG; $DOCKER_CONFIG
+// stays, the test's own) and the trust policy (and its minimum): the code
+// under test must not be able to sign results as this workload, read Aval's
+// registry credential, nor reuse or publish against the operator's trust
+// settings. $AVAL_RUN_STACK is set to stack (see runStack).
 func childEnv(stack string) []string {
 	return append(slices.DeleteFunc(os.Environ(), func(kv string) bool {
 		k, _, _ := strings.Cut(kv, "=")
-		return k == idTokenEnv || k == registryEnv || k == policyEnv || k == minTrustEnv || k == contract.RunStackEnv
+		return k == idTokenEnv || k == registryEnv || k == registry.DockerConfigEnv || k == policyEnv || k == minTrustEnv || k == contract.RunStackEnv
 	}), contract.RunStackEnv+"="+stack)
 }
 

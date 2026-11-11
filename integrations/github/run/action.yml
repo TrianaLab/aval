@@ -26,6 +26,12 @@ inputs:
       isolated. It never lowers the policy's minimum; developer opts out of the
       default-branch raise.
     default: auto
+  registry-username:
+    description: User for reading the policy's registry, sent to its host only. Empty reads anonymously. Kept out of the test's environment.
+    default: ""
+  registry-password:
+    description: Read-only token for the policy's registry (github.token with the job's permissions set to packages read), sent to its host only. Empty reads anonymously. Kept out of the test's environment, but code in the same job can still reach it; never pass a write credential.
+    default: ""
 outputs:
   outcome:
     description: verified, miss, verification-failed or error, from the report.
@@ -96,6 +102,8 @@ runs:
         INPUT_POLICY: ${{ inputs.policy }}
         INPUT_SHADOW: ${{ inputs.shadow }}
         INPUT_MIN_TRUST_LEVEL: ${{ inputs.min-trust-level }}
+        REGISTRY_USERNAME: ${{ inputs.registry-username }}
+        REGISTRY_PASSWORD: ${{ inputs.registry-password }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         GH_TOKEN: ${{ github.token }}
       run: /bin/bash "$GITHUB_ACTION_PATH/run.sh"
