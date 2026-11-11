@@ -1,6 +1,6 @@
 module github.com/TrianaLab/aval
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/google/go-containerregistry v0.22.1
