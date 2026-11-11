@@ -358,6 +358,20 @@ func TestParseAllMatrixCount(t *testing.T) {
 	}
 }
 
+// A count written in another integer spelling still gives {v_count} as
+// plain decimal, the same as the list form.
+func TestParseAllMatrixCountSpelling(t *testing.T) {
+	for _, n := range []string{"03", "+3"} {
+		got, err := ParseAll([]byte(countSet("{shard: {count: "+n+"}}", "{shard}/{shard_count}")))
+		if err != nil {
+			t.Fatalf("%s: %v", n, err)
+		}
+		if len(got) != 3 || got[2].Runner.Command[2] != "PW_SHARD=3/3" {
+			t.Fatalf("%s: %d tests, argv %q", n, len(got), got[len(got)-1].Runner.Command)
+		}
+	}
+}
+
 // A count variable beside a list variable: sorted variable order, {v_count}
 // in one pass (a list value "{shard_count}" stays literal), and the limit
 // counts N.

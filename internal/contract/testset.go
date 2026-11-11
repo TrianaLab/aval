@@ -94,7 +94,7 @@ func (v matrixVar) values(name string) ([]string, string, error) {
 	for i := range vals {
 		vals[i] = strconv.Itoa(i + 1)
 	}
-	return vals, c.Value, nil
+	return vals, strconv.Itoa(n), nil
 }
 
 // forbidden returns a message for each key of e that is set although not
