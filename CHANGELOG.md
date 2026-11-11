@@ -1,5 +1,135 @@
 # aval
 
+## 0.9.0
+
+### Minor Changes
+
+- 52911eb: `environment.env` accepts prefix patterns such as `APP_*` (#253): every
+  set variable whose name starts with the prefix is hashed, one `env NAME
+  <sha256>` line each, so a tool configured by prefix no longer needs every
+  name listed by hand. `*` may only end the entry; `*`, `*_TOKEN` and patterns
+  that would match `AVAL_RUN_STACK` (`AVAL_*`) are rejected. Names compare
+  case-sensitively on Linux and macOS and case-insensitively on Windows. A
+  pattern also hashes credentials that share the prefix; list exact names when
+  it covers secrets. `aval run` records the matched variables in its env file,
+  and `aval push --env-file` accepts the names a pattern matches. Contracts
+  without a pattern keep their fingerprint; older `aval` binaries reject a
+  contract that uses one.
+- 0c4a8b7: `environment.paths` declares files and directories outside the tree as
+  fingerprint inputs (#254), such as `~/.config/pacto` or
+  `${XDG_CONFIG_HOME}/pacto`. Each entry adds a `path <entry> <hash>` manifest
+  line with the entry as written, so another `$HOME` with the same content
+  shares a result; `absent` and `unset` are hashed too. A symlink, a special or
+  unreadable file fails the fingerprint, and an entry inside the contract tree
+  is a contract error. `aval explain` lists the lines. Format change: an
+  additive optional contract field under the same `apiVersion`, with a manifest
+  line kind only it brings; the manifest stays `aval-fingerprint/v2` and
+  existing contracts hash as before. An older `aval` rejects a contract that
+  uses `paths` (unknown field), which fails closed.
+- cef4b7b: A TestSet matrix variable can be `{count: N}` (N from 1 to 1024): it takes
+  the values "1" to "N" and defines `{v_count}` = N, so a sharded runner
+  writes `PW_SHARD={shard}/{shard_count}` and the total is stated once. The
+  expanded tests and their fingerprints are the same as the list form. A bad
+  count, an extra key in the mapping, or a `v_count` variable beside a count
+  variable `v` is a contract error (exit 2). Additive within
+  `aval.trianalab.io/v1`: older aval binaries reject the mapping form.
+- 6c24fde: A TestSet `matrix` now substitutes `{var}` into `environment.toolchain`
+  values, so one test can declare a value per leg (for example
+  `platform: "{os}"`) and each leg gets its own fingerprint. An unknown
+  `{var}` in a toolchain value, or a `{var}` in a toolchain value of a test
+  without a matrix, is now a contract error (exit 2); before, it was hashed as
+  literal text. Contracts without `{var}` in toolchain values keep their
+  fingerprints.
+- 7fa8978: `scope.optionalSource` declares source globs that may match no file yet
+  (#257), for inputs a test discovers by pattern such as `**/*testdata*.yaml`.
+  Matching files are hashed as `source` lines, with the same `exclude` rules,
+  so adding the first one is a miss. A glob may not be in both `source` and
+  `optionalSource`, and `source` plus `optionalSource` must still hash at least
+  one file. `aval explain` names optional globs that matched nothing on
+  stderr. Format change: an additive optional contract field under the same
+  `apiVersion`; the manifest stays `aval-fingerprint/v2`. Existing contracts
+  hash as before; an older `aval` rejects a contract that uses
+  `optionalSource` (unknown field), which fails closed.
+- 597b9d6: The GitHub run action takes `lookup-only: "true"` (#252): it runs `aval
+  verify` with the default branch's trust policy and trust minimum, sets the
+  `outcome` output and never runs the test, uploads or writes `.aval/`. A
+  later setup step can be skipped on `verified`; the run step after it still
+  decides reuse. A miss succeeds the step, exit 5 fails it with the `aval
+  SECURITY` annotation, and `lookup-only` with `shadow: true` exits 2.
+- da68465: The GitHub run action raises the trust minimum to `runner` on the default
+  branch (#251), so `main` no longer goes green on a developer-signed result that
+  `aval push` would then not publish. The new `min-trust-level` input (`auto` by
+  default, or `developer`, `runner`, `isolated`) passes the highest of itself,
+  the job's `AVAL_MIN_TRUST_LEVEL` and the policy's `minTrustLevel`, so it never
+  lowers the policy's minimum; `min-trust-level: developer` opts out. A policy
+  minimum of `isolated` is kept instead of failing with exit 2, and the log and
+  step summary show the effective minimum. Workflows can drop their hand-written
+  `AVAL_MIN_TRUST_LEVEL` expression.
+- c17e62f: The GitHub run action reads a private attestations registry: new optional
+  inputs `registry-username` and `registry-password` (default empty, anonymous
+  as before) write credentials for the host of the default-branch policy's
+  `registry` only, in a directory of the step that is deleted when it ends.
+  aval reads it through the new `AVAL_DOCKER_CONFIG`, a directory whose
+  `config.json` replaces `$DOCKER_CONFIG`'s for Aval's registry client and that
+  `runner.command` never gets; the test keeps the job's `DOCKER_CONFIG`. The test
+  no longer sees the job's `GH_TOKEN`.
+
+### Patch Changes
+
+- d87eec2: The GitHub actions no longer put cosign on the job's `PATH`. They install the
+  cosign that verifies the aval release into `$RUNNER_TEMP`, checked against a
+  per-platform sha256, instead of using `sigstore/cosign-installer`, which
+  writes `GITHUB_PATH`. The test and later steps see the job's own tools again.
+- 1261177: `examples/github-monorepo` and the "Integrate Aval in 5 files" guide that
+  embeds it pin the GitHub actions at the commit that pins v0.8.2, with a
+  `# v0.8.2` comment, instead of a commit that installed v0.7.0 (#261). After
+  each pin PR merges, the new `pin-examples` job of `release.yaml` opens a PR
+  (branch `release-pins/examples`) that moves the examples to the merge
+  commit, and `pin-examples-ci` dispatches `ci` on it. An architecture test
+  fails when an example's action pin installs an older release than main pins
+  (one pin behind is allowed while that PR is open) or when its comment names
+  another version, and when a doc other than `docs/install.md` names a
+  hard-coded aval version. `docs/install.md` now pins v0.8.2 in its example
+  and says the verified-install flags first ship in v0.8.1. No CLI or format
+  change.
+- 8f1912d: The pinning scanner no longer reports `npx --no`, `npx --no-install`,
+  `npm exec --no`, `pnpm exec` and `yarn exec`: they run only what is already
+  installed. Plain `npx`, `npm exec`, `pnpm dlx`, `yarn dlx` and `bunx` are still
+  reported, as are packages named by `-p`, and the fix text now mentions
+  `npx --no <bin>`.
+- 01177a9: The GitHub publish action downloads the `aval-*` artifacts right after its
+  guard (#260). With none, it prints a notice and exits 0 without installing
+  cosign or aval, fetching the policy or requesting an OIDC token, so a publish
+  job that runs on `!cancelled()` after path-filtered test jobs no longer fails
+  in a repository whose policy is not merged yet. With artifacts and no policy
+  it still exits 1.
+- 311b2fc: `aval push` accepts a result from a job with other environment variables
+  (#247). `aval run` writes an env file next to the result (`--env-file`,
+  default `.aval/env.txt`, `.aval/<test>/env.txt` with `--test`): the
+  fingerprint manifest version, then the manifest's `env NAME unset|<sha256>`
+  lines, hashes only, neither signed nor published. `aval push --env-file
+  FILE` takes the `env` section from it instead of its own environment; every
+  source, dependency, toolchain and contract line is still hashed from the
+  checkout, and the digest must still match the result and the report. A file
+  with another manifest version, a malformed or repeated line, or names other
+  than `environment.env` exits 1 and publishes nothing; inside the contract
+  scope and outside `.aval/` it exits 2, as `--result-file` does. Without the
+  flag push is unchanged. The publish action passes the artifact's `env.txt`
+  when the installed aval has the flag, so a variable such as
+  `GOTOOLCHAIN=local` from setup-go no longer fails the push. No format
+  change: the manifest stays `aval-fingerprint/v2`. docs/artifact-format.md
+  documents the env file.
+- 5312533: The run action uploads `aval-<test>` with `overwrite: true`. Re-running a
+  failed job no longer fails with 409 on the earlier attempt's artifact, and the
+  publish job signs the result of the attempt that just ran. Run each test in
+  only one job per workflow run.
+- 1634652: A symlink to a regular file under a `**` source glob now needs only its name
+  in `exclude` (#258); `<link>/**` is no longer required, since no path exists
+  under a file. A link to a directory, a dangling link or a loop still needs
+  both. The link is never followed nor hashed; Aval only checks its target's
+  type. The error names the exclude that would fix it. Dropping `<link>/**`
+  from a contract changes its hash, so the next run is a miss.
+
 ## 0.8.2
 
 ### Patch Changes
