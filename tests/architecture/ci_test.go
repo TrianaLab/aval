@@ -685,3 +685,69 @@ func TestJobEnvWriteCatches(t *testing.T) {
 		}
 	}
 }
+
+// uploadOverwriteProblems reports the actions/upload-artifact steps of an
+// action.yml that do not set overwrite: true, or none at all.
+func uploadOverwriteProblems(action []byte) ([]string, error) {
+	var a struct {
+		Runs struct {
+			Steps []struct {
+				Uses string         `yaml:"uses"`
+				With map[string]any `yaml:"with"`
+			} `yaml:"steps"`
+		} `yaml:"runs"`
+	}
+	if err := yaml.Unmarshal(action, &a); err != nil {
+		return nil, err
+	}
+	var problems []string
+	found := false
+	for _, s := range a.Runs.Steps {
+		if !strings.HasPrefix(s.Uses, "actions/upload-artifact@") {
+			continue
+		}
+		found = true
+		if s.With["overwrite"] != true {
+			problems = append(problems, fmt.Sprintf("%s: overwrite is %v, want true", s.Uses, s.With["overwrite"]))
+		}
+	}
+	if !found {
+		problems = append(problems, "no actions/upload-artifact step")
+	}
+	return problems, nil
+}
+
+// Re-running a failed job uploads aval-<test> again in the same workflow run
+// (#249): without overwrite the upload returns 409 and publish signs the
+// earlier attempt's result.
+func TestRunActionUploadOverwrites(t *testing.T) {
+	p, err := uploadOverwriteProblems([]byte(readFile(t, actionFiles[0])))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range p {
+		t.Error(s)
+	}
+}
+
+func TestUploadOverwriteProblemsCatches(t *testing.T) {
+	const step = "runs:\n  steps:\n    - uses: actions/upload-artifact@x\n      with:\n        name: aval-unit\n"
+	for in, want := range map[string]int{
+		step + "        overwrite: true\n":     0,
+		step:                                   1,
+		step + "        overwrite: false\n":    1,
+		step + "        overwrite: \"true\"\n": 1,
+		"runs:\n  steps:\n    - run: true\n":   1,
+	} {
+		p, err := uploadOverwriteProblems([]byte(in))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(p) != want {
+			t.Errorf("%q: problems %q, want %d", in, p, want)
+		}
+	}
+	if _, err := uploadOverwriteProblems([]byte("runs: [")); err == nil {
+		t.Error("invalid YAML: no error")
+	}
+}
