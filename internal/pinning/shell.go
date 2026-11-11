@@ -249,6 +249,8 @@ func jsCmd(c shellCtx, t []string) {
 	switch {
 	case sub(t, 1, "global") && sub(t, 2, "add"): // yarn global add
 		n = 3
+	case sub(t, 1, "exec") && (path.Base(t[0]) == "pnpm" || path.Base(t[0]) == "yarn"):
+		return // runs a binary installed from the lockfile; never fetches
 	case sub(t, 1, "dlx", "x", "exec"): // pnpm dlx, bun x, npm exec
 		dlxCmd(c, t[1:])
 		return
@@ -262,6 +264,31 @@ func jsCmd(c shellCtx, t []string) {
 	}
 }
 
+// localOnly reports whether npx or npm exec (t[0] "npx" or "exec") gets
+// --no, --no-install or --yes=false before the operand: it then runs only
+// what is already installed. pnpm dlx, bun x and bunx always fetch what is
+// missing.
+func localOnly(t []string) bool {
+	if b := path.Base(t[0]); b != "npx" && b != "exec" {
+		return false
+	}
+	local := false
+	for _, a := range t[1:] {
+		if a == "--" || !strings.HasPrefix(a, "-") {
+			break // an option after the operand belongs to the binary
+		}
+		switch a {
+		case "--no", "--no-install", "--yes=false":
+			local = true
+		case "--yes", "-y", "--yes=true":
+			local = false
+		}
+	}
+	return local
+}
+
+// dlxCmd checks npx, bunx, pnpm dlx, bun x and npm exec. A local-only run
+// does not fetch its bare operand; packages named by -p are still checked.
 func dlxCmd(c shellCtx, t []string) {
 	var pkgs []string // -p names the packages; else the first operand is one
 	for i, a := range t {
@@ -272,12 +299,12 @@ func dlxCmd(c shellCtx, t []string) {
 			pkgs = append(pkgs, strings.TrimPrefix(a, "--package="))
 		}
 	}
-	if a := args(t, 1, "-c", "--call"); len(pkgs) == 0 && len(a) > 0 {
+	if a := args(t, 1, "-c", "--call"); len(pkgs) == 0 && len(a) > 0 && !localOnly(t) {
 		pkgs = a[:1]
 	}
 	for _, p := range pkgs {
 		if !npmPinned(p) {
-			c.at("npm", p, "runs whatever version is newest: pin an exact version (name@1.2.3)")
+			c.at("npm", p, "runs whatever version is newest: pin an exact version (name@1.2.3) or, to run the lockfile's version, npx --no <bin>")
 		}
 	}
 }

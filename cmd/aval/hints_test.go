@@ -226,7 +226,7 @@ func TestContractErrorLines(t *testing.T) {
 	want := "aval: " + p + ": invalid contract:\n" +
 		"  line 6: runner.command: got a boolean `true`, want a list of strings\n" +
 		"  line 8: scope.sources: unknown field; did you mean source?\n" +
-		"  line 9: scope.x\\x1b]8;;: unknown field; known fields: source, exclude, dependencies, allowMutable, resolve, contracts, root\n"
+		"  line 9: scope.x\\x1b]8;;: unknown field; known fields: source, optionalSource, exclude, dependencies, allowMutable, resolve, contracts, root\n"
 	for _, cmd := range []string{"run", "verify", "explain"} {
 		code, stdout, stderr := runCLI(cmd, "-f", p, "--registry", "reg.example/r")
 		if cmd == "explain" {
