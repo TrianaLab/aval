@@ -3,6 +3,7 @@ package contract
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -23,6 +24,7 @@ func FuzzParse(f *testing.F) {
 	f.Add([]byte(valid + "\n---\nfoo: bar\n"))
 	f.Add([]byte(strings.Replace(valid, `dependencies: ["go.sum"]`, `dependencies: ["go.sum"]
   allowMutable: [{files: ["deploy/**/*.yaml", "a[1].yaml"], ref: "nginx:1.27", reason: r}]`, 1)))
+	f.Add([]byte(strings.Replace(valid, "scope:\n", "scope:\n  optionalSource: [\"**/*testdata*.yaml\", compose.yaml]\n", 1)))
 	f.Add([]byte(strings.Replace(valid, "scope:\n", "scope:\n  root: ../..\n", 1)))
 	f.Add([]byte(strings.Replace(valid, "scope:\n", "scope:\n  root: ../x\n", 1)))
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -38,7 +40,12 @@ func FuzzParse(f *testing.F) {
 				t.Fatalf("Parse accepted scope.root %q", c.Scope.Root)
 			}
 		}
-		globs := append(append(append([]string{}, c.Scope.Source...), c.Scope.Exclude...), c.Scope.Dependencies...)
+		globs := slices.Concat(c.Scope.Source, c.Scope.OptionalSource, c.Scope.Exclude, c.Scope.Dependencies)
+		for _, g := range c.Scope.OptionalSource {
+			if slices.Contains(c.Scope.Source, g) {
+				t.Fatalf("Parse accepted %q in both scope.source and scope.optionalSource", g)
+			}
+		}
 		for _, a := range c.Scope.AllowMutable {
 			if a.File != "" && len(a.Files) > 0 {
 				t.Fatalf("Parse accepted file and files together: %+v", a)

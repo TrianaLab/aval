@@ -111,7 +111,12 @@ type Runner struct {
 type Scope struct {
 	// Source globs select files whose content is part of the fingerprint.
 	Source []string `yaml:"source" json:"source"`
-	// Exclude globs remove files selected by Source.
+	// OptionalSource globs are hashed like Source, but may match no files:
+	// inputs the test discovers by pattern, where the first matching file
+	// may be added later. Omitted when empty, so contracts without it hash
+	// as before.
+	OptionalSource []string `yaml:"optionalSource,omitempty" json:"optionalSource,omitempty"`
+	// Exclude globs remove files selected by Source and OptionalSource.
 	Exclude []string `yaml:"exclude,omitempty" json:"exclude"`
 	// Dependencies are lockfiles or manifests. Each glob must match at
 	// least one file, otherwise fingerprinting fails (fail closed).
@@ -321,10 +326,11 @@ func (c *Contract) Validate() error {
 		add("scope.source: at least one glob is required (scope is always declared)")
 	}
 	for field, globs := range map[string][]string{
-		"scope.source":       c.Scope.Source,
-		"scope.exclude":      c.Scope.Exclude,
-		"scope.dependencies": c.Scope.Dependencies,
-		"outputs":            c.Outputs,
+		"scope.source":         c.Scope.Source,
+		"scope.optionalSource": c.Scope.OptionalSource,
+		"scope.exclude":        c.Scope.Exclude,
+		"scope.dependencies":   c.Scope.Dependencies,
+		"outputs":              c.Outputs,
 	} {
 		for i, g := range globs {
 			if err := ValidateGlob(g); err != nil {
@@ -342,9 +348,15 @@ func (c *Contract) Validate() error {
 	return errors.Join(errs...)
 }
 
-// validate checks scope.root, scope.allowMutable, scope.resolve and
-// scope.contracts; Validate checks the globs.
+// validate checks scope.root, scope.optionalSource against scope.source,
+// scope.allowMutable, scope.resolve and scope.contracts; Validate checks
+// the globs.
 func (s Scope) validate(add func(string, ...any)) {
+	for i, g := range s.OptionalSource {
+		if slices.Contains(s.Source, g) {
+			add("scope.optionalSource[%d]: %q is also in scope.source: list it in one of them", i, g)
+		}
+	}
 	if s.Root != "" && !rootRe.MatchString(s.Root) {
 		add("scope.root: %q must be '..' segments only (.., ../..): the path up from the contract's directory to the root of its tree", s.Root)
 	}
