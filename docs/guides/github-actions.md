@@ -83,15 +83,15 @@ default `false`). In order, it:
 
 What `aval push` does with each artifact:
 
-- An artifact `aval-a` that holds test `b`, or a result that does not match
-  the fingerprint push computes from the checkout, exits 1 and publishes
-  nothing; the other artifacts are still pushed.
+- An artifact `aval-a` that holds test `b`, or a result that does not match the fingerprint push
+  computes from the checkout (`environment.env` from the artifact's [`env.txt`](../artifact-format.md#env-file),
+  as hashed in the suite job), exits 1 and publishes nothing; the other artifacts are still pushed.
 - A reused result (report outcome `verified`, also under `--shadow`) and a
   `non-deterministic` test print `nothing to push: ...` and exit 0.
 - A `miss` or an `error` publishes the result, failures included: on a tie
   in trust level a failure outranks a later flaky pass.
 - A report that records a security event signs nothing and exits 5.
-- The artifact holds `result.json`, `report.json`, `record.json` and
+- The artifact holds `result.json`, `report.json`, `record.json`, `env.txt` and
   `outputs/<path>`, the files the `outputs` globs matched; push publishes
   those, never the checkout's. No `outputs/` for a test with outputs, or a
   symlink, extra file, input, `.git` or `.aval` in it, exits 1, publishing nothing.
