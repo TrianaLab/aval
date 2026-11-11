@@ -21,9 +21,27 @@ jobs:
         with:
           test: unit
   # --8<-- [end:run]
+  # --8<-- [start:lookup]
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@<sha> # pin by commit SHA
+        with:
+          persist-credentials: false
+      - id: lookup
+        uses: TrianaLab/aval/integrations/github/run@<sha> # pin by commit SHA
+        with:
+          test: ui
+          lookup-only: "true"
+      - if: steps.lookup.outputs.outcome != 'verified'
+        uses: actions/setup-node@<sha> # pin by commit SHA
+      - uses: TrianaLab/aval/integrations/github/run@<sha> # pin by commit SHA
+        with:
+          test: ui
+  # --8<-- [end:lookup]
   # --8<-- [start:publish]
   publish:
-    needs: unit
+    needs: [unit, ui]
     if: ${{ !cancelled() && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     runs-on: ubuntu-latest
     permissions:
