@@ -44,6 +44,7 @@ tests:
         # The CLI reference cmd/aval checks, the contracts the contract fuzz
         # target seeds from, and the example the shard test reads.
         - "docs/cli-reference.md"
+        # The whole TestSet file: an edit to aval-e2e also changes this fingerprint.
         - "aval.yaml"
         - "examples/go-compose/aval.yaml"
   - metadata: {name: aval-e2e}

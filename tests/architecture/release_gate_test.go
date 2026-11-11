@@ -23,8 +23,9 @@ if ! [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$sha256" =~ ^linux_amd64=[0-
 fi
 cosign=$(command -v cosign)
 gh=$(command -v gh)
+git show origin/main:scripts/get-aval.sh > "$RUNNER_TEMP/get-aval.sh"
 PATH="/usr/bin:/bin:${cosign%/*}:${gh%/*}" AVAL_INSTALL_DIR="$RUNNER_TEMP/aval" USE_SUDO=false \
-  /bin/bash scripts/get-aval.sh --version "$version" --sha256 "$sha256" --require-verify --require-provenance
+  /bin/bash "$RUNNER_TEMP/get-aval.sh" --version "$version" --sha256 "$sha256" --require-verify --require-provenance
 echo "$RUNNER_TEMP/aval" >> "$GITHUB_PATH"`
 
 // gatePolicy and gateVerify: the gate reads main's policy, never the
