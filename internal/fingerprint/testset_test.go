@@ -224,3 +224,47 @@ func TestContractsRejectTestSet(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+// shardSet is the sharding TestSet of #259 with the matrix line m and the
+// shard argument arg.
+func shardSet(m, arg string) string {
+	return "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ntests:\n" +
+		"  - metadata: {name: \"browser-{shard}\"}\n" +
+		"    runner: {command: [make, test-browser, \"PW_SHARD=" + arg + "\"]}\n" +
+		"    matrix: " + m + "\n    scope: {source: [VERSION]}\n    cacheability: hermetic\n"
+}
+
+func shardFingerprints(t *testing.T, doc string) map[string]Fingerprint {
+	t.Helper()
+	_, fps := setFingerprints(t, writeTree(t, map[string]string{"aval.yaml": doc, "VERSION": "1\n"}), "aval.yaml")
+	return fps
+}
+
+// {count: 3} with {shard}/{shard_count} fingerprints byte for byte like the
+// list ["1","2","3"] with {shard}/3, which is what existing results were
+// recorded with (#259).
+func TestTestSetMatrixCountSameFingerprints(t *testing.T) {
+	count := shardFingerprints(t, shardSet("{shard: {count: 3}}", "{shard}/{shard_count}"))
+	list := shardFingerprints(t, shardSet(`{shard: ["1", "2", "3"]}`, "{shard}/3"))
+	if len(count) != 3 || len(list) != 3 {
+		t.Fatalf("got %d and %d tests", len(count), len(list))
+	}
+	for name, fp := range list {
+		if count[name].Manifest != fp.Manifest {
+			t.Errorf("%s: count form differs from the list form:\n%s\n%s", name, count[name].Manifest, fp.Manifest)
+		}
+	}
+}
+
+// False hit: changing N changes the argv, so the contract hash and the
+// fingerprint, of every test that references {shard_count}; a result of
+// shard 1 of 2 is a miss for shard 1 of 3.
+func TestTestSetMatrixCountFalseHit(t *testing.T) {
+	two := shardFingerprints(t, shardSet("{shard: {count: 2}}", "{shard}/{shard_count}"))
+	three := shardFingerprints(t, shardSet("{shard: {count: 3}}", "{shard}/{shard_count}"))
+	for _, name := range []string{"browser-1", "browser-2"} {
+		if two[name].Digest == three[name].Digest {
+			t.Errorf("%s: N=2 and N=3 share a fingerprint (false hit)", name)
+		}
+	}
+}

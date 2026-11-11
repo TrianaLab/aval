@@ -7,7 +7,10 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // KindTestSet is a file of many tests that share defaults and fragments.
@@ -35,14 +38,63 @@ type testSet struct {
 // kind: Test plus use and matrix. Which keys each may set is checked by
 // forbidden.
 type entry struct {
-	Metadata     Metadata            `yaml:"metadata"`
-	Runner       Runner              `yaml:"runner"`
-	Scope        Scope               `yaml:"scope"`
-	Environment  Environment         `yaml:"environment"`
-	Cacheability Cacheability        `yaml:"cacheability"`
-	Outputs      []string            `yaml:"outputs"`
-	Use          []string            `yaml:"use"`
-	Matrix       map[string][]string `yaml:"matrix"`
+	Metadata     Metadata             `yaml:"metadata"`
+	Runner       Runner               `yaml:"runner"`
+	Scope        Scope                `yaml:"scope"`
+	Environment  Environment          `yaml:"environment"`
+	Cacheability Cacheability         `yaml:"cacheability"`
+	Outputs      []string             `yaml:"outputs"`
+	Use          []string             `yaml:"use"`
+	Matrix       map[string]matrixVar `yaml:"matrix"`
+}
+
+// matrixVar is one matrix variable: a list of values, or the mapping
+// {count: N}, kept as a node until values checks it.
+type matrixVar struct {
+	list  []string
+	count *yaml.Node
+}
+
+// UnmarshalYAML keeps a mapping for values and decodes anything else as a
+// list of strings, so a wrong type is the usual typed decoding error.
+func (v *matrixVar) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind == yaml.MappingNode {
+		v.count = n
+		return nil
+	}
+	return n.Decode(&v.list)
+}
+
+// values returns the values of variable name: the list, or "1".."N" for
+// {count: N}, and N as a string ("" for a list).
+func (v matrixVar) values(name string) ([]string, string, error) {
+	if v.count == nil {
+		return v.list, "", nil
+	}
+	var errs []error
+	var c *yaml.Node
+	for i := 0; i+1 < len(v.count.Content); i += 2 {
+		if k := v.count.Content[i].Value; k != "count" || c != nil {
+			errs = append(errs, fmt.Errorf("matrix.%s: unexpected key %q (the mapping form is {count: N})", name, k))
+		} else {
+			c = v.count.Content[i+1]
+		}
+	}
+	if c == nil {
+		return nil, "", errors.Join(append(errs, fmt.Errorf("matrix.%s: count is required in the mapping form {count: N}", name))...)
+	}
+	n, err := strconv.Atoi(c.Value)
+	if c.ShortTag() != "!!int" || err != nil || n < 1 || n > maxTests {
+		errs = append(errs, fmt.Errorf("matrix.%s.count: got %q, want an integer from 1 to %d", name, c.Value, maxTests))
+	}
+	if len(errs) > 0 {
+		return nil, "", errors.Join(errs...)
+	}
+	vals := make([]string, n)
+	for i := range vals {
+		vals[i] = strconv.Itoa(i + 1)
+	}
+	return vals, strconv.Itoa(n), nil
 }
 
 // forbidden returns a message for each key of e that is set although not
@@ -252,27 +304,45 @@ func union[T any](a, b []T) []T {
 	return a
 }
 
-// matrix expands c into one test per combination of the values of m, by
+// matrix expands c into one test per combination of the values of mv, by
 // sorted variable name, substituting {var} into metadata.name,
-// runner.command and environment.toolchain values only. Without a matrix,
-// c is the only test, nothing is substituted, and a {var} in a toolchain
-// value is an error: it would be hashed as literal text. More than limit
-// tests is an error.
-func matrix(c *Contract, m map[string][]string, limit int) ([]*Contract, error) {
-	if m == nil {
+// runner.command and environment.toolchain values only. A {count: N}
+// variable v also defines {v_count} = N, the same in every test. Without a
+// matrix, c is the only test, nothing is substituted, and a {var} in a
+// toolchain value is an error: it would be hashed as literal text. More
+// than limit tests is an error.
+func matrix(c *Contract, mv map[string]matrixVar, limit int) ([]*Contract, error) {
+	if mv == nil {
 		if err := noMatrixRefs(c); err != nil {
 			return nil, err
 		}
 		return []*Contract{c}, nil
 	}
-	if len(m) == 0 {
+	if len(mv) == 0 {
 		return nil, errors.New("matrix: at least one variable is required")
 	}
-	vars := slices.Sorted(maps.Keys(m))
-	if err := checkMatrix(c, m, vars, limit); err != nil {
+	vars := slices.Sorted(maps.Keys(mv))
+	m, counts := map[string][]string{}, map[string]string{}
+	var errs []error
+	for _, v := range vars {
+		vals, n, err := mv[v].values(v)
+		errs = append(errs, err)
+		m[v] = vals
+		if mv[v].count == nil {
+			continue
+		}
+		if _, clash := mv[v+"_count"]; clash {
+			errs = append(errs, fmt.Errorf("matrix: variable %s_count clashes with {%s_count}, the count of %s", v, v, v))
+		}
+		counts[v+"_count"] = n
+	}
+	if err := errors.Join(errs...); err != nil {
 		return nil, err
 	}
-	combos := []map[string]string{{}}
+	if err := checkMatrix(c, m, counts, vars, limit); err != nil {
+		return nil, err
+	}
+	combos := []map[string]string{counts}
 	for _, v := range vars {
 		var next []map[string]string
 		for _, b := range combos {
@@ -317,8 +387,8 @@ func noMatrixRefs(c *Contract) error {
 
 // checkMatrix checks the variables and values of m, its size against
 // limit, and that every {var} in c's name, command and toolchain values is
-// a variable of m.
-func checkMatrix(c *Contract, m map[string][]string, vars []string, limit int) error {
+// a variable of m or of counts.
+func checkMatrix(c *Contract, m map[string][]string, counts map[string]string, vars []string, limit int) error {
 	var errs []error
 	n := 1
 	for _, v := range vars {
@@ -333,10 +403,12 @@ func checkMatrix(c *Contract, m map[string][]string, vars []string, limit int) e
 			return fmt.Errorf("matrix: expands to more than %d tests in the set", maxTests)
 		}
 	}
+	known := slices.Sorted(slices.Values(append(slices.Clone(vars), slices.Collect(maps.Keys(counts))...)))
 	unknown := func(where, s string) {
 		for _, r := range refRe.FindAllStringSubmatch(s, -1) {
-			if _, ok := m[r[1]]; !ok {
-				errs = append(errs, fmt.Errorf("unknown matrix variable {%s} in %s%q (the matrix has %s)", r[1], where, s, strings.Join(vars, ", ")))
+			_, ok := m[r[1]]
+			if _, n := counts[r[1]]; !ok && !n {
+				errs = append(errs, fmt.Errorf("unknown matrix variable {%s} in %s%q (the matrix has %s)", r[1], where, s, strings.Join(known, ", ")))
 			}
 		}
 	}
