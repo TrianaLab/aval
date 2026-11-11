@@ -632,7 +632,8 @@ type file struct {
 // The walk does not follow symlinks. A symlink under which a source or
 // dependency glob could match files may point to a directory whose files
 // cannot be hashed, so it is an error here (fail closed), unless
-// excludedSymlink proves nothing under it is an input. A symlink only an
+// excludedSymlink proves nothing under it is an input. A link to a
+// non-directory needs only its name excluded. A symlink only an
 // exact glob reaches is rejected when hashed (unless excluded).
 func listFiles(fsys fs.FS, skip map[string]bool, source, deps, exclude []contract.Glob) ([]file, error) {
 	include := slices.Concat(source, deps)
@@ -663,8 +664,19 @@ func listFiles(fsys fs.FS, skip map[string]bool, source, deps, exclude []contrac
 			}
 			return nil
 		}
-		if d.Type()&fs.ModeSymlink != 0 && mayContain && !excludedSymlink(f.segs, deps, exclude) {
-			return fmt.Errorf("%q is a symlink a glob could match files under: only regular files are supported in scope (symlinks are not followed)", rel)
+		if d.Type()&fs.ModeSymlink != 0 && mayContain {
+			// Stat follows the link once, to learn its target's type; nothing
+			// of the target is read. A dangling link, a loop or an unreadable
+			// target counts as a directory (fail closed).
+			fi, err := fs.Stat(fsys, rel)
+			toFile := err == nil && !fi.IsDir()
+			if !excludedSymlink(f.segs, toFile, deps, exclude) {
+				fix := fmt.Sprintf("exclude %q and %q", rel, rel+"/**")
+				if toFile {
+					fix = fmt.Sprintf("exclude it by name (%q)", rel)
+				}
+				return fmt.Errorf("%q is a symlink a glob could match files under: only regular files are supported in scope (symlinks are not followed); remove it, or %s with no dependencies glob reaching it", rel, fix)
+			}
 		}
 		if skip[rel] {
 			return nil
@@ -678,13 +690,14 @@ func listFiles(fsys fs.FS, skip map[string]bool, source, deps, exclude []contrac
 
 // excludedSymlink reports whether a symlink at name can be walked past
 // without following it: exclude drops its name (by the rule hashMatching
-// applies) and everything under it (a glob ending in ** that matches name
-// matches every path below it), and no dependency glob, which exclude does
-// not apply to, can reach it. The symlink stays in the file list, where
-// hashMatching drops it as excluded.
-func excludedSymlink(name []string, deps, exclude []contract.Glob) bool {
+// applies) and, unless the link points to a non-directory (toFile), under
+// which no path exists, everything under it (a glob ending in ** that
+// matches name matches every path below it); and no dependency glob, which
+// exclude does not apply to, can reach it. The symlink stays in the file
+// list, where hashMatching drops it as excluded.
+func excludedSymlink(name []string, toFile bool, deps, exclude []contract.Glob) bool {
 	nameExcluded := slices.ContainsFunc(exclude, func(g contract.Glob) bool { return g.MatchContents(name) })
-	contentsExcluded := slices.ContainsFunc(exclude, func(g contract.Glob) bool { return g[len(g)-1] == "**" && g.Match(name) })
+	contentsExcluded := toFile || slices.ContainsFunc(exclude, func(g contract.Glob) bool { return g[len(g)-1] == "**" && g.Match(name) })
 	depReaches := slices.ContainsFunc(deps, func(g contract.Glob) bool { return g.Match(name) || g.MayContain(name) })
 	return nameExcluded && contentsExcluded && !depReaches
 }

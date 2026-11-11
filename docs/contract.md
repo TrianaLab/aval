@@ -246,10 +246,13 @@ hashed nor recorded, and `environment.env` cannot list it.
 - Order does not matter.
 - Symlinks are never followed nor hashed. A symlink under which a `source`
   or `dependencies` glob could match files is an error, unless `exclude`
-  covers both its name and its contents and no `dependencies` glob reaches
-  it: `**/node_modules/**` skips `pkg/web/node_modules/.bin/tool`, and
-  `["pkg/bin", "pkg/bin/**"]` skips a symlinked `pkg/bin`. `pkg/bin` or
-  `pkg/bin/**` alone does not.
+  covers its name and no `dependencies` glob reaches it. A symlink to a
+  regular file needs only its name excluded: `tests/fx/link.yaml` skips a
+  link to `real.yaml`. Any other symlink (to a directory, dangling, or a
+  loop) needs its contents excluded too: `**/node_modules/**` skips
+  `pkg/web/node_modules/.bin/tool`, and `["pkg/bin", "pkg/bin/**"]` skips a
+  symlinked `pkg/bin`. `pkg/bin` or `pkg/bin/**` alone does not. If a
+  name-excluded link later points to a directory, fingerprinting fails.
 
 ### Optional source globs
 
@@ -374,7 +377,7 @@ test and records nothing; `aval explain`, `aval verify` and `aval push` exit 1
 | `source "<path>" is excluded only by a trailing "**"` | exclude it by name, or narrow the glob |
 | `dependency glob "<glob>" matched no files` | fix the glob |
 | `only regular files are supported in scope` | remove the symlink, device or socket from scope |
-| `"<path>" is a symlink a glob could match files under` | symlinks are not followed: remove it, or exclude its name and contents (`**/node_modules/**`, or `pkg/bin` plus `pkg/bin/**`) with no `dependencies` glob reaching it ([Globs](#globs)); the contract directory itself may be a symlink |
+| `"<path>" is a symlink a glob could match files under` | symlinks are not followed: remove it, or exclude it with no `dependencies` glob reaching it ([Globs](#globs)). The message names the fix: its name alone for a link to a regular file, its name and contents (`pkg/bin` plus `pkg/bin/**`, or `**/node_modules/**`) for anything else. The contract directory itself may be a symlink |
 | `control characters in path are not supported` | rename the file (newline or carriage return) |
 | `resolve <kind> <reference>: <reason>` | see [When resolution fails](resolve/index.md#when-resolution-fails) |
 | `scope.contracts <path>: <reason>` | any error above in the referenced contract, or: missing or invalid contract, `leads outside the repository root` (also its `scope.root`), `no git working tree (.git) at or above <dir>`, `<path> is a symlink`, `<path> is not a regular file`, `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`, `more than 8 levels or 64 contracts` |
