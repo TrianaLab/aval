@@ -1,6 +1,6 @@
 module example.com/evidence-consumer
 
-go 1.27.3
+go 1.27.4
 
 require github.com/TrianaLab/aval v0.0.0
 
