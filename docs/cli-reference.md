@@ -303,7 +303,9 @@ and records the result. Anything Aval cannot prove runs the test.
 
 Without a registry and a trust policy the test always runs. --registry-timeout
 covers lookup and fetch together; --push has its own. runner.command never
-sees $SIGSTORE_ID_TOKEN, $AVAL_REGISTRY, $AVAL_POLICY or $AVAL_MIN_TRUST_LEVEL.
+sees $SIGSTORE_ID_TOKEN, $AVAL_REGISTRY, $AVAL_POLICY, $AVAL_MIN_TRUST_LEVEL or
+$AVAL_DOCKER_CONFIG, a directory whose config.json Aval reads registry
+credentials from instead of $DOCKER_CONFIG's (the test keeps $DOCKER_CONFIG).
 
 runner.command and the probes get $AVAL_RUN_STACK, the contracts of
 the enclosing aval runs. A run whose contract is already there exits 2 before

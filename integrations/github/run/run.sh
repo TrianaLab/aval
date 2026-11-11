@@ -90,10 +90,12 @@ else
   echo "::warning title=aval run::no trust policy at $INPUT_POLICY in the default branch (${DEFAULT_BRANCH:-unknown}, HTTP $status): nothing is reused, the test runs"
 fi
 
-# Registry credentials (#250), opt-in: the code under test runs with them.
-# They go to the policy registry's host only, in a credential store of this
-# step that starts from the job's auths (so tests keep their own logins) and
-# is deleted on exit. A missing policy or registry field adds none.
+# Registry credentials (#250), opt-in. They go to the policy registry's host
+# only, in a credential store of this step that starts from the job's auths
+# (so aval keeps the job's logins) and is deleted on exit. aval reads it
+# through AVAL_DOCKER_CONFIG, which runner.command never gets: the test keeps
+# the job's DOCKER_CONFIG. A missing policy or registry field, or an aval
+# without AVAL_DOCKER_CONFIG, adds none.
 username=${REGISTRY_USERNAME:-} password=${REGISTRY_PASSWORD:-}
 unset REGISTRY_USERNAME REGISTRY_PASSWORD
 if [ -n "$username" ] || [ -n "$password" ]; then
@@ -103,6 +105,8 @@ if [ -n "$username" ] || [ -n "$password" ]; then
     echo "::warning title=aval run::no trust policy, so no registry to send credentials to: the registry is read anonymously"
   elif ! registry=$(/bin/bash "${BASH_SOURCE[0]%/*}/../policy-registry.sh" "$policy" 2>&1); then
     echo "::warning title=aval run::the trust policy at $INPUT_POLICY has no valid registry field: no credentials are sent"
+  elif [[ "$("$AVAL" run --help 2> /dev/null || true)" != *AVAL_DOCKER_CONFIG* ]]; then
+    echo "::warning title=aval run::the installed aval has no AVAL_DOCKER_CONFIG, which keeps the credentials from the test: the registry is read anonymously"
   else
     job="${DOCKER_CONFIG:-${HOME:-}/.docker}/config.json"
     creds=$(/usr/bin/mktemp -d "$RUNNER_TEMP/aval-run-docker.XXXXXX")
@@ -112,7 +116,7 @@ if [ -n "$username" ] || [ -n "$password" ]; then
       /usr/bin/jq -Rc --arg host "${registry%%/*}" --slurpfile job "$creds/job.json" \
         '{auths: ($job[0] + {($host): {auth: .}})}' > "$creds/config.json"
     /bin/rm -f "$creds/job.json"
-    export DOCKER_CONFIG="$creds"
+    export AVAL_DOCKER_CONFIG="$creds"
     echo "registry credentials: for ${registry%%/*} only"
   fi
 fi

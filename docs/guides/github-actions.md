@@ -24,7 +24,7 @@ The action [`integrations/github/run`](https://github.com/TrianaLab/aval/blob/ma
 
 1. Refuses `pull_request_target` and `workflow_run`, and fails when the job has `id-token: write`: a suite job can never sign.
 2. Installs the aval release pinned in its `action.yml`, checked against the per-platform sha256, the release signature and the provenance ([Install](../install.md)). Pinning the action by commit SHA pins aval too.
-3. Fetches the policy from the default branch through the contents API with `github.token`, on every event, never from the checkout. The registry comes from the policy's `registry` field ([Write a trust policy](trust-policy.md)); the job's `AVAL_REGISTRY` and `AVAL_POLICY` are ignored; `AVAL_MIN_TRUST_LEVEL` is not, since it only raises the policy's minimum. With no policy nothing is reused, the test runs and a warning is logged. `GH_TOKEN` is unset after the fetch, so the test never sees `github.token`.
+3. Fetches the policy from the default branch through the contents API with `github.token`, on every event, never from the checkout. The registry comes from the policy's `registry` field ([Write a trust policy](trust-policy.md)); the job's `AVAL_REGISTRY` and `AVAL_POLICY` are ignored; `AVAL_MIN_TRUST_LEVEL` is not, since it only raises the policy's minimum. With no policy nothing is reused, the test runs and a warning is logged. `GH_TOKEN` is unset after the fetch, so `github.token` is not in the test's environment.
 4. Runs `aval run -f <file> --test <test>` with the CI run URL, the repository and, on a push to the default branch, `--outputs-dir`.
 5. Writes the outcome to the step summary and the `outcome` output. Exit 5 sets the outcome to `verification-failed`, becomes an `aval SECURITY` error annotation and fails the step; a miss is routine.
 6. On a push to the default branch only, uploads `.aval/<test>/` as the artifact `aval-<test>`. A re-run of the job replaces the earlier attempt's `aval-<test>`, so publish signs the result of the attempt that just ran. Run each test in only one job per workflow run: two jobs uploading the same name race.
@@ -39,10 +39,10 @@ The policy is a separate file on the default branch, so `publicKey` paths in it 
 
 ## Private registry
 
-A private attestations package (GHCR creates them private) cannot be read anonymously: every lookup is outcome `error` and the test always runs. Give the suite job `packages: read` and pass `registry-username: ${{ github.actor }}` and `registry-password: ${{ github.token }}` to the run action. It then writes the credentials for the host of the default-branch policy's `registry` only, in a `DOCKER_CONFIG` of the step under `$RUNNER_TEMP` that starts from the job's `auths` (not its `credsStore` or `credHelpers`) and is deleted when the step ends. No policy, or no valid `registry`, writes none and warns. Without the inputs `DOCKER_CONFIG` stays the job's.
+A private attestations package (GHCR creates them private) cannot be read anonymously: every lookup is outcome `error` (not `miss`, never `verification-failed`) and the test always runs. Pass `registry-username: ${{ github.actor }}` and `registry-password: ${{ github.token }}` to the run action, and set the suite job's `permissions` to `packages: read` (with `contents: read`): `github.token` has the job's permissions, so that is what makes it read-only. The action then writes the credentials for the host of the default-branch policy's `registry` only, in a directory of the step under `$RUNNER_TEMP` that starts from the job's `auths` (not its `credsStore` or `credHelpers`) and is deleted when the step ends. aval reads it through `AVAL_DOCKER_CONFIG`, which the test never gets: the test keeps the job's `DOCKER_CONFIG`. No policy, no valid `registry`, or a pinned aval without `AVAL_DOCKER_CONFIG` (0.8.2 and older, milestone 15) writes none and warns.
 
-!!! warning "The code under test can read the credentials"
-    The test runs in that step, so a pull request's code can read the token. Pass a read-only token (`packages: read`), never a write credential, and never give the suite job `id-token: write` (the action refuses it).
+!!! warning "Same job, same user"
+    Neither the token nor `AVAL_DOCKER_CONFIG` is in the test's environment, but the test runs in the same job as the same user, so a pull request's code can still reach the job's files and processes. Keep the token read-only (`packages: read`, never `packages: write`), never pass a write credential, and never give the suite job `id-token: write` (the action refuses it).
 
 ## Split credentials
 

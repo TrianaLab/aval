@@ -247,6 +247,9 @@ is not set, including the credential helpers it names (`credsStore`,
 `docker-credential-ecr-login`). Log in with `docker login <registry>` (or
 `oras login`, which writes the same file). Without an entry for the registry,
 Aval connects anonymously, which is enough to read a public repository.
+`$AVAL_DOCKER_CONFIG`, when set, names a directory whose `config.json` Aval
+reads instead, for every command; `runner.command` never sees it, and keeps
+the job's `$DOCKER_CONFIG`.
 
 A config file that cannot be parsed, or a helper that fails, is outcome
 `error` (exit 1): `aval run` runs the test and nothing is reused. Loopback

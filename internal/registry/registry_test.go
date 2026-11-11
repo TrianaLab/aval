@@ -3,6 +3,7 @@ package registry
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -822,6 +824,31 @@ func TestFingerprintCheckAgreesWithEvidence(t *testing.T) {
 		_, perr := evidence.Parse(raw)
 		if (checkFingerprint(fp) == nil) != (perr == nil) {
 			t.Errorf("%q: registry %v, evidence.Parse %v", fp, checkFingerprint(fp), perr)
+		}
+	}
+}
+
+// $AVAL_DOCKER_CONFIG, when set, is the only credential source of the
+// registry client; unset, $DOCKER_CONFIG is (#250).
+func TestDockerConfigEnv(t *testing.T) {
+	write := func(user string) string {
+		dir := t.TempDir()
+		auth := base64.StdEncoding.EncodeToString([]byte(user + ":pw"))
+		if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"auths":{"reg.example":{"auth":"`+auth+`"}}}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+	t.Setenv("DOCKER_CONFIG", write("job"))
+	for env, want := range map[string]string{write("aval"): "aval", "": "job"} {
+		t.Setenv(DockerConfigEnv, env)
+		store, err := newCredentialStore()
+		if err != nil {
+			t.Fatal(err)
+		}
+		cred, err := store.Get(context.Background(), "reg.example")
+		if err != nil || cred.Username != want {
+			t.Fatalf("%s=%q: username %q, %v; want %q", DockerConfigEnv, env, cred.Username, err, want)
 		}
 	}
 }

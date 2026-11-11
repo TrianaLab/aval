@@ -20,10 +20,10 @@ inputs:
     description: Run the test even when a verified result exists, and fail on a false hit (aval run --shadow).
     default: "false"
   registry-username:
-    description: User for reading the policy's registry, sent to its host only. Empty reads anonymously. The code under test can read it.
+    description: User for reading the policy's registry, sent to its host only. Empty reads anonymously. Kept out of the test's environment.
     default: ""
   registry-password:
-    description: Read-only token (packages read) for the policy's registry, sent to its host only. Empty reads anonymously. The code under test can read it; never pass a write credential.
+    description: Read-only token for the policy's registry (github.token with the job's permissions set to packages read), sent to its host only. Empty reads anonymously. Kept out of the test's environment, but code in the same job can still reach it; never pass a write credential.
     default: ""
 outputs:
   outcome:
