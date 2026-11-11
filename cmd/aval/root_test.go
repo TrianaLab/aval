@@ -146,5 +146,5 @@ func collect(t *testing.T, file string, c *contract.Contract) ([]registry.Output
 	if err != nil {
 		t.Fatal(err)
 	}
-	return collectOutputs(dir, name, c)
+	return collectOutputs(dir, name, c, false)
 }

@@ -1,7 +1,8 @@
 # Trust policy of the publish action's CI test (ci.yaml publish-action,
 # #212), read from main through the contents API: a result for
-# testdata/aval.yaml verifies only when its certificate names Aval's
-# ci.yaml on main, not integrations/github/publish.
+# testdata/aval.yaml or for test unit of examples/github-monorepo (#236)
+# verifies only when its certificate names Aval's ci.yaml on main, not
+# integrations/github/publish.
 apiVersion: aval.trianalab.io/v1
 kind: Policy
 registry: ghcr.io/trianalab/aval-example-go-compose

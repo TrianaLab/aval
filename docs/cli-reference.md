@@ -223,6 +223,10 @@ when it records a security event (outcome verification-failed, or a rejected
 attestation that failed verification), push publishes nothing and exits 5.
 A non-deterministic test is never pushed: push publishes nothing and exits 0.
 With --test, the result and the report must both be for that test.
+--outputs-dir reads the contract's outputs from the directory that
+'aval run --outputs-dir' filled, not from the contract root: any entry in it
+that is not a regular file matched by an outputs glob publishes nothing.
+The directory may be missing only when the contract declares no outputs.
 Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
 Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
 --login) opens the interactive Sigstore login in the browser; no token is
@@ -240,6 +244,7 @@ Flags:
   -h, --help                        help for push
       --key string                  signing key path (default: keyless OIDC)
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
+      --outputs-dir string          read the contract's outputs from this directory ('aval run --outputs-dir') instead of the contract root; anything in it that is not a declared output publishes nothing
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --report-file string          report written by the same 'aval run'; push nothing when it reused a verified result, and exit 5 when it records a security event
@@ -323,6 +328,7 @@ Flags:
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
       --min-trust-level string      raise the trust policy's minTrustLevel to developer, runner or isolated; a value below it exits 2 (default: $AVAL_MIN_TRUST_LEVEL)
       --no-reuse                    always run, never reuse (excludes --shadow)
+      --outputs-dir string          also copy the contract's outputs to this empty directory when the result is recorded, for 'aval push --outputs-dir' in another job (keep it outside the scope, e.g. under .aval/)
       --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
       --push                        sign and publish the result after running (needs --registry)
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)

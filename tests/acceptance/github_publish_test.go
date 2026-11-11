@@ -307,7 +307,175 @@ func TestGitHubPublishActionRefuses(t *testing.T) {
 		t.Fatalf("no artifacts: exit %d\n%s", r.code, r.out)
 	}
 	s.artifact(t, "A_b", s.suite(t, "a"), nil)
-	if r := s.publish(t); r.code != 2 || len(r.calls) != 0 || !strings.Contains(r.out, "is not a valid metadata.name") {
+	if r := s.publish(t); r.code != 2 || len(pushes(r.calls)) != 0 || !strings.Contains(r.out, "is not a valid metadata.name") {
 		t.Fatalf("no artifacts: exit %d\n%s", r.code, r.out)
+	}
+}
+
+// outputsSet is a TestSet whose test cov writes the declared output
+// coverage.out.
+const outputsSet = `apiVersion: aval.trianalab.io/v1
+kind: TestSet
+tests:
+  - metadata: {name: cov}
+    runner: {command: ["sh", "-c", "printf cov > coverage.out"]}
+    scope: {source: ["src/**"]}
+    cacheability: hermetic
+    outputs: [coverage.out]
+`
+
+// outputsStory is a publish story whose contract is outputsSet. Its
+// artifact func runs the run action for cov on a push to main, copies
+// .aval/cov/ to the artifact aval-cov, lets edit change it, then deletes
+// coverage.out from the project, as the publish job's checkout has none.
+func outputsStory(t *testing.T) (*publishStory, func(t *testing.T, edit func(dst string))) {
+	t.Helper()
+	s := newPublishStory(t)
+	if err := os.WriteFile(filepath.Join(s.dir, "aval.yaml"), []byte(outputsSet), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cov := filepath.Join(s.dir, "coverage.out")
+	return s, func(t *testing.T, edit func(dst string)) {
+		t.Helper()
+		s.reset(t)
+		_ = os.Remove(cov)
+		if r := action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", "INPUT_TEST=cov"); r.code != 0 || r.outputs["upload"] != "true" {
+			t.Fatalf("run action: exit %d\n%s", r.code, r.out)
+		}
+		dst := filepath.Join(s.artifacts, "aval-cov")
+		if err := os.CopyFS(dst, os.DirFS(filepath.Join(s.dir, ".aval", "cov"))); err != nil {
+			t.Fatal(err)
+		}
+		if b, err := os.ReadFile(filepath.Join(dst, "outputs", "coverage.out")); err != nil || string(b) != "cov" {
+			t.Fatalf("artifact outputs/coverage.out: %q %v", b, err)
+		}
+		if edit != nil {
+			edit(dst)
+		}
+		if err := os.Remove(cov); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// The run action carries a test's outputs in its artifact (#236): the
+// publish action pushes them from there, in a checkout without them, the
+// attestation verifies, and a later run reuses it and restores them.
+func TestGitHubActionsCarryOutputs(t *testing.T) {
+	s, artifact := outputsStory(t)
+	artifact(t, nil)
+	if r := s.publish(t); r.code != 0 || len(pushes(r.calls)) != 1 || !strings.Contains(pushes(r.calls)[0], "--outputs-dir "+filepath.Join(s.artifacts, "aval-cov", "outputs")) {
+		t.Fatalf("publish: exit %d\n%s\n%s", r.code, r.out, strings.Join(r.calls, "\n"))
+	}
+	if code := s.verify(t, "cov"); code != 0 {
+		t.Fatalf("verify cov: exit %d, want 0", code)
+	}
+	if out, errOut, code := avalIn(t, s.dir, "run", "--test", "cov", "--registry", s.repo, "--policy", ".github/aval/policy.yaml"); code != 0 || !strings.Contains(out, "restored coverage.out") {
+		t.Fatalf("reuse: exit %d\n%s\n%s", code, out, errOut)
+	}
+	if b, err := os.ReadFile(filepath.Join(s.dir, "coverage.out")); err != nil || string(b) != "cov" {
+		t.Fatalf("restored coverage.out: %q %v", b, err)
+	}
+}
+
+// An artifact with anything outside its layout, an outputs/ entry that
+// is not a declared output, or no outputs/ for a contract that declares
+// outputs (never the checkout's), is refused for that test with exit 1 and
+// nothing is pushed.
+func TestGitHubActionsRefuseBadOutputs(t *testing.T) {
+	s, artifact := outputsStory(t)
+	put := func(rel, body string) func(string) {
+		return func(dst string) {
+			p := filepath.Join(dst, filepath.FromSlash(rel))
+			if err := errors.Join(os.MkdirAll(filepath.Dir(p), 0o755), os.WriteFile(p, []byte(body), 0o644)); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	for name, tc := range map[string]struct {
+		edit func(string)
+		want string
+	}{
+		"file outside the layout": {put("evil.sh", "x"), "artifact aval-cov holds evil.sh, which is not part of the artifact layout"},
+		"undeclared output":       {put("outputs/notes.txt", "x"), "notes.txt, which is not a declared output"},
+		"output escaping by symlink": {func(dst string) {
+			p := filepath.Join(dst, "outputs", "coverage.out")
+			if err := errors.Join(os.Remove(p), os.Symlink("/etc/hosts", p)); err != nil {
+				t.Fatal(err)
+			}
+		}, "coverage.out is not a regular file"},
+	} {
+		artifact(t, tc.edit)
+		if r := s.publish(t); r.code != 1 || !strings.Contains(r.out, tc.want) || s.verify(t, "cov") != 4 {
+			t.Fatalf("%s: exit %d, want 1, ~%q and nothing published\n%s", name, r.code, tc.want, r.out)
+		}
+	}
+
+	// No outputs/: the checkout's coverage.out is never signed instead.
+	artifact(t, func(dst string) { _ = os.RemoveAll(filepath.Join(dst, "outputs")) })
+	if err := os.WriteFile(filepath.Join(s.dir, "coverage.out"), []byte("committed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r := s.publish(t); r.code != 1 || !strings.Contains(r.out, "outputs: no such file or directory") || s.verify(t, "cov") != 4 {
+		t.Fatalf("no outputs/: exit %d, want 1 and nothing published\n%s", r.code, r.out)
+	}
+}
+
+// oldAval is real as a release without --outputs-dir (v0.8.1): its help
+// does not list the flag and it rejects it as cobra does.
+func oldAval(t *testing.T, real string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "aval")
+	script := fmt.Sprintf(`#!/bin/bash
+for a in "$@"; do
+  if [ "$a" = --outputs-dir ]; then echo 'Error: unknown flag: --outputs-dir' >&2; exit 2; fi
+done
+if [ "${2:-}" = --help ]; then %q "$@" | grep -v -- --outputs-dir; exit 0; fi
+exec %q "$@"
+`, real, real)
+	if err := os.WriteFile(p, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// With a pinned release that has no --outputs-dir (v0.8.1), the actions
+// still run and publish a test without outputs, and refuse a test with
+// outputs (exit 1, naming the release it needs) instead of running it
+// without carrying them or publishing the checkout's files (#236).
+func TestGitHubActionsOldReleaseOutputs(t *testing.T) {
+	s, _ := outputsStory(t)
+	set := outputsSet + `  - metadata: {name: plain}
+    runner: {command: ["true"]}
+    scope: {source: ["src/**"]}
+    cacheability: hermetic
+`
+	if err := os.WriteFile(filepath.Join(s.dir, "aval.yaml"), []byte(set), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := oldAval(t, aval)
+	r := action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", "INPUT_TEST=cov", "AVAL="+old)
+	if _, err := os.Stat(filepath.Join(s.dir, ".aval", "cov", "result.json")); r.code != 1 || !strings.Contains(r.out, "cov declares outputs and the installed aval has no run --outputs-dir") ||
+		!strings.Contains(r.out, "aval v0.8.2 or later") || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("run action cov: exit %d, want 1 and no run (%v)\n%s", r.code, err, r.out)
+	}
+	if r := action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", "INPUT_TEST=plain", "AVAL="+old); r.code != 0 || r.outputs["upload"] != "true" {
+		t.Fatalf("run action plain: exit %d\n%s", r.code, r.out)
+	}
+	s.artifact(t, "plain", filepath.Join(s.dir, ".aval", "plain"), nil)
+	s.artifact(t, "cov", s.suite(t, "cov"), nil)
+	if err := os.Remove(filepath.Join(s.dir, "coverage.out")); err != nil {
+		t.Fatal(err)
+	}
+	// The publish wrapper signs with a key; the old release wraps it.
+	p := s.publish(t, "AVAL="+oldAval(t, s.wrapper()))
+	if p.code != 1 || !strings.Contains(p.out, "cov declares outputs and the installed aval has no push --outputs-dir") || len(pushes(p.calls)) != 1 {
+		t.Fatalf("publish: exit %d, want 1 and one push\n%s\n%s", p.code, p.out, strings.Join(p.calls, "\n"))
+	}
+	if strings.Contains(pushes(p.calls)[0], "--outputs-dir") {
+		t.Fatalf("push of plain passed --outputs-dir to a release without it: %s", pushes(p.calls)[0])
+	}
+	if s.verify(t, "plain") != 0 || s.verify(t, "cov") != 4 {
+		t.Fatal("want plain published and cov not")
 	}
 }
