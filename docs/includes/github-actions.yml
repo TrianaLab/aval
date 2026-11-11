@@ -33,8 +33,9 @@ jobs:
         with:
           test: ui
           lookup-only: "true"
+      - uses: actions/setup-node@<sha> # pin by commit SHA; probed, so never skipped
       - if: steps.lookup.outputs.outcome != 'verified'
-        uses: actions/setup-node@<sha> # pin by commit SHA
+        run: npm ci && npx --no playwright install --with-deps
       - uses: TrianaLab/aval/integrations/github/run@<sha> # pin by commit SHA
         with:
           test: ui
