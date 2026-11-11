@@ -20,40 +20,29 @@ A suite job:
 --8<-- "docs/includes/github-actions.yml:run"
 ```
 
-The action [`integrations/github/run`](https://github.com/TrianaLab/aval/blob/main/integrations/github/run/action.yml)
-takes `test` (required), `file` (default `aval.yaml`), `policy` (default
-`.github/aval/policy.yaml`) and `shadow` (`true` adds `--shadow`). In order, it:
+The action [`integrations/github/run`](https://github.com/TrianaLab/aval/blob/main/integrations/github/run/action.yml) takes `test` (required), `file` (default `aval.yaml`), `policy` (default `.github/aval/policy.yaml`), `shadow` (`true` adds `--shadow`) and `registry-username` and `registry-password` (default empty: the registry is read anonymously; see [Private registry](#private-registry)). In order, it:
 
-1. Refuses `pull_request_target` and `workflow_run`, and fails when the job
-   has `id-token: write`: a suite job can never sign.
-2. Installs the aval release pinned in its `action.yml`, checked against the
-   per-platform sha256, the release signature and the provenance
-   ([Install](../install.md)). Pinning the action by commit SHA pins aval too.
-3. Fetches the policy from the default branch through the contents API with
-   `github.token`, on every event, never from the checkout. The registry
-   comes from the policy's `registry` field
-   ([Write a trust policy](trust-policy.md)); the job's `AVAL_REGISTRY` and
-   `AVAL_POLICY` are ignored; `AVAL_MIN_TRUST_LEVEL` is not, since it only
-   raises the policy's minimum. With no policy nothing is reused, the test runs and a warning is logged.
-4. Runs `aval run -f <file> --test <test>` with the CI run URL, the
-   repository and, on a push to the default branch, `--outputs-dir`.
-5. Writes the outcome to the step summary and the `outcome` output. Exit 5
-   sets the outcome to `verification-failed`, becomes an `aval SECURITY`
-   error annotation and fails the step; a miss is routine.
+1. Refuses `pull_request_target` and `workflow_run`, and fails when the job has `id-token: write`: a suite job can never sign.
+2. Installs the aval release pinned in its `action.yml`, checked against the per-platform sha256, the release signature and the provenance ([Install](../install.md)). Pinning the action by commit SHA pins aval too.
+3. Fetches the policy from the default branch through the contents API with `github.token`, on every event, never from the checkout. The registry comes from the policy's `registry` field ([Write a trust policy](trust-policy.md)); the job's `AVAL_REGISTRY` and `AVAL_POLICY` are ignored; `AVAL_MIN_TRUST_LEVEL` is not, since it only raises the policy's minimum. With no policy nothing is reused, the test runs and a warning is logged. `GH_TOKEN` is unset after the fetch, so the test never sees `github.token`.
+4. Runs `aval run -f <file> --test <test>` with the CI run URL, the repository and, on a push to the default branch, `--outputs-dir`.
+5. Writes the outcome to the step summary and the `outcome` output. Exit 5 sets the outcome to `verification-failed`, becomes an `aval SECURITY` error annotation and fails the step; a miss is routine.
 6. On a push to the default branch only, uploads `.aval/<test>/` as the artifact `aval-<test>`. A re-run of the job replaces the earlier attempt's `aval-<test>`, so publish signs the result of the attempt that just ran. Run each test in only one job per workflow run: two jobs uploading the same name race.
 7. Warns when the policy trusts a `refs/pull/` subject at or above `minTrustLevel`.
 
-The policy is a separate file on the default branch, so `publicKey` paths in
-it are not fetched; use keyless identities. The action needs `/usr/bin/jq`
-(GitHub's Ubuntu images, macOS 15 and later).
-Neither action writes `GITHUB_PATH` or `GITHUB_ENV`: the cosign that checks
-the aval release is pinned by sha256 and installed in `$RUNNER_TEMP`, off the
-job's `PATH`, so the test and later steps see the job's own tools.
+The policy is a separate file on the default branch, so `publicKey` paths in it are not fetched; use keyless identities. The action needs `/usr/bin/jq` (GitHub's Ubuntu images, macOS 15 and later). Neither action writes `GITHUB_PATH` or `GITHUB_ENV`: the cosign that checks the aval release is pinned by sha256 and installed in `$RUNNER_TEMP`, off the job's `PATH`, so the test and later steps see the job's own tools.
 
 !!! note "Pinned release"
     Pinning an action by commit SHA pins its aval release too, moved by a PR
     after each release. Until a pin with `--outputs-dir` (after 0.8.1,
     milestone 14), a test with `outputs` fails with exit 1; others work.
+
+## Private registry
+
+A private attestations package (GHCR creates them private) cannot be read anonymously: every lookup is outcome `error` and the test always runs. Give the suite job `packages: read` and pass `registry-username: ${{ github.actor }}` and `registry-password: ${{ github.token }}` to the run action. It then writes the credentials for the host of the default-branch policy's `registry` only, in a `DOCKER_CONFIG` of the step under `$RUNNER_TEMP` that starts from the job's `auths` (not its `credsStore` or `credHelpers`) and is deleted when the step ends. No policy, or no valid `registry`, writes none and warns. Without the inputs `DOCKER_CONFIG` stays the job's.
+
+!!! warning "The code under test can read the credentials"
+    The test runs in that step, so a pull request's code can read the token. Pass a read-only token (`packages: read`), never a write credential, and never give the suite job `id-token: write` (the action refuses it).
 
 ## Split credentials
 

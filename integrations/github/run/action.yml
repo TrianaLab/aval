@@ -19,6 +19,12 @@ inputs:
   shadow:
     description: Run the test even when a verified result exists, and fail on a false hit (aval run --shadow).
     default: "false"
+  registry-username:
+    description: User for reading the policy's registry, sent to its host only. Empty reads anonymously. The code under test can read it.
+    default: ""
+  registry-password:
+    description: Read-only token (packages read) for the policy's registry, sent to its host only. Empty reads anonymously. The code under test can read it; never pass a write credential.
+    default: ""
 outputs:
   outcome:
     description: verified, miss, verification-failed or error, from the report.
@@ -89,6 +95,8 @@ runs:
         INPUT_FILE: ${{ inputs.file }}
         INPUT_POLICY: ${{ inputs.policy }}
         INPUT_SHADOW: ${{ inputs.shadow }}
+        REGISTRY_USERNAME: ${{ inputs.registry-username }}
+        REGISTRY_PASSWORD: ${{ inputs.registry-password }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         GH_TOKEN: ${{ github.token }}
       run: /bin/bash "$GITHUB_ACTION_PATH/run.sh"

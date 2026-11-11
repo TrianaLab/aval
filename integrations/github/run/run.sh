@@ -1,7 +1,8 @@
 #!/bin/bash
 # Steps 3 to 7 of the aval run action (#211). Reads INPUT_TEST, INPUT_FILE,
 # INPUT_POLICY, INPUT_SHADOW, AVAL (absolute path of the installed binary),
-# DEFAULT_BRANCH, GH_TOKEN and the runner's GITHUB_* variables.
+# DEFAULT_BRANCH, GH_TOKEN, REGISTRY_USERNAME, REGISTRY_PASSWORD and the
+# runner's GITHUB_* variables.
 #
 # The trust policy is fetched from the default branch through the contents
 # API on every event, never read from the checkout, so a pull request that
@@ -53,6 +54,8 @@ if [ -n "${DEFAULT_BRANCH:-}" ]; then
       -H "Accept: application/vnd.github.raw+json" -H "X-GitHub-Api-Version: 2022-11-28" \
       "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/contents/$INPUT_POLICY?ref=$ref") || status=000
 fi
+# The test runs pull request code: it never sees the job token (#250).
+unset GH_TOKEN
 args=(run -f "$INPUT_FILE" --test "$INPUT_TEST" --source-repo "$GITHUB_REPOSITORY")
 # The files the outputs globs matched travel in the artifact, for the
 # publish job's aval push --outputs-dir (#236); aval resolves them. A
@@ -86,6 +89,34 @@ else
   /bin/rm -f "$policy"
   echo "::warning title=aval run::no trust policy at $INPUT_POLICY in the default branch (${DEFAULT_BRANCH:-unknown}, HTTP $status): nothing is reused, the test runs"
 fi
+
+# Registry credentials (#250), opt-in: the code under test runs with them.
+# They go to the policy registry's host only, in a credential store of this
+# step that starts from the job's auths (so tests keep their own logins) and
+# is deleted on exit. A missing policy or registry field adds none.
+username=${REGISTRY_USERNAME:-} password=${REGISTRY_PASSWORD:-}
+unset REGISTRY_USERNAME REGISTRY_PASSWORD
+if [ -n "$username" ] || [ -n "$password" ]; then
+  if [ -z "$username" ] || [ -z "$password" ]; then
+    echo "::warning title=aval run::set both registry-username and registry-password: the registry is read anonymously"
+  elif [ ! -f "$policy" ]; then
+    echo "::warning title=aval run::no trust policy, so no registry to send credentials to: the registry is read anonymously"
+  elif ! registry=$(/bin/bash "${BASH_SOURCE[0]%/*}/../policy-registry.sh" "$policy" 2>&1); then
+    echo "::warning title=aval run::the trust policy at $INPUT_POLICY has no valid registry field: no credentials are sent"
+  else
+    job="${DOCKER_CONFIG:-${HOME:-}/.docker}/config.json"
+    creds=$(/usr/bin/mktemp -d "$RUNNER_TEMP/aval-run-docker.XXXXXX")
+    trap '/bin/rm -rf "$creds"' EXIT
+    { /usr/bin/jq -cs 'if (.[0].auths | type) == "object" then .[0].auths else {} end' "$job" 2> /dev/null || echo '{}'; } > "$creds/job.json"
+    printf '%s:%s' "$username" "$password" | /usr/bin/base64 | /usr/bin/tr -d '\n' |
+      /usr/bin/jq -Rc --arg host "${registry%%/*}" --slurpfile job "$creds/job.json" \
+        '{auths: ($job[0] + {($host): {auth: .}})}' > "$creds/config.json"
+    /bin/rm -f "$creds/job.json"
+    export DOCKER_CONFIG="$creds"
+    echo "registry credentials: for ${registry%%/*} only"
+  fi
+fi
+unset username password
 
 # Step 7: a policy that trusts pull request workflows at or above
 # minTrustLevel lets a pull request sign results that are reused.

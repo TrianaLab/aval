@@ -2,6 +2,8 @@ package acceptance
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -266,4 +268,174 @@ func TestGitHubRunActionShadowAndMinTrustLevel(t *testing.T) {
 	s.want(t, "raised minimum", s.pr(t, "AVAL_MIN_TRUST_LEVEL=isolated"), 0, 3, "miss")
 	// Lowering it below the policy's minimum is a usage error.
 	s.want(t, "lowered minimum", s.pr(t, "AVAL_MIN_TRUST_LEVEL=developer"), 2, 3, "unknown")
+}
+
+// credStory is a run action story against a registry that needs basic auth
+// bot:s3cr3t-pw (#250). AVAL is a wrapper that records the DOCKER_CONFIG aval
+// gets and its config.json, then runs aval, or stops when WRAP_ONLY is set
+// (registries the test must not dial).
+type credStory struct {
+	*actionStory
+	job, log string
+}
+
+const credUser, credPassword = "bot", "s3cr3t-pw"
+
+func newCredStory(t *testing.T) *credStory {
+	t.Helper()
+	reg := ggcr.New(ggcr.Logger(log.New(io.Discard, "", 0)))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if u, p, ok := r.BasicAuth(); !ok || u != credUser || p != credPassword {
+			w.Header().Set("WWW-Authenticate", `Basic realm="aval"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		reg.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	s := &credStory{actionStory: &actionStory{repo: strings.TrimPrefix(srv.URL, "http://") + "/acme/app-aval", contents: &fakeContents{}}}
+	s.api = httptest.NewServer(s.contents)
+	t.Cleanup(s.api.Close)
+	keys := t.TempDir()
+	key, pub := keyPair(t, keys, "ci")
+	s.ciKey = key
+	s.mainPolicy = "apiVersion: aval.trianalab.io/v1\nkind: Policy\nregistry: " + s.repo + "\nminTrustLevel: runner\nidentities:\n" +
+		"  - publicKey: " + pub + "\n    trustLevel: runner\n"
+	runner := strings.Replace(contract, `["true"]`, `["sh", "-c", "echo ran >> ../runs.log; env > ../env.log"]`, 1)
+	s.root = writeProject(t, map[string]string{"app/aval.yaml": runner, "app/src/a.txt": "a\n"})
+	s.dir = filepath.Join(s.root, "app")
+	s.contents.set(s.mainPolicy)
+
+	// The job's own login, for another host: tests keep it.
+	s.job = t.TempDir()
+	if err := os.WriteFile(filepath.Join(s.job, "config.json"), []byte(`{"auths":{"other.example":{"auth":"b3RoZXI6eA=="}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s.log = filepath.Join(keys, "aval")
+	wrapper := fmt.Sprintf(`#!/bin/bash
+printf '%%s' "$DOCKER_CONFIG" > %[1]q.dir
+/bin/cp "$DOCKER_CONFIG/config.json" %[1]q.json 2> /dev/null || echo none > %[1]q.json
+[ -z "${WRAP_ONLY:-}" ] || exit 0
+exec %[2]q "$@"
+`, s.log, aval)
+	if err := os.WriteFile(filepath.Join(keys, "wrapper"), []byte(wrapper), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Publish with credentials, outside the action.
+	creds := t.TempDir()
+	auth := base64.StdEncoding.EncodeToString([]byte(credUser + ":" + credPassword))
+	host := strings.SplitN(s.repo, "/", 2)[0]
+	if err := os.WriteFile(filepath.Join(creds, "config.json"), []byte(`{"auths":{"`+host+`":{"auth":"`+auth+`"}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(aval, "run", "-f", "aval.yaml", "--test", "story", "--registry", s.repo, "--push", "--key", key, "--no-reuse")
+	cmd.Dir, cmd.Env = s.dir, append(os.Environ(), "DOCKER_CONFIG="+creds)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("publish: %v\n%s", err, out)
+	}
+	return s
+}
+
+// run runs the action as on a pull request, with the job's DOCKER_CONFIG,
+// the wrapper as AVAL and a job token, and returns the DOCKER_CONFIG aval got
+// and the auths of its config.json (nil when it had none).
+func (s *credStory) run(t *testing.T, env ...string) (actionRun, string, map[string]map[string]string) {
+	t.Helper()
+	_ = os.Remove(s.log + ".dir")
+	env = append([]string{"DOCKER_CONFIG=" + s.job, "AVAL=" + filepath.Join(filepath.Dir(s.log), "wrapper"), "GH_TOKEN=tok"}, env...)
+	r := action(t, s.dir, s.api.URL, s.repo, "pull_request", "refs/pull/1/merge", env...)
+	dir, err := os.ReadFile(s.log + ".dir")
+	if err != nil {
+		t.Fatalf("aval did not run: %v\n%s", err, r.out)
+	}
+	var cfg struct {
+		Auths map[string]map[string]string `json:"auths"`
+	}
+	b, _ := os.ReadFile(s.log + ".json")
+	_ = json.Unmarshal(b, &cfg)
+	auth := base64.StdEncoding.EncodeToString([]byte(credUser + ":" + credPassword))
+	for _, secret := range []string{credPassword, auth} {
+		if strings.Contains(r.out, secret) || strings.Contains(r.summary, secret) {
+			t.Fatalf("the log or the step summary holds the registry password or its base64\n%s\n%s", r.out, r.summary)
+		}
+	}
+	return r, string(dir), cfg.Auths
+}
+
+// With registry-username and registry-password, aval runs with a
+// DOCKER_CONFIG of the step that adds an entry for the policy registry's host
+// only to the job's auths, and reads the private registry: verified. The
+// directory is gone after the step. Without them, DOCKER_CONFIG is the job's
+// and the registry refuses the read: the test runs, an error outcome, never
+// verification-failed (invariant 4). The test never sees GH_TOKEN. The
+// story already ran the test once to publish it.
+func TestGitHubRunActionRegistryCredentials(t *testing.T) {
+	s := newCredStory(t)
+	host := strings.SplitN(s.repo, "/", 2)[0]
+	auth := base64.StdEncoding.EncodeToString([]byte(credUser + ":" + credPassword))
+	inputs := []string{"REGISTRY_USERNAME=" + credUser, "REGISTRY_PASSWORD=" + credPassword}
+
+	r, dir, auths := s.run(t, inputs...)
+	s.want(t, "with credentials", r, 0, 1, "verified", "registry credentials: for "+host+" only")
+	if dir == s.job || len(auths) != 2 || auths[host]["auth"] != auth || auths["other.example"]["auth"] != "b3RoZXI6eA==" {
+		t.Fatalf("with credentials: DOCKER_CONFIG %s, auths %v; want a step directory with the job's auths plus %s", dir, auths, host)
+	}
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the step's DOCKER_CONFIG %s is still there after the step: %v", dir, err)
+	}
+
+	r, dir, auths = s.run(t)
+	s.want(t, "anonymous", r, 0, 2, "error")
+	if dir != s.job || len(auths) != 1 {
+		t.Fatalf("anonymous: DOCKER_CONFIG %s, auths %v; want the job's, unchanged", dir, auths)
+	}
+	env, err := os.ReadFile(filepath.Join(s.root, "env.log"))
+	if err != nil || strings.Contains(string(env), "GH_TOKEN=") || strings.Contains(string(env), "REGISTRY_PASSWORD=") {
+		t.Fatalf("runner.command sees GH_TOKEN or the registry password (%v)", err)
+	}
+
+	// Only one of the inputs: anonymous, with a warning.
+	r, dir, _ = s.run(t, "REGISTRY_USERNAME="+credUser)
+	if dir != s.job || !strings.Contains(r.out, "set both registry-username and registry-password") {
+		t.Fatalf("username only: DOCKER_CONFIG %s\n%s", dir, r.out)
+	}
+}
+
+// A policy with no valid registry adds no credentials, and a valid one
+// gets them for its own host only, whatever the path or port looks like.
+func TestGitHubRunActionRegistryCredentialsHostOnly(t *testing.T) {
+	s := newCredStory(t)
+	inputs := []string{"REGISTRY_USERNAME=" + credUser, "REGISTRY_PASSWORD=" + credPassword, "WRAP_ONLY=1"}
+	policy := func(registry string) string {
+		return strings.Replace(s.mainPolicy, "registry: "+s.repo+"\n", registry, 1)
+	}
+	for name, tc := range map[string]struct {
+		policy, host string // host "" means no credentials
+	}{
+		"no policy":          {"", ""},
+		"no registry field":  {policy(""), ""},
+		"empty registry":     {policy("registry:\n"), ""},
+		"scheme":             {policy("registry: https://ghcr.io/x\n"), ""},
+		"userinfo":           {policy("registry: ghcr.io@evil.example/x\n"), ""},
+		"no path":            {policy("registry: ghcr.io\n"), ""},
+		"space":              {policy("registry: \"ghcr.io /x\"\n"), ""},
+		"nested only":        {policy("auth:\n  registry: ghcr.io/x\n"), ""},
+		"path trick":         {policy("registry: evil.example/ghcr.io/x\n"), "evil.example"},
+		"suffix trick":       {policy("registry: ghcr.io.evil.example/x\n"), "ghcr.io.evil.example"},
+		"port":               {policy("registry: 'ghcr.io:8443/x'\n"), "ghcr.io:8443"},
+		"comment after path": {policy("registry: ghcr.io/x # evil.example\n"), "ghcr.io"},
+	} {
+		s.contents.set(tc.policy)
+		r, dir, auths := s.run(t, inputs...)
+		if tc.host == "" {
+			if dir != s.job || !strings.Contains(r.out, "::warning title=aval run::") {
+				t.Errorf("%s: DOCKER_CONFIG %s, auths %v; want the job's and a warning\n%s", name, dir, auths, r.out)
+			}
+			continue
+		}
+		if _, ok := auths[tc.host]; dir == s.job || len(auths) != 2 || !ok {
+			t.Errorf("%s: auths %v; want the job's plus %s only", name, auths, tc.host)
+		}
+	}
 }
