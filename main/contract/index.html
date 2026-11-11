@@ -3009,10 +3009,13 @@ hashed nor recorded, and <code>environment.env</code> cannot list it.</p>
 <li>Order does not matter.</li>
 <li>Symlinks are never followed nor hashed. A symlink under which a <code>source</code>
   or <code>dependencies</code> glob could match files is an error, unless <code>exclude</code>
-  covers both its name and its contents and no <code>dependencies</code> glob reaches
-  it: <code>**/node_modules/**</code> skips <code>pkg/web/node_modules/.bin/tool</code>, and
-  <code>["pkg/bin", "pkg/bin/**"]</code> skips a symlinked <code>pkg/bin</code>. <code>pkg/bin</code> or
-  <code>pkg/bin/**</code> alone does not.</li>
+  covers its name and no <code>dependencies</code> glob reaches it. A symlink to a
+  regular file needs only its name excluded: <code>tests/fx/link.yaml</code> skips a
+  link to <code>real.yaml</code>. Any other symlink (to a directory, dangling, or a
+  loop) needs its contents excluded too: <code>**/node_modules/**</code> skips
+  <code>pkg/web/node_modules/.bin/tool</code>, and <code>["pkg/bin", "pkg/bin/**"]</code> skips a
+  symlinked <code>pkg/bin</code>. <code>pkg/bin</code> or <code>pkg/bin/**</code> alone does not. If a
+  name-excluded link later points to a directory, fingerprinting fails.</li>
 </ul>
 <h3 id="optional-source-globs">Optional source globs<a class="headerlink" href="#optional-source-globs" title="Anchor link">&para;</a></h3>
 <p>Every <code>source</code> glob must match a file, which catches typos. A test that
@@ -3224,7 +3227,7 @@ test and records nothing; <code>aval explain</code>, <code>aval verify</code> an
 </tr>
 <tr>
 <td><code>"&lt;path&gt;" is a symlink a glob could match files under</code></td>
-<td>symlinks are not followed: remove it, or exclude its name and contents (<code>**/node_modules/**</code>, or <code>pkg/bin</code> plus <code>pkg/bin/**</code>) with no <code>dependencies</code> glob reaching it (<a href="#globs">Globs</a>); the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory itself may be a symlink</td>
+<td>symlinks are not followed: remove it, or exclude it with no <code>dependencies</code> glob reaching it (<a href="#globs">Globs</a>). The message names the fix: its name alone for a link to a regular file, its name and contents (<code>pkg/bin</code> plus <code>pkg/bin/**</code>, or <code>**/node_modules/**</code>) for anything else. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory itself may be a symlink</td>
 </tr>
 <tr>
 <td><code>control characters in path are not supported</code></td>
