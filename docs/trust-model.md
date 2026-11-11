@@ -239,6 +239,11 @@ outcome does: [Outcomes](concepts/outcomes.md).
 
 - `$SIGSTORE_ID_TOKEN` is removed from the environment before
   `runner.command` starts, so the code under test cannot sign as the CI job.
+- `$AVAL_DOCKER_CONFIG`, the registry credentials Aval uses instead of
+  `$DOCKER_CONFIG`'s, is removed the same way, so a CI step can hand Aval a
+  read token the test does not get through its environment. It is not a
+  sandbox: code in the same job, as the same user, can still reach the
+  job's files and processes.
 - A `--report-file` that cannot be written disables reuse: the test runs, and a
   verification failure still exits 5.
 - Reasons from attestations are escaped on text output and stderr (`\n`,

@@ -19,6 +19,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -115,8 +117,18 @@ func StatsTag(testID string) string { return "stats-" + testID }
 // Tag returns the lookup tag for a fingerprint ("sha256:<hex>").
 func Tag(fingerprint string) string { return strings.Replace(fingerprint, ":", "-", 1) }
 
+// DockerConfigEnv names a directory whose config.json, when set, holds the
+// registry credentials of Aval's own registry client instead of
+// $DOCKER_CONFIG's. Commands Aval runs never see it, so a CI step can hand
+// Aval a credential the code under test must not read (#250).
+const DockerConfigEnv = "AVAL_DOCKER_CONFIG"
+
 // Seam for tests: the credential store read by newRepository.
 var newCredentialStore = func() (credentials.Store, error) {
+	if dir := os.Getenv(DockerConfigEnv); dir != "" {
+		config := filepath.Join(dir, "config.json")
+		return credentials.NewStore(config, credentials.StoreOptions{})
+	}
 	return credentials.NewStoreFromDocker(credentials.StoreOptions{})
 }
 

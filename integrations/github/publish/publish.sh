@@ -36,16 +36,7 @@ if [ "$status" != 200 ]; then
   echo "::error title=aval publish::no trust policy at $INPUT_POLICY in the default branch ($DEFAULT_BRANCH, HTTP $status): it names the registry to publish to"
   exit 1
 fi
-# ponytail: line-based read of the top-level registry: key in block-style
-# YAML, as in the run action's policy warning; aval validates the value.
-registry=$(/usr/bin/awk '
-  /^registry:/ {
-    s = $0; sub(/^registry:[ \t]*/, "", s)
-    if (s ~ /^".*"$/ || s ~ /^'"'"'.*'"'"'$/) s = substr(s, 2, length(s) - 2)
-    else sub(/[ \t]+#.*$/, "", s)
-    print s; exit
-  }' "$policy")
-if ! [[ "$registry" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+$ ]]; then
+if ! registry=$(/bin/bash "${BASH_SOURCE[0]%/*}/../policy-registry.sh" "$policy" 2>&1); then
   echo "::error title=aval publish::the trust policy at $INPUT_POLICY has no valid registry field: \"$registry\""
   exit 1
 fi

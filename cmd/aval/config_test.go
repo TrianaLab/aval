@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/TrianaLab/aval/internal/policy"
+	"github.com/TrianaLab/aval/internal/registry"
 	"github.com/TrianaLab/aval/pkg/evidence"
 )
 
@@ -259,17 +261,24 @@ func TestPolicyOnlyWhereUsed(t *testing.T) {
 	}
 }
 
-// runner.command sees neither the registry nor the trust policy: a nested
-// aval in the test must not reuse or publish against the operator's
-// settings.
+// runner.command sees neither the registry, its credentials nor the trust
+// policy: a nested aval in the test must not reuse or publish against the
+// operator's settings, and the test must not read Aval's registry
+// credential (#250). The job's DOCKER_CONFIG stays, for the test's own use.
 func TestChildEnvWithholdsTrustSettings(t *testing.T) {
 	t.Setenv(registryEnv, "reg.example/r")
 	t.Setenv(policyEnv, "p.yaml")
 	t.Setenv(idTokenEnv, "token")
 	t.Setenv(minTrustEnv, "runner")
-	for _, kv := range childEnv("") {
-		if k, _, _ := strings.Cut(kv, "="); k == registryEnv || k == policyEnv || k == idTokenEnv || k == minTrustEnv {
+	t.Setenv(registry.DockerConfigEnv, "/tmp/aval-creds")
+	t.Setenv("DOCKER_CONFIG", "/tmp/job-docker")
+	env := childEnv("")
+	for _, kv := range env {
+		if k, _, _ := strings.Cut(kv, "="); k == registryEnv || k == policyEnv || k == idTokenEnv || k == minTrustEnv || k == registry.DockerConfigEnv {
 			t.Errorf("child env has %s", kv)
 		}
+	}
+	if !slices.Contains(env, "DOCKER_CONFIG=/tmp/job-docker") {
+		t.Error("child env lost the job's DOCKER_CONFIG")
 	}
 }
