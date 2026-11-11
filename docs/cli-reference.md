@@ -227,6 +227,12 @@ With --test, the result and the report must both be for that test.
 'aval run --outputs-dir' filled, not from the contract root: any entry in it
 that is not a regular file matched by an outputs glob publishes nothing.
 The directory may be missing only when the contract declares no outputs.
+--env-file takes the env section of the fingerprint from the file that
+'aval run' wrote with the result (hashes of environment.env, no values),
+not from this process's environment, so a job with other variables can
+publish it. Every other input is still hashed from the checkout. A file with
+another manifest version, a malformed or repeated line, or names other than
+environment.env publishes nothing.
 Keyless signing reads the OIDC token from $SIGSTORE_ID_TOKEN.
 Without --key or $SIGSTORE_ID_TOKEN, signing on a terminal (or with
 --login) opens the interactive Sigstore login in the browser; no token is
@@ -241,6 +247,7 @@ Examples:
 
 Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
+      --env-file string             take the env section of the fingerprint from this file ('aval run --env-file') instead of this process's environment
   -h, --help                        help for push
       --key string                  signing key path (default: keyless OIDC)
       --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
@@ -321,6 +328,7 @@ Examples:
 Flags:
       --ci-run-url string           link to the CI run, stored in the run record
   -f, --contract string             path to the test contract (default "aval.yaml")
+      --env-file string             where to record the env section of the fingerprint (hashes, no values) with the result, for 'aval push --env-file' in another job (default ".aval/env.txt")
       --explain                     print the fingerprint manifest (what was hashed) before the run; 'aval explain' prints it alone
       --fingerprint-only            print the execution fingerprint and exit (same as 'aval explain --digest')
   -h, --help                        help for run

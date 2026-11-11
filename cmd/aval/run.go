@@ -37,6 +37,10 @@ import (
 // defaultResult is where `aval run` records a result for `aval push`.
 const defaultResult = ".aval/result.json"
 
+// defaultEnvFile is where `aval run` records the env section of the
+// fingerprint for `aval push --env-file`.
+const defaultEnvFile = ".aval/env.txt"
+
 // idTokenEnv holds the OIDC token for keyless signing (the Sigstore tooling
 // convention). Obtaining it is the caller's job, so no CI vendor is assumed.
 const idTokenEnv = "SIGSTORE_ID_TOKEN"
@@ -51,7 +55,7 @@ const (
 
 type runFlags struct {
 	file, test, repo, policyFile, resultFile, reportFile, key string
-	recordFile, ciRunURL, repository, outputsDir              string
+	recordFile, ciRunURL, repository, outputsDir, envFile     string
 	push, noReuse, shadow, fingerprintOnly, explain           bool
 	record, login                                             bool
 	registryTimeout                                           time.Duration
@@ -87,7 +91,8 @@ attestation, which is never reused, or more attestations than the lookup cap),
 			o.file, o.test, o.repo, o.policyFile, o.registryTimeout, o.minTrust, o.config = g.file, g.test, g.registry, g.policy, g.timeout, g.minLevel, g
 			testOutputs(cmd, o.test, testOutput{&o.resultFile, "result.json", []string{"result-file", "result"}},
 				testOutput{&o.reportFile, "report.json", []string{"report-file", "report"}},
-				testOutput{&o.recordFile, "record.json", []string{"stats-file", "record-file"}})
+				testOutput{&o.recordFile, "record.json", []string{"stats-file", "record-file"}},
+				testOutput{&o.envFile, "env.txt", []string{"env-file"}})
 			return runTest(cmd, o)
 		},
 	}
@@ -98,6 +103,7 @@ attestation, which is never reused, or more attestations than the lookup cap),
 	f.BoolVar(&o.login, "login", false, loginFlagHelp)
 	f.StringVar(&o.resultFile, "result-file", defaultResult, "where to record the result for 'aval push'")
 	f.StringVar(&o.reportFile, "report-file", "", "also write the lookup decision as a verify report (JSON) to this file")
+	f.StringVar(&o.envFile, "env-file", defaultEnvFile, "where to record the env section of the fingerprint (hashes, no values) with the result, for 'aval push --env-file' in another job")
 	f.StringVar(&o.outputsDir, "outputs-dir", "", "also copy the contract's outputs to this empty directory when the result is recorded, for 'aval push --outputs-dir' in another job (keep it outside the scope, e.g. under "+fingerprint.OutputDir+"/)")
 	f.BoolVar(&o.noReuse, "no-reuse", false, "always run, never reuse (excludes --shadow)")
 	f.BoolVar(&o.shadow, "shadow", false, "verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)")
@@ -231,12 +237,29 @@ func loadP256(path string) (*ecdsa.PrivateKey, error) {
 // cannot see through aliases (a symlinked root, a case-insensitive file
 // system). --fingerprint-only writes nothing.
 func (o runFlags) checkOutputs() error {
+	if o.fingerprintOnly {
+		return nil
+	}
 	for _, p := range []string{o.resultFile, o.reportFile} {
-		if !o.fingerprintOnly && existsNonAvalOutput(p) {
+		if existsNonAvalOutput(p) {
 			return usageError{fmt.Errorf("output %s (--result-file or --report-file) exists and holds neither an Aval result nor a report; Aval does not overwrite it: choose another path or remove the file", p)}
 		}
 	}
+	if existsNonEnvFile(o.envFile) {
+		return usageError{fmt.Errorf("output %s (--env-file) exists and is not an env file; Aval does not overwrite it: choose another path or remove the file", o.envFile)}
+	}
 	return nil
+}
+
+// existsNonEnvFile reports whether something other than an env file that
+// 'aval run' wrote sits at p. Anything that cannot be read counts.
+func existsNonEnvFile(p string) bool {
+	if !existsNonAvalOutput(p) {
+		return false
+	}
+	raw, _ := os.ReadFile(p) // unreadable: nil, which does not parse
+	_, err := fingerprint.ParseEnvFile(raw)
+	return err != nil
 }
 
 // preflight refuses a run nested in its own runner.command, removes the
@@ -269,9 +292,9 @@ func (o runFlags) preflight() (string, error) {
 // stops the test from running (#86).
 func (o runFlags) outputs() []string {
 	if existsNonAvalOutput(o.recordFile) {
-		return []string{o.resultFile, o.reportFile}
+		return []string{o.resultFile, o.reportFile, o.envFile}
 	}
-	return []string{o.resultFile, o.reportFile, o.recordFile}
+	return []string{o.resultFile, o.reportFile, o.envFile, o.recordFile}
 }
 
 func runTest(cmd *cobra.Command, o runFlags) (err error) {
@@ -335,7 +358,7 @@ func runTest(cmd *cobra.Command, o runFlags) (err error) {
 	}
 	sum.Result, sum.Took = p.Result, p.FinishedAt.Sub(p.StartedAt)
 	w.End(c.Metadata.Name, p.Result, p.Execution.ExitCode, sum.Took)
-	kept := keep(ctx, w, &sum, c, p, fpErr, probeErr, mutable(c, fp), token, o)
+	kept := keep(ctx, w, &sum, c, p, fp, fpErr, probeErr, mutable(c, fp), token, o)
 	recordRun(ctx, out, warn, o, r, false, p)
 	verdict := judge(w, r, p, o.shadow)
 	w.Summary(sum)
@@ -630,7 +653,7 @@ func execute(ctx context.Context, stdout, stderr io.Writer, c *contract.Contract
 // recorded but not published. After a failed probe it is not even recorded,
 // so 'aval push' cannot publish it; only --push turns that into an error,
 // otherwise the suite's verdict decides the exit code (#197).
-func keep(ctx context.Context, w cliout.Run, sum *cliout.Summary, c *contract.Contract, p *evidence.Predicate, fpErr, probeErr, pinErr error, token string, o runFlags) []error {
+func keep(ctx context.Context, w cliout.Run, sum *cliout.Summary, c *contract.Contract, p *evidence.Predicate, fp fingerprint.Fingerprint, fpErr, probeErr, pinErr error, token string, o runFlags) []error {
 	if probeErr != nil {
 		if o.push {
 			return []error{fmt.Errorf("result not published: %w", probeErr)}
@@ -646,6 +669,9 @@ func keep(ctx context.Context, w cliout.Run, sum *cliout.Summary, c *contract.Co
 	}
 	if err := writeJSON(o.resultFile, p); err != nil {
 		return []error{fmt.Errorf("recording result: %w", err)}
+	}
+	if err := writeEnvFile(o.envFile, fp); err != nil {
+		return []error{fmt.Errorf("recording the env file: %w", err)}
 	}
 	if o.outputsDir != "" && len(c.Outputs) > 0 {
 		// A failed test may write no outputs; push refuses that later.
@@ -739,6 +765,18 @@ func writeReportFile(path string, r evidence.Report) error {
 	return nil
 }
 
+// writeEnvFile writes the env file of fp (fingerprint.Fingerprint.EnvFile)
+// to path, unless --env-file is empty.
+func writeEnvFile(path string, fp fingerprint.Fingerprint) error {
+	if path == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(fp.EnvFile()), 0o644)
+}
+
 func writeJSON(path string, v any) error {
 	raw, _ := json.MarshalIndent(v, "", "  ") // ponytail: plain structs, cannot fail
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -814,7 +852,7 @@ func signAndPush(ctx context.Context, ui cliout.Run, p *evidence.Predicate, c *c
 }
 
 func newPushCmd() *cobra.Command {
-	var key, resultFile, reportFile, outputsDir string
+	var key, resultFile, reportFile, outputsDir, envFile string
 	g := &globalFlags{}
 	var interactive bool
 	cmd := &cobra.Command{
@@ -832,6 +870,12 @@ With --test, the result and the report must both be for that test.
 'aval run --outputs-dir' filled, not from the contract root: any entry in it
 that is not a regular file matched by an outputs glob publishes nothing.
 The directory may be missing only when the contract declares no outputs.
+--env-file takes the env section of the fingerprint from the file that
+'aval run' wrote with the result (hashes of environment.env, no values),
+not from this process's environment, so a job with other variables can
+publish it. Every other input is still hashed from the checkout. A file with
+another manifest version, a malformed or repeated line, or names other than
+environment.env publishes nothing.
 Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 ` + loginHelp + `.`,
 		Args: noArgs,
@@ -844,7 +888,7 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 			if err := cmp.Or(requireRegistry(repo), checkTimeout(timeout), checkSigner(key, token, interactive)); err != nil {
 				return err
 			}
-			c, _, fp, err := loadAndFingerprint(cmd.Context(), file, g.test, resultFile, reportFile)
+			c, fp, err := pushFingerprint(cmd.Context(), file, g.test, envFile, resultFile, reportFile)
 			if err != nil {
 				return err
 			}
@@ -897,8 +941,21 @@ Keyless signing reads the OIDC token from $` + idTokenEnv + `.
 	f.StringVar(&resultFile, "result-file", defaultResult, "result recorded by 'aval run'")
 	f.StringVar(&reportFile, "report-file", "", "report written by the same 'aval run'; push nothing when it reused a verified result, and exit 5 when it records a security event")
 	f.StringVar(&outputsDir, "outputs-dir", "", "read the contract's outputs from this directory ('aval run --outputs-dir') instead of the contract root; anything in it that is not a declared output publishes nothing")
+	f.StringVar(&envFile, "env-file", "", "take the env section of the fingerprint from this file ('aval run --env-file') instead of this process's environment")
 	alias(cmd, "result-file", "result") // TODO(milestone-13): remove (deprecated in 0.7.0, #165), not before 0.8.0.
 	return cmd
+}
+
+// pushFingerprint loads the test named test of the contract file and
+// computes its fingerprint as push checks it: with envFile (--env-file), the
+// env section comes from that file (rootAndFingerprint).
+func pushFingerprint(ctx context.Context, file, test, envFile, resultFile, reportFile string) (*contract.Contract, fingerprint.Fingerprint, error) {
+	c, err := loadContract(file, test)
+	if err != nil {
+		return nil, fingerprint.Fingerprint{}, err
+	}
+	c, _, fp, err := rootAndFingerprint(ctx, file, c, envFile, resultFile, reportFile, envFile)
+	return c, fp, err
 }
 
 // reusedByRun reads the report that 'aval run --report-file' wrote and

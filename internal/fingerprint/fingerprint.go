@@ -144,6 +144,12 @@ const OutputDir = ".aval"
 // working tree that holds dir (see repoRoot): no reference or root may lead
 // outside it.
 func Compute(ctx context.Context, dir string, c *contract.Contract, env LookupEnv, outputs ...string) (Fingerprint, error) {
+	return compute(ctx, dir, c, env, nil, outputs)
+}
+
+// compute is Compute and ComputeRecorded: recorded, when not nil, is the
+// env section of c.
+func compute(ctx context.Context, dir string, c *contract.Contract, env LookupEnv, recorded []string, outputs []string) (Fingerprint, error) {
 	root, rel := dir, "."
 	if len(c.Scope.Contracts) > 0 || c.Scope.Root != "" {
 		var err error
@@ -164,7 +170,9 @@ func Compute(ctx context.Context, dir string, c *contract.Contract, env LookupEn
 	for p := range outputsUnder(base, outputs) {
 		skip[path.Join(scope, p)] = true
 	}
-	return newTree(ctx, os.DirFS(root), env, skip).compute(rel, c)
+	t := newTree(ctx, os.DirFS(root), env, skip)
+	t.recorded = recorded
+	return t.compute(rel, c)
 }
 
 // Root returns the directory the scope of c, a contract in dir, is rooted
@@ -257,6 +265,9 @@ type tree struct {
 	// the chain being computed, to name a cycle.
 	done  map[string]Dependency
 	stack []string
+	// recorded, when not nil, is the env section of the top contract, from
+	// an env file (ComputeRecorded).
+	recorded []string
 }
 
 func newTree(ctx context.Context, root fs.FS, env LookupEnv, skip map[string]bool) *tree {
@@ -296,7 +307,7 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 		return Fingerprint{}, fmt.Errorf("scope.root %s %s", c.Scope.Root, outside)
 	}
 	fsys, skip := t.sub(top)
-	ctx, env := t.ctx, t.env
+	ctx := t.ctx
 	canon := canonicalContract(c)
 	source, exclude, deps := splitGlobs(c.Scope.Source), splitGlobs(c.Scope.Exclude), splitGlobs(c.Scope.Dependencies)
 	files, err := listFiles(fsys, skip, source, deps, exclude)
@@ -330,14 +341,9 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 	slices.Sort(section)
 	lines = append(lines, section...)
 
-	section = nil
-	for _, name := range c.Environment.Env {
-		v, ok := env(name)
-		h := "unset"
-		if ok {
-			h = sum([]byte(v))
-		}
-		section = append(section, fmt.Sprintf("env %s %s", name, h))
+	section, err = t.envSection(c)
+	if err != nil {
+		return Fingerprint{}, err
 	}
 	slices.Sort(section)
 	lines = append(lines, slices.Compact(section)...)
@@ -373,6 +379,24 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 
 	manifest := strings.Join(lines, "\n") + "\n"
 	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: found, Resolved: resolved, Contracts: refs}, nil
+}
+
+// envSection returns the env lines of c, unsorted: the recorded ones for
+// the top contract when there are (ComputeRecorded), else hashed from t.env.
+func (t *tree) envSection(c *contract.Contract) ([]string, error) {
+	if t.recorded != nil && len(t.stack) == 0 {
+		return recordedEnv(t.recorded, c.Environment.Env)
+	}
+	var section []string
+	for _, name := range c.Environment.Env {
+		v, ok := t.env(name)
+		h := "unset"
+		if ok {
+			h = sum([]byte(v))
+		}
+		section = append(section, fmt.Sprintf("env %s %s", name, h))
+	}
+	return section, nil
 }
 
 // contracts fingerprints the scope.contracts of c, whose directory is dir,

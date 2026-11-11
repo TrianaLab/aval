@@ -290,12 +290,14 @@ func loadAndFingerprint(ctx context.Context, file, test string, outputs ...strin
 	if err != nil {
 		return nil, "", fingerprint.Fingerprint{}, err
 	}
-	return rootAndFingerprint(ctx, file, c, outputs...)
+	return rootAndFingerprint(ctx, file, c, "", outputs...)
 }
 
 // rootAndFingerprint resolves the root of c, loaded from file, and computes its
-// fingerprint, as loadAndFingerprint.
-func rootAndFingerprint(ctx context.Context, file string, c *contract.Contract, outputs ...string) (*contract.Contract, string, fingerprint.Fingerprint, error) {
+// fingerprint, as loadAndFingerprint. With envFile ('aval push --env-file'),
+// the env section comes from that file (fingerprint.ComputeRecorded), not
+// from this process's environment; a file that does not parse is an error.
+func rootAndFingerprint(ctx context.Context, file string, c *contract.Contract, envFile string, outputs ...string) (*contract.Contract, string, fingerprint.Fingerprint, error) {
 	root, _, err := contractRoot(file, c)
 	if err != nil {
 		return nil, "", fingerprint.Fingerprint{}, err
@@ -307,10 +309,23 @@ func rootAndFingerprint(ctx context.Context, file string, c *contract.Contract, 
 	for _, o := range check {
 		if isInput(root, c, o) {
 			// Skipping it would silently drop an input from the fingerprint.
-			return nil, "", fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result-file or --report-file) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract root", o, fingerprint.OutputDir)}
+			return nil, "", fingerprint.Fingerprint{}, usageError{fmt.Errorf("output %s (--result-file, --report-file or --env-file) is an input of the test: the contract scope includes it and it holds neither an Aval result nor a report; keep results and reports under %s/ or outside the contract root", o, fingerprint.OutputDir)}
 		}
 	}
-	fp, err := fingerprint.Compute(ctx, filepath.Dir(file), c, os.LookupEnv, outputs...)
+	var fp fingerprint.Fingerprint
+	if envFile == "" {
+		fp, err = fingerprint.Compute(ctx, filepath.Dir(file), c, os.LookupEnv, outputs...)
+	} else {
+		raw, rerr := os.ReadFile(envFile)
+		var recorded []string
+		if rerr == nil {
+			recorded, rerr = fingerprint.ParseEnvFile(raw)
+		}
+		if rerr != nil {
+			return nil, "", fingerprint.Fingerprint{}, fmt.Errorf("--env-file %s: %w", envFile, rerr)
+		}
+		fp, err = fingerprint.ComputeRecorded(ctx, filepath.Dir(file), c, recorded, outputs...)
+	}
 	if errors.Is(err, fingerprint.ErrContract) {
 		return nil, "", fingerprint.Fingerprint{}, usageError{fmt.Errorf("%s: %w", file, err)}
 	}
