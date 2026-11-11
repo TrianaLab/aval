@@ -396,8 +396,7 @@ func dogfoodJobStepProblems(name, action, test, shadow string, steps []step) []s
 			if s.With["test"] != test || s.With["shadow"] != shadow {
 				problems = append(problems, name+": "+action+" with test "+strconv.Quote(s.With["test"])+" and shadow "+strconv.Quote(s.With["shadow"]))
 			}
-		// The informational stats summary may read the public stats registry.
-		case strings.Contains(s.Run, "aval") && !strings.Contains(s.Run, ` stats --registry "$AVAL_STATS_REGISTRY"`):
+		case !statsOnly(s.Run):
 			problems = append(problems, name+": runs aval outside "+action)
 		}
 	}
@@ -405,6 +404,23 @@ func dogfoodJobStepProblems(name, action, test, shadow string, steps []step) []s
 		problems = append(problems, name+": must use "+action+" once")
 	}
 	return problems
+}
+
+// statsOnly: every line of run that mentions aval builds the stats binary or
+// runs it against the public stats registry, and nothing else on that line
+// mentions aval. The informational stats summary is the only such step.
+func statsOnly(run string) bool {
+	const (
+		build = `go build -o "$RUNNER_TEMP/stats-bin/aval" ./cmd/aval`
+		stats = `"$RUNNER_TEMP/stats-bin/aval" stats --registry "$AVAL_STATS_REGISTRY" `
+	)
+	for _, line := range strings.Split(run, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "aval") && line != build && (!strings.HasPrefix(line, stats) || strings.Count(line, "aval") != 1) {
+			return false
+		}
+	}
+	return true
 }
 
 func TestDogfoodJobsUseTheActions(t *testing.T) {
@@ -421,7 +437,7 @@ func TestDogfoodJobCheckCatchesDrift(t *testing.T) {
 	const (
 		env     = "    env: {AVAL_MIN_TRUST_LEVEL: \"" + mainMinTrust + "\"}\n"
 		e2e     = "  ci-e2e:\n" + env + "    steps: [{uses: actions/checkout@x}, {uses: ./integrations/github/run, with: {test: aval-e2e}}]\n"
-		shadow  = "  dogfood-shadow:\n" + env + "    steps: [{uses: ./integrations/github/run, with: {test: aval-engine, shadow: 'true'}}, {run: 'aval stats --registry \"$AVAL_STATS_REGISTRY\" --since 30d'}]\n"
+		shadow  = "  dogfood-shadow:\n" + env + "    steps: [{uses: ./integrations/github/run, with: {test: aval-engine, shadow: 'true'}}, {run: '\"$RUNNER_TEMP/stats-bin/aval\" stats --registry \"$AVAL_STATS_REGISTRY\" --since 30d'}]\n"
 		publish = "  dogfood-publish:\n    permissions: {id-token: write, packages: write}\n    steps: [{uses: ./integrations/github/publish}]\n"
 	)
 	good := "jobs:\n" + e2e + shadow + publish
@@ -436,10 +452,14 @@ func TestDogfoodJobCheckCatchesDrift(t *testing.T) {
 		"other test":           strings.Replace(good, "test: aval-e2e", "test: aval-engine", 1),
 		"shadow off":           strings.Replace(good, ", shadow: 'true'", "", 1),
 		"publish without oidc": strings.Replace(good, "{id-token: write, packages: write}", "{packages: write}", 1),
-		"stats elsewhere":      strings.Replace(good, `aval stats --registry "$AVAL_STATS_REGISTRY"`, "aval stats --registry evil.io/x", 1),
+		"stats elsewhere":      strings.Replace(good, `--registry "$AVAL_STATS_REGISTRY"`, "--registry evil.io/x", 1),
+		"stats then run":       strings.Replace(good, "--since 30d", "--since 30d; aval run -f aval.yaml", 1),
 		"publish by hand":      strings.Replace(good, "{uses: ./integrations/github/publish}", "{run: aval push -f aval.yaml}", 1),
 		"no publish job":       "jobs:\n" + e2e + shadow,
 		"other job signs":      good + "  x:\n    permissions: {id-token: write}\n    steps: [{uses: ./integrations/github/run, with: {test: t}}]\n",
+	}
+	if statsOnly("go build -o \"$RUNNER_TEMP/stats-bin/aval\" ./cmd/aval\naval run -f aval.yaml") {
+		t.Error("run beside stats: not reported")
 	}
 	for name, wf := range bad {
 		if p, err := dogfoodJobProblems([]byte(wf)); err != nil || len(p) == 0 {
