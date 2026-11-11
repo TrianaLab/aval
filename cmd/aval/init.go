@@ -395,7 +395,7 @@ func matched(sources []string) ([]string, error) {
 			return nil, fmt.Errorf("source glob %w", err)
 		}
 	}
-	fp, err := fingerprint.ComputeFS(os.DirFS("."), &contract.Contract{Scope: contract.Scope{Source: sources}}, os.LookupEnv)
+	fp, err := fingerprint.ComputeFS(os.DirFS("."), &contract.Contract{Scope: contract.Scope{Source: sources}}, fingerprint.Env{})
 	if err != nil {
 		return nil, err
 	}

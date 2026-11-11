@@ -124,6 +124,69 @@ func TestPushEnvFileRejects(t *testing.T) {
 	}
 }
 
+// Issues #253 and #247: with APP_* in environment.env, run records each
+// matched variable, push with the file publishes after the publish job
+// unset them or set another APP_ variable, and an edited file (a name the
+// pattern does not match, a matched name dropped or added) publishes
+// nothing.
+func TestPushEnvFilePattern(t *testing.T) {
+	signed := fakePublish(t, nil, nil)
+	writes := countPublish(t)
+	c, result, report, env, lines := patternRun(t)
+	join := func(l ...string) string { return strings.Join(l, "\n") + "\n" }
+	h := strings.Repeat("0", 64)
+	for name, tc := range map[string]struct{ body, want string }{
+		"name the pattern misses": {join(lines[0], lines[1], lines[2], lines[3], "env OTHER "+h), "env file names"},
+		"unset pattern line":      {join(lines[0], lines[1], lines[2], "env APP_C unset", lines[3]), "env file names"},
+		"matched name dropped":    {join(lines[0], lines[1], lines[3]), "run the test again"},
+		"matched name added":      {join(lines[0], lines[1], lines[2], "env APP_C "+h, lines[3]), "run the test again"},
+		"exact name dropped":      {join(lines[0], lines[1], lines[2]), "env file names"},
+	} {
+		p := filepath.Join(filepath.Dir(env), "bad.txt")
+		if err := os.WriteFile(p, []byte(tc.body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if code, _, stderr := pushEnv(t, c, result, report, p); code != ExitError || !strings.Contains(stderr, tc.want) || len(*signed) != 0 || *writes != 0 {
+			t.Errorf("%s: exit %d, stderr %q, signed %d, writes %d; want 1, ~%q, nothing pushed", name, code, stderr, len(*signed), *writes, tc.want)
+		}
+	}
+	// A variable the pattern matches, set only in the publish job, is not
+	// in the file and not hashed: the digest is the run's.
+	t.Setenv("APP_C", "3")
+	if code, stdout, stderr := pushEnv(t, c, result, report, env); code != ExitOK || !strings.Contains(stdout, "pushed reg.example/r@sha256:bb") || len(*signed) != 1 {
+		t.Fatalf("push: exit %d, stdout %q, stderr %q, signed %d", code, stdout, stderr, len(*signed))
+	}
+}
+
+// patternRun runs a contract with APP_* and MODE in environment.env as
+// splitRun does, with APP_A and APP_B set in the run only, and returns the
+// contract, result, report and env file paths and the env file's lines.
+func patternRun(t *testing.T) (c, result, report, env string, lines []string) {
+	t.Helper()
+	c = writeContract(t, "hermetic")
+	body, _ := os.ReadFile(c)
+	if err := os.WriteFile(c, append(body, "environment:\n  env: [\"APP_*\", MODE]\n"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("APP_A", "1")
+	t.Setenv("APP_B", "2")
+	result, report, env = splitRun(t, c)
+	for _, k := range []string{"APP_A", "APP_B"} {
+		if err := os.Unsetenv(k); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := os.ReadFile(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines = strings.Split(strings.TrimSuffix(string(raw), "\n"), "\n")
+	if len(lines) != 4 || !strings.HasPrefix(lines[1], "env APP_A ") || !strings.HasPrefix(lines[2], "env APP_B ") || !strings.HasPrefix(lines[3], "env MODE ") {
+		t.Fatalf("env file %q: want APP_A, APP_B and MODE", raw)
+	}
+	return c, result, report, env, lines
+}
+
 // An env file inside the contract scope and outside .aval/ is an input:
 // push exits 2 as for --result-file, and so does a later run.
 func TestEnvFileInScope(t *testing.T) {
