@@ -40,7 +40,7 @@ takes `test` (required), `file` (default `aval.yaml`), `policy` (default
 5. Writes the outcome to the step summary and the `outcome` output. Exit 5
    sets the outcome to `verification-failed`, becomes an `aval SECURITY`
    error annotation and fails the step; a miss is routine.
-6. On a push to the default branch only, uploads `.aval/<test>/` as the artifact `aval-<test>`.
+6. On a push to the default branch only, uploads `.aval/<test>/` as the artifact `aval-<test>`. A re-run of the job replaces the earlier attempt's `aval-<test>`, so publish signs the result of the attempt that just ran. Run each test in only one job per workflow run: two jobs uploading the same name race.
 7. Warns when the policy trusts a `refs/pull/` subject at or above `minTrustLevel`.
 
 The policy is a separate file on the default branch, so `publicKey` paths in
