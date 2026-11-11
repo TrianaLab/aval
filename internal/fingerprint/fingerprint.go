@@ -42,6 +42,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -134,8 +135,68 @@ func (f Fingerprint) Unpinned() []pinning.Finding {
 // Hex returns the hex part of the digest.
 func (f Fingerprint) Hex() string { return strings.TrimPrefix(f.Digest, "sha256:") }
 
-// LookupEnv resolves environment variables; os.LookupEnv in production.
-type LookupEnv func(string) (string, bool)
+// Env is an environment, variable name to value: ProcessEnv() in
+// production, a literal in tests. A nil Env reads the process environment.
+type Env map[string]string
+
+// ProcessEnv returns the environment of this process.
+func ProcessEnv() Env {
+	env := Env{}
+	for _, kv := range os.Environ() {
+		if k, v, ok := strings.Cut(kv, "="); ok && k != "" { // Windows lists "=C:=C:\\" entries
+			env[k] = v
+		}
+	}
+	return env
+}
+
+// foldEnv: environment variable names are case-insensitive on Windows and
+// case-sensitive elsewhere, so on Windows names compare upper-cased.
+var foldEnv = runtime.GOOS == "windows"
+
+// envKey is name as it compares on this platform.
+func envKey(name string) string {
+	if foldEnv {
+		return strings.ToUpper(name)
+	}
+	return name
+}
+
+// lookup returns the value of the variable name, compared as envKey gives it.
+func (e Env) lookup(name string) (string, bool) {
+	for k, v := range e {
+		if envKey(k) == envKey(name) {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+// envLines returns the manifest's env lines for the environment.env
+// entries, sorted and without duplicates. An exact name gives one line,
+// "unset" when it is not set; a prefix pattern (APP_*) gives one line
+// per set variable whose name starts with the prefix, named as envKey
+// gives it, and none when nothing matches.
+func envLines(entries []string, env Env) []string {
+	var lines []string
+	for _, entry := range entries {
+		prefix, pattern := strings.CutSuffix(entry, "*")
+		h := "unset"
+		for k, v := range env {
+			switch {
+			case pattern && strings.HasPrefix(envKey(k), envKey(prefix)):
+				lines = append(lines, fmt.Sprintf("env %s %s", envKey(k), sum([]byte(v))))
+			case !pattern && envKey(k) == envKey(entry):
+				h = sum([]byte(v))
+			}
+		}
+		if !pattern {
+			lines = append(lines, fmt.Sprintf("env %s %s", entry, h))
+		}
+	}
+	slices.Sort(lines)
+	return slices.Compact(lines)
+}
 
 // OutputDir is the directory name Aval reserves for its own outputs. A
 // directory with this name is skipped at any depth, like ".git".
@@ -149,13 +210,13 @@ const OutputDir = ".aval"
 // A contract with scope.contracts or scope.root is resolved inside the git
 // working tree that holds dir (see repoRoot): no reference or root may lead
 // outside it.
-func Compute(ctx context.Context, dir string, c *contract.Contract, env LookupEnv, outputs ...string) (Fingerprint, error) {
+func Compute(ctx context.Context, dir string, c *contract.Contract, env Env, outputs ...string) (Fingerprint, error) {
 	return compute(ctx, dir, c, env, nil, outputs)
 }
 
 // compute is Compute and ComputeRecorded: recorded, when not nil, is the
 // env section of c.
-func compute(ctx context.Context, dir string, c *contract.Contract, env LookupEnv, recorded []string, outputs []string) (Fingerprint, error) {
+func compute(ctx context.Context, dir string, c *contract.Contract, env Env, recorded []string, outputs []string) (Fingerprint, error) {
 	root, rel := dir, "."
 	if len(c.Scope.Contracts) > 0 || c.Scope.Root != "" {
 		var err error
@@ -248,7 +309,7 @@ func repoRoot(dir string) (string, string, error) {
 // one Compute writes for the same tree. skip lists slash-separated paths,
 // relative to the root, that are Aval outputs and not inputs.
 // scope.contracts references must lie inside fsys.
-func ComputeFS(fsys fs.FS, c *contract.Contract, env LookupEnv, skip ...string) (Fingerprint, error) {
+func ComputeFS(fsys fs.FS, c *contract.Contract, env Env, skip ...string) (Fingerprint, error) {
 	m := map[string]bool{}
 	for _, s := range skip {
 		m[s] = true
@@ -262,7 +323,7 @@ func ComputeFS(fsys fs.FS, c *contract.Contract, env LookupEnv, skip ...string) 
 type tree struct {
 	ctx  context.Context
 	root fs.FS
-	env  LookupEnv
+	env  Env
 	// skip holds Aval outputs, relative to root. It applies to the top
 	// contract only: the #63 guard checks only that contract's scope, so
 	// in a referenced contract an output stays an input (fail closed).
@@ -280,9 +341,9 @@ type tree struct {
 	dir string
 }
 
-func newTree(ctx context.Context, root fs.FS, env LookupEnv, skip map[string]bool) *tree {
+func newTree(ctx context.Context, root fs.FS, env Env, skip map[string]bool) *tree {
 	if env == nil {
-		env = os.LookupEnv
+		env = ProcessEnv()
 	}
 	return &tree{ctx: ctx, root: root, env: env, skip: skip, done: map[string]Dependency{}}
 }
@@ -356,8 +417,7 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 	if err != nil {
 		return Fingerprint{}, err
 	}
-	slices.Sort(section)
-	lines = append(lines, slices.Compact(section)...)
+	lines = append(lines, section...)
 
 	section, err = t.pathSection(h, top, c)
 	if err != nil {
@@ -398,22 +458,13 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: found, Resolved: resolved, Contracts: refs, UnmatchedOptional: unmatched(files, optional)}, nil
 }
 
-// envSection returns the env lines of c, unsorted: the recorded ones for
-// the top contract when there are (ComputeRecorded), else hashed from t.env.
+// envSection returns the env lines of c, sorted: the recorded ones for the
+// top contract when there are (ComputeRecorded), else hashed from t.env.
 func (t *tree) envSection(c *contract.Contract) ([]string, error) {
 	if t.recorded != nil && len(t.stack) == 0 {
 		return recordedEnv(t.recorded, c.Environment.Env)
 	}
-	var section []string
-	for _, name := range c.Environment.Env {
-		v, ok := t.env(name)
-		h := "unset"
-		if ok {
-			h = sum([]byte(v))
-		}
-		section = append(section, fmt.Sprintf("env %s %s", name, h))
-	}
-	return section, nil
+	return envLines(c.Environment.Env, t.env), nil
 }
 
 // pathSection returns the path lines of c, whose scope is rooted at top,
@@ -443,7 +494,7 @@ func (t *tree) pathLine(h *hasher, top, p string) (string, error) {
 	var err error
 	if name == contract.HomePath {
 		base, err = os.UserHomeDir()
-	} else if v, ok := t.env(name); ok {
+	} else if v, ok := t.env.lookup(name); ok {
 		base = v
 	} else {
 		return "path " + p + " unset", nil
@@ -739,7 +790,8 @@ type file struct {
 // The walk does not follow symlinks. A symlink under which a source or
 // dependency glob could match files may point to a directory whose files
 // cannot be hashed, so it is an error here (fail closed), unless
-// excludedSymlink proves nothing under it is an input. A symlink only an
+// excludedSymlink proves nothing under it is an input. A link to a
+// non-directory needs only its name excluded. A symlink only an
 // exact glob reaches is rejected when hashed (unless excluded).
 func listFiles(fsys fs.FS, skip map[string]bool, source, deps, exclude []contract.Glob) ([]file, error) {
 	include := slices.Concat(source, deps)
@@ -770,8 +822,19 @@ func listFiles(fsys fs.FS, skip map[string]bool, source, deps, exclude []contrac
 			}
 			return nil
 		}
-		if d.Type()&fs.ModeSymlink != 0 && mayContain && !excludedSymlink(f.segs, deps, exclude) {
-			return fmt.Errorf("%q is a symlink a glob could match files under: only regular files are supported in scope (symlinks are not followed)", rel)
+		if d.Type()&fs.ModeSymlink != 0 && mayContain {
+			// Stat follows the link once, to learn its target's type; nothing
+			// of the target is read. A dangling link, a loop or an unreadable
+			// target counts as a directory (fail closed).
+			fi, err := fs.Stat(fsys, rel)
+			toFile := err == nil && !fi.IsDir()
+			if !excludedSymlink(f.segs, toFile, deps, exclude) {
+				fix := fmt.Sprintf("exclude %q and %q", rel, rel+"/**")
+				if toFile {
+					fix = fmt.Sprintf("exclude it by name (%q)", rel)
+				}
+				return fmt.Errorf("%q is a symlink a glob could match files under: only regular files are supported in scope (symlinks are not followed); remove it, or %s with no dependencies glob reaching it", rel, fix)
+			}
 		}
 		if skip[rel] {
 			return nil
@@ -785,13 +848,14 @@ func listFiles(fsys fs.FS, skip map[string]bool, source, deps, exclude []contrac
 
 // excludedSymlink reports whether a symlink at name can be walked past
 // without following it: exclude drops its name (by the rule hashMatching
-// applies) and everything under it (a glob ending in ** that matches name
-// matches every path below it), and no dependency glob, which exclude does
-// not apply to, can reach it. The symlink stays in the file list, where
-// hashMatching drops it as excluded.
-func excludedSymlink(name []string, deps, exclude []contract.Glob) bool {
+// applies) and, unless the link points to a non-directory (toFile), under
+// which no path exists, everything under it (a glob ending in ** that
+// matches name matches every path below it); and no dependency glob, which
+// exclude does not apply to, can reach it. The symlink stays in the file
+// list, where hashMatching drops it as excluded.
+func excludedSymlink(name []string, toFile bool, deps, exclude []contract.Glob) bool {
 	nameExcluded := slices.ContainsFunc(exclude, func(g contract.Glob) bool { return g.MatchContents(name) })
-	contentsExcluded := slices.ContainsFunc(exclude, func(g contract.Glob) bool { return g[len(g)-1] == "**" && g.Match(name) })
+	contentsExcluded := toFile || slices.ContainsFunc(exclude, func(g contract.Glob) bool { return g[len(g)-1] == "**" && g.Match(name) })
 	depReaches := slices.ContainsFunc(deps, func(g contract.Glob) bool { return g.Match(name) || g.MayContain(name) })
 	return nameExcluded && contentsExcluded && !depReaches
 }

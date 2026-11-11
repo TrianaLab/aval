@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -65,7 +66,7 @@ func isHash(s string) bool {
 
 // ComputeRecorded is Compute with the env section of c taken from env, the
 // lines of an env file (ParseEnvFile), instead of the process environment.
-// Their names must be exactly the sorted, deduplicated environment.env of c.
+// They must be lines the environment.env of c could give (recordedEnv).
 // Everything else is hashed from dir as Compute does, and a contract in
 // scope.contracts still reads the process environment.
 func ComputeRecorded(ctx context.Context, dir string, c *contract.Contract, env []string, outputs ...string) (Fingerprint, error) {
@@ -75,16 +76,41 @@ func ComputeRecorded(ctx context.Context, dir string, c *contract.Contract, env 
 	return compute(ctx, dir, c, nil, env, outputs)
 }
 
-// recordedEnv checks that the names of the recorded env lines are exactly
-// the sorted, deduplicated names, and returns the lines.
-func recordedEnv(lines, names []string) ([]string, error) {
-	want := slices.Compact(slices.Sorted(slices.Values(names)))
-	got := make([]string, len(lines))
-	for i, l := range lines {
-		got[i] = strings.Split(l, " ")[1] // ParseEnvFile checked the shape
+// recordedEnv checks that the recorded env lines are lines envLines could
+// give for entries, the environment.env of c, and returns them. The lines
+// must be sorted; every exact name must have a line; every other line must
+// be a set variable (not "unset") whose name a prefix pattern matches, as
+// envKey writes it. A name no entry covers, a missing exact name or an
+// unset pattern line is an error. Which variables a pattern matched in the
+// run job cannot be checked here: a line left out changes the digest.
+func recordedEnv(lines, entries []string) ([]string, error) {
+	exact := map[string]bool{}
+	var prefixes []string
+	for _, e := range entries {
+		if p, ok := strings.CutSuffix(e, "*"); ok {
+			prefixes = append(prefixes, envKey(p))
+		} else {
+			exact[e] = true
+		}
 	}
-	if !slices.Equal(got, want) {
-		return nil, fmt.Errorf("env file names %v, want environment.env %v", got, want)
+	if !slices.IsSorted(lines) {
+		return nil, fmt.Errorf("env file names are not sorted")
+	}
+	seen := map[string]bool{}
+	for _, l := range lines {
+		f := strings.Split(l, " ") // ParseEnvFile checked the shape
+		name := f[1]
+		seen[name] = true
+		matched := name == envKey(name) && f[2] != "unset" &&
+			slices.ContainsFunc(prefixes, func(p string) bool { return strings.HasPrefix(name, p) })
+		if !exact[name] && !matched {
+			return nil, fmt.Errorf("env file names %s, which no environment.env entry %v gives", name, entries)
+		}
+	}
+	for _, e := range slices.Sorted(maps.Keys(exact)) {
+		if !seen[e] {
+			return nil, fmt.Errorf("env file names lack %s from environment.env %v", e, entries)
+		}
 	}
 	return lines, nil
 }

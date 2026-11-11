@@ -249,6 +249,32 @@ func TestExplainUnmatchedOptional(t *testing.T) {
 	}
 }
 
+// A matrix substitutes {var} into toolchain values: each leg explains its
+// own value (#255).
+func TestExplainMatrixToolchain(t *testing.T) {
+	dir := t.TempDir()
+	set := `apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults: {scope: {source: [a.txt]}, cacheability: hermetic}
+tests:
+  - metadata: {name: "unit-{os}"}
+    runner: {command: [echo, "{os}"]}
+    matrix: {os: [linux, darwin]}
+    environment: {toolchain: {platform: "{os}"}}
+`
+	for name, data := range map[string]string{"a.txt": "a\n", "aval.yaml": set} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, goos := range []string{"linux", "darwin"} {
+		code, out, stderr := runCLI("explain", "-f", filepath.Join(dir, "aval.yaml"), "--test", "unit-"+goos)
+		if code != ExitOK || !strings.Contains(out, "toolchain platform="+goos+"\n") {
+			t.Errorf("unit-%s: exit %d, stderr %q:\n%s", goos, code, stderr, out)
+		}
+	}
+}
+
 // explain lists one path line per environment.paths entry, as declared,
 // and a change under the home directory changes the digest (#254).
 func TestExplainPaths(t *testing.T) {

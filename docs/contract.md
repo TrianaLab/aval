@@ -39,7 +39,7 @@ environment:
     go: "1.25"
   probe:                        # optional, checks a toolchain entry before the run
     go: [go, version]
-  env:                          # optional, names only; values are hashed
+  env:                          # optional, names or PREFIX_* patterns; values are hashed
     - CGO_ENABLED
     - GOFLAGS
 
@@ -88,7 +88,7 @@ above it ([Contracts in a subdirectory](#contracts-in-a-subdirectory)). A
 | `scope.root` | string | no | The path from this contract's directory up to the root of its tree: `..` segments only (`..`, `../..`). Globs, `outputs`, `allowMutable[].file` and `files`, `runner.command` and `environment.probe` resolve from it; `scope.contracts` does not. The root must lie inside the git working tree of this contract, as for `scope.contracts`; otherwise `aval run`, `explain`, `verify` and `push` exit 2. See [Contracts in a subdirectory](#contracts-in-a-subdirectory). |
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
 | `environment.probe` | map string to list of strings | no | Each key must be an `environment.toolchain` key with a non-empty value; each value a non-empty argv, first element not blank. See [Probe the toolchain](#probe-the-toolchain). |
-| `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`, except `AVAL_RUN_STACK` in any case (set by `aval run`, not an input). |
+| `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`, or prefix patterns: a name followed by `*` (`APP_*`), see [Environment variable patterns](#environment-variable-patterns). `AVAL_RUN_STACK` is rejected in any case (set by `aval run`, not an input), and so is a pattern that would match it (`AVAL_*`, `AVAL_RUN_*`). |
 | `environment.paths` | list of strings | no | Files or directories outside the tree, each `~/<path>`, `$NAME/<path>` or `${NAME}/<path>` with a clean relative path: no globs, no `.` or `..` segments, no other variables, no spaces, no duplicates. See [Files outside the tree](#files-outside-the-tree). |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
 | `outputs` | list of globs | no | Files the test writes that a reused result restores, such as `coverage.xml` ([Restore coverage and reports on reuse](guides/write-a-contract.md#restore-coverage-and-reports-on-reuse)). Same glob rules as `scope`. When publishing, each glob must match a regular file (no symlink) that is not the contract file, outside the scope, `.git` and `.aval`; at most 256 files, 16 MiB each, 64 MiB in total. Otherwise nothing is published (exit 1). To push from another job, `aval run --outputs-dir` copies them and `aval push --outputs-dir` publishes them from that copy ([the artifact](guides/github-actions.md#split-credentials)). Omitted from the fingerprint when empty, so existing contracts keep theirs; adding it changes the fingerprint, so a result without outputs is never reused for it. |
@@ -164,17 +164,37 @@ Merge rules, in the order `defaults`, each used fragment, then the test:
   another fragment.
 
 `matrix` maps variables to lists of strings and creates one test per
-combination. It substitutes `{var}` into `metadata.name` and
-`runner.command` only, so each value is part of the fingerprinted argv. In a
-test with a matrix, every `{name}` in those two fields must be a matrix
-variable: write a shell variable as `$VAR`, not `${VAR}`. A set expands to
-at most 1024 tests.
+combination. It substitutes `{var}` into `metadata.name`, `runner.command`
+and the values of `environment.toolchain` (inherited ones too), in one pass,
+so a value that holds `{x}` is not substituted again. Each value is part of
+the fingerprinted argv or toolchain lines. In a test with a matrix, every
+`{name}` in those fields must be a matrix variable: write a shell variable as
+`$VAR`, not `${VAR}`. In a test without a matrix, a `{name}` in a toolchain
+value is an error. Probe argv, `env`, `scope` and `outputs` are not
+substituted. A set expands to at most 1024 tests.
+
+One test per platform, each with its own fingerprint, so a result recorded
+on darwin is never reused on linux:
+
+```yaml
+tests:
+  - metadata: {name: "unit-{os}"}
+    runner: {command: [go, test, ./...]}
+    matrix: {os: [linux, darwin]}
+    environment:
+      toolchain: {platform: "{os}"}
+      probe: {platform: [go, env, GOOS]}
+```
+
+`aval run --test unit-darwin` records a result only where the probe prints
+`darwin`. To reuse a result across platforms, do not declare `platform`.
 
 Each of these exits 2 and names the problem: an unknown fragment, a fragment
 no test uses, a fragment with `use`, `exclude`, `runner`, `metadata`,
 `outputs`, `matrix` or `cacheability`, a conflicting key, an unknown
-`{var}`, two tests with the same expanded name, and a `scope.contracts`
-entry that points at a TestSet (share scope with fragments instead).
+`{var}`, a `{var}` in a toolchain value of a test without a matrix, two
+tests with the same expanded name, and a `scope.contracts` entry that points
+at a TestSet (share scope with fragments instead).
 
 ### Select a test
 
@@ -247,10 +267,13 @@ hashed nor recorded, and `environment.env` cannot list it.
 - Order does not matter.
 - Symlinks are never followed nor hashed. A symlink under which a `source`
   or `dependencies` glob could match files is an error, unless `exclude`
-  covers both its name and its contents and no `dependencies` glob reaches
-  it: `**/node_modules/**` skips `pkg/web/node_modules/.bin/tool`, and
-  `["pkg/bin", "pkg/bin/**"]` skips a symlinked `pkg/bin`. `pkg/bin` or
-  `pkg/bin/**` alone does not.
+  covers its name and no `dependencies` glob reaches it. A symlink to a
+  regular file needs only its name excluded: `tests/fx/link.yaml` skips a
+  link to `real.yaml`. Any other symlink (to a directory, dangling, or a
+  loop) needs its contents excluded too: `**/node_modules/**` skips
+  `pkg/web/node_modules/.bin/tool`, and `["pkg/bin", "pkg/bin/**"]` skips a
+  symlinked `pkg/bin`. `pkg/bin` or `pkg/bin/**` alone does not. If a
+  name-excluded link later points to a directory, fingerprinting fails.
 
 ### Optional source globs
 
@@ -326,7 +349,7 @@ contract <path> <name> <fingerprint>
 | `contract` | sha256 of the parsed contract as JSON | comments, formatting, key order, the order and duplicates of set-like lists (argv order counts; an empty list equals an omitted one) |
 | `source`, `dependency` | sha256 of the content, `x` (any exec bit) or `-`, path. A file in both sets appears twice | owner, timestamps, other permission bits |
 | `toolchain` | `key=value` as written; checked against the installed tools only by `environment.probe` | |
-| `env` | sha256 of the value, or `unset` (empty is not unset); values never appear in clear, but the hash of a short or guessable value (a low-entropy secret) can be found by trying values, so declare secrets only if `aval explain` output and the [env file](artifact-format.md#env-file) may be seen | |
+| `env` | sha256 of the value, or `unset` (empty is not unset); values never appear in clear, but the hash of a short or guessable value (a low-entropy secret) can be found by trying values, so declare secrets only if `aval explain` output and the [env file](artifact-format.md#env-file) may be seen. A prefix pattern gives one line per set variable it matches and none when nothing matches | |
 | `path` | one line per `environment.paths` entry, as declared (not expanded): `<mode> <sha256>` for a file, for a directory the sha256 of its sorted `<sha256> <mode> <relpath>` lines, `absent` if nothing is there, `unset` if its variable is unset; only with `environment.paths`. The hash of a short or guessable file (a low-entropy secret) can be found by trying values, as for `env` | where `~` or the variable points, as long as the content is the same |
 | `resolve` | kind, reference, version or `floating`, immutable id; only with `scope.resolve`, and needs the network ([Resolve references](resolve/index.md)) | the registry address |
 | `contract <path>` | one line per `scope.contracts` entry: the path as written, the referenced contract's `metadata.name` and its fingerprint, computed from its own directory and inputs (so references are transitive). `aval explain` also prints the tree, one `depends on <path> (<name>) <fingerprint>` line per reference | |
@@ -334,6 +357,36 @@ contract <path> <name> <fingerprint>
 Lines are sorted within each section, so checkout path and walk order do not
 matter. Paths are hashed byte for byte. Windows has no exec bit, so an
 executable file fingerprints differently there than on Unix.
+
+### Environment variable patterns
+
+A tool configured by prefix (viper `SetEnvPrefix` with `AutomaticEnv`, Go
+envconfig, pydantic-settings `env_prefix`, Spring relaxed binding) reads any
+`PREFIX_<KEY>`. List the prefix instead of every name:
+
+```yaml
+environment:
+  env: ["APP_*", GOFLAGS]
+```
+
+`*` may only end the entry, after at least one name character: `*`,
+`*_TOKEN`, `APP*X` and `APP_?` are rejected. The pattern hashes every
+variable set when the fingerprint is computed whose name starts with the
+prefix, one `env NAME <sha256>` line each, so setting, unsetting or changing
+one changes the fingerprint. A pattern that matches nothing adds no line; the
+pattern itself is in the `contract` line. An exact name a pattern also
+matches yields one line.
+
+Names compare as the platform does: case-sensitively on Linux and macOS
+(`APP_*` matches neither `APPX` nor `app_a`), case-insensitively on
+Windows, where a matched name is written upper-cased in the manifest.
+
+A pattern also hashes credentials that share the prefix, such as
+`APP_REGISTRY_TOKEN`, as it would a listed name. Their sha256 digests are
+in the manifest that `aval explain` and `--explain` print (CI logs), and the
+published fingerprint is a hash over that manifest, so anyone who knows the
+other inputs can test guesses of a short or guessable secret against it.
+When the prefix covers secrets, list the exact names instead.
 
 ### What does not go in
 
@@ -378,9 +431,9 @@ test and records nothing; `aval explain`, `aval verify` and `aval push` exit 1
 | `scope.source matched no files` | `exclude` removed every `source` and `optionalSource` file, or `optionalSource` matched nothing and `exclude` removed every `source` file |
 | `source "<path>" is excluded only by a trailing "**"` | exclude it by name, or narrow the glob |
 | `dependency glob "<glob>" matched no files` | fix the glob |
-| `only regular files are supported` | remove the symlink, device, socket or FIFO from scope |
+| `only regular files are supported in scope` | remove the symlink, device or socket from scope |
 | `environment.paths <entry>: <reason>` | the entry or a file under it is a symlink, a special file or unreadable, or `~` or its variable is not an absolute path ([Files outside the tree](#files-outside-the-tree)) |
-| `"<path>" is a symlink a glob could match files under` | symlinks are not followed: remove it, or exclude its name and contents (`**/node_modules/**`, or `pkg/bin` plus `pkg/bin/**`) with no `dependencies` glob reaching it ([Globs](#globs)); the contract directory itself may be a symlink |
+| `"<path>" is a symlink a glob could match files under` | symlinks are not followed: remove it, or exclude it with no `dependencies` glob reaching it ([Globs](#globs)). The message names the fix: its name alone for a link to a regular file, its name and contents (`pkg/bin` plus `pkg/bin/**`, or `**/node_modules/**`) for anything else. The contract directory itself may be a symlink |
 | `control characters in path are not supported` | rename the file (newline or carriage return) |
 | `resolve <kind> <reference>: <reason>` | see [When resolution fails](resolve/index.md#when-resolution-fails) |
 | `scope.contracts <path>: <reason>` | any error above in the referenced contract, or: missing or invalid contract, `leads outside the repository root` (also its `scope.root`), `no git working tree (.git) at or above <dir>`, `<path> is a symlink`, `<path> is not a regular file`, `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`, `more than 8 levels or 64 contracts` |

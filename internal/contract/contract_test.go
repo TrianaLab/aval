@@ -40,6 +40,18 @@ func TestParseValid(t *testing.T) {
 	}
 }
 
+// TestParseEnvPattern: a prefix pattern is accepted beside exact names,
+// including one that shares a prefix with AVAL_RUN_STACK but cannot match it.
+func TestParseEnvPattern(t *testing.T) {
+	c, err := Parse([]byte(strings.Replace(valid, "env: [DB_IMAGE]", "env: [APP_*, DB_IMAGE, AVAL_RUN_STACKX*, AVAL]", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.Environment.Env; len(got) != 4 || got[0] != "APP_*" {
+		t.Fatalf("env %q", got)
+	}
+}
+
 func TestParseProbe(t *testing.T) {
 	c, err := Parse([]byte(strings.Replace(valid, `toolchain: {go: "1.25"}`, "toolchain: {go: \"1.25\"}\n  probe: {go: [go, version]}", 1)))
 	if err != nil {
@@ -81,28 +93,38 @@ func TestParseInvalid(t *testing.T) {
 		"bad env name":          {"[DB_IMAGE]", "[DB-IMAGE]", "environment.env"},
 		// The run stack differs between an outer and a nested run of the
 		// same inputs: hashing it would split their fingerprints (#196).
-		"run stack in env":            {"[DB_IMAGE]", "[DB_IMAGE, AVAL_RUN_STACK]", "environment.env[1]: AVAL_RUN_STACK is set by aval run and is not an input"},
-		"run stack in env, any case":  {"[DB_IMAGE]", "[aval_run_stack]", "environment.env[0]: aval_run_stack is set by aval run"},
-		"paths glob":                  {"env: [DB_IMAGE]", `paths: ["~/.config/*"]`, `environment.paths[0]: "~/.config/*": no globs`},
-		"paths class":                 {"env: [DB_IMAGE]", `paths: ["~/.config/[ab]"]`, "environment.paths[0]"},
-		"paths dotdot":                {"env: [DB_IMAGE]", `paths: ["~/../etc"]`, "clean relative path"},
-		"paths inner dotdot":          {"env: [DB_IMAGE]", `paths: ["~/a/../b"]`, "clean relative path"},
-		"paths dot":                   {"env: [DB_IMAGE]", `paths: ["~/."]`, "clean relative path"},
-		"paths trailing slash":        {"env: [DB_IMAGE]", `paths: ["~/.config/"]`, "clean relative path"},
-		"paths empty":                 {"env: [DB_IMAGE]", `paths: [""]`, "must start with ~/, $NAME/ or ${NAME}/"},
-		"paths only home":             {"env: [DB_IMAGE]", `paths: ["~"]`, "must start with"},
-		"paths only home slash":       {"env: [DB_IMAGE]", `paths: ["~/"]`, "clean relative path"},
-		"paths only var":              {"env: [DB_IMAGE]", `paths: ["$HOME"]`, "must start with"},
-		"paths only braced var":       {"env: [DB_IMAGE]", `paths: ["${HOME}"]`, "must start with"},
-		"paths relative":              {"env: [DB_IMAGE]", `paths: [".config/app"]`, "must start with"},
-		"paths absolute":              {"env: [DB_IMAGE]", `paths: ["/etc/app"]`, "must start with"},
-		"paths other user":            {"env: [DB_IMAGE]", `paths: ["~root/x"]`, "must start with"},
-		"paths bad var":               {"env: [DB_IMAGE]", `paths: ["$1A/x"]`, "must start with"},
-		"paths second var":            {"env: [DB_IMAGE]", `paths: ["$HOME/$APP"]`, "variables after the base"},
-		"paths backslash":             {"env: [DB_IMAGE]", `paths: ["~/a\\b"]`, "backslashes"},
-		"paths space":                 {"env: [DB_IMAGE]", `paths: ["~/a b"]`, "spaces"},
-		"paths duplicate":             {"env: [DB_IMAGE]", `paths: ["~/.npmrc", "$HOME/.npmrc", "~/.npmrc"]`, `environment.paths[2]: "~/.npmrc" is listed twice`},
-		"paths not a list":            {"env: [DB_IMAGE]", `paths: "~/.npmrc"`, "paths"},
+		"run stack in env":           {"[DB_IMAGE]", "[DB_IMAGE, AVAL_RUN_STACK]", "environment.env[1]: AVAL_RUN_STACK is set by aval run and is not an input"},
+		"run stack in env, any case": {"[DB_IMAGE]", "[aval_run_stack]", "environment.env[0]: aval_run_stack is set by aval run"},
+		"paths glob":                 {"env: [DB_IMAGE]", `paths: ["~/.config/*"]`, `environment.paths[0]: "~/.config/*": no globs`},
+		"paths class":                {"env: [DB_IMAGE]", `paths: ["~/.config/[ab]"]`, "environment.paths[0]"},
+		"paths dotdot":               {"env: [DB_IMAGE]", `paths: ["~/../etc"]`, "clean relative path"},
+		"paths inner dotdot":         {"env: [DB_IMAGE]", `paths: ["~/a/../b"]`, "clean relative path"},
+		"paths dot":                  {"env: [DB_IMAGE]", `paths: ["~/."]`, "clean relative path"},
+		"paths trailing slash":       {"env: [DB_IMAGE]", `paths: ["~/.config/"]`, "clean relative path"},
+		"paths empty":                {"env: [DB_IMAGE]", `paths: [""]`, "must start with ~/, $NAME/ or ${NAME}/"},
+		"paths only home":            {"env: [DB_IMAGE]", `paths: ["~"]`, "must start with"},
+		"paths only home slash":      {"env: [DB_IMAGE]", `paths: ["~/"]`, "clean relative path"},
+		"paths only var":             {"env: [DB_IMAGE]", `paths: ["$HOME"]`, "must start with"},
+		"paths only braced var":      {"env: [DB_IMAGE]", `paths: ["${HOME}"]`, "must start with"},
+		"paths relative":             {"env: [DB_IMAGE]", `paths: [".config/app"]`, "must start with"},
+		"paths absolute":             {"env: [DB_IMAGE]", `paths: ["/etc/app"]`, "must start with"},
+		"paths other user":           {"env: [DB_IMAGE]", `paths: ["~root/x"]`, "must start with"},
+		"paths bad var":              {"env: [DB_IMAGE]", `paths: ["$1A/x"]`, "must start with"},
+		"paths second var":           {"env: [DB_IMAGE]", `paths: ["$HOME/$APP"]`, "variables after the base"},
+		"paths backslash":            {"env: [DB_IMAGE]", `paths: ["~/a\\b"]`, "backslashes"},
+		"paths space":                {"env: [DB_IMAGE]", `paths: ["~/a b"]`, "spaces"},
+		"paths duplicate":            {"env: [DB_IMAGE]", `paths: ["~/.npmrc", "$HOME/.npmrc", "~/.npmrc"]`, `environment.paths[2]: "~/.npmrc" is listed twice`},
+		"paths not a list":           {"env: [DB_IMAGE]", `paths: "~/.npmrc"`, "paths"},
+		// Prefix patterns (#253): "*" only last, after a non-empty name.
+		"bare star pattern":           {"[DB_IMAGE]", `["*"]`, `environment.env[0]: invalid variable name or prefix pattern "*"`},
+		"inner star pattern":          {"[DB_IMAGE]", "[APP*X]", `invalid variable name or prefix pattern "APP*X"`},
+		"leading star pattern":        {"[DB_IMAGE]", `["*_TOKEN"]`, `invalid variable name or prefix pattern "*_TOKEN"`},
+		"bad name pattern":            {"[DB_IMAGE]", "[AP-P_*]", `invalid variable name or prefix pattern "AP-P_*"`},
+		"double star pattern":         {"[DB_IMAGE]", "[APP_**]", `invalid variable name or prefix pattern "APP_**"`},
+		"pattern matches run stack":   {"[DB_IMAGE]", "[AVAL_*]", "environment.env[0]: AVAL_* is set by aval run and is not an input"},
+		"pattern matches run stack2":  {"[DB_IMAGE]", "[AVAL_RUN_*]", "environment.env[0]: AVAL_RUN_* is set by aval run"},
+		"pattern, any case":           {"[DB_IMAGE]", "[aval_run_*]", "environment.env[0]: aval_run_* is set by aval run"},
+		"whole name pattern":          {"[DB_IMAGE]", "[AVAL_RUN_STACK*]", "environment.env[0]: AVAL_RUN_STACK* is set by aval run"},
 		"missing scope":               {`source: ["**/*.go", "compose.yaml"]`, `source: []`, "scope.source"},
 		"bad kind":                    {"kind: Test", "kind: Suite", "kind"},
 		"bad tool key":                {"{go: ", "{Go: ", "environment.toolchain"},

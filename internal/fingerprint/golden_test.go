@@ -55,15 +55,7 @@ var goldenModes = map[string]fs.FileMode{
 	"suid.txt": fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky | 0o644,
 }
 
-func goldenEnv(k string) (string, bool) {
-	switch k {
-	case "DB_IMAGE":
-		return "postgres:16", true
-	case "EMPTY":
-		return "", true
-	}
-	return "", false
-}
+var goldenEnv = Env{"DB_IMAGE": "postgres:16", "EMPTY": ""}
 
 // goldenProblem reports why fps, computed under version, do not match the
 // golden committed for that version, or "" if they do.

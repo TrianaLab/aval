@@ -12,7 +12,7 @@ import (
 	"github.com/TrianaLab/aval/internal/fingerprint"
 )
 
-func noEnv(string) (string, bool) { return "", false }
+var noEnv = fingerprint.Env{}
 
 // copyTree copies the regular files under src into dst.
 func copyTree(t *testing.T, src, dst string) {

@@ -196,7 +196,9 @@ type Environment struct {
 	// version, such as {go: [go, version]}. Only `aval run` executes it.
 	// Omitted when empty, so contracts without it hash as before.
 	Probe map[string][]string `yaml:"probe,omitempty" json:"probe,omitempty"`
-	// Env lists environment variable names whose values are hashed.
+	// Env lists environment variable names whose values are hashed. An
+	// entry ending in "*", such as APP_*, is a prefix pattern: every set
+	// variable whose name starts with the prefix is hashed.
 	Env []string `yaml:"env,omitempty" json:"env"`
 	// Paths are files or directories outside the tree whose content is
 	// hashed: `~/rel`, `$NAME/rel` or `${NAME}/rel` (SplitPath). Omitted
@@ -232,7 +234,7 @@ func SplitPath(p string) (base, rel string, err error) {
 
 var (
 	nameRe    = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$`)
-	envRe     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	envRe     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\*?$`)
 	toolKeyRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
 	rootRe    = regexp.MustCompile(`^\.\.(/\.\.)*$`)
 )
@@ -576,7 +578,8 @@ var credentialKeys = []string{"token", "private_token", "access_token", "securit
 
 // RunStackEnv names the variable `aval run` sets for runner.command: the
 // contracts of the enclosing runs. It differs between an outer and a nested
-// run of the same inputs, so it may not appear in environment.env.
+// run of the same inputs, so it may not appear in environment.env, by name
+// or by a prefix pattern that would match it.
 const RunStackEnv = "AVAL_RUN_STACK"
 
 func (e Environment) validate(add func(string, ...any)) {
@@ -595,10 +598,16 @@ func (e Environment) validate(add func(string, ...any)) {
 			add("environment.probe.%s: must be a non-empty argv list", k)
 		}
 	}
+	e.validateInputs(add)
+}
+
+// validateInputs checks environment.env and environment.paths.
+func (e Environment) validateInputs(add func(string, ...any)) {
 	for i, v := range e.Env {
 		if !envRe.MatchString(v) {
-			add("environment.env[%d]: invalid variable name %q", i, v)
-		} else if strings.EqualFold(v, RunStackEnv) {
+			add("environment.env[%d]: invalid variable name or prefix pattern %q", i, v)
+		} else if p, pattern := strings.CutSuffix(v, "*"); strings.EqualFold(v, RunStackEnv) ||
+			pattern && strings.HasPrefix(strings.ToUpper(RunStackEnv), strings.ToUpper(p)) {
 			add("environment.env[%d]: %s is set by aval run and is not an input", i, v)
 		}
 	}

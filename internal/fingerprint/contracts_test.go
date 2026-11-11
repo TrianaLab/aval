@@ -70,7 +70,7 @@ func computeFile(root, file string, outputs ...string) (Fingerprint, error) {
 	return Compute(context.Background(), filepath.Dir(p), c, noEnv, outputs...)
 }
 
-func noEnv(string) (string, bool) { return "", false }
+var noEnv = Env{}
 
 // TestContractsFalseHits: the dependent's fingerprint follows every input a
 // referenced contract declares, transitively, and nothing it does not.

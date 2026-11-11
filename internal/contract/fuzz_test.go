@@ -40,6 +40,9 @@ func FuzzParse(f *testing.F) {
 	f.Add([]byte(strings.Replace(valid, "scope:\n", "scope:\n  root: ../..\n", 1)))
 	f.Add([]byte(strings.Replace(valid, "scope:\n", "scope:\n  root: ../x\n", 1)))
 	f.Add([]byte(strings.Replace(valid, "env: [DB_IMAGE]", `paths: ["~/.config/app", "${XDG_CONFIG_HOME}/app", "$H/../x"]`, 1)))
+	for _, env := range []string{"[APP_*]", "[APP_*, DB_IMAGE]", `["*"]`, "[AVAL_*]", "[AVAL_RUN_STACK*]", "[APP*X]"} {
+		f.Add([]byte(strings.Replace(valid, "env: [DB_IMAGE]", "env: "+env, 1)))
+	}
 	f.Fuzz(func(t *testing.T, data []byte) {
 		c, err := Parse(data)
 		if err != nil {
@@ -48,18 +51,12 @@ func FuzzParse(f *testing.F) {
 		if err := c.Validate(); err != nil {
 			t.Fatalf("Parse accepted an invalid contract: %v", err)
 		}
-		for _, seg := range strings.Split(c.Scope.Root, "/") {
-			if c.Scope.Root != "" && seg != ".." {
-				t.Fatalf("Parse accepted scope.root %q", c.Scope.Root)
-			}
+		if v, bad := badEnvEntry(c.Environment.Env); bad {
+			t.Fatalf("Parse accepted environment.env entry %q", v)
 		}
 		checkPaths(t, c.Environment.Paths)
+		checkFuzzedScope(t, c.Scope)
 		globs := slices.Concat(c.Scope.Source, c.Scope.OptionalSource, c.Scope.Exclude, c.Scope.Dependencies)
-		for _, g := range c.Scope.OptionalSource {
-			if slices.Contains(c.Scope.Source, g) {
-				t.Fatalf("Parse accepted %q in both scope.source and scope.optionalSource", g)
-			}
-		}
 		for _, a := range c.Scope.AllowMutable {
 			if a.File != "" && len(a.Files) > 0 {
 				t.Fatalf("Parse accepted file and files together: %+v", a)
@@ -72,6 +69,36 @@ func FuzzParse(f *testing.F) {
 			}
 		}
 	})
+}
+
+// checkFuzzedScope fails t if Parse accepted a scope.root that is not ".."
+// segments only, or a glob in both scope.source and scope.optionalSource.
+func checkFuzzedScope(t *testing.T, s Scope) {
+	t.Helper()
+	for _, seg := range strings.Split(s.Root, "/") {
+		if s.Root != "" && seg != ".." {
+			t.Fatalf("Parse accepted scope.root %q", s.Root)
+		}
+	}
+	for _, g := range s.OptionalSource {
+		if slices.Contains(s.Source, g) {
+			t.Fatalf("Parse accepted %q in both scope.source and scope.optionalSource", g)
+		}
+	}
+}
+
+// badEnvEntry returns an entry that is neither a name nor a prefix pattern
+// (a non-empty name before a single trailing "*"), or that names the run
+// stack.
+func badEnvEntry(env []string) (string, bool) {
+	for _, v := range env {
+		p, pattern := strings.CutSuffix(v, "*")
+		if p == "" || strings.Contains(p, "*") || strings.EqualFold(v, RunStackEnv) ||
+			pattern && strings.HasPrefix(strings.ToUpper(RunStackEnv), strings.ToUpper(p)) {
+			return v, true
+		}
+	}
+	return "", false
 }
 
 // FuzzMatch: for any glob ValidateGlob accepts, Match never panics and never
@@ -115,6 +142,12 @@ func FuzzParseAll(f *testing.F) {
 	f.Add([]byte(strings.Replace(set, "web:\n", "web:\n    use: [db]\n", 1)))
 	f.Add([]byte(strings.Replace(set, `toolchain: {postgres: "16"}`, `toolchain: {postgres: "16", go: "1.24"}`, 1)))
 	f.Add([]byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ntests: []\n"))
+	// Toolchain substitution (#255): per-leg values, a value holding "{x}",
+	// an unknown variable, a reference without a matrix.
+	f.Add([]byte(strings.Replace(set, "    cacheability: controlled", "    environment: {toolchain: {os: \"{index}/{total}\"}}\n    cacheability: controlled", 1)))
+	f.Add([]byte(strings.Replace(set, `total: ["2"]`, `total: ["{index}"]`, 1)))
+	f.Add([]byte(strings.Replace(set, `toolchain: {go: "1.25"}`, `toolchain: {go: "{index}"}`, 1)))
+	f.Add([]byte(strings.Replace(set, `toolchain: {postgres: "16"}`, `toolchain: {postgres: "{nope}"}`, 1)))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cs, err := ParseAll(data)
 		if err != nil {

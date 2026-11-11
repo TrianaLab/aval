@@ -1,0 +1,17 @@
+# One test per platform. The matrix writes the platform into the toolchain,
+# so each leg has its own fingerprint: unit-darwin never reuses unit-linux.
+# The probe records a leg's result only on the platform it declares.
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    source: ["**/*.go"]
+    dependencies: [go.mod]
+  cacheability: hermetic
+tests:
+  - metadata: {name: "unit-{os}"}
+    runner: {command: [go, test, ./...]}
+    matrix: {os: [linux, darwin]}
+    environment:
+      toolchain: {platform: "{os}"}
+      probe: {platform: [go, env, GOOS]}
