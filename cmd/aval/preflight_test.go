@@ -150,6 +150,10 @@ func TestInScope(t *testing.T) {
 	if !inScope(dir, deps, filepath.Join(dir, "deps", "go.sum")) || inScope(dir, deps, filepath.Join(dir, "deps", "other")) || inScope(dir, deps, "") {
 		t.Error("dependencies are inputs even when source excludes them; nothing else is")
 	}
+	opt := &contract.Contract{Scope: contract.Scope{Source: []string{"src/**"}, OptionalSource: []string{"gen/**"}, Exclude: []string{"gen/skip/**"}}}
+	if !inScope(dir, opt, filepath.Join(dir, "gen", "r.json")) || inScope(dir, opt, filepath.Join(dir, "gen", "skip", "r.json")) {
+		t.Error("optionalSource files are inputs unless excluded, like source files")
+	}
 }
 
 // validResult is a predicate that 'aval run' could have recorded.

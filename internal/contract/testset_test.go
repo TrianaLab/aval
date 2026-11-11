@@ -264,3 +264,24 @@ func TestLoadTestSet(t *testing.T) {
 		}
 	}
 }
+
+// scope.optionalSource unions across layers like scope.source, and a glob
+// that one layer makes required and another optional is rejected.
+func TestParseAllOptionalSource(t *testing.T) {
+	opt := strings.Replace(set, `scope: {source: ["db/**"]}`, `scope: {source: ["db/**"], optionalSource: ["db/seed/*.sql"]}`, 1)
+	opt = strings.Replace(opt, "    use: [web, db]\n", "    use: [web, db]\n    scope: {optionalSource: [\"**/*testdata*.yaml\", \"db/seed/*.sql\"]}\n", 1)
+	cs, err := ParseAll([]byte(opt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cs[0].Scope.OptionalSource != nil {
+		t.Errorf("unit optionalSource %q, want nil", cs[0].Scope.OptionalSource)
+	}
+	if want := []string{"db/seed/*.sql", "**/*testdata*.yaml"}; !reflect.DeepEqual(cs[1].Scope.OptionalSource, want) {
+		t.Errorf("optionalSource %q, want %q", cs[1].Scope.OptionalSource, want)
+	}
+	both := strings.Replace(set, `scope: {source: ["**/*.go"]}`, `scope: {source: ["**/*.go"], optionalSource: ["go.mod"]}`, 1)
+	if _, err := ParseAll([]byte(both)); err == nil || !strings.Contains(err.Error(), `"go.mod" is also in scope.source`) {
+		t.Fatalf("want a both-fields error, got %v", err)
+	}
+}

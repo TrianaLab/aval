@@ -74,6 +74,9 @@ type Fingerprint struct {
 	// with its own fingerprint (and so its own references): the tree
 	// --explain shows.
 	Contracts []Dependency
+	// UnmatchedOptional are the scope.optionalSource globs that matched no
+	// file, as written: explain shows them so a typo stays visible.
+	UnmatchedOptional []string
 }
 
 // Dependency is one scope.contracts reference and its fingerprint. Its
@@ -309,8 +312,9 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 	fsys, skip := t.sub(top)
 	ctx := t.ctx
 	canon := canonicalContract(c)
-	source, exclude, deps := splitGlobs(c.Scope.Source), splitGlobs(c.Scope.Exclude), splitGlobs(c.Scope.Dependencies)
-	files, err := listFiles(fsys, skip, source, deps, exclude)
+	source, optional := splitGlobs(c.Scope.Source), splitGlobs(c.Scope.OptionalSource)
+	exclude, deps := splitGlobs(c.Scope.Exclude), splitGlobs(c.Scope.Dependencies)
+	files, err := listFiles(fsys, skip, slices.Concat(source, optional), deps, exclude)
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -319,7 +323,7 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 	lines = append(lines, Version, "contract "+sum(canon))
 
 	h := &hasher{buf: make([]byte, 32<<10)}
-	src, err := h.hashMatching(fsys, files, "source", source, exclude)
+	src, err := h.hashMatching(fsys, files, "source", source, optional, exclude)
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -328,7 +332,7 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 	}
 	lines = append(lines, src...)
 
-	dep, err := h.hashMatching(fsys, files, "dependency", deps, nil)
+	dep, err := h.hashMatching(fsys, files, "dependency", deps, nil, nil)
 	if err != nil {
 		return Fingerprint{}, err
 	}
@@ -378,7 +382,7 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 	}
 
 	manifest := strings.Join(lines, "\n") + "\n"
-	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: found, Resolved: resolved, Contracts: refs}, nil
+	return Fingerprint{Digest: "sha256:" + sum([]byte(manifest)), Manifest: manifest, Findings: found, Resolved: resolved, Contracts: refs, UnmatchedOptional: unmatched(files, optional)}, nil
 }
 
 // envSection returns the env lines of c, unsorted: the recorded ones for
@@ -563,6 +567,7 @@ func canonicalContract(c *contract.Contract) []byte {
 		cc.Environment.Toolchain = nil
 	}
 	cc.Scope.Source = sorted(c.Scope.Source)
+	cc.Scope.OptionalSource = sorted(c.Scope.OptionalSource)
 	cc.Scope.Exclude = sorted(c.Scope.Exclude)
 	cc.Scope.Dependencies = sorted(c.Scope.Dependencies)
 	cc.Environment.Env = sorted(c.Environment.Env)
@@ -687,17 +692,17 @@ func excludedSymlink(name []string, deps, exclude []contract.Glob) bool {
 // hasher hashes files through one reused copy buffer.
 type hasher struct{ buf []byte }
 
-// hashMatching hashes every file matching any include glob and no exclude
-// glob. Every include glob must match at least one file (before exclude): a
-// glob that matches nothing is a typo or a name that differs on disk (case,
-// Unicode form), and ignoring it would silently drop a declared input.
-func (h *hasher) hashMatching(fsys fs.FS, files []file, kind string, include, exclude []contract.Glob) ([]string, error) {
+// hashMatching hashes every file matching any include or optional glob and
+// no exclude glob. Every include glob must match at least one file (before
+// exclude): a glob that matches nothing is a typo or a name that differs on
+// disk (case, Unicode form), and ignoring it would silently drop a declared
+// input. Optional globs are exempt from that rule only.
+func (h *hasher) hashMatching(fsys fs.FS, files []file, kind string, include, optional, exclude []contract.Glob) ([]string, error) {
 	var lines []string
-	for _, g := range include {
-		if !slices.ContainsFunc(files, func(f file) bool { return g.Match(f.segs) }) {
-			return nil, fmt.Errorf("%s glob %q matched no files", kind, strings.Join(g, "/"))
-		}
+	if u := unmatched(files, include); len(u) > 0 {
+		return nil, fmt.Errorf("%s glob %q matched no files", kind, u[0])
 	}
+	include = slices.Concat(include, optional)
 	for _, f := range files {
 		if !matchesAny(include, f) {
 			continue
@@ -723,6 +728,17 @@ func (h *hasher) hashMatching(fsys fs.FS, files []file, kind string, include, ex
 		lines = append(lines, kind+" "+sum+" "+mode+" "+f.rel)
 	}
 	return lines, nil // files is sorted, so lines are too
+}
+
+// unmatched returns the globs that match none of files, slash-joined.
+func unmatched(files []file, globs []contract.Glob) []string {
+	var out []string
+	for _, g := range globs {
+		if !slices.ContainsFunc(files, func(f file) bool { return g.Match(f.segs) }) {
+			out = append(out, strings.Join(g, "/"))
+		}
+	}
+	return out
 }
 
 func matchesAny(globs []contract.Glob, f file) bool {
