@@ -65,6 +65,10 @@ aval run --test uv-monorepo-shard-0
 `aval explain --all` checks every shard and prints its fingerprint
 ([Select a test](../contract.md#select-a-test)).
 
+For a runner that counts shards from 1, `matrix: {shard: {count: 3}}` with
+`{shard}/{shard_count}` in the command states the total once, so the shard
+list and the total cannot disagree.
+
 ## One test per platform
 
 `matrix` also substitutes into `environment.toolchain` values, so each

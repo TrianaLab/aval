@@ -61,22 +61,23 @@ then pin the version and the archive's sha256 (from that release's
 `checksums.txt`):
 
 ```sh
-curl -fsSLo .ci/get-aval.sh https://raw.githubusercontent.com/TrianaLab/aval/v0.8.0/scripts/get-aval.sh
+curl -fsSLo .ci/get-aval.sh https://raw.githubusercontent.com/TrianaLab/aval/v0.8.2/scripts/get-aval.sh
 ```
 
 ```sh
 # cosign (and gh for --require-provenance) must be on PATH.
-bash .ci/get-aval.sh --version v0.8.0 \
-  --sha256 linux_amd64=<sha256 of aval_0.8.0_linux_amd64.tar.gz> \
-  --sha256 darwin_arm64=<sha256 of aval_0.8.0_darwin_arm64.tar.gz> \
+bash .ci/get-aval.sh --version v0.8.2 \
+  --sha256 linux_amd64=<sha256 of aval_0.8.2_linux_amd64.tar.gz> \
+  --sha256 darwin_arm64=<sha256 of aval_0.8.2_darwin_arm64.tar.gz> \
   --require-verify --require-provenance
 ```
 
 The entry for the runner's platform is required. A re-tagged release, a
 mirror serving another build, or a missing `cosign` fails the install.
-`--sha256`, `--require-verify` and `--require-provenance` first ship in the
-release after 0.7.0. Aval's GitHub actions (`integrations/github/run` and
-`publish`) install their pinned release the same way.
+`--sha256`, `--require-verify` and `--require-provenance` first ship in
+v0.8.1 (the v0.8.0 tag has no release). Aval's GitHub actions
+(`integrations/github/run` and `publish`) install their pinned release the
+same way.
 
 ## Upgrade
 

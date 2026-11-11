@@ -63,6 +63,74 @@ func TestComputeRecordedNames(t *testing.T) {
 	}
 }
 
+// With a prefix pattern the env file records one line per matched set
+// variable, push takes it back to the same digest, and a file that names a
+// variable no entry covers, drops an exact name or a matched one, or adds
+// an unset pattern line does not give the run's digest (#253, #247).
+func TestComputeRecordedPatterns(t *testing.T) {
+	f := newFixture(t)
+	f.c.Environment.Env = []string{"APP_*", "MODE"}
+	f.env = map[string]string{"APP_A": "1", "APP_B": "2", "APPX": "3", "DB_IMAGE": "x"}
+	want, err := f.compute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b := "env APP_A "+sum([]byte("1")), "env APP_B "+sum([]byte("2"))
+	if got := want.EnvFile(); got != Version+"\n"+a+"\n"+b+"\nenv MODE unset\n" {
+		t.Fatalf("EnvFile() = %q", got)
+	}
+	env, err := ParseEnvFile([]byte(want.EnvFile()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("APP_C", "set only in the publish job") // not hashed: the file is the run's
+	if got, err := ComputeRecorded(context.Background(), f.dir, f.c, env); err != nil || got.Digest != want.Digest {
+		t.Fatalf("recorded: %v %s, want %s", err, got.Digest, want.Digest)
+	}
+	h := strings.Repeat("a", 64)
+	for name, env := range map[string][]string{
+		"name no entry covers":  {a, b, "env APPX " + h, "env MODE unset"},
+		"name a pattern misses": {a, b, "env MODE unset", "env OTHER " + h},
+		"unset pattern line":    {a, b, "env APP_C unset", "env MODE unset"},
+		"exact name missing":    {a, b},
+		"unsorted":              {b, a, "env MODE unset"},
+		"other case":            {a, b, "env MODE unset", "env app_c " + h},
+	} {
+		if _, err := ComputeRecorded(context.Background(), f.dir, f.c, env); err == nil || !strings.Contains(err.Error(), "env file names") {
+			t.Errorf("%s: %v, want a names error", name, err)
+		}
+	}
+	// False hit: a matched variable left out of the file, or one the run
+	// did not have, is accepted by name but changes the digest.
+	for name, env := range map[string][]string{
+		"matched name dropped": {a, "env MODE unset"},
+		"matched name added":   {a, b, "env APP_C " + h, "env MODE unset"},
+	} {
+		if got, err := ComputeRecorded(context.Background(), f.dir, f.c, env); err != nil || got.Digest == want.Digest {
+			t.Errorf("%s: %v, digest unchanged", name, err)
+		}
+	}
+}
+
+// On Windows a pattern line names the variable upper-cased, as envLines
+// writes it; a lower-case spelling is a name no entry gives.
+func TestRecordedEnvWindows(t *testing.T) {
+	defer func(old bool) { foldEnv = old }(foldEnv)
+	foldEnv = true
+	h := strings.Repeat("a", 64)
+	entries := []string{"app_*", "Mode"}
+	if _, err := recordedEnv([]string{"env APP_A " + h, "env Mode unset"}, entries); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recordedEnv([]string{"env Mode unset", "env app_a " + h}, entries); err == nil {
+		t.Fatal("lower-case pattern line accepted on Windows")
+	}
+	// A matching prefix with a mixed-case suffix reaches the envKey guard.
+	if _, err := recordedEnv([]string{"env APP_a " + h, "env Mode unset"}, entries); err == nil {
+		t.Fatal("mixed-case pattern line accepted on Windows")
+	}
+}
+
 func TestParseEnvFile(t *testing.T) {
 	h := strings.Repeat("0", 64)
 	for name, tc := range map[string]struct{ in, want string }{

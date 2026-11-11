@@ -199,8 +199,15 @@ env GOTOOLCHAIN 25bf8e1a2393f1108d37029b3df5593236c755742ec93465bbafa9b290bddcf6
   must still equal the result's and the report's.
 - Push refuses it (exit 1, nothing published) when the version line is not
   the current manifest version, a line is malformed or repeats a name, a hash
-  is neither `unset` nor 64 lowercase hex digits, or its names are not
-  exactly the sorted, deduplicated `environment.env` of the contract.
+  is neither `unset` nor 64 lowercase hex digits, the lines are not sorted,
+  an exact `environment.env` name has no line, or a line names a variable
+  that no exact name covers and no prefix pattern matches (as a set
+  variable, upper-cased on Windows).
+- With a prefix pattern (`APP_*`) the file has one line per variable the
+  pattern matched in the job that ran the test. Push cannot know which
+  those were: a matched variable set only in the publish job is not hashed,
+  and a line removed from the file changes the digest, which then no longer
+  equals the result's.
 - Contracts in `scope.contracts` are covered by their digests: push still
   hashes their `environment.env` from its own environment.
 - An existing env file inside the contract scope and outside `.aval/` is an
@@ -660,6 +667,9 @@ contract or policy file with `aval.dev/v1alpha1` is invalid.
   that uses it (unknown fields are rejected), which fails closed.
 - A new contract `kind` whose tests expand to `kind: Test` contracts that
   fingerprint as before. Older `aval` binaries reject it, which fails closed.
+- Widening the validation of a contract field to accept values it used to
+  reject, when every value it accepted before keeps its manifest. Older
+  `aval` binaries reject the new values, which fails closed.
 - A new manifest section that only a new optional contract field brings.
   Every contract without the field keeps its manifest byte for byte, and a
   contract with it cannot have had a fingerprint before, so no fingerprint
@@ -743,6 +753,10 @@ version adds a new file. The tests that enforce this:
       stopped being hashed, like a `.git` directory. Every existing
       attestation is a miss once and the tests run again; there is no
       lookup by v1.
+    - Within `aval.trianalab.io/v1` and `aval-fingerprint/v2` (#253),
+      `environment.env` accepts `PREFIX_*` patterns, which write the
+      existing `env` lines, one per matching variable. Contracts without a
+      pattern keep their manifest.
     - Within `aval.trianalab.io/v1` (#206), the contract gained
       `kind: TestSet`. Each of its tests fingerprints byte for byte like the
       same `kind: Test`, so the manifest version stays `aval-fingerprint/v2`.

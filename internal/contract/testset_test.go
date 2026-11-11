@@ -325,3 +325,111 @@ func TestParseAllOptionalSource(t *testing.T) {
 		t.Fatalf("want a both-fields error, got %v", err)
 	}
 }
+
+// countSet is the sharding repro of #259 with the matrix line m and the
+// shard argument arg.
+func countSet(m, arg string) string {
+	return `apiVersion: aval.trianalab.io/v1
+kind: TestSet
+tests:
+  - metadata: {name: "browser-{shard}"}
+    runner: {command: [make, test-browser, "PW_SHARD=` + arg + `"]}
+    matrix: ` + m + `
+    scope: {source: [a.txt]}
+    cacheability: hermetic
+`
+}
+
+// {count: N} expands like the list "1".."N", and {v_count} is N (#259).
+func TestParseAllMatrixCount(t *testing.T) {
+	count, err := ParseAll([]byte(countSet("{shard: {count: 3}}", "{shard}/{shard_count}")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := ParseAll([]byte(countSet(`{shard: ["1", "2", "3"]}`, "{shard}/3")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(count) != 3 || !reflect.DeepEqual(count, list) {
+		t.Fatalf("count form differs from the list form:\n%+v\n%+v", count, list)
+	}
+	if got := count[2].Runner.Command[2]; got != "PW_SHARD=3/3" {
+		t.Fatalf("argv %q", got)
+	}
+}
+
+// A count written in another integer spelling still gives {v_count} as
+// plain decimal, the same as the list form.
+func TestParseAllMatrixCountSpelling(t *testing.T) {
+	for _, n := range []string{"03", "+3"} {
+		got, err := ParseAll([]byte(countSet("{shard: {count: "+n+"}}", "{shard}/{shard_count}")))
+		if err != nil {
+			t.Fatalf("%s: %v", n, err)
+		}
+		if len(got) != 3 || got[2].Runner.Command[2] != "PW_SHARD=3/3" {
+			t.Fatalf("%s: %d tests, argv %q", n, len(got), got[len(got)-1].Runner.Command)
+		}
+	}
+}
+
+// A count variable beside a list variable: sorted variable order, {v_count}
+// in one pass (a list value "{shard_count}" stays literal), and the limit
+// counts N.
+func TestParseAllMatrixCountWithList(t *testing.T) {
+	doc := countSet(`{shard: {count: 2}, browser: [webkit, chromium], arg: ["{shard_count}"]}`, "{shard}/{shard_count}")
+	doc = strings.Replace(doc, `"browser-{shard}"`, `"{browser}-{shard}"`, 1)
+	doc = strings.Replace(doc, `make, test-browser`, `make, "{arg}"`, 1)
+	cs, err := ParseAll([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, c := range cs {
+		got = append(got, c.Metadata.Name+" "+strings.Join(c.Runner.Command, " "))
+	}
+	want := []string{
+		"webkit-1 make {shard_count} PW_SHARD=1/2",
+		"webkit-2 make {shard_count} PW_SHARD=2/2",
+		"chromium-1 make {shard_count} PW_SHARD=1/2",
+		"chromium-2 make {shard_count} PW_SHARD=2/2",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	for _, m := range []string{`{shard: {count: 513}, b: [x, y]}`, `{shard: {count: 1024}, b: [x, y]}`} {
+		if _, err := ParseAll([]byte(strings.Replace(countSet(m, "x"), "browser-{shard}", "{b}-{shard}", 1))); err == nil || !strings.Contains(err.Error(), "more than 1024 tests") {
+			t.Errorf("%s: got %v", m, err)
+		}
+	}
+	if cs, err := ParseAll([]byte(strings.Replace(countSet(`{shard: {count: 512}, b: [x, y]}`, "x"), "browser-{shard}", "{b}-{shard}", 1))); err != nil || len(cs) != 1024 {
+		t.Errorf("512x2: %d, %v", len(cs), err)
+	}
+}
+
+func TestParseAllMatrixCountInvalid(t *testing.T) {
+	cases := map[string]struct{ m, arg, want string }{
+		"zero":            {"{shard: {count: 0}}", "{shard}", `matrix.shard.count: got "0", want an integer from 1 to 1024`},
+		"negative":        {"{shard: {count: -1}}", "{shard}", `matrix.shard.count: got "-1"`},
+		"float":           {"{shard: {count: 1.5}}", "{shard}", `matrix.shard.count: got "1.5"`},
+		"string":          {`{shard: {count: "3"}}`, "{shard}", `matrix.shard.count: got "3"`},
+		"too many":        {"{shard: {count: 1025}}", "{shard}", `matrix.shard.count: got "1025"`},
+		"hex":             {"{shard: {count: 0x3}}", "{shard}", `matrix.shard.count: got "0x3"`},
+		"extra key":       {"{shard: {count: 3, step: 2}}", "{shard}", `matrix.shard: unexpected key "step" (the mapping form is {count: N})`},
+		"twice":           {"{shard: {count: 3, count: 4}}", "{shard}", `matrix.shard: unexpected key "count"`},
+		"missing":         {"{shard: {total: 3}}", "{shard}", "matrix.shard: count is required in the mapping form {count: N}"},
+		"empty mapping":   {"{shard: {}}", "{shard}", "matrix.shard: count is required"},
+		"clash":           {`{shard: {count: 3}, shard_count: ["3"]}`, "{shard}/{shard_count}", "matrix: variable shard_count clashes with {shard_count}, the count of shard"},
+		"list count":      {`{shard: ["1", "2"]}`, "{shard}/{shard_count}", `unknown matrix variable {shard_count} in "PW_SHARD={shard}/{shard_count}" (the matrix has shard)`},
+		"other count":     {`{shard: {count: 2}, other: [a]}`, "{shard}{other}/{other_count}", `unknown matrix variable {other_count} in "PW_SHARD={shard}{other}/{other_count}" (the matrix has other, shard, shard_count)`},
+		"scalar":          {"{shard: 3}", "{shard}", "tests[0].matrix.shard: got a number `3`, want a list of strings"},
+		"mapping in list": {"{shard: [{count: 3}]}", "{shard}", "want a string"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := ParseAll([]byte(countSet(tc.m, tc.arg)))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("got %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
