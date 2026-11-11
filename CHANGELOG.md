@@ -1,5 +1,43 @@
 # aval
 
+## 0.8.2
+
+### Patch Changes
+
+- 422352d: The GitHub actions carry a test's `outputs` from run to publish (#236).
+  `aval run --outputs-dir DIR` copies the files the `outputs` globs matched
+  into an empty DIR when it records the result, and `aval push --outputs-dir
+  DIR` publishes them from there instead of the contract root, refusing
+  (exit 1, nothing published) any entry that is not a regular file matched by
+  an `outputs` glob: a symlink, an extra file, an input, `.git` or `.aval`.
+  The run action passes `--outputs-dir .aval/<test>/outputs` on a push to the
+  default branch; the publish action passes the artifact's `outputs/`, so a test with outputs and no `outputs/` exits 1 instead of
+  publishing the checkout's files, and it refuses an artifact with any entry
+  outside `result.json`, `report.json`, `record.json` and `outputs/`. docs/guides/github-actions.md
+  documents the artifact layout. No format change. This closes the known gap
+  noted in 0.8.1 (the publish action could not push a test with `outputs`).
+  With a pinned release without `--outputs-dir` (0.8.1), the actions keep
+  running and publishing tests without `outputs`, and refuse a test with
+  `outputs`, as `aval explain --expand` reports it, with exit 1 naming aval
+  v0.8.2 or later, instead of dropping its outputs or signing the checkout's
+  files.
+- 8f78554: The aval run action takes a `shadow` input (default `false`): `true` passes
+  `aval run --shadow`, so the test runs beside a verified result and a false
+  hit fails the step; any value other than `true` or `false` exits 2 before
+  anything runs (#216). The job's `AVAL_MIN_TRUST_LEVEL` still reaches aval,
+  which only lets it raise the policy's minimum. Aval's own CI now runs its
+  suites through `integrations/github/run` and publishes through
+  `integrations/github/publish`: `aval.yaml` is a `kind: TestSet` with the
+  tests `aval-engine` and `aval-e2e` (same fingerprints as the former
+  `aval.yaml` and `aval.e2e.yaml`), one `.github/aval/policy.yaml` carries the
+  registry and replaces `main.yaml` and `pr.yaml` (main and releases raise the
+  minimum to `runner`), and `.github/aval/install.sh`, `trust-from-base.sh`
+  and `summary.sh` are removed. The release gate verifies with the release
+  the actions pin, under main's policy. No change to the aval binary, its
+  exit codes or formats.
+- 15cc546: Build with Go 1.27.4, which fixes GO-2026-6859 in `net/http` (govulncheck
+  reports it as reachable from required modules, not from Aval's code).
+
 ## 0.8.1
 
 ### Patch Changes
