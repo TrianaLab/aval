@@ -157,17 +157,15 @@ jobs:
   # the checkout; installs its pinned, verified aval release; and refuses a
   # job with id-token. GHCR is read anonymously. On main, the action uploads
   # the result as the artifact aval-aval-e2e, which dogfood-publish signs and
-  # pushes. The suite itself (runner.command) builds and tests the PR. It
+  # pushes. One policy (.github/aval/policy.yaml, #214): on main the action
+  # raises the minimum to runner (min-trust-level: auto, #251), so main
+  # reuses only ci.yaml on main; a PR also a maintainer's developer
+  # signature. The suite itself (runner.command) builds and tests the PR. It
   # needs ci-gates, so when the gates fail this check is skipped.
   ci-e2e:
     needs: [changes, ci-gates]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    env:
-      # One policy (.github/aval/policy.yaml, #214): main reuses only ci.yaml
-      # on main (runner level); a PR or dispatch also a maintainer's
-      # developer signature. Empty means the policy's minimum.
-      AVAL_MIN_TRUST_LEVEL: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'runner' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -692,9 +690,6 @@ jobs:
     needs: [changes, ci-gates]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    env:
-      # As in ci-e2e (#214).
-      AVAL_MIN_TRUST_LEVEL: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'runner' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -1,7 +1,7 @@
 # Aval's trust policy (#28, #216). The GitHub actions in ci.yaml read it from
 # main through the contents API, never from the checkout, and push to its
-# registry. Only ci.yaml on main signs at runner level. ci.yaml raises the
-# minimum to runner on main (AVAL_MIN_TRUST_LEVEL) and release.yaml's
+# registry. Only ci.yaml on main signs at runner level. The run action raises
+# the minimum to runner on main (min-trust-level: auto, #251) and release.yaml's
 # e2e-gate does too (--min-trust-level runner), so main and releases never
 # reuse a developer signature; pull requests do. An unlisted signer is a
 # verification failure. tests/architecture/dogfood_test.go enforces this.

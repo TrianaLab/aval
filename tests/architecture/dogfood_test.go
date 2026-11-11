@@ -42,7 +42,7 @@ const dogfoodRegistry = "ghcr.io/trianalab/aval-attestations"
 // policyProblems: the one policy (#216) names the registry and grants runner
 // level, or more, only to Aval's own workflows, keyless (#28). Any other
 // identity is at developer level only, so main and releases, which raise the
-// minimum to runner (mainMinTrust), never reuse its results, and a result it
+// minimum to runner (the run action on main, #251), never reuse its results, and a result it
 // signed is a miss there, never a verification failure (#130). Pull requests
 // keep the policy's minimum, which must not exceed runner, or CI could never
 // reuse its own results.
@@ -326,10 +326,6 @@ func TestDogfoodScopeCheckCatchesUndeclaredReads(t *testing.T) {
 	}
 }
 
-// mainMinTrust is the AVAL_MIN_TRUST_LEVEL of the suite jobs (#214): runner
-// on a push to main, the policy's minimum anywhere else.
-const mainMinTrust = "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'runner' || '' }}"
-
 // dogfoodJobs maps each job that uses Aval as a user would to the action it
 // uses (#216) and, for a suite, its test in aval.yaml and shadow input.
 var dogfoodJobs = map[string]struct{ uses, test, shadow string }{
@@ -347,7 +343,9 @@ type actionJob struct {
 // dogfoodJobProblems: each dogfood job reaches aval only through its action,
 // which installs the pinned, verified release: it builds and runs no aval of
 // its own. A suite job has no id-token (the action refuses one anyway) and
-// raises the minimum on main; only the publish job has id-token: write. No
+// leaves the trust minimum to the action, which raises it to runner on main
+// (#251): no AVAL_MIN_TRUST_LEVEL, no min-trust-level other than auto. Only
+// the publish job has id-token: write. No
 // other job of ci.yaml uses the run action with id-token.
 func dogfoodJobProblems(ci []byte) ([]string, error) {
 	var wf struct {
@@ -368,8 +366,8 @@ func dogfoodJobProblems(ci []byte) ([]string, error) {
 			if _, ok := j.Permissions["id-token"]; ok {
 				problems = append(problems, name+": a suite job must not have id-token")
 			}
-			if j.Env["AVAL_MIN_TRUST_LEVEL"] != mainMinTrust {
-				problems = append(problems, name+": AVAL_MIN_TRUST_LEVEL must be "+mainMinTrust)
+			if _, ok := j.Env["AVAL_MIN_TRUST_LEVEL"]; ok {
+				problems = append(problems, name+": AVAL_MIN_TRUST_LEVEL overrides the action's trust minimum")
 			}
 		} else if j.Permissions["id-token"] != "write" {
 			problems = append(problems, name+": the publish job needs id-token: write")
@@ -395,6 +393,9 @@ func dogfoodJobStepProblems(name, action, test, shadow string, steps []step) []s
 			uses++
 			if s.With["test"] != test || s.With["shadow"] != shadow {
 				problems = append(problems, name+": "+action+" with test "+strconv.Quote(s.With["test"])+" and shadow "+strconv.Quote(s.With["shadow"]))
+			}
+			if m := s.With["min-trust-level"]; m != "" && m != "auto" {
+				problems = append(problems, name+": "+action+" with min-trust-level "+strconv.Quote(m)+", want auto")
 			}
 		case !statsOnly(s.Run):
 			problems = append(problems, name+": runs aval outside "+action)
@@ -435,9 +436,8 @@ func TestDogfoodJobsUseTheActions(t *testing.T) {
 
 func TestDogfoodJobCheckCatchesDrift(t *testing.T) {
 	const (
-		env     = "    env: {AVAL_MIN_TRUST_LEVEL: \"" + mainMinTrust + "\"}\n"
-		e2e     = "  ci-e2e:\n" + env + "    steps: [{uses: actions/checkout@x}, {uses: ./integrations/github/run, with: {test: aval-e2e}}]\n"
-		shadow  = "  dogfood-shadow:\n" + env + "    steps: [{uses: ./integrations/github/run, with: {test: aval-engine, shadow: 'true'}}, {run: '\"$RUNNER_TEMP/stats-bin/aval\" stats --registry \"$AVAL_STATS_REGISTRY\" --since 30d'}]\n"
+		e2e     = "  ci-e2e:\n" + "    steps: [{uses: actions/checkout@x}, {uses: ./integrations/github/run, with: {test: aval-e2e}}]\n"
+		shadow  = "  dogfood-shadow:\n" + "    steps: [{uses: ./integrations/github/run, with: {test: aval-engine, shadow: 'true'}}, {run: '\"$RUNNER_TEMP/stats-bin/aval\" stats --registry \"$AVAL_STATS_REGISTRY\" --since 30d'}]\n"
 		publish = "  dogfood-publish:\n    permissions: {id-token: write, packages: write}\n    steps: [{uses: ./integrations/github/publish}]\n"
 	)
 	good := "jobs:\n" + e2e + shadow + publish
@@ -446,7 +446,8 @@ func TestDogfoodJobCheckCatchesDrift(t *testing.T) {
 	}
 	bad := map[string]string{
 		"suite with id-token":  strings.Replace(good, "  ci-e2e:\n", "  ci-e2e:\n    permissions: {id-token: write}\n", 1),
-		"no raised minimum":    strings.Replace(good, env, "", 1),
+		"job minimum":          strings.Replace(good, "  ci-e2e:\n", "  ci-e2e:\n    env: {AVAL_MIN_TRUST_LEVEL: ''}\n", 1),
+		"opted out":            strings.Replace(good, "test: aval-e2e}", "test: aval-e2e, min-trust-level: developer}", 1),
 		"runs aval directly":   strings.Replace(good, "{uses: ./integrations/github/run, with: {test: aval-e2e}}", "{run: aval run -f aval.yaml --test aval-e2e}", 1),
 		"builds aval":          strings.Replace(good, "{uses: actions/checkout@x}", "{run: go build -o bin/aval ./cmd/aval}", 1),
 		"other test":           strings.Replace(good, "test: aval-e2e", "test: aval-engine", 1),
