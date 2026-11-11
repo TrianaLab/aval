@@ -187,6 +187,11 @@ var corpus = []corpusCase{
 	{name: "toolchain value with an embedded newline", change: func(f *fixture) {
 		f.c.Environment.Toolchain["go"] = "1.25\nsource " + sum([]byte("x")) + " - x.go"
 	}, want: differ},
+	{name: "matrix leg of another platform", setup: func(f *fixture) {
+		f.write("go.mod", "module x\n")
+		f.c = platformLeg(f.t, "unit-darwin")
+	},
+		change: func(f *fixture) { f.c = platformLeg(f.t, "unit-linux") }, want: differ},
 	{name: "env value", change: func(f *fixture) { f.env["DB_IMAGE"] = "postgres:17" }, want: differ},
 	{name: "env unset to set", change: func(f *fixture) { f.env["MODE"] = "fast" }, want: differ},
 	{name: "env set to unset", change: func(f *fixture) { delete(f.env, "DB_IMAGE") }, want: differ},
@@ -296,6 +301,25 @@ var corpus = []corpusCase{
 		out, err := os.Readlink(f.path("pkg/bin"))
 		f.do(err)
 		f.do(os.WriteFile(filepath.Join(out, "b.go"), []byte("package b // edited\n"), 0o644))
+	}, want: same},
+	// A symlink to a file has no path under it, so its name alone is
+	// excluded (#258). It is never hashed nor followed.
+	{name: "file symlink excluded by name, retargeted to another file", setup: fileLink,
+		change: func(f *fixture) {
+			f.write("other.txt", "other\n")
+			f.remove("tests/fx/link.yaml")
+			f.symlink("../../other.txt", "tests/fx/link.yaml")
+		}, want: same},
+	{name: "file symlink outside root excluded by name, target edited", setup: func(f *fixture) {
+		fileLink(f)
+		out := filepath.Join(f.t.TempDir(), "x.yaml")
+		f.do(os.WriteFile(out, []byte("a\n"), 0o644))
+		f.remove("tests/fx/link.yaml")
+		f.symlink(out, "tests/fx/link.yaml")
+	}, change: func(f *fixture) {
+		out, err := os.Readlink(f.path("tests/fx/link.yaml"))
+		f.do(err)
+		f.do(os.WriteFile(out, []byte("b\n"), 0o644))
 	}, want: same},
 	{name: "file under .git added", change: func(f *fixture) { f.write(".git/objects/x.go", "package x\n") }, want: same},
 	{name: "file under a nested .git added", change: func(f *fixture) { f.write("pkg/a/.git/x.go", "package x\n") }, want: same},
@@ -442,6 +466,24 @@ var corpus = []corpusCase{
 		f.do(os.MkdirAll(f.path("pkg/node_modules"), 0o755))
 		symlinkDir(f, "pkg/node_modules/lib")
 	}, want: failClosed},
+	// A name-excluded file symlink that stops pointing to a file needs its
+	// contents excluded again: a directory, dangling link or loop fails.
+	{name: "name-excluded file symlink retargeted to a directory", setup: fileLink, change: func(f *fixture) {
+		f.remove("tests/fx/link.yaml")
+		symlinkDir(f, "tests/fx/link.yaml")
+	}, want: failClosed},
+	{name: "name-excluded file symlink left dangling", setup: fileLink,
+		change: func(f *fixture) { f.remove("tests/fx/real.yaml") }, want: failClosed},
+	{name: "name-excluded file symlink turned into a loop", setup: fileLink, change: func(f *fixture) {
+		f.remove("tests/fx/link.yaml")
+		f.symlink("link.yaml", "tests/fx/link.yaml")
+	}, want: failClosed},
+	{name: "name-excluded file symlink a dependency glob reaches", setup: fileLink, change: func(f *fixture) {
+		f.c.Scope.Dependencies = append(f.c.Scope.Dependencies, "tests/**/*.yaml")
+	}, want: failClosed},
+	{name: "file symlink exclude dropped", setup: fileLink, change: func(f *fixture) {
+		f.c.Scope.Exclude = slices.DeleteFunc(f.c.Scope.Exclude, func(g string) bool { return g == "tests/fx/link.yaml" })
+	}, want: failClosed},
 	{name: "source replaced by symlink", change: func(f *fixture) {
 		f.rename("main.go", "real.txt")
 		f.symlink("real.txt", "main.go")
@@ -488,12 +530,37 @@ var corpus = []corpusCase{
 	}, change: func(*fixture) {}, want: refused},
 }
 
+// platformLeg is the test named name of platformSet over the corpus tree.
+func platformLeg(t *testing.T, name string) *contract.Contract {
+	t.Helper()
+	cs, err := contract.LoadAll(platformSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cs {
+		if c.Metadata.Name == name {
+			return c
+		}
+	}
+	t.Fatalf("no test %s", name)
+	return nil
+}
+
 // symlinkTool adds pkg/web/node_modules/.bin/tool -> ../tool/bin/cli.js,
 // as npm ci does.
 func symlinkTool(f *fixture) {
 	f.write("pkg/web/node_modules/tool/bin/cli.js", "#!/bin/sh\necho a\n")
 	f.do(os.MkdirAll(f.path("pkg/web/node_modules/.bin"), 0o755))
 	f.symlink("../tool/bin/cli.js", "pkg/web/node_modules/.bin/tool")
+}
+
+// fileLink adds tests/fx/link.yaml -> real.yaml under source tests/**,
+// with the link excluded by name only: the repro from #258.
+func fileLink(f *fixture) {
+	f.write("tests/fx/real.yaml", "real\n")
+	f.symlink("real.yaml", "tests/fx/link.yaml")
+	f.c.Scope.Source = append(f.c.Scope.Source, "tests/**")
+	f.c.Scope.Exclude = append(f.c.Scope.Exclude, "tests/fx/link.yaml")
 }
 
 // symlinkDir adds name -> a directory outside the root holding b.go.

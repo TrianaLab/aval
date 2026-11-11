@@ -65,6 +65,19 @@ aval run --test uv-monorepo-shard-0
 `aval explain --all` checks every shard and prints its fingerprint
 ([Select a test](../contract.md#select-a-test)).
 
+## One test per platform
+
+`matrix` also substitutes into `environment.toolchain` values, so each
+platform is its own test with its own fingerprint:
+
+```yaml
+--8<-- "internal/fingerprint/testdata/shards/platforms.yaml"
+```
+
+`unit-darwin` never reuses a result of `unit-linux`. Run the leg of the
+machine you are on: the probe of the other leg does not match, so its result
+is not recorded. To reuse across platforms, do not declare `platform`.
+
 ## The matrix
 
 One job per shard, each with its own `--result-file` and coverage `outputs`:

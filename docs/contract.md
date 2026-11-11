@@ -163,17 +163,37 @@ Merge rules, in the order `defaults`, each used fragment, then the test:
   another fragment.
 
 `matrix` maps variables to lists of strings and creates one test per
-combination. It substitutes `{var}` into `metadata.name` and
-`runner.command` only, so each value is part of the fingerprinted argv. In a
-test with a matrix, every `{name}` in those two fields must be a matrix
-variable: write a shell variable as `$VAR`, not `${VAR}`. A set expands to
-at most 1024 tests.
+combination. It substitutes `{var}` into `metadata.name`, `runner.command`
+and the values of `environment.toolchain` (inherited ones too), in one pass,
+so a value that holds `{x}` is not substituted again. Each value is part of
+the fingerprinted argv or toolchain lines. In a test with a matrix, every
+`{name}` in those fields must be a matrix variable: write a shell variable as
+`$VAR`, not `${VAR}`. In a test without a matrix, a `{name}` in a toolchain
+value is an error. Probe argv, `env`, `scope` and `outputs` are not
+substituted. A set expands to at most 1024 tests.
+
+One test per platform, each with its own fingerprint, so a result recorded
+on darwin is never reused on linux:
+
+```yaml
+tests:
+  - metadata: {name: "unit-{os}"}
+    runner: {command: [go, test, ./...]}
+    matrix: {os: [linux, darwin]}
+    environment:
+      toolchain: {platform: "{os}"}
+      probe: {platform: [go, env, GOOS]}
+```
+
+`aval run --test unit-darwin` records a result only where the probe prints
+`darwin`. To reuse a result across platforms, do not declare `platform`.
 
 Each of these exits 2 and names the problem: an unknown fragment, a fragment
 no test uses, a fragment with `use`, `exclude`, `runner`, `metadata`,
 `outputs`, `matrix` or `cacheability`, a conflicting key, an unknown
-`{var}`, two tests with the same expanded name, and a `scope.contracts`
-entry that points at a TestSet (share scope with fragments instead).
+`{var}`, a `{var}` in a toolchain value of a test without a matrix, two
+tests with the same expanded name, and a `scope.contracts` entry that points
+at a TestSet (share scope with fragments instead).
 
 ### Select a test
 
@@ -246,10 +266,13 @@ hashed nor recorded, and `environment.env` cannot list it.
 - Order does not matter.
 - Symlinks are never followed nor hashed. A symlink under which a `source`
   or `dependencies` glob could match files is an error, unless `exclude`
-  covers both its name and its contents and no `dependencies` glob reaches
-  it: `**/node_modules/**` skips `pkg/web/node_modules/.bin/tool`, and
-  `["pkg/bin", "pkg/bin/**"]` skips a symlinked `pkg/bin`. `pkg/bin` or
-  `pkg/bin/**` alone does not.
+  covers its name and no `dependencies` glob reaches it. A symlink to a
+  regular file needs only its name excluded: `tests/fx/link.yaml` skips a
+  link to `real.yaml`. Any other symlink (to a directory, dangling, or a
+  loop) needs its contents excluded too: `**/node_modules/**` skips
+  `pkg/web/node_modules/.bin/tool`, and `["pkg/bin", "pkg/bin/**"]` skips a
+  symlinked `pkg/bin`. `pkg/bin` or `pkg/bin/**` alone does not. If a
+  name-excluded link later points to a directory, fingerprinting fails.
 
 ### Optional source globs
 
@@ -404,7 +427,7 @@ test and records nothing; `aval explain`, `aval verify` and `aval push` exit 1
 | `source "<path>" is excluded only by a trailing "**"` | exclude it by name, or narrow the glob |
 | `dependency glob "<glob>" matched no files` | fix the glob |
 | `only regular files are supported in scope` | remove the symlink, device or socket from scope |
-| `"<path>" is a symlink a glob could match files under` | symlinks are not followed: remove it, or exclude its name and contents (`**/node_modules/**`, or `pkg/bin` plus `pkg/bin/**`) with no `dependencies` glob reaching it ([Globs](#globs)); the contract directory itself may be a symlink |
+| `"<path>" is a symlink a glob could match files under` | symlinks are not followed: remove it, or exclude it with no `dependencies` glob reaching it ([Globs](#globs)). The message names the fix: its name alone for a link to a regular file, its name and contents (`pkg/bin` plus `pkg/bin/**`, or `**/node_modules/**`) for anything else. The contract directory itself may be a symlink |
 | `control characters in path are not supported` | rename the file (newline or carriage return) |
 | `resolve <kind> <reference>: <reason>` | see [When resolution fails](resolve/index.md#when-resolution-fails) |
 | `scope.contracts <path>: <reason>` | any error above in the referenced contract, or: missing or invalid contract, `leads outside the repository root` (also its `scope.root`), `no git working tree (.git) at or above <dir>`, `<path> is a symlink`, `<path> is not a regular file`, `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`, `more than 8 levels or 64 contracts` |
