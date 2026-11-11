@@ -3,6 +3,7 @@ package release
 import (
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
@@ -86,14 +87,21 @@ func pinProblems(version string, pins, checksums map[string]string) []string {
 // with no release, or a release with no checksums.txt, is an error.
 func fetchChecksums(t *testing.T, version string) map[string]string {
 	t.Helper()
+	return fetchSums(t, releaseBase+version+"/"+checksumsFile)
+}
+
+// fetchSums downloads and parses a sha256sum-style file. Anything but HTTP
+// 200 is an error: the actions pin a version that was never released.
+func fetchSums(t *testing.T, url string) map[string]string {
+	t.Helper()
 	c := http.Client{Timeout: time.Minute}
-	resp, err := c.Get(releaseBase + version + "/" + checksumsFile)
+	resp, err := c.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("release %s has no %s (HTTP %d): the actions pin a version that was never released", version, checksumsFile, resp.StatusCode)
+		t.Fatalf("%s: HTTP %d: the actions pin a version that was never released", url, resp.StatusCode)
 	}
 	path := filepath.Join(t.TempDir(), checksumsFile)
 	data, err := io.ReadAll(resp.Body)
@@ -272,4 +280,121 @@ func diffLines(a, b []byte) int {
 		}
 	}
 	return n
+}
+
+// cosignChecksums is where a cosign release lists the sha256 of its assets.
+const cosignChecksums = "https://github.com/sigstore/cosign/releases/download/%s/cosign_checksums.txt"
+
+// cosignPins returns COSIGN_VERSION and the cosign-<os>-<arch> -> sha256
+// entries of COSIGN_SHA256 from the cosign step (id: cosign) of an action.yml.
+func cosignPins(data []byte) (string, map[string]string, error) {
+	var a struct {
+		Runs struct {
+			Steps []struct {
+				ID  string            `yaml:"id"`
+				Env map[string]string `yaml:"env"`
+			} `yaml:"steps"`
+		} `yaml:"runs"`
+	}
+	if err := yaml.Unmarshal(data, &a); err != nil {
+		return "", nil, err
+	}
+	for _, s := range a.Runs.Steps {
+		if s.ID != "cosign" {
+			continue
+		}
+		pins := map[string]string{}
+		for _, f := range strings.Fields(s.Env["COSIGN_SHA256"]) {
+			asset, sum, ok := strings.Cut(f, "=")
+			if !ok || pins[asset] != "" {
+				return "", nil, fmt.Errorf("COSIGN_SHA256: malformed or duplicate entry %q", f)
+			}
+			pins[asset] = sum
+		}
+		return s.Env["COSIGN_VERSION"], pins, nil
+	}
+	return "", nil, fmt.Errorf("no cosign step")
+}
+
+// cosignPinProblems: every supported platform, and nothing else, is pinned to
+// the sha256 that cosign_checksums.txt lists for its binary.
+func cosignPinProblems(pins, sums map[string]string) []string {
+	var problems []string
+	want := map[string]bool{}
+	for _, p := range pinPlatforms {
+		asset := "cosign-" + strings.Replace(p, "_", "-", 1)
+		want[asset] = true
+		switch sum := sums[asset]; {
+		case sum == "":
+			problems = append(problems, asset+": not in cosign_checksums.txt")
+		case pins[asset] != sum:
+			problems = append(problems, fmt.Sprintf("%s: pinned %q, cosign_checksums.txt says %s", asset, pins[asset], sum))
+		}
+	}
+	for asset := range pins {
+		if !want[asset] {
+			problems = append(problems, "unsupported platform pinned: "+asset)
+		}
+	}
+	slices.Sort(problems)
+	return problems
+}
+
+// The run and publish actions pin the same cosign release (#248), and each
+// per-platform sha256 is the one its cosign_checksums.txt lists. Moving the
+// pin is a manual step (the comment above the cosign step says how); this
+// test fails a pin that does not match the release. Needs network.
+func TestCosignPinMatchesRelease(t *testing.T) {
+	var version string
+	var pins map[string]string
+	for i, f := range actionFiles {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		v, p, err := cosignPins(data)
+		if err != nil {
+			t.Fatalf("%s: %v", f, err)
+		}
+		if i > 0 && (v != version || fmt.Sprint(p) != fmt.Sprint(pins)) {
+			t.Fatalf("%s pins cosign %s %v, %s pins %s %v", f, v, p, actionFiles[0], version, pins)
+		}
+		version, pins = v, p
+	}
+	for _, p := range cosignPinProblems(pins, fetchSums(t, fmt.Sprintf(cosignChecksums, version))) {
+		t.Error(p)
+	}
+}
+
+func TestCosignPinCheckCatchesDrift(t *testing.T) {
+	sums, pins := map[string]string{"cosign-windows-amd64.exe": strings.Repeat("9", 64)}, map[string]string{}
+	for i, a := range []string{"cosign-linux-amd64", "cosign-linux-arm64", "cosign-darwin-amd64", "cosign-darwin-arm64"} {
+		sums[a] = strings.Repeat(fmt.Sprint(i), 64)
+		pins[a] = sums[a]
+	}
+	if got := cosignPinProblems(pins, sums); len(got) != 0 {
+		t.Fatalf("matching pins reported %v", got)
+	}
+	for name, mutate := range map[string]func(p, s map[string]string){
+		"wrong sha256":     func(p, _ map[string]string) { p["cosign-linux-amd64"] = strings.Repeat("f", 64) },
+		"platform gone":    func(p, _ map[string]string) { delete(p, "cosign-darwin-arm64") },
+		"extra entry":      func(p, _ map[string]string) { p["cosign-windows-amd64.exe"] = strings.Repeat("9", 64) },
+		"release lacks it": func(_, s map[string]string) { delete(s, "cosign-linux-arm64") },
+	} {
+		p, s := maps.Clone(pins), maps.Clone(sums)
+		mutate(p, s)
+		if got := cosignPinProblems(p, s); len(got) == 0 {
+			t.Errorf("%s: no problem reported", name)
+		}
+	}
+	for name, yml := range map[string]string{
+		"no cosign step":  "runs:\n  steps:\n    - id: install\n",
+		"duplicate entry": "runs:\n  steps:\n    - id: cosign\n      env: {COSIGN_SHA256: a=1 a=2}\n",
+		"no equals":       "runs:\n  steps:\n    - id: cosign\n      env: {COSIGN_SHA256: abc}\n",
+		"not yaml":        "runs: [\n",
+	} {
+		if _, _, err := cosignPins([]byte(yml)); err == nil {
+			t.Errorf("%s: no error", name)
+		}
+	}
 }

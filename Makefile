@@ -99,7 +99,7 @@ lint:
 	GOOS=js GOARCH=wasm go vet ./cmd/aval-wasm
 	GOOS=js GOARCH=wasm golangci-lint run ./cmd/aval-wasm
 	cd examples/evidence-consumer && golangci-lint run ./...
-	shellcheck scripts/*.sh docs/assets/tapes/*.sh integrations/github/*/*.sh examples/github-monorepo/*/*.sh
+	shellcheck scripts/*.sh docs/assets/tapes/*.sh integrations/github/*.sh integrations/github/*/*.sh examples/github-monorepo/*/*.sh
 
 # The workflows (actionlint, with shellcheck on their run: scripts) and the
 # GitHub actions under integrations/ (zizmor; offline, so no network audits),
