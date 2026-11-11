@@ -20,7 +20,7 @@ import (
 // file only shard 2 reads leaves shard 1 reusable. The one acceptance test
 // that reaches the network: uv installs the locked packages from PyPI (or
 // its cache). It fails without uv instead of skipping, so a pass of this
-// suite (aval.e2e.yaml) always includes it.
+// suite (aval-e2e in aval.yaml) always includes it.
 func TestUVMonorepoShards(t *testing.T) {
 	if _, err := exec.LookPath("uv"); err != nil {
 		t.Fatalf("uv is required (https://docs.astral.sh/uv/): %v", err)

@@ -1,8 +1,9 @@
 name: ci
 
 # Each ci-* job runs the `make` leg of the same name, so `make ci` locally and
-# this workflow stay one to one, except ci-e2e, which runs the same `aval run`
-# with the pinned release (tests/architecture/ci_test.go pinnedLegs, #134).
+# this workflow stay one to one, except ci-e2e, which runs the same test
+# through integrations/github/run and its pinned release
+# (tests/architecture/ci_test.go pinnedLegs, #134, #216).
 # The `required` job aggregates every other job and is the only required
 # status check; tests/architecture/ci_test.go fails if a job is not wired
 # into it.
@@ -20,8 +21,9 @@ on:
   # GITHUB_TOKEN, a push that starts no run, and its pin-actions-ci job on
   # release-pins/main after each release (#213). The `changes` job fails any
   # other dispatched ref. A dispatch run is treated as a PR against main: trust
-  # policy and registry from main (trust-from-base.sh), AVAL_GOLDEN_BASE and
-  # the API base origin/main, and every job with write scopes stays push-only.
+  # policy and registry from main (integrations/github/run reads them there on
+  # every event), developer signatures accepted, AVAL_GOLDEN_BASE and the API
+  # base origin/main, and every job with write scopes stays push-only.
   # pr-title and dependency-review are pull_request-only and skip on purpose:
   # release.yaml fixes the title, and the version PR only bumps the version in
   # package.json and package-lock.json.
@@ -30,16 +32,12 @@ on:
 permissions:
   contents: read
 
-# The aval release that jobs using Aval as a user would (the heavy suite ci-e2e, the demo and the dogfood shadow, publish and
-# record jobs) install with .github/aval/install.sh (main's
-# scripts/get-aval.sh with --sha256 and --require-verify, #202),
-# verified before use. The sha256 is that of aval_<version>_linux_amd64.tar.gz
-# as checksums.txt lists it, so a re-tagged release cannot change what runs.
-# Jobs that test the PR's code build from source (CONTRIBUTING.md "Which aval
-# a CI job runs").
+# The jobs that use Aval as a user would (ci-e2e, dogfood-shadow,
+# dogfood-publish) go through integrations/github/run and publish (#216),
+# which install the aval release pinned in their action.yml, verified before
+# use. Jobs that test the commit's code build from source (CONTRIBUTING.md
+# "Which aval a CI job runs").
 env:
-  AVAL_VERSION: 0.7.0
-  AVAL_SHA256: ca69a546f50902f12a7b22f65f520f3b9ed6ec296bdc576085aff35aa94102d8
   # The public stats registry (#97): dogfood-record publishes run records
   # there and docs.yaml (which names it too) builds the site's stats.json.
   AVAL_STATS_REGISTRY: ghcr.io/trianalab/aval-stats
@@ -149,25 +147,26 @@ jobs:
         env:
           AVAL_GOLDEN_BASE: ${{ github.event_name == 'push' && (github.event.before || 'no-push-before') || format('origin/{0}', github.base_ref || 'main') }}
 
-  # Dogfooding M3 (#28): the heavy suite (levels 2 and 4, aval.e2e.yaml)
-  # through `aval run`. A verified passing result for the same inputs is
-  # reused instead of running it; anything unproven runs it (invariant 3). A
-  # verification failure runs it and exits 5, which fails this job
-  # (invariant 4). Read-only: GHCR is read anonymously and no token or OIDC
-  # permission reaches the suite. If the package cannot be read anonymously,
-  # every lookup is an error and the suite runs. On main, dogfood-publish
-  # signs and pushes the recorded result, and dogfood-record publishes the
-  # run record. The pinned, verified aval release decides reuse, not
-  # `make ci-e2e` (#134): that would verify with bin/aval and the Makefile
-  # from the PR. The suite itself (runner.command) still builds and tests the
-  # PR. It needs ci-gates, so when the gates fail this check is skipped.
+  # Dogfooding M3 (#28): the heavy suite (levels 2 and 4, aval-e2e in
+  # aval.yaml) through integrations/github/run (#216). A verified passing
+  # result for the same inputs is reused instead of running it; anything
+  # unproven runs it (invariant 3). A verification failure exits 5, which
+  # fails this job (invariant 4). The action fetches the trust policy, and
+  # the registry inside it, from main through the contents API, never from
+  # the checkout; installs its pinned, verified aval release; and refuses a
+  # job with id-token. GHCR is read anonymously. On main, the action uploads
+  # the result as the artifact aval-aval-e2e, which dogfood-publish signs and
+  # pushes. The suite itself (runner.command) builds and tests the PR. It
+  # needs ci-gates, so when the gates fail this check is skipped.
   ci-e2e:
     needs: [changes, ci-gates]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     env:
-      AVAL_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      AVAL_REPOSITORY: ${{ github.repository }}
+      # One policy (.github/aval/policy.yaml, #214): main reuses only ci.yaml
+      # on main (runner level); a PR or dispatch also a maintainer's
+      # developer signature. Empty means the policy's minimum.
+      AVAL_MIN_TRUST_LEVEL: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'runner' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -175,56 +174,15 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        with:
-          cosign-release: v3.0.6
       # tests/acceptance runs examples/uv-monorepo and fails without uv; this
-      # is the uv version the example declares in environment.toolchain.
+      # is the uv version aval-e2e declares in environment.toolchain.
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.9.18"
           enable-cache: false
-      # AVAL_POLICY and AVAL_REGISTRY (#134): main reuses only this workflow
-      # on main (main.yaml); a PR or dispatch also developer signatures, with
-      # pr.yaml and the registry read from main. Both scripts are main's
-      # copies, run by absolute path. If main has no trust-from-base.sh
-      # (before #134 lands), no policy is set and nothing is reused. This step
-      # is still the PR's own ci.yaml: on pull_request a hostile PR can make
-      # its own check green; required code-owner review is what protects main.
-      - name: Trust policy, registry and pinned aval release, from main
-        env:
-          # gh attestation verify (--require-provenance) needs a token.
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          /usr/bin/git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-          /usr/bin/git show origin/main:.github/aval/install.sh > "$RUNNER_TEMP/install.sh"
-          if /usr/bin/git show origin/main:.github/aval/trust-from-base.sh > "$RUNNER_TEMP/trust-from-base.sh"; then
-            /bin/bash "$RUNNER_TEMP/trust-from-base.sh"
-          else
-            echo "::warning::main has no .github/aval/trust-from-base.sh: no trust policy, nothing is reused"
-          fi
-          /bin/bash "$RUNNER_TEMP/install.sh"
-      # --registry and --policy stay explicit even though aval reads
-      # AVAL_REGISTRY and AVAL_POLICY: the trust source stays visible in the
-      # command (#134).
-      - name: Heavy suite through the pinned aval release
-        run: |
-          aval run -f aval.e2e.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
-            --result-file .aval/e2e-result.json --report-file .aval/e2e-report.json \
-            --stats-file .aval/e2e-record.json --ci-run-url "$AVAL_CI_RUN_URL" --source-repo "$AVAL_REPOSITORY"
-      - name: Summary
-        if: always()
-        run: .github/aval/summary.sh aval-e2e .aval/e2e-report.json
-      - if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - uses: ./integrations/github/run
         with:
-          name: aval-e2e
-          path: |
-            .aval/e2e-report.json
-            .aval/e2e-result.json
-            .aval/e2e-record.json
-          include-hidden-files: true
-          if-no-files-found: ignore
+          test: aval-e2e
 
   # Release dry-run: the release build from .goreleaser.yaml as a snapshot
   # (unsigned: a PR gets no OIDC token), checked by tests/release. Runs on
@@ -370,6 +328,7 @@ jobs:
   # policy does not trust (exit 5, expected here). Push to main only: it
   # needs `packages: write` and `id-token: write`, which no PR-triggered job
   # gets. The same story runs locally in tests/acceptance (run_test.go).
+  # aval is built from the commit, as in publish-action (#216).
   example-go-compose:
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name == 'push'
@@ -388,16 +347,10 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        with:
-          cosign-release: v3.0.6
-      - name: Install the pinned aval release (verified)
-        env:
-          # gh attestation verify (--require-provenance) needs a token.
-          GH_TOKEN: ${{ github.token }}
-        run: .github/aval/install.sh
-      # TODO(milestone-14): in the Publish step, replace the outcome check with
-      # aval push --report-file publish.json once the pinned release has it (#216).
+      - name: Build aval
+        run: |
+          go build -o "$RUNNER_TEMP/bin/aval" ./cmd/aval
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Log in to GHCR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -408,14 +361,13 @@ jobs:
       - name: Publish (runs and pushes unless a verified result exists)
         run: |
           aval run -f "$CONTRACT" --registry "$REPO" --policy "$POLICY" --report-file publish.json
-          if [ "$(jq -r .outcome publish.json)" != "verified" ]; then
-            # The Actions OIDC token for Fulcio, fetched after the test so a
-            # slow test cannot outlive it. aval push reads SIGSTORE_ID_TOKEN.
-            SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
-            export SIGSTORE_ID_TOKEN
-            aval push -f "$CONTRACT" --registry "$REPO"
-          fi
+          # The Actions OIDC token for Fulcio, fetched after the test so a
+          # slow test cannot outlive it. aval push reads SIGSTORE_ID_TOKEN;
+          # with --report-file it signs nothing when the run reused (#201).
+          SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
+          export SIGSTORE_ID_TOKEN
+          aval push -f "$CONTRACT" --registry "$REPO" --report-file publish.json
           echo "| publish | \`$(jq -r .outcome publish.json)\` |" >> "$GITHUB_STEP_SUMMARY"
       - name: Unchanged scope reuses (hit)
         run: |
@@ -468,10 +420,10 @@ jobs:
   # them under integrations/github/publish/testdata/policy.yaml, which trusts
   # only ci.yaml on main: the certificate names the calling workflow, not
   # integrations/github/publish. bin/aval is built from the commit, because
-  # the action's pinned release has no --test yet.
-  # TODO(milestone-14): uses: ./integrations/github/publish once its pin has --test (#213, #216).
-  # The action downloads every aval-* artifact, so that switch must first
-  # rename aval-e2e and aval-shadow-engine or give the action a pattern input.
+  # the action's pinned release has no --outputs-dir yet. The artifacts are
+  # named suite-*, not aval-*: dogfood-publish runs the action, which
+  # downloads every aval-* artifact of the run.
+  # TODO(milestone-14): uses: ./integrations/github/publish once its pin has --outputs-dir (#213, #236).
   publish-action-suite:
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name == 'push'
@@ -495,17 +447,17 @@ jobs:
           done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: aval-publish-a
+          name: suite-publish-a
           path: .aval/publish-a/
           include-hidden-files: true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: aval-publish-b
+          name: suite-publish-b
           path: .aval/publish-b/
           include-hidden-files: true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: aval-publish-outputs
+          name: suite-publish-outputs
           path: .aval/publish-outputs/
           include-hidden-files: true
       # The run action's scripts on examples/github-monorepo's unit test, whose
@@ -524,7 +476,7 @@ jobs:
         run: |
           AVAL="$GITHUB_WORKSPACE/bin/aval" /bin/bash ../../integrations/github/run/guard.sh
           AVAL="$GITHUB_WORKSPACE/bin/aval" /bin/bash ../../integrations/github/run/run.sh
-      # Not aval-*: dogfood-publish downloads those.
+      # Not aval-*: dogfood-publish's action downloads those.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: example-github-monorepo-unit
@@ -554,10 +506,14 @@ jobs:
           echo "$GITHUB_RUN_ID" > integrations/github/publish/testdata/run-id
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          # Only the suite's artifacts: aval-e2e and aval-shadow-engine are
-          # not tests of this contract.
-          pattern: aval-publish-*
+          # Only the suite's artifacts, renamed to the aval-<test> layout the
+          # action's script reads.
+          pattern: suite-publish-*
           path: ${{ runner.temp }}/aval-artifacts
+      - name: Rename the suite's artifacts
+        env:
+          ARTIFACTS: ${{ runner.temp }}/aval-artifacts
+        run: for d in "$ARTIFACTS"/suite-*; do mv "$d" "$ARTIFACTS/aval-${d##*/suite-}"; done
       - name: Publish with the action's scripts
         env:
           ALLOW_UNPROTECTED: "false"
@@ -606,8 +562,9 @@ jobs:
   # to trust any GitHub workflow, registry included, and the action must
   # still use the default branch's copy (or none, before it exists there),
   # so nothing the edit trusts is reused. bin/aval is built from the commit,
-  # because the action's pinned release has no --test yet.
-  # TODO(milestone-14): uses: ./integrations/github/run once its pin has --test (#213, #216).
+  # because the example's unit test declares outputs and the action's pinned
+  # release has no --outputs-dir yet.
+  # TODO(milestone-14): uses: ./integrations/github/run once its pin has --outputs-dir (#213, #236).
   example-github-monorepo:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -697,12 +654,12 @@ jobs:
           other="$RUNNER_TEMP/elsewhere/aval"
           mkdir -p "$(dirname "$other")" && cp -R . "$other"
           : > fingerprint.txt
-          for f in aval.yaml aval.e2e.yaml; do
-            a=$(./bin/aval explain --digest -f "$f")
-            b=$(./bin/aval explain --digest -f "$other/$f")
-            test "$a" = "$b" || { echo "::error::$f: fingerprint depends on checkout path: $a vs $b"; exit 1; }
-            echo "$f $a" >> fingerprint.txt
-            { echo "### $f on $OS: \`$a\`"; echo '```'; ./bin/aval explain -f "$f" | sed '$d'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          for t in aval-engine aval-e2e; do
+            a=$(./bin/aval explain --digest -f aval.yaml --test "$t")
+            b=$(./bin/aval explain --digest -f "$other/aval.yaml" --test "$t")
+            test "$a" = "$b" || { echo "::error::$t: fingerprint depends on checkout path: $a vs $b"; exit 1; }
+            echo "$t $a" >> fingerprint.txt
+            { echo "### $t on $OS: \`$a\`"; echo '```'; ./bin/aval explain -f aval.yaml --test "$t" | sed '$d'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -724,19 +681,20 @@ jobs:
             cmp -s "${files[0]}" "$f" || { echo "::error::fingerprints differ across OSes"; exit 1; }
           done
 
-  # Dogfooding M2 (#28): shadow mode for the engine unit suite (aval.yaml).
+  # Dogfooding M2 (#28): shadow mode for the engine unit suite (aval-engine
+  # in aval.yaml) through integrations/github/run with shadow: true (#216).
   # `aval run --shadow` verifies a published result and runs the suite
   # anyway, so unit tests always run; a verified result that disagrees with
   # the run is a false hit and exits 1, a verification failure exits 5, and
-  # both fail this job. The report goes up as an artifact in the
-  # `aval verify --output json` format. Read-only, like ci-e2e.
+  # both fail this job. Read-only, like ci-e2e; on main the action uploads
+  # aval-aval-engine for dogfood-publish.
   dogfood-shadow:
     needs: [changes, ci-gates]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     env:
-      AVAL_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      AVAL_REPOSITORY: ${{ github.repository }}
+      # As in ci-e2e (#214).
+      AVAL_MIN_TRUST_LEVEL: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'runner' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -744,67 +702,19 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - uses: ./integrations/github/run
         with:
-          cosign-release: v3.0.6
-      # AVAL_POLICY and AVAL_REGISTRY (#134): main reuses only this workflow
-      # on main (main.yaml); a PR or dispatch also developer signatures, with
-      # pr.yaml and the registry read from main. Both scripts are main's
-      # copies, run by absolute path. If main has no trust-from-base.sh
-      # (before #134 lands), no policy is set and nothing is reused. This step
-      # is still the PR's own ci.yaml: on pull_request a hostile PR can make
-      # its own check green; required code-owner review is what protects main.
-      - name: Trust policy, registry and pinned aval release, from main
-        env:
-          # gh attestation verify (--require-provenance) needs a token.
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          /usr/bin/git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-          /usr/bin/git show origin/main:.github/aval/install.sh > "$RUNNER_TEMP/install.sh"
-          if /usr/bin/git show origin/main:.github/aval/trust-from-base.sh > "$RUNNER_TEMP/trust-from-base.sh"; then
-            /bin/bash "$RUNNER_TEMP/trust-from-base.sh"
-          else
-            echo "::warning::main has no .github/aval/trust-from-base.sh: no trust policy, nothing is reused"
-          fi
-          /bin/bash "$RUNNER_TEMP/install.sh"
-      - name: Shadow run of the engine unit suite
-        run: |
-          aval run --shadow -f aval.yaml --registry "$AVAL_REGISTRY" --policy "$AVAL_POLICY" \
-            --result-file .aval/engine-result.json --report-file .aval/engine-report.json \
-            --stats-file .aval/engine-record.json --ci-run-url "$AVAL_CI_RUN_URL" --source-repo "$AVAL_REPOSITORY"
-      - name: Summary
-        if: always()
-        run: .github/aval/summary.sh aval-engine .aval/engine-report.json
-      # Run statistics (#88): `aval stats` over the run records in the public
-      # stats registry, read anonymously. Informational: it never fails the job.
-      - name: Run statistics
-        if: always()
-        continue-on-error: true
-        run: |
-          {
-            echo "### aval stats, last 30 days"
-            echo '```'
-            aval stats --registry "$AVAL_STATS_REGISTRY" --by repository --since 30d --registry-timeout 10m 2>&1 || echo "aval stats failed"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-      - if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: aval-shadow-engine
-          path: |
-            .aval/engine-report.json
-            .aval/engine-result.json
-            .aval/engine-record.json
-          include-hidden-files: true
-          if-no-files-found: ignore
+          test: aval-engine
+          shadow: "true"
 
-  # Dogfooding M2 (#28): on main, sign keyless and push every result that
-  # ci-e2e and dogfood-shadow recorded and did not reuse. Only this job gets
-  # `id-token: write`; it and dogfood-record are the only jobs with
-  # `packages: write`. It runs no tests, and it runs
-  # only after both suites passed, so it publishes passing results only.
-  # `aval push` refuses a result whose fingerprint differs from this
-  # checkout's (same commit).
+  # Dogfooding M2 (#28): on main, integrations/github/publish (#216) signs
+  # keyless and pushes every result that ci-e2e and dogfood-shadow uploaded
+  # and did not reuse (aval push --report-file signs nothing for a reused
+  # result), to the registry in main's .github/aval/policy.yaml. Only this
+  # job of the dogfood jobs gets `id-token: write`; the suites have none. It
+  # runs no tests, and it runs only after both suites passed, so it publishes
+  # passing results only. `aval push` refuses a result whose fingerprint
+  # differs from this checkout's (same commit).
   dogfood-publish:
     needs: [ci-e2e, dogfood-shadow]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -813,10 +723,6 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    env:
-      # The one registry declaration: trust-from-base.sh reads it for the
-      # suites, from main on pull requests.
-      AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -824,38 +730,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: aval-*
-          path: results
-          merge-multiple: true
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        with:
-          cosign-release: v3.0.6
-      - name: Install the pinned aval release (verified)
-        env:
-          # gh attestation verify (--require-provenance) needs a token.
-          GH_TOKEN: ${{ github.token }}
-        run: .github/aval/install.sh
-      - name: Sign and push results that were not reused
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          export DOCKER_CONFIG="$RUNNER_TEMP/docker"
-          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          for pair in aval.yaml:engine aval.e2e.yaml:e2e; do
-            contract=${pair%%:*} name=${pair##*:}
-            # TODO(milestone-14): replace with aval push --report-file once the pinned release has it (#216).
-            if jq -e '.outcome == "verified"' "results/$name-report.json" > /dev/null; then
-              echo "$contract: reused a verified result, nothing to push"
-              continue
-            fi
-            # A fresh OIDC token per push, fetched after the tests ran.
-            SIGSTORE_ID_TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sigstore" | jq -r .value)
-            export SIGSTORE_ID_TOKEN
-            aval push -f "$contract" --registry "$AVAL_REGISTRY" --result-file "results/$name-result.json"
-          done
+      - uses: ./integrations/github/publish
 
   # Story 8.8 (#90): the one-line installers (scripts/get-aval.sh,
   # scripts/install.ps1) against Aval's real releases, including tampered
@@ -867,10 +742,6 @@ jobs:
   installer:
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    # The installers read AVAL_SHA256 (#202); the workflow-level pin is for
-    # .github/aval/install.sh, not for these tests.
-    env:
-      AVAL_SHA256: ""
     strategy:
       fail-fast: false
       matrix:
@@ -902,14 +773,15 @@ jobs:
         run: scripts/test-install.ps1 -Shell powershell
 
   # Run statistics (#87): on main, publish the run records that ci-e2e and
-  # dogfood-shadow wrote, whatever their outcome (always(), so failed runs
-  # count too). The suites run without credentials and write the record to a
-  # file; this job has `packages: write` only, runs no tests, and publishes
-  # with `aval stats publish` to the public stats registry (#97), a package of its
+  # dogfood-shadow wrote into their aval-* artifacts, whatever their outcome
+  # (always(), so failed runs count too). The suites run without credentials;
+  # this job has `packages: write` only, runs no tests, and publishes with
+  # `aval stats publish` to the public stats registry (#97), a package of its
   # own so other repositories can be given write access to it without access
   # to the attestations; docs.yaml turns it into the site's stats.json.
-  # Best-effort: a record that cannot be published is a warning. Records are
-  # unsigned statistics; run and verify never read them.
+  # aval is built from the commit: records are unsigned statistics that run
+  # and verify never read. Best-effort: a record that cannot be published is
+  # a warning.
   dogfood-record:
     needs: [changes, ci-e2e, dogfood-shadow]
     if: always() && needs.changes.outputs.code == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -924,37 +796,32 @@ jobs:
         continue-on-error: true
         with:
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        continue-on-error: true
+        with:
+          go-version-file: go.mod
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         continue-on-error: true
         with:
           pattern: aval-*
-          path: results
-          merge-multiple: true
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        continue-on-error: true
-        with:
-          cosign-release: v3.0.6
-      - name: Install the pinned aval release (verified)
-        continue-on-error: true
-        env:
-          # gh attestation verify (--require-provenance) needs a token.
-          GH_TOKEN: ${{ github.token }}
-        run: .github/aval/install.sh
+          path: ${{ runner.temp }}/results
       - name: Publish run records
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          RESULTS: ${{ runner.temp }}/results
         run: |
+          go build -o "$RUNNER_TEMP/aval" ./cmd/aval
           export DOCKER_CONFIG="$RUNNER_TEMP/docker"
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin \
             || { echo "::warning title=aval run record::ghcr login failed; run records not published"; exit 0; }
-          for name in engine e2e; do
-            f="results/$name-record.json"
+          for name in aval-engine aval-e2e; do
+            f="$RESULTS/aval-$name/record.json"
             if [ ! -f "$f" ]; then
               echo "::warning title=aval run record::$name: no run record to publish"
               continue
             fi
-            aval stats publish --registry "$AVAL_STATS_REGISTRY" "$f" \
+            "$RUNNER_TEMP/aval" stats publish --registry "$AVAL_STATS_REGISTRY" "$f" \
               || echo "::warning title=aval run record::$name: run record not published"
           done
 

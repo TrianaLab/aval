@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -13,42 +12,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
-
-// #135: summary.sh gates every aval report in CI and the release job. A
-// verification failure fails the step even when a trusted sibling verified
-// (an entry in rejected); a below-minimum signer (rejected miss) does not
-// (invariant 4).
-func TestSummaryFailsOnSecurityEvent(t *testing.T) {
-	cases := []struct {
-		name, report string
-		fail         bool
-	}{
-		{"verified", `{"outcome":"verified","result":"passed"}`, false},
-		{"verified beside a below-minimum signer", `{"outcome":"verified","result":"passed","rejected":[{"reference":"r@sha256:bb","outcome":"miss","reason":"x"}]}`, false},
-		{"miss", `{"outcome":"miss"}`, false},
-		{"verification failed", `{"outcome":"verification-failed"}`, true},
-		{"verified beside an untrusted signer", `{"outcome":"verified","result":"passed","rejected":[{"reference":"r@sha256:bb","outcome":"verification-failed","reason":"x"}]}`, true},
-		{"error beside an untrusted signer", `{"outcome":"error","rejected":[{"reference":"r@sha256:aa","outcome":"error","reason":"x"},{"reference":"r@sha256:bb","outcome":"verification-failed","reason":"x"}]}`, true},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			report, summary := filepath.Join(dir, "report.json"), filepath.Join(dir, "summary.md")
-			if err := os.WriteFile(report, []byte(tc.report), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			cmd := exec.Command("bash", filepath.Join(root, ".github", "aval", "summary.sh"), "e2e", report)
-			cmd.Env = append(os.Environ(), "GITHUB_STEP_SUMMARY="+summary)
-			out, err := cmd.CombinedOutput()
-			if (err != nil) != tc.fail {
-				t.Fatalf("summary.sh error %v, want failure %v; output %s", err, tc.fail, out)
-			}
-			if tc.fail && !strings.Contains(string(out), "::error title=aval verification failed (e2e)::") {
-				t.Fatalf("no error annotation: %s", out)
-			}
-		})
-	}
-}
 
 const aggregator = "required"
 
@@ -156,10 +119,18 @@ jobs:
 	}
 }
 
-// pinnedLegs run in CI through the pinned aval release instead of `make`,
-// with the same contract: `make ci-e2e` would verify with bin/aval and the
-// Makefile from the PR (#134).
-var pinnedLegs = map[string]string{"ci-e2e": "aval run -f aval.e2e.yaml "}
+// pinnedLegs run in CI through integrations/github/run and its pinned
+// release instead of `make`, with the same test: `make ci-e2e` would verify
+// with bin/aval and the Makefile from the PR (#134, #216).
+var pinnedLegs = map[string]string{"ci-e2e": "aval-e2e"}
+
+// runsLeg: step s runs `make leg`, or the run action on its pinnedLegs test.
+func runsLeg(leg string, s step) bool {
+	if test, ok := pinnedLegs[leg]; ok {
+		return s.Uses == runAction && s.With["test"] == test
+	}
+	return strings.TrimSpace(s.Run) == "make "+leg
+}
 
 // Every leg of `make ci` runs in the CI job of the same name and has a row in
 // the AGENTS.md Commands table, so local gates, CI and docs cannot drift apart.
@@ -186,12 +157,7 @@ func TestMakeCILegsMirrorCIJobs(t *testing.T) {
 			t.Errorf("make leg %s has no CI job %q", leg, leg)
 			continue
 		}
-		if !slices.ContainsFunc(job.Steps, func(s step) bool {
-			if want, ok := pinnedLegs[leg]; ok {
-				return strings.HasPrefix(strings.TrimSpace(s.Run), want)
-			}
-			return strings.TrimSpace(s.Run) == "make "+leg
-		}) {
+		if !slices.ContainsFunc(job.Steps, func(s step) bool { return runsLeg(leg, s) }) {
 			t.Errorf("CI job %s must run `make %s` (or its pinnedLegs command)", leg, leg)
 		}
 	}

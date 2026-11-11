@@ -16,6 +16,9 @@ inputs:
   policy:
     description: Path of the trust policy in the default branch.
     default: .github/aval/policy.yaml
+  shadow:
+    description: Run the test even when a verified result exists, and fail on a false hit (aval run --shadow).
+    default: "false"
 outputs:
   outcome:
     description: verified, miss, verification-failed or error, from the report.
@@ -68,6 +71,7 @@ runs:
         INPUT_TEST: ${{ inputs.test }}
         INPUT_FILE: ${{ inputs.file }}
         INPUT_POLICY: ${{ inputs.policy }}
+        INPUT_SHADOW: ${{ inputs.shadow }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         GH_TOKEN: ${{ github.token }}
       run: /bin/bash "$GITHUB_ACTION_PATH/run.sh"

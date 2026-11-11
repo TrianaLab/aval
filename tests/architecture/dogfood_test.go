@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -37,14 +36,23 @@ func loadPolicy(t *testing.T, name string) *policy.Policy {
 	return p
 }
 
-// mainPolicyProblems: main and releases require runner level (#28) and
-// grant it only to Aval's own workflows, keyless. Any other identity may be
-// listed at developer level only, below the minimum, so its results are a
-// miss on main, never reused and never a verification failure (#130).
-func mainPolicyProblems(p *policy.Policy) []string {
+// dogfoodRegistry is where Aval's own CI publishes its results.
+const dogfoodRegistry = "ghcr.io/trianalab/aval-attestations"
+
+// policyProblems: the one policy (#216) names the registry and grants runner
+// level, or more, only to Aval's own workflows, keyless (#28). Any other
+// identity is at developer level only, so main and releases, which raise the
+// minimum to runner (mainMinTrust), never reuse its results, and a result it
+// signed is a miss there, never a verification failure (#130). Pull requests
+// keep the policy's minimum, which must not exceed runner, or CI could never
+// reuse its own results.
+func policyProblems(p *policy.Policy) []string {
 	var problems []string
-	if p.MinTrustLevel != evidence.TrustRunner {
-		problems = append(problems, "minTrustLevel must be runner")
+	if p.Registry != dogfoodRegistry {
+		problems = append(problems, "registry must be "+dogfoodRegistry)
+	}
+	if p.MinTrustLevel > evidence.TrustRunner {
+		problems = append(problems, "minTrustLevel must not exceed runner")
 	}
 	for _, id := range p.Identities {
 		ownCI := id.PublicKey == "" && id.Issuer == actionsIssuer && strings.HasPrefix(id.SubjectRegexp, ownWorkflow) && literalRegexp(id.SubjectRegexp) && id.TrustLevel == evidence.TrustRunner
@@ -68,65 +76,45 @@ func literalRegexp(s string) bool {
 	return complete
 }
 
-// prPolicyProblems: a PR may also accept developer signatures, but grants
-// more than developer level only to identities the main policy trusts.
-func prPolicyProblems(pr, main *policy.Policy) []string {
-	var problems []string
-	for _, id := range pr.Identities {
-		if id.TrustLevel > evidence.TrustDeveloper && !slices.Contains(main.Identities, id) {
-			problems = append(problems, "identity above developer level not in the main policy: "+id.Issuer+" "+id.SubjectRegexp)
-		}
-	}
-	return problems
-}
-
-func TestDogfoodPolicies(t *testing.T) {
-	main, pr := loadPolicy(t, "main.yaml"), loadPolicy(t, "pr.yaml")
-	for _, p := range append(mainPolicyProblems(main), prPolicyProblems(pr, main)...) {
+func TestDogfoodPolicy(t *testing.T) {
+	for _, p := range policyProblems(loadPolicy(t, "policy.yaml")) {
 		t.Error(p)
 	}
 }
 
-func TestDogfoodPolicyChecksCatchLooseTrust(t *testing.T) {
+func TestDogfoodPolicyCheckCatchesLooseTrust(t *testing.T) {
 	ci := evidence.Identity{Issuer: actionsIssuer, SubjectRegexp: ownWorkflow + `ci\.yaml@refs/heads/main`, TrustLevel: evidence.TrustRunner}
-	main := &policy.Policy{MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci}}
-	if p := mainPolicyProblems(main); len(p) != 0 {
-		t.Fatalf("valid main policy reported %v", p)
-	}
 	dev := evidence.Identity{Issuer: "https://github.com/login/oauth", SubjectRegexp: `a@example\.com`, TrustLevel: evidence.TrustDeveloper}
-	if p := mainPolicyProblems(&policy.Policy{MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, dev}}); len(p) != 0 {
-		t.Fatalf("main policy with a developer identity at developer level reported %v", p)
+	pol := func(min evidence.TrustLevel, ids ...evidence.Identity) *policy.Policy {
+		return &policy.Policy{Registry: dogfoodRegistry, MinTrustLevel: min, Identities: ids}
+	}
+	for _, p := range []*policy.Policy{pol(evidence.TrustDeveloper, ci, dev), pol(evidence.TrustRunner, ci, dev), pol(evidence.TrustDeveloper, ci, evidence.Identity{PublicKey: "k", TrustLevel: evidence.TrustDeveloper})} {
+		if got := policyProblems(p); len(got) != 0 {
+			t.Errorf("valid policy reported %v", got)
+		}
 	}
 	runnerDev := dev
 	runnerDev.TrustLevel = evidence.TrustRunner
+	otherRegistry := pol(evidence.TrustDeveloper, ci)
+	otherRegistry.Registry = "ghcr.io/evil/x"
 	bad := map[string]*policy.Policy{
-		"developer level":              {MinTrustLevel: evidence.TrustDeveloper, Identities: []evidence.Identity{ci}},
-		"lowered minimum beside dev":   {MinTrustLevel: evidence.TrustDeveloper, Identities: []evidence.Identity{ci, dev}},
-		"developer identity at runner": {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, runnerDev}},
-		"developer key at runner":      {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, {PublicKey: "k", TrustLevel: evidence.TrustRunner}}},
-		"key":                          {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{PublicKey: "k", TrustLevel: evidence.TrustRunner}}},
-		"other repository":             {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: `https://github\.com/evil/aval/.*`, TrustLevel: evidence.TrustRunner}}},
-		"other issuer":                 {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: "https://evil", SubjectRegexp: ci.SubjectRegexp, TrustLevel: evidence.TrustRunner}}},
-		"wildcard developer":           {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, {Issuer: actionsIssuer, SubjectRegexp: ".*", TrustLevel: evidence.TrustDeveloper}}},
-		"wildcard after own workflow":  {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: ownWorkflow + ".*|.*", TrustLevel: evidence.TrustRunner}}},
-		"invalid developer regexp":     {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, {Issuer: actionsIssuer, SubjectRegexp: "(", TrustLevel: evidence.TrustDeveloper}}},
-		"isolated self-grant":          {MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{{Issuer: actionsIssuer, SubjectRegexp: ci.SubjectRegexp, TrustLevel: evidence.TrustIsolated}}},
+		"other registry":               otherRegistry,
+		"no registry":                  {MinTrustLevel: evidence.TrustDeveloper, Identities: []evidence.Identity{ci}},
+		"isolated minimum":             pol(evidence.TrustIsolated, ci),
+		"developer identity at runner": pol(evidence.TrustDeveloper, ci, runnerDev),
+		"developer key at runner":      pol(evidence.TrustDeveloper, ci, evidence.Identity{PublicKey: "k", TrustLevel: evidence.TrustRunner}),
+		"other repository":             pol(evidence.TrustDeveloper, evidence.Identity{Issuer: actionsIssuer, SubjectRegexp: `https://github\.com/evil/aval/.*`, TrustLevel: evidence.TrustRunner}),
+		"pull request at runner":       pol(evidence.TrustDeveloper, evidence.Identity{Issuer: actionsIssuer, SubjectRegexp: ownWorkflow + `ci\.yaml@refs/pull/.*`, TrustLevel: evidence.TrustRunner}),
+		"other issuer":                 pol(evidence.TrustDeveloper, evidence.Identity{Issuer: "https://evil", SubjectRegexp: ci.SubjectRegexp, TrustLevel: evidence.TrustRunner}),
+		"wildcard developer":           pol(evidence.TrustDeveloper, ci, evidence.Identity{Issuer: actionsIssuer, SubjectRegexp: ".*", TrustLevel: evidence.TrustDeveloper}),
+		"wildcard after own workflow":  pol(evidence.TrustDeveloper, evidence.Identity{Issuer: actionsIssuer, SubjectRegexp: ownWorkflow + ".*|.*", TrustLevel: evidence.TrustRunner}),
+		"invalid developer regexp":     pol(evidence.TrustDeveloper, ci, evidence.Identity{Issuer: actionsIssuer, SubjectRegexp: "(", TrustLevel: evidence.TrustDeveloper}),
+		"isolated self-grant":          pol(evidence.TrustDeveloper, evidence.Identity{Issuer: actionsIssuer, SubjectRegexp: ci.SubjectRegexp, TrustLevel: evidence.TrustIsolated}),
 	}
 	for name, p := range bad {
-		if len(mainPolicyProblems(p)) == 0 {
-			t.Errorf("main policy with %s: no problem reported", name)
+		if len(policyProblems(p)) == 0 {
+			t.Errorf("policy with %s: no problem reported", name)
 		}
-	}
-	if p := prPolicyProblems(&policy.Policy{Identities: []evidence.Identity{ci, dev}}, main); len(p) != 0 {
-		t.Errorf("PR policy with a developer identity reported %v", p)
-	}
-	if len(prPolicyProblems(&policy.Policy{Identities: []evidence.Identity{ci, runnerDev}}, main)) == 0 {
-		t.Error("PR policy granting runner level to a developer: no problem reported")
-	}
-	// Main listing the developer (at developer level) does not let a PR raise it.
-	withDev := &policy.Policy{MinTrustLevel: evidence.TrustRunner, Identities: []evidence.Identity{ci, dev}}
-	if len(prPolicyProblems(&policy.Policy{Identities: []evidence.Identity{ci, runnerDev}}, withDev)) == 0 {
-		t.Error("PR policy raising main's developer identity to runner: no problem reported")
 	}
 }
 
@@ -220,11 +208,11 @@ func TestWriteScopeCheckCatchesPRJobs(t *testing.T) {
 // further directories it only builds.
 type suiteDirs struct{ run, built []string }
 
-// dogfoodSuites maps each dogfood contract to its suite's directories.
+// dogfoodSuites maps each test of aval.yaml to its suite's directories.
 // Update it with runner.command.
 var dogfoodSuites = map[string]suiteDirs{
-	"aval.yaml":     {run: []string{"cmd", "internal", "pkg"}},
-	"aval.e2e.yaml": {run: []string{"tests/integration", "tests/acceptance"}, built: []string{"cmd", "internal", "pkg"}},
+	"aval-engine": {run: []string{"cmd", "internal", "pkg"}},
+	"aval-e2e":    {run: []string{"tests/integration", "tests/acceptance"}, built: []string{"cmd", "internal", "pkg"}},
 }
 
 // literalPaths returns the relative paths a Go file names as string
@@ -312,25 +300,25 @@ func undeclaredReads(t *testing.T, c *contract.Contract, dirs suiteDirs) []strin
 }
 
 func TestDogfoodScopeCoversEveryRead(t *testing.T) {
-	for file, dirs := range dogfoodSuites {
-		c, err := contract.Load(filepath.Join(root, file), "")
+	for test, dirs := range dogfoodSuites {
+		c, err := contract.Load(filepath.Join(root, "aval.yaml"), test)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, f := range undeclaredReads(t, c, dirs) {
-			t.Errorf("%s: the suite reads %s, which is outside scope: a change to it alone would be a false hit", file, f)
+			t.Errorf("%s: the suite reads %s, which is outside scope: a change to it alone would be a false hit", test, f)
 		}
 	}
 }
 
 func TestDogfoodScopeCheckCatchesUndeclaredReads(t *testing.T) {
-	c, err := contract.Load(filepath.Join(root, "aval.yaml"), "")
+	c, err := contract.Load(filepath.Join(root, "aval.yaml"), "aval-engine")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Go sources only: testdata, the CLI reference and the fuzz seeds drop out.
 	c.Scope.Source = []string{"cmd/**/*.go", "internal/**/*.go", "pkg/**/*.go"}
-	got := undeclaredReads(t, c, dogfoodSuites["aval.yaml"])
+	got := undeclaredReads(t, c, dogfoodSuites["aval-engine"])
 	for _, want := range []string{"pkg/evidence/testdata/verify-report-v1.golden.json", "docs/cli-reference.md", "aval.yaml", "examples/go-compose/aval.yaml"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("undeclared read of %s not reported (got %v)", want, got)
@@ -338,75 +326,88 @@ func TestDogfoodScopeCheckCatchesUndeclaredReads(t *testing.T) {
 	}
 }
 
-// releaseJobs use Aval as a user would, so they run the pinned release that
-// .github/aval/install.sh verifies, never a binary built from the PR.
-var releaseJobs = []string{"ci-e2e", "example-go-compose", "dogfood-shadow", "dogfood-publish", "dogfood-record"}
+// mainMinTrust is the AVAL_MIN_TRUST_LEVEL of the suite jobs (#214): runner
+// on a push to main, the policy's minimum anywhere else.
+const mainMinTrust = "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'runner' || '' }}"
 
-var (
-	pinVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
-	pinSHA256  = regexp.MustCompile(`^[0-9a-f]{64}$`)
-)
+// dogfoodJobs maps each job that uses Aval as a user would to the action it
+// uses (#216) and, for a suite, its test in aval.yaml and shadow input.
+var dogfoodJobs = map[string]struct{ uses, test, shadow string }{
+	"ci-e2e":          {runAction, "aval-e2e", ""},
+	"dogfood-shadow":  {runAction, "aval-engine", "true"},
+	"dogfood-publish": {"./integrations/github/publish", "", ""},
+}
 
-// releasePinProblems: ci.yaml pins a released aval version (a CHANGELOG.md
-// section) and a sha256, and each release job installs cosign, then runs
-// install.sh before any aval step, and builds nothing. Offline, this cannot
-// prove the sha256 belongs to the version; install.sh checks that at run
-// time against the signed checksums.txt.
-func releasePinProblems(ci, changelog []byte) ([]string, error) {
+type actionJob struct {
+	Permissions map[string]string `yaml:"permissions"`
+	Env         map[string]string `yaml:"env"`
+	Steps       []step            `yaml:"steps"`
+}
+
+// dogfoodJobProblems: each dogfood job reaches aval only through its action,
+// which installs the pinned, verified release: it builds and runs no aval of
+// its own. A suite job has no id-token (the action refuses one anyway) and
+// raises the minimum on main; only the publish job has id-token: write. No
+// other job of ci.yaml uses the run action with id-token.
+func dogfoodJobProblems(ci []byte) ([]string, error) {
 	var wf struct {
-		Env  map[string]string  `yaml:"env"`
-		Jobs map[string]permJob `yaml:"jobs"`
+		Jobs map[string]actionJob `yaml:"jobs"`
 	}
 	if err := yaml.Unmarshal(ci, &wf); err != nil {
 		return nil, err
 	}
 	var problems []string
-	v := wf.Env["AVAL_VERSION"]
-	if !pinVersion.MatchString(v) || !slices.Contains(strings.Split(string(changelog), "\n"), "## "+v) {
-		problems = append(problems, "AVAL_VERSION "+strconv.Quote(v)+" is not a released version in CHANGELOG.md")
+	for name, want := range dogfoodJobs {
+		j, ok := wf.Jobs[name]
+		if !ok {
+			problems = append(problems, name+": missing")
+			continue
+		}
+		problems = append(problems, dogfoodJobStepProblems(name, want.uses, want.test, want.shadow, j.Steps)...)
+		if want.uses == runAction {
+			if _, ok := j.Permissions["id-token"]; ok {
+				problems = append(problems, name+": a suite job must not have id-token")
+			}
+			if j.Env["AVAL_MIN_TRUST_LEVEL"] != mainMinTrust {
+				problems = append(problems, name+": AVAL_MIN_TRUST_LEVEL must be "+mainMinTrust)
+			}
+		} else if j.Permissions["id-token"] != "write" {
+			problems = append(problems, name+": the publish job needs id-token: write")
+		}
 	}
-	if !pinSHA256.MatchString(wf.Env["AVAL_SHA256"]) {
-		problems = append(problems, "AVAL_SHA256 is not a sha256")
-	}
-	for _, name := range releaseJobs {
-		problems = append(problems, releaseJobProblems(name, wf.Jobs[name].Steps)...)
+	for name, j := range wf.Jobs {
+		if _, ok := j.Permissions["id-token"]; ok && slices.ContainsFunc(j.Steps, func(s step) bool { return s.Uses == runAction }) {
+			problems = append(problems, name+": uses "+runAction+" with id-token")
+		}
 	}
 	slices.Sort(problems)
 	return problems, nil
 }
 
-// releaseJobProblems checks one release job: install the release (after
-// cosign) before any aval step, and build nothing.
-func releaseJobProblems(name string, steps []step) []string {
+// dogfoodJobStepProblems: the job uses action once, with the given test and
+// shadow inputs, and no other step mentions aval.
+func dogfoodJobStepProblems(name, action, test, shadow string, steps []step) []string {
 	var problems []string
-	cosign, installed := false, false
+	uses := 0
 	for _, s := range steps {
 		switch {
-		case strings.HasPrefix(s.Uses, "sigstore/cosign-installer@"):
-			cosign = true
-		case strings.TrimSpace(s.Run) == ".github/aval/install.sh" || strings.TrimSpace(s.Run) == trustStep:
-			if !cosign {
-				problems = append(problems, name+": install.sh before cosign is installed")
+		case s.Uses == action:
+			uses++
+			if s.With["test"] != test || s.With["shadow"] != shadow {
+				problems = append(problems, name+": "+action+" with test "+strconv.Quote(s.With["test"])+" and shadow "+strconv.Quote(s.With["shadow"]))
 			}
-			installed = true
-		case strings.Contains(s.Run, "make build") || strings.Contains(s.Run, "bin/aval"):
-			problems = append(problems, name+": builds aval instead of using the release")
-		case strings.Contains(s.Run, "aval ") && !installed:
-			problems = append(problems, name+": runs aval before installing the release")
+		case strings.Contains(s.Run, "aval"):
+			problems = append(problems, name+": runs aval outside "+action)
 		}
 	}
-	if !installed {
-		problems = append(problems, name+": does not install the pinned release")
+	if uses != 1 {
+		problems = append(problems, name+": must use "+action+" once")
 	}
 	return problems
 }
 
-func TestCIPinsVerifiedRelease(t *testing.T) {
-	changelog, err := os.ReadFile(filepath.Join(root, "CHANGELOG.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	problems, err := releasePinProblems(readCI(t), changelog)
+func TestDogfoodJobsUseTheActions(t *testing.T) {
+	problems, err := dogfoodJobProblems(readCI(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,33 +416,31 @@ func TestCIPinsVerifiedRelease(t *testing.T) {
 	}
 }
 
-func TestReleasePinCheckCatchesDrift(t *testing.T) {
-	changelog := []byte("# aval\n\n## 0.2.0\n\n## 0.1.0\n")
-	sha := strings.Repeat("a", 64)
-	install := "[{uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}, {run: aval run}]"
-	wf := func(version, sha, steps string) []byte {
-		s := "env: {AVAL_VERSION: " + version + ", AVAL_SHA256: " + sha + "}\njobs:\n"
-		for _, j := range releaseJobs {
-			s += "  " + j + ": {steps: " + steps + "}\n"
-		}
-		return []byte(s)
-	}
-	if p, err := releasePinProblems(wf("0.2.0", sha, install), changelog); err != nil || len(p) != 0 {
+func TestDogfoodJobCheckCatchesDrift(t *testing.T) {
+	const (
+		env     = "    env: {AVAL_MIN_TRUST_LEVEL: \"" + mainMinTrust + "\"}\n"
+		e2e     = "  ci-e2e:\n" + env + "    steps: [{uses: actions/checkout@x}, {uses: ./integrations/github/run, with: {test: aval-e2e}}]\n"
+		shadow  = "  dogfood-shadow:\n" + env + "    steps: [{uses: ./integrations/github/run, with: {test: aval-engine, shadow: 'true'}}]\n"
+		publish = "  dogfood-publish:\n    permissions: {id-token: write, packages: write}\n    steps: [{uses: ./integrations/github/publish}]\n"
+	)
+	good := "jobs:\n" + e2e + shadow + publish
+	if p, err := dogfoodJobProblems([]byte(good)); err != nil || len(p) != 0 {
 		t.Fatalf("valid workflow reported %v (%v)", p, err)
 	}
-	bad := map[string][]byte{
-		"unreleased version":  wf("0.3.0", sha, install),
-		"version with v":      wf("v0.2.0", sha, install),
-		"short sha":           wf("0.2.0", "abc", install),
-		"no install":          wf("0.2.0", sha, "[{run: aval run}]"),
-		"no cosign":           wf("0.2.0", sha, "[{run: .github/aval/install.sh}]"),
-		"builds from source":  wf("0.2.0", sha, "[{uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}, {run: make build}]"),
-		"runs bin/aval":       wf("0.2.0", sha, "[{uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}, {run: ./bin/aval run}]"),
-		"source build only":   wf("0.2.0", sha, "[{run: make build}, {run: aval run}]"),
-		"aval before install": wf("0.2.0", sha, "[{run: aval run}, {uses: sigstore/cosign-installer@x}, {run: .github/aval/install.sh}]"),
+	bad := map[string]string{
+		"suite with id-token":  strings.Replace(good, "  ci-e2e:\n", "  ci-e2e:\n    permissions: {id-token: write}\n", 1),
+		"no raised minimum":    strings.Replace(good, env, "", 1),
+		"runs aval directly":   strings.Replace(good, "{uses: ./integrations/github/run, with: {test: aval-e2e}}", "{run: aval run -f aval.yaml --test aval-e2e}", 1),
+		"builds aval":          strings.Replace(good, "{uses: actions/checkout@x}", "{run: go build -o bin/aval ./cmd/aval}", 1),
+		"other test":           strings.Replace(good, "test: aval-e2e", "test: aval-engine", 1),
+		"shadow off":           strings.Replace(good, ", shadow: 'true'", "", 1),
+		"publish without oidc": strings.Replace(good, "{id-token: write, packages: write}", "{packages: write}", 1),
+		"publish by hand":      strings.Replace(good, "{uses: ./integrations/github/publish}", "{run: aval push -f aval.yaml}", 1),
+		"no publish job":       "jobs:\n" + e2e + shadow,
+		"other job signs":      good + "  x:\n    permissions: {id-token: write}\n    steps: [{uses: ./integrations/github/run, with: {test: t}}]\n",
 	}
-	for name, data := range bad {
-		if p, err := releasePinProblems(data, changelog); err != nil || len(p) == 0 {
+	for name, wf := range bad {
+		if p, err := dogfoodJobProblems([]byte(wf)); err != nil || len(p) == 0 {
 			t.Errorf("%s: no problem reported (%v)", name, err)
 		}
 	}
