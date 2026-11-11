@@ -2437,6 +2437,9 @@ never overwrite each other's outputs:</p>
 </span></code></pre></div>
 <p><code>aval explain --all</code> checks every shard and prints its <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>
 (<a href="../../contract/#select-a-test">Select a test</a>).</p>
+<p>For a runner that counts shards from 1, <code>matrix: {shard: {count: 3}}</code> with
+<code>{shard}/{shard_count}</code> in the command states the total once, so the shard
+list and the total cannot disagree.</p>
 <h2 id="one-test-per-platform">One test per platform<a class="headerlink" href="#one-test-per-platform" title="Anchor link">&para;</a></h2>
 <p><code>matrix</code> also substitutes into <code>environment.toolchain</code> values, so each
 platform is its own test with its own <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>:</p>
