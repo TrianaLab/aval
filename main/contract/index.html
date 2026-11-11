@@ -2939,8 +2939,8 @@ expanded <code>metadata.name</code> of one test:</p>
 <li>On a <code>kind: Test</code> file, or a TestSet of one test, <code>--test</code> is optional; a
   name that matches no test exits 2.</li>
 <li>With <code>--test</code>, the output files default to <code>.aval/&lt;name&gt;/result.json</code>,
-  <code>report.json</code> and <code>record.json</code> (<code>--result-file</code>, <code>--report-file</code>,
-  <code>--stats-file</code>), so tests never overwrite each other's outputs and
+  <code>report.json</code>, <code>record.json</code> and <code>env.txt</code> (<code>--result-file</code>, <code>--report-file</code>,
+  <code>--stats-file</code>, <code>--env-file</code>), so tests never overwrite each other's outputs and
   <code>aval push --test &lt;name&gt;</code> finds the result and report of the run.
   <code>aval run --test &lt;name&gt;</code> removes a stale <code>.aval/&lt;name&gt;/</code> before it runs.
   A flag you pass wins. Without <code>--test</code> the defaults are unchanged.</li>
@@ -3121,7 +3121,7 @@ hashed, in this order:</p>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td>sha256 of the value, or <code>unset</code> (empty is not unset); values never appear in clear</td>
+<td>sha256 of the value, or <code>unset</code> (empty is not unset); values never appear in clear, but the hash of a short or guessable value (a low-entropy secret) can be found by trying values, so declare secrets only if <code>aval explain</code> output and the <a href="../artifact-format/#env-file">env file</a> may be seen</td>
 <td></td>
 </tr>
 <tr>

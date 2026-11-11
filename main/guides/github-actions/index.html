@@ -2411,15 +2411,15 @@ default <code>false</code>). In order, it:</p>
 </ol>
 <p>What <code>aval push</code> does with each artifact:</p>
 <ul>
-<li>An artifact <code>aval-a</code> that holds test <code>b</code>, or a result that does not match
-  the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> push computes from the checkout, exits 1 and publishes
-  nothing; the other artifacts are still pushed.</li>
+<li>An artifact <code>aval-a</code> that holds test <code>b</code>, or a result that does not match the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> push
+  computes from the checkout (<code>environment.env</code> from the artifact's <a href="../../artifact-format/#env-file"><code>env.txt</code></a>,
+  as hashed in the suite job), exits 1 and publishes nothing; the other artifacts are still pushed.</li>
 <li>A reused result (report <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>, also under <code>--shadow</code>) and a
   <code>non-deterministic</code> test print <code>nothing to push: ...</code> and exit 0.</li>
 <li>A <code>miss</code> or an <code>error</code> publishes the result, failures included: on a tie
   in <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> a failure outranks a later flaky pass.</li>
 <li>A report that records a security event signs nothing and exits 5.</li>
-<li>The artifact holds <code>result.json</code>, <code>report.json</code>, <code>record.json</code> and
+<li>The artifact holds <code>result.json</code>, <code>report.json</code>, <code>record.json</code>, <code>env.txt</code> and
   <code>outputs/&lt;path&gt;</code>, the files the <code>outputs</code> globs matched; push publishes
   those, never the checkout's. No <code>outputs/</code> for a test with outputs, or a
   symlink, extra file, input, <code>.git</code> or <code>.aval</code> in it, exits 1, publishing nothing.</li>
