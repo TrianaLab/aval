@@ -67,6 +67,11 @@ fi
 help=$("$AVAL" push --help) || help=""
 outputs_dir=false
 if [[ "$help" == *--outputs-dir* ]]; then outputs_dir=true; fi
+# The suite job's env section (#247): environment.env is hashed where the
+# test ran, not in this job. A release without push --env-file hashes this
+# job's environment, as before.
+env_file=false
+if [[ "$help" == *--env-file* ]]; then env_file=true; fi
 
 # Step 6: one push per artifact, each with its own token.
 worst=0 pushed=0
@@ -81,7 +86,7 @@ for dir in "$ARTIFACTS"/aval-*/; do
   if ! [[ "$name" =~ ^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$ ]]; then
     echo "::error title=aval publish::artifact aval-$name: \"$name\" is not a valid metadata.name"
     code=2
-  elif extra=$(/usr/bin/find "$dir" -mindepth 1 -maxdepth 1 ! -name result.json ! -name report.json ! -name record.json ! -name outputs -print -quit) && [ -n "$extra" ]; then
+  elif extra=$(/usr/bin/find "$dir" -mindepth 1 -maxdepth 1 ! -name result.json ! -name report.json ! -name record.json ! -name env.txt ! -name outputs -print -quit) && [ -n "$extra" ]; then
     echo "::error title=aval publish::artifact aval-$name holds ${extra##*/}, which is not part of the artifact layout"
     code=1
   elif [ "$outputs_dir" = false ] && ! expanded=$("$AVAL" explain -f "$INPUT_FILE" --test "$name" --expand); then
@@ -101,6 +106,7 @@ for dir in "$ARTIFACTS"/aval-*/; do
     # outputs globs and refuses anything else, or a missing outputs/ when
     # the contract declares outputs (#236).
     if [ "$outputs_dir" = true ]; then args+=(--outputs-dir "${dir}outputs"); fi
+    if [ "$env_file" = true ] && [ -f "${dir}env.txt" ]; then args+=(--env-file "${dir}env.txt"); fi
     SIGSTORE_ID_TOKEN="$token" "$AVAL" "${args[@]}" || code=$?
   fi
   echo "| $name | exit $code |" >> "$GITHUB_STEP_SUMMARY"

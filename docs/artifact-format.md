@@ -171,6 +171,41 @@ the test then runs and rewrites them.
   candidate.
 - Push needs no DELETE rights.
 
+### Env file
+
+`aval run` writes the env file next to the result (`--env-file`, default
+`.aval/env.txt`, `.aval/<test>/env.txt` with `--test`), and `aval push
+--env-file FILE` takes the `env` section of the manifest from it instead of
+its own environment, for a publish job whose variables differ from the job
+that ran the test:
+
+```text
+aval-fingerprint/v2
+env GOFLAGS unset
+env GOTOOLCHAIN 25bf8e1a2393f1108d37029b3df5593236c755742ec93465bbafa9b290bddcf6
+```
+
+- The first line is the fingerprint manifest version; the rest are the
+  manifest's `env NAME unset|<sha256 hex>` lines exactly as hashed, the same
+  lines `aval explain` prints, and nothing else. The file has no version of
+  its own beyond that line.
+- It holds hashes, never values. A hash of a low-entropy secret can be found
+  by trying values, as with `aval explain`.
+- It is neither signed nor published, and is no more trusted than the
+  `result.json` beside it: it replaces only the `env` section. Sources,
+  dependencies, toolchain and contract lines are hashed from the publish
+  checkout, so an edited env file cannot make push sign a result for files
+  the checkout does not have, and a different hash changes the digest, which
+  must still equal the result's and the report's.
+- Push refuses it (exit 1, nothing published) when the version line is not
+  the current manifest version, a line is malformed or repeats a name, a hash
+  is neither `unset` nor 64 lowercase hex digits, or its names are not
+  exactly the sorted, deduplicated `environment.env` of the contract.
+- Contracts in `scope.contracts` are covered by their digests: push still
+  hashes their `environment.env` from its own environment.
+- An existing env file inside the contract scope and outside `.aval/` is an
+  input: run and push exit 2, as for `--result-file`.
+
 ### Lookup and consumption
 
 1. Compute the fingerprint locally (`aval explain --digest`).

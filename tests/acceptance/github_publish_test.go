@@ -423,16 +423,20 @@ func TestGitHubActionsRefuseBadOutputs(t *testing.T) {
 
 // oldAval is real as a release without --outputs-dir (v0.8.1): its help
 // does not list the flag and it rejects it as cobra does.
-func oldAval(t *testing.T, real string) string {
+func oldAval(t *testing.T, real string) string { return withoutFlag(t, real, "--outputs-dir") }
+
+// withoutFlag is real as a release without flag: its help does not list
+// it and it rejects it as cobra does.
+func withoutFlag(t *testing.T, real, flag string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "aval")
 	script := fmt.Sprintf(`#!/bin/bash
 for a in "$@"; do
-  if [ "$a" = --outputs-dir ]; then echo 'Error: unknown flag: --outputs-dir' >&2; exit 2; fi
+  if [ "$a" = %[1]s ]; then echo 'Error: unknown flag: %[1]s' >&2; exit 2; fi
 done
-if [ "${2:-}" = --help ]; then %q "$@" | grep -v -- --outputs-dir; exit 0; fi
-exec %q "$@"
-`, real, real)
+if [ "${2:-}" = --help ]; then %[2]q "$@" | grep -v -- %[1]s; exit 0; fi
+exec %[2]q "$@"
+`, flag, real)
 	if err := os.WriteFile(p, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -477,5 +481,58 @@ func TestGitHubActionsOldReleaseOutputs(t *testing.T) {
 	}
 	if s.verify(t, "plain") != 0 || s.verify(t, "cov") != 4 {
 		t.Fatal("want plain published and cov not")
+	}
+}
+
+// envSet is a TestSet whose test a declares GOTOOLCHAIN in environment.env.
+const envSet = `apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope: {source: ["src/**"]}
+  cacheability: hermetic
+  environment: {env: [GOTOOLCHAIN]}
+tests:
+  - metadata: {name: a}
+    runner: {command: ["true"]}
+`
+
+// A suite job with GOTOOLCHAIN=local (as setup-go exports) and a publish
+// job without it (#247): the publish action takes environment.env from the
+// artifact's env.txt and pushes. With a release without push --env-file
+// (v0.8.2) it hashes its own environment, as before: exit 1, nothing
+// published.
+func TestGitHubActionsCarryEnv(t *testing.T) {
+	s := newPublishStory(t)
+	if err := os.WriteFile(filepath.Join(s.dir, "aval.yaml"), []byte(envSet), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r := action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", "INPUT_TEST=a", "GOTOOLCHAIN=local"); r.code != 0 || r.outputs["upload"] != "true" {
+		t.Fatalf("run action: exit %d\n%s", r.code, r.out)
+	}
+	if err := os.CopyFS(filepath.Join(s.artifacts, "aval-a"), os.DirFS(filepath.Join(s.dir, ".aval", "a"))); err != nil {
+		t.Fatal(err)
+	}
+	// The publish job runs without GOTOOLCHAIN; verify runs with it, as the
+	// suite job does.
+	unset := func() {
+		t.Setenv("GOTOOLCHAIN", "") // restored after the test
+		if err := os.Unsetenv("GOTOOLCHAIN"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	unset()
+	old := s.publish(t, "AVAL="+withoutFlag(t, s.wrapper(), "--env-file"))
+	t.Setenv("GOTOOLCHAIN", "local")
+	if old.code != 1 || !strings.Contains(old.out, "run the test again") || s.verify(t, "a") != 4 {
+		t.Fatalf("release without --env-file: exit %d, want 1 and nothing published\n%s", old.code, old.out)
+	}
+	unset()
+	r := s.publish(t)
+	if r.code != 0 || len(pushes(r.calls)) != 1 || !strings.Contains(pushes(r.calls)[0], "--env-file "+filepath.Join(s.artifacts, "aval-a", "env.txt")) {
+		t.Fatalf("publish: exit %d\n%s\n%s", r.code, r.out, strings.Join(r.calls, "\n"))
+	}
+	t.Setenv("GOTOOLCHAIN", "local")
+	if code := s.verify(t, "a"); code != 0 {
+		t.Fatalf("verify a with GOTOOLCHAIN=local: exit %d, want 0", code)
 	}
 }

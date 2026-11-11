@@ -79,4 +79,5 @@ tests:
           reason: example fixture, read as text by tests/acceptance
     environment:
       toolchain: {uv: "0.9.18"}
+      # TODO(milestone-15): add GOTOOLCHAIN once the pinned release has push --env-file (#247).
       env: [GOFLAGS, GOEXPERIMENT, CGO_ENABLED]

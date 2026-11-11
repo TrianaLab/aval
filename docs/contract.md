@@ -190,8 +190,8 @@ aval push --test shard-1
 - On a `kind: Test` file, or a TestSet of one test, `--test` is optional; a
   name that matches no test exits 2.
 - With `--test`, the output files default to `.aval/<name>/result.json`,
-  `report.json` and `record.json` (`--result-file`, `--report-file`,
-  `--stats-file`), so tests never overwrite each other's outputs and
+  `report.json`, `record.json` and `env.txt` (`--result-file`, `--report-file`,
+  `--stats-file`, `--env-file`), so tests never overwrite each other's outputs and
   `aval push --test <name>` finds the result and report of the run.
   `aval run --test <name>` removes a stale `.aval/<name>/` before it runs.
   A flag you pass wins. Without `--test` the defaults are unchanged.
@@ -246,10 +246,13 @@ hashed nor recorded, and `environment.env` cannot list it.
 - Order does not matter.
 - Symlinks are never followed nor hashed. A symlink under which a `source`
   or `dependencies` glob could match files is an error, unless `exclude`
-  covers both its name and its contents and no `dependencies` glob reaches
-  it: `**/node_modules/**` skips `pkg/web/node_modules/.bin/tool`, and
-  `["pkg/bin", "pkg/bin/**"]` skips a symlinked `pkg/bin`. `pkg/bin` or
-  `pkg/bin/**` alone does not.
+  covers its name and no `dependencies` glob reaches it. A symlink to a
+  regular file needs only its name excluded: `tests/fx/link.yaml` skips a
+  link to `real.yaml`. Any other symlink (to a directory, dangling, or a
+  loop) needs its contents excluded too: `**/node_modules/**` skips
+  `pkg/web/node_modules/.bin/tool`, and `["pkg/bin", "pkg/bin/**"]` skips a
+  symlinked `pkg/bin`. `pkg/bin` or `pkg/bin/**` alone does not. If a
+  name-excluded link later points to a directory, fingerprinting fails.
 
 ### Optional source globs
 
@@ -324,7 +327,7 @@ contract <path> <name> <fingerprint>
 | `contract` | sha256 of the parsed contract as JSON | comments, formatting, key order, the order and duplicates of set-like lists (argv order counts; an empty list equals an omitted one) |
 | `source`, `dependency` | sha256 of the content, `x` (any exec bit) or `-`, path. A file in both sets appears twice | owner, timestamps, other permission bits |
 | `toolchain` | `key=value` as written; checked against the installed tools only by `environment.probe` | |
-| `env` | sha256 of the value, or `unset` (empty is not unset); values never appear in clear | |
+| `env` | sha256 of the value, or `unset` (empty is not unset); values never appear in clear, but the hash of a short or guessable value (a low-entropy secret) can be found by trying values, so declare secrets only if `aval explain` output and the [env file](artifact-format.md#env-file) may be seen | |
 | `resolve` | kind, reference, version or `floating`, immutable id; only with `scope.resolve`, and needs the network ([Resolve references](resolve/index.md)) | the registry address |
 | `contract <path>` | one line per `scope.contracts` entry: the path as written, the referenced contract's `metadata.name` and its fingerprint, computed from its own directory and inputs (so references are transitive). `aval explain` also prints the tree, one `depends on <path> (<name>) <fingerprint>` line per reference | |
 
@@ -374,7 +377,7 @@ test and records nothing; `aval explain`, `aval verify` and `aval push` exit 1
 | `source "<path>" is excluded only by a trailing "**"` | exclude it by name, or narrow the glob |
 | `dependency glob "<glob>" matched no files` | fix the glob |
 | `only regular files are supported in scope` | remove the symlink, device or socket from scope |
-| `"<path>" is a symlink a glob could match files under` | symlinks are not followed: remove it, or exclude its name and contents (`**/node_modules/**`, or `pkg/bin` plus `pkg/bin/**`) with no `dependencies` glob reaching it ([Globs](#globs)); the contract directory itself may be a symlink |
+| `"<path>" is a symlink a glob could match files under` | symlinks are not followed: remove it, or exclude it with no `dependencies` glob reaching it ([Globs](#globs)). The message names the fix: its name alone for a link to a regular file, its name and contents (`pkg/bin` plus `pkg/bin/**`, or `**/node_modules/**`) for anything else. The contract directory itself may be a symlink |
 | `control characters in path are not supported` | rename the file (newline or carriage return) |
 | `resolve <kind> <reference>: <reason>` | see [When resolution fails](resolve/index.md#when-resolution-fails) |
 | `scope.contracts <path>: <reason>` | any error above in the referenced contract, or: missing or invalid contract, `leads outside the repository root` (also its `scope.root`), `no git working tree (.git) at or above <dir>`, `<path> is a symlink`, `<path> is not a regular file`, `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`, `more than 8 levels or 64 contracts` |
