@@ -594,3 +594,50 @@ func TestGitHubRunActionRegistryCredentialsHostOnly(t *testing.T) {
 		}
 	}
 }
+
+// lookup-only: true verifies without running, uploading or writing
+// anything, under the default branch's policy (#252); runs() counts only
+// the publishes. A miss succeeds the step; exit 5 fails it with the SECURITY
+// annotation, never mapped to miss.
+func TestGitHubRunActionLookupOnly(t *testing.T) {
+	s := newActionStory(t)
+	s.publish(t, s.ciKey)
+	if err := os.RemoveAll(filepath.Join(s.dir, ".aval")); err != nil {
+		t.Fatal(err)
+	}
+	lookup := "INPUT_LOOKUP_ONLY=true"
+	s.want(t, "verified", s.pr(t, lookup), 0, 1, "verified", "trust policy: .github/aval/policy.yaml from the default branch (main)")
+	r := action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", lookup)
+	s.want(t, "verified on main", r, 0, 1, "verified")
+	if r.outputs["upload"] != "false" || !strings.Contains(r.summary, "### aval lookup story: `verified`") {
+		t.Fatalf("lookup on main: upload %q, summary %q", r.outputs["upload"], r.summary)
+	}
+	if _, err := os.Stat(filepath.Join(s.dir, ".aval")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("lookup wrote .aval: %v", err)
+	}
+
+	s.want(t, "below AVAL_MIN_TRUST_LEVEL", s.pr(t, lookup, "AVAL_MIN_TRUST_LEVEL=isolated"), 0, 1, "miss")
+	s.contents.set("")
+	s.want(t, "no policy", s.pr(t, lookup), 0, 1, "miss", "::warning title=aval run::no trust policy")
+	s.contents.set(s.mainPolicy)
+
+	// The checkout's policy would trust this developer result: ignored.
+	s.write(t, "b\n")
+	s.want(t, "no attestation", s.pr(t, lookup), 0, 1, "miss")
+	s.publish(t, s.devKey)
+	s.want(t, "policy edited in the PR", s.pr(t, lookup), 0, 2, "miss")
+
+	s.write(t, "a\n")
+	tamper(t, s.repo, s.dir, func() {})
+	r = s.pr(t, lookup)
+	s.want(t, "tampered attestation", r, 5, 2, "verification-failed", "::error title=aval SECURITY::story: ")
+
+	for name, env := range map[string][]string{
+		"bad value":   {"INPUT_LOOKUP_ONLY=yes"},
+		"with shadow": {lookup, "INPUT_SHADOW=true"},
+	} {
+		if r := s.pr(t, env...); r.code != 2 || s.runs() != 2 || !strings.Contains(r.out, "::error title=aval run::lookup-only: ") {
+			t.Fatalf("%s: exit %d, %d runs\n%s", name, r.code, s.runs(), r.out)
+		}
+	}
+}

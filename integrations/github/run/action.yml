@@ -19,6 +19,13 @@ inputs:
   shadow:
     description: Run the test even when a verified result exists, and fail on a false hit (aval run --shadow).
     default: "false"
+  lookup-only:
+    description: >-
+      Only look up and verify a result (aval verify), never run the test, upload
+      or write .aval/: outcome verified or miss lets later setup steps be skipped.
+      A miss succeeds the step, exit 5 fails it. Keep a normal run step after it;
+      it decides reuse. Cannot be combined with shadow.
+    default: "false"
   min-trust-level:
     description: >-
       Raise the policy's minTrustLevel for this run: auto (runner when the ref is
@@ -101,6 +108,7 @@ runs:
         INPUT_FILE: ${{ inputs.file }}
         INPUT_POLICY: ${{ inputs.policy }}
         INPUT_SHADOW: ${{ inputs.shadow }}
+        INPUT_LOOKUP_ONLY: ${{ inputs.lookup-only }}
         INPUT_MIN_TRUST_LEVEL: ${{ inputs.min-trust-level }}
         REGISTRY_USERNAME: ${{ inputs.registry-username }}
         REGISTRY_PASSWORD: ${{ inputs.registry-password }}
