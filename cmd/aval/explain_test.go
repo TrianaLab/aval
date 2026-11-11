@@ -309,7 +309,7 @@ func TestExplainPaths(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, ".config", "app", "config.yaml"), []byte("x: 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, digest, _ := runCLI("explain", "-f", c, "--digest"); strings.HasSuffix(before, "fingerprint "+digest) {
-		t.Fatalf("a file added under ~/.config/app kept the digest %s", digest)
+	if code, digest, stderr := runCLI("explain", "-f", c, "--digest"); code != ExitOK || strings.HasSuffix(before, "fingerprint "+digest) {
+		t.Fatalf("explain --digest: exit %d, stderr %q; a file added under ~/.config/app kept the digest %s", code, stderr, digest)
 	}
 }
