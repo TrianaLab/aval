@@ -2354,21 +2354,21 @@ takes <code>test</code> (required), <code>file</code> (default <code>aval.yaml</
    comes from the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code> field
    (<a href="../trust-policy/">Write a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></a>); the job's <code>AVAL_REGISTRY</code> and
    <code>AVAL_POLICY</code> are ignored; <code>AVAL_MIN_TRUST_LEVEL</code> is not, since it only
-   raises the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s minimum. With no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> nothing is reused, the test
-   runs and a warning is logged.</li>
+   raises the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s minimum. With no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> nothing is reused, the test runs and a warning is logged.</li>
 <li>Runs <code>aval run -f &lt;file&gt; --test &lt;test&gt;</code> with the CI run URL, the
    repository and, on a push to the default branch, <code>--outputs-dir</code>.</li>
 <li>Writes the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> to the step summary and the <code>outcome</code> output. Exit 5
    sets the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> to <code>verification-failed</code>, becomes an <code>aval SECURITY</code>
    error annotation and fails the step; a miss is routine.</li>
-<li>On a push to the default branch only, uploads <code>.aval/&lt;test&gt;/</code> as the
-   artifact <code>aval-&lt;test&gt;</code>.</li>
-<li>Warns when the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> trusts a <code>refs/pull/</code> subject at or above
-   <code>minTrustLevel</code>.</li>
+<li>On a push to the default branch only, uploads <code>.aval/&lt;test&gt;/</code> as the artifact <code>aval-&lt;test&gt;</code>.</li>
+<li>Warns when the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> trusts a <code>refs/pull/</code> subject at or above <code>minTrustLevel</code>.</li>
 </ol>
 <p>The <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> is a separate file on the default branch, so <code>publicKey</code> paths in
 it are not fetched; use keyless identities. The action needs <code>/usr/bin/jq</code>
-(GitHub's Ubuntu images, macOS 15 and later).</p>
+(GitHub's Ubuntu images, macOS 15 and later).
+Neither action writes <code>GITHUB_PATH</code> or <code>GITHUB_ENV</code>: the cosign that checks
+the aval release is pinned by sha256 and installed in <code>$RUNNER_TEMP</code>, off the
+job's <code>PATH</code>, so the test and later steps see the job's own tools.</p>
 <div class="admonition note">
 <p class="admonition-title">Pinned release</p>
 <p>Pinning an action by commit SHA pins its aval release too, moved by a PR
