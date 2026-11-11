@@ -1,18 +1,21 @@
 #!/bin/bash
 # Steps 3 to 7 of the aval run action (#211). Reads INPUT_TEST, INPUT_FILE,
-# INPUT_POLICY, INPUT_SHADOW, AVAL (absolute path of the installed binary),
-# DEFAULT_BRANCH, GH_TOKEN, REGISTRY_USERNAME, REGISTRY_PASSWORD and the
-# runner's GITHUB_* variables.
+# INPUT_POLICY, INPUT_SHADOW, INPUT_MIN_TRUST_LEVEL, AVAL (absolute path of
+# the installed binary), DEFAULT_BRANCH, GH_TOKEN, REGISTRY_USERNAME,
+# REGISTRY_PASSWORD and the runner's GITHUB_* variables.
 #
 # The trust policy is fetched from the default branch through the contents
 # API on every event, never read from the checkout, so a pull request that
 # edits it does not change what its own run trusts. The registry comes from
 # inside the policy (#209); AVAL_REGISTRY and AVAL_POLICY from the job are
 # ignored; AVAL_MIN_TRUST_LEVEL is not, since it can only raise the policy's
-# minimum (#214). No policy means nothing is reused. Tools are called by absolute
-# path, so an earlier step that writes GITHUB_PATH cannot shim them. A hostile
-# pull request still controls its own workflow file: required code-owner
-# review is what protects the default branch (docs/trust-model.md).
+# minimum (#214). On the default branch the minimum is raised to runner unless
+# the min-trust-level input says otherwise (#251), so main never goes green on
+# a developer result that aval push would then not publish. No policy means
+# nothing is reused. Tools are called by absolute path, so an earlier step
+# that writes GITHUB_PATH cannot shim them. A hostile pull request still
+# controls its own workflow file: required code-owner review is what protects
+# the default branch (docs/trust-model.md).
 set -euo pipefail
 : "${INPUT_TEST:?}" "${INPUT_FILE:?}" "${INPUT_POLICY:?}" "${AVAL:?}" "${GH_TOKEN:?}"
 : "${GITHUB_API_URL:?}" "${GITHUB_REPOSITORY:?}" "${GITHUB_EVENT_NAME:?}" "${RUNNER_TEMP:?}" "${GITHUB_OUTPUT:?}" "${GITHUB_STEP_SUMMARY:?}"
@@ -34,10 +37,42 @@ case "${INPUT_SHADOW:-false}" in
     exit 2
     ;;
 esac
+rank() { case "$1" in developer) echo 1 ;; runner) echo 2 ;; isolated) echo 3 ;; *) echo 9 ;; esac; }
+case "${INPUT_MIN_TRUST_LEVEL:-auto}" in
+  auto | developer | runner | isolated) ;;
+  *)
+    echo "::error title=aval run::min-trust-level: \"$INPUT_MIN_TRUST_LEVEL\" must be auto, developer, runner or isolated"
+    exit 2
+    ;;
+esac
+if [ -n "${AVAL_MIN_TRUST_LEVEL:-}" ] && [ "$(rank "$AVAL_MIN_TRUST_LEVEL")" = 9 ]; then
+  echo "::error title=aval run::AVAL_MIN_TRUST_LEVEL: \"$AVAL_MIN_TRUST_LEVEL\" must be developer, runner or isolated"
+  exit 2
+fi
+
+# A literal string comparison: no glob, no prefix match, and an empty
+# default branch never matches.
+on_default=false
+if [ -n "${DEFAULT_BRANCH:-}" ] && [ "${GITHUB_REF:-}" = "refs/heads/$DEFAULT_BRANCH" ]; then
+  on_default=true
+fi
+# The requested minimum: the input (runner on the default branch under auto)
+# or the job's AVAL_MIN_TRUST_LEVEL, whichever is higher. Empty keeps the
+# policy's. Step 7 raises it to the policy's minimum if that is higher.
+want="${INPUT_MIN_TRUST_LEVEL:-auto}"
+if [ "$want" = auto ]; then
+  want=""
+  if [ "$on_default" = true ]; then want=runner; fi
+fi
+job="${AVAL_MIN_TRUST_LEVEL:-}"
+unset AVAL_MIN_TRUST_LEVEL
+if [ -n "$job" ] && { [ -z "$want" ] || [ "$(rank "$job")" -gt "$(rank "$want")" ]; }; then
+  want=$job
+fi
 
 # Step 6: only a push to the default branch hands its result to a publish job.
 upload=false
-if [ "$GITHUB_EVENT_NAME" = push ] && [ -n "${DEFAULT_BRANCH:-}" ] && [ "${GITHUB_REF:-}" = "refs/heads/$DEFAULT_BRANCH" ]; then
+if [ "$GITHUB_EVENT_NAME" = push ] && [ "$on_default" = true ]; then
   upload=true
 fi
 echo "upload=$upload" >> "$GITHUB_OUTPUT"
@@ -108,10 +143,10 @@ if [ -n "$username" ] || [ -n "$password" ]; then
   elif [[ "$("$AVAL" run --help 2> /dev/null || true)" != *AVAL_DOCKER_CONFIG* ]]; then
     echo "::warning title=aval run::the installed aval has no AVAL_DOCKER_CONFIG, which keeps the credentials from the test: the registry is read anonymously"
   else
-    job="${DOCKER_CONFIG:-${HOME:-}/.docker}/config.json"
+    jobconf="${DOCKER_CONFIG:-${HOME:-}/.docker}/config.json"
     creds=$(/usr/bin/mktemp -d "$RUNNER_TEMP/aval-run-docker.XXXXXX")
     trap '/bin/rm -rf "$creds"' EXIT
-    { /usr/bin/jq -cs 'if (.[0].auths | type) == "object" then .[0].auths else {} end' "$job" 2> /dev/null || echo '{}'; } > "$creds/job.json"
+    { /usr/bin/jq -cs 'if (.[0].auths | type) == "object" then .[0].auths else {} end' "$jobconf" 2> /dev/null || echo '{}'; } > "$creds/job.json"
     printf '%s:%s' "$username" "$password" | /usr/bin/base64 | /usr/bin/tr -d '\n' |
       /usr/bin/jq -Rc --arg host "${registry%%/*}" --slurpfile job "$creds/job.json" \
         '{auths: ($job[0] + {($host): {auth: .}})}' > "$creds/config.json"
@@ -129,11 +164,10 @@ unset username password
 if [ -f "$policy" ]; then
   sample="https://github.com/${GITHUB_WORKFLOW_REF:-$GITHUB_REPOSITORY/.github/workflows/ci.yaml@refs/heads/main}"
   sample="${sample%@*}@refs/pull/1/merge"
-  rank() { case "$1" in developer) echo 1 ;; runner) echo 2 ;; isolated) echo 3 ;; *) echo 9 ;; esac; }
-  min=9
+  min=9 minname=""
   while IFS=$'\t' read -r level re; do
     if [ "$level" = min ]; then
-      min=$(rank "$re")
+      min=$(rank "$re") minname=$re
       continue
     fi
     if [ "$(rank "$level")" -ge "$min" ] && [ "$(rank "$level")" -ne 9 ] &&
@@ -155,7 +189,24 @@ if [ -f "$policy" ]; then
     /^[ \t]*trustLevel:/ { lvl = val($0) }
     END { flush() }
   ' "$policy")
+  # Never below the policy's minimum. An unparsed minimum (9) leaves the
+  # requested level to aval, which exits 2 if it is below: fail closed.
+  if [ -n "$want" ] && [ "$min" != 9 ] && [ "$min" -gt "$(rank "$want")" ]; then
+    want=$minname
+  fi
+  if [ -n "$want" ]; then
+    args+=(--min-trust-level "$want")
+    effective=$want
+  elif [ "$min" != 9 ]; then
+    effective=$minname
+  else
+    effective="the policy's"
+  fi
+else
+  # No policy: nothing is reused, so the minimum has no effect.
+  effective="none (no policy)"
 fi
+echo "trust minimum: $effective"
 
 # Step 4. A report left by an earlier run in this workspace must not be read
 # as this run's outcome.
@@ -177,6 +228,7 @@ case "$result" in passed | failed | "") ;; *) result=unknown ;; esac
 if [ "$code" -eq 5 ]; then outcome=verification-failed; fi
 echo "outcome=$outcome" >> "$GITHUB_OUTPUT"
 echo "### aval $INPUT_TEST: \`$outcome\` $result (exit $code)" >> "$GITHUB_STEP_SUMMARY"
+echo "Trust minimum: $effective" >> "$GITHUB_STEP_SUMMARY"
 if [ "$code" -eq 5 ]; then
   echo "::error title=aval SECURITY::$INPUT_TEST: an attestation for this fingerprint failed signature or policy verification; see the SECURITY line in the log and the uploaded report"
 fi
