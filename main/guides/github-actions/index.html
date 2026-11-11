@@ -2360,7 +2360,7 @@ takes <code>test</code> (required), <code>file</code> (default <code>aval.yaml</
 <li>Writes the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> to the step summary and the <code>outcome</code> output. Exit 5
    sets the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> to <code>verification-failed</code>, becomes an <code>aval SECURITY</code>
    error annotation and fails the step; a miss is routine.</li>
-<li>On a push to the default branch only, uploads <code>.aval/&lt;test&gt;/</code> as the artifact <code>aval-&lt;test&gt;</code>.</li>
+<li>On a push to the default branch only, uploads <code>.aval/&lt;test&gt;/</code> as the artifact <code>aval-&lt;test&gt;</code>. A re-run of the job replaces the earlier attempt's <code>aval-&lt;test&gt;</code>, so publish signs the result of the attempt that just ran. Run each test in only one job per workflow run: two jobs uploading the same name race.</li>
 <li>Warns when the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> trusts a <code>refs/pull/</code> subject at or above <code>minTrustLevel</code>.</li>
 </ol>
 <p>The <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> is a separate file on the default branch, so <code>publicKey</code> paths in
