@@ -2917,6 +2917,10 @@ copied into the predicate as <code>test.cacheability</code>.</p>
 <td>Verification requires the signed <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and test id to equal the ones computed locally. The signed predicate cannot be re-labeled without breaking the signature. Mismatch is <code>verification-failed</code>.</td>
 </tr>
 <tr>
+<td>Secret hashed into the manifest (an <code>environment.env</code> name or <code>PREFIX_*</code> pattern that covers a token)</td>
+<td>The manifest <code>--explain</code> prints carries the sha256 of every hashed value, never the value, and the published <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> hashes that manifest; a short or guessable secret can be brute-forced from either by someone who knows the other inputs. List exact names instead of a prefix that covers credentials (<a href="../contract/#environment-variable-patterns">Environment variable patterns</a>).</td>
+</tr>
+<tr>
 <td>Undeclared input changed (file outside <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, unlisted env var, network service)</td>
 <td>Not detected: the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> only covers declared inputs. Mitigated by <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> review, <code>external-dependencies</code> not being reusable by default and <code>non-deterministic</code> never being reusable, and the false-hit suite. Observed-input tracing is future work; until then, <a href="../guides/write-a-contract/#find-undeclared-inputs">find undeclared inputs</a> by hand.</td>
 </tr>

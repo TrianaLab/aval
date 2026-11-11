@@ -3173,8 +3173,15 @@ that ran the test:</p>
   must still equal the result's and the report's.</li>
 <li>Push refuses it (exit 1, nothing published) when the version line is not
   the current manifest version, a line is malformed or repeats a name, a hash
-  is neither <code>unset</code> nor 64 lowercase hex digits, or its names are not
-  exactly the sorted, deduplicated <code>environment.env</code> of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>.</li>
+  is neither <code>unset</code> nor 64 lowercase hex digits, the lines are not sorted,
+  an exact <code>environment.env</code> name has no line, or a line names a variable
+  that no exact name covers and no prefix pattern matches (as a set
+  variable, upper-cased on Windows).</li>
+<li>With a prefix pattern (<code>APP_*</code>) the file has one line per variable the
+  pattern matched in the job that ran the test. Push cannot know which
+  those were: a matched variable set only in the publish job is not hashed,
+  and a line removed from the file changes the digest, which then no longer
+  equals the result's.</li>
 <li>Contracts in <code>scope.contracts</code> are covered by their digests: push still
   hashes their <code>environment.env</code> from its own environment.</li>
 <li>An existing env file inside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> and outside <code>.aval/</code> is an
@@ -4026,6 +4033,9 @@ writes, so attestations published by v0.1.0 stay readable. The report and the
   that uses it (unknown fields are rejected), which fails closed.</li>
 <li>A new <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <code>kind</code> whose tests expand to <code>kind: Test</code> contracts that
   <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> as before. Older <code>aval</code> binaries reject it, which fails closed.</li>
+<li>Widening the validation of a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field to accept values it used to
+  reject, when every value it accepted before keeps its manifest. Older
+  <code>aval</code> binaries reject the new values, which fails closed.</li>
 <li>A new manifest section that only a new optional <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field brings.
   Every <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> without the field keeps its manifest byte for byte, and a
   <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> with it cannot have had a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> before, so no <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>
@@ -4104,6 +4114,10 @@ version adds a new file. The tests that enforce this:
   stopped being hashed, like a <code>.git</code> directory. Every existing
   <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> is a miss once and the tests run again; there is no
   lookup by v1.</li>
+<li>Within <code>aval.trianalab.io/v1</code> and <code>aval-fingerprint/v2</code> (#253),
+  <code>environment.env</code> accepts <code>PREFIX_*</code> patterns, which write the
+  existing <code>env</code> lines, one per matching variable. Contracts without a
+  pattern keep their manifest.</li>
 <li>Within <code>aval.trianalab.io/v1</code> (#206), the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> gained
   <code>kind: TestSet</code>. Each of its tests fingerprints byte for byte like the
   same <code>kind: Test</code>, so the manifest version stays <code>aval-fingerprint/v2</code>.</li>

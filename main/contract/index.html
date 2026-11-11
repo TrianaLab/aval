@@ -1864,6 +1864,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#environment-variable-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment variable patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#what-does-not-go-in" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2472,6 +2483,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#environment-variable-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment variable patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#what-does-not-go-in" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2668,7 +2690,7 @@ do not declare is invisible to Aval. Format: <code>aval.trianalab.io/v1</code>, 
 </span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">    </span><span class="nt">go</span><span class="p">:</span><span class="w"> </span><span class="s">"1.25"</span>
 </span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span><span class="w">                        </span><span class="c1"># optional, checks a toolchain entry before the run</span>
 </span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">    </span><span class="nt">go</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">go</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">version</span><span class="p p-Indicator">]</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w">                          </span><span class="c1"># optional, names only; values are hashed</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w">                          </span><span class="c1"># optional, names or PREFIX_* patterns; values are hashed</span>
 </span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CGO_ENABLED</span>
 </span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOFLAGS</span>
 </span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>
@@ -2791,7 +2813,7 @@ above it (<a href="#contracts-in-a-subdirectory">Contracts in a subdirectory</a>
 <td><code>environment.env</code></td>
 <td>list of strings</td>
 <td>no</td>
-<td>Variable names matching <code>^[A-Za-z_][A-Za-z0-9_]*$</code>, except <code>AVAL_RUN_STACK</code> in any case (set by <code>aval run</code>, not an input).</td>
+<td>Variable names matching <code>^[A-Za-z_][A-Za-z0-9_]*$</code>, or prefix patterns: a name followed by <code>*</code> (<code>APP_*</code>), see <a href="#environment-variable-patterns">Environment variable patterns</a>. <code>AVAL_RUN_STACK</code> is rejected in any case (set by <code>aval run</code>, not an input), and so is a pattern that would match it (<code>AVAL_*</code>, <code>AVAL_RUN_*</code>).</td>
 </tr>
 <tr>
 <td><code>cacheability</code></td>
@@ -3140,7 +3162,7 @@ hashed, in this order:</p>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td>sha256 of the value, or <code>unset</code> (empty is not unset); values never appear in clear, but the hash of a short or guessable value (a low-entropy secret) can be found by trying values, so declare secrets only if <code>aval explain</code> output and the <a href="../artifact-format/#env-file">env file</a> may be seen</td>
+<td>sha256 of the value, or <code>unset</code> (empty is not unset); values never appear in clear, but the hash of a short or guessable value (a low-entropy secret) can be found by trying values, so declare secrets only if <code>aval explain</code> output and the <a href="../artifact-format/#env-file">env file</a> may be seen. A prefix pattern gives one line per set variable it matches and none when nothing matches</td>
 <td></td>
 </tr>
 <tr>
@@ -3158,6 +3180,29 @@ hashed, in this order:</p>
 <p>Lines are sorted within each section, so checkout path and walk order do not
 matter. Paths are hashed byte for byte. Windows has no exec bit, so an
 executable file fingerprints differently there than on Unix.</p>
+<h3 id="environment-variable-patterns">Environment variable patterns<a class="headerlink" href="#environment-variable-patterns" title="Anchor link">&para;</a></h3>
+<p>A tool configured by prefix (viper <code>SetEnvPrefix</code> with <code>AutomaticEnv</code>, Go
+envconfig, pydantic-settings <code>env_prefix</code>, Spring relaxed binding) reads any
+<code>PREFIX_&lt;KEY&gt;</code>. List the prefix instead of every name:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"APP_*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">GOFLAGS</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<p><code>*</code> may only end the entry, after at least one name character: <code>*</code>,
+<code>*_TOKEN</code>, <code>APP*X</code> and <code>APP_?</code> are rejected. The pattern hashes every
+variable set when the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is computed whose name starts with the
+prefix, one <code>env NAME &lt;sha256&gt;</code> line each, so setting, unsetting or changing
+one changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. A pattern that matches nothing adds no line; the
+pattern itself is in the <code>contract</code> line. An exact name a pattern also
+matches yields one line.</p>
+<p>Names compare as the platform does: case-sensitively on Linux and macOS
+(<code>APP_*</code> matches neither <code>APPX</code> nor <code>app_a</code>), case-insensitively on
+Windows, where a matched name is written upper-cased in the manifest.</p>
+<p>A pattern also hashes credentials that share the prefix, such as
+<code>APP_REGISTRY_TOKEN</code>, as it would a listed name. Their sha256 digests are
+in the manifest that <code>aval explain</code> and <code>--explain</code> print (CI logs), and the
+published <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is a hash over that manifest, so anyone who knows the
+other inputs can test guesses of a short or guessable secret against it.
+When the prefix covers secrets, list the exact names instead.</p>
 <h3 id="what-does-not-go-in">What does not go in<a class="headerlink" href="#what-does-not-go-in" title="Anchor link">&para;</a></h3>
 <table>
 <thead>
@@ -3271,11 +3316,11 @@ value must appear in the output (stdout and stderr) as a version token: not
 preceded by a digit or a dot, not followed by a digit. <code>3.13</code> matches
 <code>Python 3.13.1</code>; it does not match <code>Python 3.130</code>, and <code>3.1</code> does not match
 <code>Python 3.13</code>.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">environment</span><span class="p">:</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
 <p>On a mismatch, a probe that cannot start, a non-zero exit, a timeout or
 output over 4 KiB (it is signed into the predicate),
