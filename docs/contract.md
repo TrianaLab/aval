@@ -79,7 +79,8 @@ above it ([Contracts in a subdirectory](#contracts-in-a-subdirectory)). A
 | `metadata.name` | string | yes | 1-64 chars of `[a-z0-9._-]`, starting and ending with `[a-z0-9]`. |
 | `runner.command` | list of strings | yes | Non-empty argv, first element not blank. No shell. It must not start `aval run` on the same contract again, directly or through other contracts: see [Nested runs](#nested-runs). |
 | `scope.source` | list of globs | yes | At least one glob. Each glob must match a file, and at least one file must remain after `exclude`. |
-| `scope.exclude` | list of globs | no | Removes files from the `source` set (not from `dependencies`). May match nothing. |
+| `scope.optionalSource` | list of globs | no | Hashed like `source`, but a glob may match nothing yet. A glob may not also be in `source`. See [Optional source globs](#optional-source-globs). |
+| `scope.exclude` | list of globs | no | Removes files from the `source` and `optionalSource` set (not from `dependencies`). May match nothing. |
 | `scope.dependencies` | list of globs | no | Lockfiles and manifests. Each glob must match a file. |
 | `scope.allowMutable` | list of `{file, files, ref, reason}` | no | Accepts a mutable reference on purpose: `ref` exactly as Aval reports it, plus a non-blank `reason`. An optional `file` (an exact path relative to the contract root, or `runner.command`) limits it to that file; without `file` or `files`, a `ref` that several files report is not accepted. An optional `files`, a list of globs relative to the contract root that excludes `file`, accepts the `ref` in every file in scope that a glob matches, never in `runner.command`; each glob must match a file in scope, otherwise the contract is invalid (exit 2). See [Pin your dependencies](pinning.md#accept-a-reference-on-purpose). |
 | `scope.resolve` | list of `kind: reference` | no | One `kind: reference` per entry. Kind is one of `image`, `npm`, `pypi`, `go`, `maven`, `crate`, `gem`, `git`, `url`. The reference must not contain credentials. See [Resolve references](resolve/index.md). |
@@ -149,8 +150,8 @@ as that file would be: the set above fingerprints `shard-1` like a
 
 Merge rules, in the order `defaults`, each used fragment, then the test:
 
-- Lists (`source`, `exclude`, `dependencies`, `allowMutable`, `resolve`,
-  `contracts`, `env`) are merged as a set union. Nothing inherited can be
+- Lists (`source`, `optionalSource`, `exclude`, `dependencies`,
+  `allowMutable`, `resolve`, `contracts`, `env`) are merged as a set union. Nothing inherited can be
   removed, so a merge can only widen a test's inputs. `exclude` is the one
   way to narrow them, and it is only allowed in `defaults` or in the test
   itself, where it is visible.
@@ -248,8 +249,8 @@ hashed nor recorded, and `environment.env` cannot list it.
 
 ## Globs
 
-`scope.source`, `scope.exclude`, `scope.dependencies` and `outputs` use the
-same globs:
+`scope.source`, `scope.optionalSource`, `scope.exclude`,
+`scope.dependencies` and `outputs` use the same globs:
 
 | Glob | Matches |
 |---|---|
@@ -269,6 +270,32 @@ same globs:
   it: `**/node_modules/**` skips `pkg/web/node_modules/.bin/tool`, and
   `["pkg/bin", "pkg/bin/**"]` skips a symlinked `pkg/bin`. `pkg/bin` or
   `pkg/bin/**` alone does not.
+
+### Optional source globs
+
+Every `source` glob must match a file, which catches typos. A test that
+finds its inputs by pattern (it walks the tree for every
+`*testdata*.yaml`) reads files that may not exist yet. Leaving the pattern
+out of the scope means the first such file is not hashed, and a stale result
+is reused. Declare it in `optionalSource`:
+
+```yaml
+scope:
+  source: ["src/**"]
+  optionalSource: ["**/*testdata*.yaml"]
+```
+
+- Files it matches are hashed as `source` lines, with the same `exclude`,
+  symlink and path rules. Adding the first matching file is a miss; removing
+  the last one returns to the earlier fingerprint.
+- The only difference is that a glob may match nothing. At least one file
+  from `source` and `optionalSource` together must still remain after
+  `exclude`.
+- `aval explain` names each optional glob that matched nothing on stderr
+  (`optional: scope.optionalSource glob "<glob>" matched no files yet`), so
+  check it after writing one.
+- Use it only for patterns the test discovers, not to silence a `source`
+  glob that matches nothing: that is usually a typo.
 
 ## Test identity vs execution fingerprint
 
@@ -329,7 +356,7 @@ executable file fingerprints differently there than on Unix.
 
 | Not hashed | Note |
 |---|---|
-| files no `source` or `dependencies` glob matches | the main risk: keep the scope honest |
+| files no `source`, `optionalSource` or `dependencies` glob matches | the main risk: keep the scope honest |
 | `.git` (directory, file or symlink) | exact name, at any depth; covers linked worktrees and submodules. An exact glob such as `pkg/.git` matches no file and fails |
 | `.aval/` directories and the command's `--result-file`/`--report-file` files | so `["**"]` stays stable; keep them under `.aval/`. A path in scope that holds a real input exits 2. In a `scope.contracts` reference they stay inputs (a miss, never a false hit) |
 | commit, branch, VCS metadata | two commits with the same scope share a result |
@@ -363,7 +390,7 @@ test and records nothing; `aval explain`, `aval verify` and `aval push` exit 1
 | Message | Fix |
 |---|---|
 | `source glob "<glob>" matched no files` | fix the glob; a case or Unicode mismatch also matches nothing |
-| `scope.source matched no files` | `exclude` removed every source file |
+| `scope.source matched no files` | `exclude` removed every `source` and `optionalSource` file, or `optionalSource` matched nothing and `exclude` removed every `source` file |
 | `source "<path>" is excluded only by a trailing "**"` | exclude it by name, or narrow the glob |
 | `dependency glob "<glob>" matched no files` | fix the glob |
 | `only regular files are supported in scope` | remove the symlink, device or socket from scope |

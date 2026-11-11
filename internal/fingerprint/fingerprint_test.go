@@ -5,6 +5,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/TrianaLab/aval/internal/contract"
@@ -149,5 +151,52 @@ func TestCanonicalContractNonEmptyAndDistinct(t *testing.T) {
 	}
 	if bytes.Equal(ca, cb) {
 		t.Error("contracts differing only in name must give different canonical bytes")
+	}
+}
+
+// An optional source glob may match nothing; the digest then depends only on
+// whether a matching file exists, so adding one misses and removing it
+// returns to the digest computed before it existed (#257).
+func TestOptionalSource(t *testing.T) {
+	f := newFixture(t)
+	f.c.Scope.OptionalSource = []string{"**/*testdata*.yaml", "docs/**"}
+	f.write("docs/a.md", "a\n")
+	base, err := f.compute()
+	if err != nil {
+		t.Fatalf("optional glob that matches nothing: %v", err)
+	}
+	if want := []string{"**/*testdata*.yaml"}; !slices.Equal(base.UnmatchedOptional, want) {
+		t.Fatalf("UnmatchedOptional = %q, want %q", base.UnmatchedOptional, want)
+	}
+	f.write("pkg/a/a_testdata.yaml", "k: v\n")
+	added, err := f.compute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if added.Digest == base.Digest || !strings.Contains(added.Manifest, " - pkg/a/a_testdata.yaml\n") || added.UnmatchedOptional != nil {
+		t.Fatalf("added file not hashed as a source:\n%s", added.Manifest)
+	}
+	f.remove("pkg/a/a_testdata.yaml")
+	if back, err := f.compute(); err != nil || back.Digest != base.Digest {
+		t.Fatalf("after removing the file: %v, digest %s, want %s", err, back.Digest, base.Digest)
+	}
+}
+
+// optionalSource is exempt from the matched-no-files rule only: a required
+// glob that matches nothing, or a scope whose source and optionalSource
+// together hash no file, still fail.
+func TestOptionalSourceFailsClosed(t *testing.T) {
+	for name, scope := range map[string]contract.Scope{
+		"required glob unmatched":        {Source: []string{"main.go", "missing/**"}, OptionalSource: []string{"pkg/**"}},
+		"union hashes no file":           {Source: []string{"vendor/**"}, OptionalSource: []string{"none/**"}, Exclude: []string{"vendor/**"}},
+		"optional matches excluded only": {Source: []string{"vendor/**"}, OptionalSource: []string{"vendor/v/*.go"}, Exclude: []string{"vendor/**"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t)
+			f.c.Scope = scope
+			if fp, err := f.compute(); err == nil {
+				t.Fatalf("want an error, got %s", fp.Digest)
+			}
+		})
 	}
 }

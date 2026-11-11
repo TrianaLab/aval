@@ -26,7 +26,8 @@ header, then the fingerprint as the last line. --digest prints only the
 fingerprint. explain never looks up a result and never runs the test; the
 fingerprint is the one 'aval run' computes with its default --result-file and
 without --report-file or --stats-file inside the contract root. With
-scope.root it prints the resolved root after the header.
+scope.root it prints the resolved root after the header. Each
+scope.optionalSource glob that matched no file is named on stderr.
 
 --expand prints the test as the standalone kind: Test it expands to (a test
 of a TestSet with defaults, fragments and matrix applied). --all checks every

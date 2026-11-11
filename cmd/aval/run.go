@@ -405,6 +405,9 @@ func printFingerprint(out, warn io.Writer, fp fingerprint.Fingerprint, fpErr err
 		fmt.Fprint(out, fp.Manifest)
 		printContracts(out, fp.Contracts, "")
 		printResolveCost(warn, fp)
+		for _, g := range fp.UnmatchedOptional {
+			fmt.Fprintf(warn, "optional: scope.optionalSource glob %q matched no files yet\n", g)
+		}
 	}
 	if o.fingerprintOnly {
 		printFindings(warn, fp)

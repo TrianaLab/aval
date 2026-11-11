@@ -203,6 +203,31 @@ var corpus = []corpusCase{
 	{name: "cacheability", change: func(f *fixture) { f.c.Cacheability = contract.Hermetic }, want: differ},
 	{name: "scope.source glob added", change: func(f *fixture) { f.c.Scope.Source = append(f.c.Scope.Source, "main.go") }, want: differ},
 	{name: "scope.exclude glob added", change: func(f *fixture) { f.c.Scope.Exclude = append(f.c.Scope.Exclude, "none/**") }, want: differ},
+	{name: "scope.optionalSource glob added", change: func(f *fixture) { f.c.Scope.OptionalSource = []string{"**/*testdata*.yaml"} }, want: differ},
+	{name: "glob moved from source to optionalSource", change: func(f *fixture) {
+		f.c.Scope.Source, f.c.Scope.OptionalSource = []string{"**/*.go"}, []string{"compose.yaml"}
+	}, want: differ},
+	{name: "scope.optionalSource reordered and repeated", setup: func(f *fixture) {
+		f.c.Scope.OptionalSource = []string{"a/**", "b/**"}
+	}, change: func(f *fixture) { f.c.Scope.OptionalSource = []string{"b/**", "a/**", "b/**"} }, want: same},
+	{name: "first file matching an optional glob added", setup: func(f *fixture) {
+		f.c.Scope.OptionalSource = []string{"**/*testdata*.yaml"}
+	}, change: func(f *fixture) { f.write("pkg/a/a_testdata.yaml", "k: v\n") }, want: differ},
+	{name: "file matching an optional glob changed", setup: func(f *fixture) {
+		f.c.Scope.OptionalSource = []string{"**/*testdata*.yaml"}
+		f.write("pkg/a/a_testdata.yaml", "k: v\n")
+	}, change: func(f *fixture) { f.write("pkg/a/a_testdata.yaml", "k: w\n") }, want: differ},
+	{name: "last file matching an optional glob deleted", setup: func(f *fixture) {
+		f.c.Scope.OptionalSource = []string{"**/*testdata*.yaml"}
+		f.write("pkg/a/a_testdata.yaml", "k: v\n")
+	}, change: func(f *fixture) { f.remove("pkg/a/a_testdata.yaml") }, want: differ},
+	{name: "excluded file matching an optional glob added", setup: func(f *fixture) {
+		f.c.Scope.OptionalSource = []string{"**/*testdata*.yaml"}
+	}, change: func(f *fixture) { f.write("vendor/v/v_testdata.yaml", "k: v\n") }, want: same},
+	{name: "optional file excluded only by a trailing **", setup: func(f *fixture) {
+		f.c.Scope.OptionalSource = []string{"gen"}
+		f.c.Scope.Exclude = append(f.c.Scope.Exclude, "gen/**")
+	}, change: func(f *fixture) { f.write("gen", "x\n") }, want: failClosed},
 	{name: "scope.dependencies glob added", change: func(f *fixture) { f.c.Scope.Dependencies = append(f.c.Scope.Dependencies, "compose.yaml") }, want: differ},
 	{name: "scope.allowMutable added", change: func(f *fixture) {
 		f.c.Scope.AllowMutable = []contract.AllowMutable{{Ref: "postgres:16", Reason: "scanned nightly"}}

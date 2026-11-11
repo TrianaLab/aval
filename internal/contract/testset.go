@@ -195,6 +195,7 @@ func merge(layers []layer) (*Contract, error) {
 	for _, l := range layers {
 		s, e := l.e.Scope, l.e.Environment
 		c.Scope.Source = union(c.Scope.Source, s.Source)
+		c.Scope.OptionalSource = union(c.Scope.OptionalSource, s.OptionalSource)
 		c.Scope.Exclude = union(c.Scope.Exclude, s.Exclude)
 		c.Scope.Dependencies = union(c.Scope.Dependencies, s.Dependencies)
 		c.Scope.AllowMutable = union(c.Scope.AllowMutable, s.AllowMutable)

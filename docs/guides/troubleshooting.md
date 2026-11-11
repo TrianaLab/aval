@@ -39,7 +39,7 @@ flowchart LR
     | `metadata.name: <x> must be 1-64 chars` | lower case letters, digits, `.`, `_`, `-` |
     | `runner.command: must be a non-empty argv list` | `command: ["go", "test", "./..."]` |
     | `scope.source: at least one glob is required` | list the files the test reads |
-    | `empty glob`, `must be a relative, slash-separated path`, `empty, '.' or '..' segments are not allowed`, `'**' must be a whole path segment` | write globs like `src/**/*.go` |
+    | `empty glob`, `must be a relative, slash-separated path`, `empty, '.' or '..' segments are not allowed`, `'**' must be a whole path segment`, `scope.optionalSource[<i>]: <x> is also in scope.source` | write globs like `src/**/*.go`; list each one in `source` or in `optionalSource`, not both |
     | `cacheability: required`, `cacheability: unknown class` | pick a [class](write-a-contract.md#step-by-step) |
     | `environment.toolchain: invalid key`, `invalid variable name`, `environment.probe.<key>: not a key of environment.toolchain`, `environment.probe.<key>: must be a non-empty argv list`, `environment.probe.<key>: environment.toolchain.<key> must not be empty`, `is set by aval run and is not an input` | lower case tool names, valid variable names other than `AVAL_RUN_STACK`; probe only declared, non-empty toolchain keys, each with an argv |
     | `scope.allowMutable[<i>]: ref and reason are both required`, `file <x> must be a slash-separated path relative to the contract root`, `file and files exclude each other`, `scope.allowMutable[<i>].files[<j>]: <x>`, `matches no file in scope` | give each entry a `ref`, a `reason` and, if needed, a `file` as the finding prints it or `files` globs (not both) that each match a file in the scope ([Pin your dependencies](../pinning.md#accept-a-reference-on-purpose)) |
@@ -56,7 +56,7 @@ flowchart LR
 ??? failure "Fingerprint and trust policy"
     | Message | Fix |
     |---|---|
-    | `scope.source matched no files`, `glob <x> matched no files` | fix the glob, or create the file |
+    | `scope.source matched no files`, `glob <x> matched no files` | fix the glob, or create the file; a pattern the test discovers and that may match nothing yet goes in `scope.optionalSource` ([Optional source globs](../contract.md#optional-source-globs)) |
     | `is excluded only by a trailing` | exclude the file by name |
     | `only regular files are supported in scope`, `control characters in path are not supported` | keep symlinks and odd names out of scope |
     | `scope.contracts <path>: <x>` | fix the referenced contract or the path ([Depend on another part of the repo](depend-on-a-contract.md)) |
