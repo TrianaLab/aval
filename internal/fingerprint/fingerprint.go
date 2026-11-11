@@ -9,11 +9,14 @@
 //	dependency <sha256> <mode> <path>
 //	toolchain <key>=<value>
 //	env <NAME> <sha256 of value | unset>
+//	path <entry> <mode> <sha256> | <sha256> | absent | unset
 //	resolve <kind> <reference> <version> <immutable id>
 //	contract <path> <name> <fingerprint>
 //
-// resolve lines appear only for contracts with scope.resolve, the one part
-// of the manifest that reads the network (internal/resolve); contract
+// path lines appear only for contracts with environment.paths, one per
+// entry as declared (pathLine); resolve lines only for contracts with
+// scope.resolve, the one part of the manifest that reads the network
+// (internal/resolve); contract
 // <path> lines only for contracts with scope.contracts, one per referenced
 // contract with its own fingerprint (so references are transitive).
 //
@@ -159,6 +162,16 @@ func envKey(name string) string {
 	return name
 }
 
+// lookup returns the value of the variable name, compared as envKey gives it.
+func (e Env) lookup(name string) (string, bool) {
+	for k, v := range e {
+		if envKey(k) == envKey(name) {
+			return v, true
+		}
+	}
+	return "", false
+}
+
 // envLines returns the manifest's env lines for the environment.env
 // entries, sorted and without duplicates. An exact name gives one line,
 // "unset" when it is not set; a prefix pattern (APP_*) gives one line
@@ -226,6 +239,7 @@ func compute(ctx context.Context, dir string, c *contract.Contract, env Env, rec
 	}
 	t := newTree(ctx, os.DirFS(root), env, skip)
 	t.recorded = recorded
+	t.dir = root
 	return t.compute(rel, c)
 }
 
@@ -322,6 +336,9 @@ type tree struct {
 	// recorded, when not nil, is the env section of the top contract, from
 	// an env file (ComputeRecorded).
 	recorded []string
+	// dir is root on disk, "" for ComputeFS: an environment.paths entry
+	// may not lead inside a contract's scope root under it.
+	dir string
 }
 
 func newTree(ctx context.Context, root fs.FS, env Env, skip map[string]bool) *tree {
@@ -402,6 +419,12 @@ func (t *tree) compute(dir string, c *contract.Contract) (Fingerprint, error) {
 	}
 	lines = append(lines, section...)
 
+	section, err = t.pathSection(h, top, c)
+	if err != nil {
+		return Fingerprint{}, err
+	}
+	lines = append(lines, section...)
+
 	// Last, so a contract without scope.resolve never touches the network
 	// and one with a bad scope fails before it does.
 	resolved, err := resolveAll(ctx, canonicalResolve(c.Scope.Resolve))
@@ -442,6 +465,99 @@ func (t *tree) envSection(c *contract.Contract) ([]string, error) {
 		return recordedEnv(t.recorded, c.Environment.Env)
 	}
 	return envLines(c.Environment.Env, t.env), nil
+}
+
+// pathSection returns the path lines of c, whose scope is rooted at top,
+// sorted and deduplicated.
+func (t *tree) pathSection(h *hasher, top string, c *contract.Contract) ([]string, error) {
+	var lines []string
+	for _, p := range slices.Compact(slices.Sorted(slices.Values(c.Environment.Paths))) {
+		l, err := t.pathLine(h, top, p)
+		if err != nil {
+			return nil, fmt.Errorf("environment.paths %s: %w", p, err)
+		}
+		lines = append(lines, l)
+	}
+	return lines, nil
+}
+
+// pathLine returns the manifest line of the environment.paths entry p of a
+// contract whose scope is rooted at top: "path <p> " then "unset" (its
+// variable is unset), "absent" (nothing at it: ENOENT only), "<mode>
+// <sha256>" for a regular file, or for a directory the sha256 of its sorted
+// "<sha256> <mode> <relpath>" lines. The entry is written as declared, so
+// machines with a different $HOME agree. A symlink at or under it, any
+// other file type, or an error fails (fail closed).
+func (t *tree) pathLine(h *hasher, top, p string) (string, error) {
+	name, rel, _ := contract.SplitPath(p) // Validate checked it
+	var base string
+	var err error
+	if name == contract.HomePath {
+		base, err = os.UserHomeDir()
+	} else if v, ok := t.env.lookup(name); ok {
+		base = v
+	} else {
+		return "path " + p + " unset", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if !filepath.IsAbs(base) {
+		return "", fmt.Errorf("%s is %q, not an absolute path", name, base)
+	}
+	abs := filepath.Join(base, filepath.FromSlash(rel))
+	if t.dir != "" {
+		scope, _ := filepath.Abs(filepath.Join(t.dir, filepath.FromSlash(top)))
+		if r, err := filepath.Rel(evalSymlinks(scope), evalSymlinks(abs)); err == nil && filepath.IsLocal(r) {
+			return "", fmt.Errorf("%w: %s is inside the contract tree %s: declare it with a scope glob", ErrContract, abs, scope)
+		}
+	}
+	fi, err := os.Lstat(abs)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return "path " + p + " absent", nil
+	case err != nil:
+		return "", err
+	case fi.IsDir():
+		d, err := h.hashDir(abs)
+		return "path " + p + " " + d, err
+	}
+	s, mode, err := h.hashFile(os.DirFS(filepath.Dir(abs)), filepath.Base(abs))
+	return "path " + p + " " + mode + " " + s, err
+}
+
+// evalSymlinks is the absolute path p with the symlinks of its longest
+// existing prefix resolved, so an absent entry compares with the tree too.
+func evalSymlinks(p string) string {
+	r, err := filepath.EvalSymlinks(p)
+	if err == nil || filepath.Dir(p) == p {
+		return cmp.Or(r, p)
+	}
+	return filepath.Join(evalSymlinks(filepath.Dir(p)), filepath.Base(p))
+}
+
+// hashDir returns the sha256 of the sorted "<sha256> <mode> <relpath>"
+// lines of the files under dir, the encoding of source lines. Symlinks,
+// devices, sockets and FIFOs under it fail.
+func (h *hasher) hashDir(dir string) (string, error) {
+	fsys := os.DirFS(dir)
+	var lines []string
+	err := fs.WalkDir(fsys, ".", func(rel string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if strings.ContainsAny(rel, "\n\r") {
+			return fmt.Errorf("%q: control characters in path are not supported", rel)
+		}
+		s, mode, err := h.hashFile(fsys, rel)
+		if err != nil {
+			return fmt.Errorf("%s: %w", rel, err)
+		}
+		lines = append(lines, s+" "+mode+" "+rel+"\n")
+		return nil
+	})
+	slices.Sort(lines)
+	return sum([]byte(strings.Join(lines, ""))), err
 }
 
 // contracts fingerprints the scope.contracts of c, whose directory is dir,
@@ -612,6 +728,7 @@ func canonicalContract(c *contract.Contract) []byte {
 	cc.Scope.Exclude = sorted(c.Scope.Exclude)
 	cc.Scope.Dependencies = sorted(c.Scope.Dependencies)
 	cc.Environment.Env = sorted(c.Environment.Env)
+	cc.Environment.Paths = sorted(c.Environment.Paths)
 	cc.Scope.AllowMutable = slices.Clone(c.Scope.AllowMutable)
 	for i := range cc.Scope.AllowMutable {
 		cc.Scope.AllowMutable[i].Files = sorted(cc.Scope.AllowMutable[i].Files)
@@ -808,7 +925,7 @@ func (h *hasher) hashFile(fsys fs.FS, p string) (string, string, error) {
 		return "", "", err
 	}
 	if !fi.Mode().IsRegular() {
-		return "", "", errors.New("only regular files are supported in scope (symlinks and devices are rejected)")
+		return "", "", errors.New("only regular files are supported (symlinks, devices, sockets and FIFOs are rejected)")
 	}
 	d := sha256.New()
 	f, err := fsys.Open(p)

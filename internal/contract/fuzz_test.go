@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -10,6 +11,17 @@ import (
 
 // Crashers found by `make fuzz` land in testdata/fuzz/<Target>/ and run as
 // regression cases on every `go test`; commit them with the fix.
+
+// checkPaths fails on an accepted environment.paths entry that is not a
+// base plus a clean relative path without globs or spaces, or a duplicate.
+func checkPaths(t *testing.T, paths []string) {
+	for i, p := range paths {
+		_, rel, err := SplitPath(p)
+		if err != nil || !fs.ValidPath(rel) || strings.ContainsAny(p, "*?[ \n") || slices.Index(paths, p) < i {
+			t.Fatalf("Parse accepted environment.paths %q: %v", p, err)
+		}
+	}
+}
 
 // FuzzParse: Parse never panics, and an accepted contract is valid and has
 // only globs that ValidateGlob accepts.
@@ -27,6 +39,7 @@ func FuzzParse(f *testing.F) {
 	f.Add([]byte(strings.Replace(valid, "scope:\n", "scope:\n  optionalSource: [\"**/*testdata*.yaml\", compose.yaml]\n", 1)))
 	f.Add([]byte(strings.Replace(valid, "scope:\n", "scope:\n  root: ../..\n", 1)))
 	f.Add([]byte(strings.Replace(valid, "scope:\n", "scope:\n  root: ../x\n", 1)))
+	f.Add([]byte(strings.Replace(valid, "env: [DB_IMAGE]", `paths: ["~/.config/app", "${XDG_CONFIG_HOME}/app", "$H/../x"]`, 1)))
 	for _, env := range []string{"[APP_*]", "[APP_*, DB_IMAGE]", `["*"]`, "[AVAL_*]", "[AVAL_RUN_STACK*]", "[APP*X]"} {
 		f.Add([]byte(strings.Replace(valid, "env: [DB_IMAGE]", "env: "+env, 1)))
 	}
@@ -41,6 +54,7 @@ func FuzzParse(f *testing.F) {
 		if v, bad := badEnvEntry(c.Environment.Env); bad {
 			t.Fatalf("Parse accepted environment.env entry %q", v)
 		}
+		checkPaths(t, c.Environment.Paths)
 		checkFuzzedScope(t, c.Scope)
 		globs := slices.Concat(c.Scope.Source, c.Scope.OptionalSource, c.Scope.Exclude, c.Scope.Dependencies)
 		for _, a := range c.Scope.AllowMutable {
