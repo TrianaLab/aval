@@ -22,7 +22,7 @@ A suite job:
 
 The action [`integrations/github/run`](https://github.com/TrianaLab/aval/blob/main/integrations/github/run/action.yml)
 takes `test` (required), `file` (default `aval.yaml`), `policy` (default
-`.github/aval/policy.yaml`) and `shadow` (`true` adds `--shadow`). In order, it:
+`.github/aval/policy.yaml`), `shadow` (`true` adds `--shadow`) and `min-trust-level` (default `auto`). In order, it:
 
 1. Refuses `pull_request_target` and `workflow_run`, and fails when the job
    has `id-token: write`: a suite job can never sign.
@@ -33,10 +33,10 @@ takes `test` (required), `file` (default `aval.yaml`), `policy` (default
    `github.token`, on every event, never from the checkout. The registry
    comes from the policy's `registry` field
    ([Write a trust policy](trust-policy.md)); the job's `AVAL_REGISTRY` and
-   `AVAL_POLICY` are ignored; `AVAL_MIN_TRUST_LEVEL` is not, since it only
-   raises the policy's minimum. With no policy nothing is reused, the test runs and a warning is logged.
+   `AVAL_POLICY` are ignored. With no policy nothing is reused, the test runs and a warning is logged.
 4. Runs `aval run -f <file> --test <test>` with the CI run URL, the
    repository and, on a push to the default branch, `--outputs-dir`.
+   It passes `--min-trust-level` as the highest of the `min-trust-level` input, the job's `AVAL_MIN_TRUST_LEVEL` and the policy's `minTrustLevel`, never lower than the policy's. Under `auto` that is `runner` on the default branch (any event), so `main` never goes green on a developer result, which `aval push` would not publish: it is a miss and the test runs. Pull requests and other branches keep the policy's minimum. `min-trust-level: developer` opts out; a value other than `auto`, `developer`, `runner` or `isolated` exits 2 before the test runs. The log and step summary show the effective minimum.
 5. Writes the outcome to the step summary and the `outcome` output. Exit 5
    sets the outcome to `verification-failed`, becomes an `aval SECURITY`
    error annotation and fails the step; a miss is routine.

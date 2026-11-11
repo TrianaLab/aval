@@ -261,8 +261,9 @@ numbers as the site's `stats.json` twice an hour
 
 Trust comes from one policy, `.github/aval/policy.yaml`, which also names the
 registry: `ci.yaml` on `main` at runner level, maintainers at developer level,
-`minTrustLevel: developer`. The suite jobs set `AVAL_MIN_TRUST_LEVEL=runner`
-on a push to `main`, and the release gate passes `--min-trust-level runner`,
+`minTrustLevel: developer`. The run action raises the minimum to runner on
+`main` by default (`min-trust-level: auto`), and the release gate passes
+`--min-trust-level runner`,
 so `main` and releases reuse only `ci.yaml` on `main`; pull requests and the
 version PR's dispatched run also reuse a maintainer's signature.
 `tests/architecture/dogfood_test.go` enforces the policy and those jobs, and

@@ -2,6 +2,7 @@ package acceptance
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -252,18 +254,140 @@ func TestGitHubRunActionWarnsOnPullRequestTrust(t *testing.T) {
 }
 
 // shadow: true runs the test beside a verified result, and a bad value is
-// refused before anything runs (#216). The job's AVAL_MIN_TRUST_LEVEL reaches
-// aval, which only lets it raise the policy's minimum: Aval's CI sets runner
-// on main.
-func TestGitHubRunActionShadowAndMinTrustLevel(t *testing.T) {
+// refused before anything runs (#216).
+func TestGitHubRunActionShadow(t *testing.T) {
 	s := newActionStory(t)
 	s.publish(t, s.ciKey)
 	s.want(t, "shadow", s.pr(t, "INPUT_SHADOW=true"), 0, 2, "verified")
 	if r := s.pr(t, "INPUT_SHADOW=yes"); r.code != 2 || s.runs() != 2 || !strings.Contains(r.out, `shadow: "yes" must be true or false`) {
 		t.Fatalf("shadow: yes: exit %d, %d runs\n%s", r.code, s.runs(), r.out)
 	}
-	// A runner result below a raised minimum is a miss: the test runs.
-	s.want(t, "raised minimum", s.pr(t, "AVAL_MIN_TRUST_LEVEL=isolated"), 0, 3, "miss")
-	// Lowering it below the policy's minimum is a usage error.
-	s.want(t, "lowered minimum", s.pr(t, "AVAL_MIN_TRUST_LEVEL=developer"), 2, 3, "unknown")
+}
+
+// recordingAval wraps aval in a script that logs each command line, so a
+// test sees the --min-trust-level the action passes.
+type recordingAval struct{ env, log string }
+
+func newRecordingAval(t *testing.T) recordingAval {
+	t.Helper()
+	dir := t.TempDir()
+	r := recordingAval{log: filepath.Join(dir, "args.log")}
+	script := filepath.Join(dir, "aval")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\necho \"$*\" >> '"+r.log+"'\nexec '"+aval+"' \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r.env = "AVAL=" + script
+	return r
+}
+
+// minTrust is the --min-trust-level of the logged aval run, "" without the
+// flag and "no run" when aval run was not called; it clears the log.
+func (r recordingAval) minTrust(t *testing.T) string {
+	t.Helper()
+	b, _ := os.ReadFile(r.log)
+	_ = os.Remove(r.log)
+	for _, l := range strings.Split(string(b), "\n") {
+		f := strings.Fields(l)
+		if len(f) < 2 || f[0] != "run" || f[1] != "-f" {
+			continue
+		}
+		if i := slices.Index(f, "--min-trust-level"); i >= 0 && i+1 < len(f) {
+			return f[i+1]
+		}
+		return ""
+	}
+	return "no run"
+}
+
+// The action raises the minimum to runner on the default branch, so main
+// never goes green on a developer result that aval push would not publish
+// (#251). The highest of the input, the job's AVAL_MIN_TRUST_LEVEL and the
+// policy's minimum wins; the action never passes one below the policy's.
+func TestGitHubRunActionMinTrustLevel(t *testing.T) {
+	s := newActionStory(t)
+	rec := newRecordingAval(t)
+	policy := func(min string) string {
+		return strings.Replace(s.mainPolicy, "minTrustLevel: runner", "minTrustLevel: "+min, 1)
+	}
+	s.contents.set(policy("developer"))
+	s.publish(t, s.devKey)
+	runs := s.runs()
+	for _, tc := range []struct {
+		name, policy, event, ref string
+		env                      []string
+		code                     int
+		min, outcome             string
+		ran                      bool
+	}{
+		{"pull request", "developer", "pull_request", "refs/pull/1/merge", nil, 0, "", "verified", false},
+		{"push to another branch", "developer", "push", "refs/heads/feature", nil, 0, "", "verified", false},
+		// A developer result on main is a miss, never a verification failure.
+		{"push to the default branch", "developer", "push", "refs/heads/main", nil, 0, "runner", "miss", true},
+		{"schedule on the default branch", "developer", "schedule", "refs/heads/main", nil, 0, "runner", "miss", true},
+		{"renamed default branch", "developer", "push", "refs/heads/trunk", []string{"DEFAULT_BRANCH=trunk"}, 0, "runner", "miss", true},
+		{"opt out", "developer", "push", "refs/heads/main", []string{"INPUT_MIN_TRUST_LEVEL=developer"}, 0, "developer", "verified", false},
+		{"explicit runner on a PR", "developer", "pull_request", "refs/pull/1/merge", []string{"INPUT_MIN_TRUST_LEVEL=runner"}, 0, "runner", "miss", true},
+		{"job isolated beats auto", "developer", "pull_request", "refs/pull/1/merge", []string{"AVAL_MIN_TRUST_LEVEL=isolated"}, 0, "isolated", "miss", true},
+		{"job isolated beats runner on main", "developer", "push", "refs/heads/main", []string{"AVAL_MIN_TRUST_LEVEL=isolated"}, 0, "isolated", "miss", true},
+		{"job developer is raised to the policy's", "runner", "pull_request", "refs/pull/1/merge", []string{"AVAL_MIN_TRUST_LEVEL=developer"}, 0, "runner", "miss", true},
+		{"input developer is raised to the policy's", "runner", "push", "refs/heads/main", []string{"INPUT_MIN_TRUST_LEVEL=developer"}, 0, "runner", "miss", true},
+		// Not runner below the policy's isolated, which aval would refuse (exit 2).
+		{"policy isolated on the default branch", "isolated", "push", "refs/heads/main", nil, 0, "isolated", "miss", true},
+		// An unparsed minimum leaves the requested level to aval, which
+		// refuses one below the policy's: fail closed.
+		{"unparsed policy minimum", "!!str isolated", "push", "refs/heads/main", nil, 2, "runner", "unknown", false},
+		{"bogus input", "developer", "pull_request", "refs/pull/1/merge", []string{"INPUT_MIN_TRUST_LEVEL=bogus"}, 2, "no run", "", false},
+		{"bogus job level", "developer", "pull_request", "refs/pull/1/merge", []string{"AVAL_MIN_TRUST_LEVEL=bogus"}, 2, "no run", "", false},
+	} {
+		s.contents.set(policy(tc.policy))
+		if tc.ran {
+			runs++
+		}
+		r := action(t, s.dir, s.api.URL, s.repo, tc.event, tc.ref, append([]string{rec.env}, tc.env...)...)
+		s.want(t, tc.name, r, tc.code, runs, tc.outcome)
+		if got := rec.minTrust(t); got != tc.min {
+			t.Errorf("%s: --min-trust-level %q, want %q\n%s", tc.name, got, tc.min, r.out)
+		}
+		switch {
+		case tc.min == "no run":
+			if len(s.contents.queries) != 0 || !strings.Contains(r.out, "::error title=aval run::") {
+				t.Errorf("%s: policy fetched or no annotation\n%s", tc.name, r.out)
+			}
+		case tc.code == 0:
+			want := cmp.Or(tc.min, tc.policy)
+			if !strings.Contains(r.out, "trust minimum: "+want+"\n") || !strings.Contains(r.summary, "Trust minimum: "+want+"\n") {
+				t.Errorf("%s: effective minimum %q not logged\n%s\n%s", tc.name, want, r.out, r.summary)
+			}
+		}
+	}
+
+	// A default branch name with shell metacharacters, glob characters or a
+	// refs/heads/ prefix never makes another ref count as the default branch.
+	s.contents.set(policy("developer"))
+	for _, tc := range []struct{ branch, ref string }{
+		{"ma*", "refs/heads/main"},
+		{"m?in", "refs/heads/main"},
+		{"[m]ain", "refs/heads/main"},
+		{"*", "refs/heads/main"},
+		{"$(touch pwned)main", "refs/heads/main"},
+		{"`touch pwned`main", "refs/heads/main"},
+		{"main; touch pwned", "refs/heads/main"},
+		{"main\n", "refs/heads/main"},
+		{" main", "refs/heads/main"},
+		{"refs/heads/main", "refs/heads/main"},
+		{"heads/main", "refs/heads/main"},
+		{"main", "refs/heads/main/x"},
+		{"main", "refs/heads/mainx"},
+		{"main", "refs/tags/main"},
+		{"main", "refs/heads/refs/heads/main"},
+		{"", "refs/heads/"},
+	} {
+		r := action(t, s.dir, s.api.URL, s.repo, "push", tc.ref, rec.env, "DEFAULT_BRANCH="+tc.branch)
+		if got := rec.minTrust(t); r.code != 0 || got != "" || r.outputs["upload"] != "false" {
+			t.Errorf("default branch %q, ref %q: exit %d, --min-trust-level %q, upload %q; want no raise\n%s", tc.branch, tc.ref, r.code, got, r.outputs["upload"], r.out)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(s.dir, "pwned")); err == nil {
+		t.Error("the default branch name ran a command")
+	}
 }

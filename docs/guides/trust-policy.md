@@ -43,6 +43,8 @@ aval run --policy policy.yaml --min-trust-level runner
 `aval run` and `aval verify` and can only raise the policy's minimum: a lower
 or unknown level exits 2. A developer result is then a miss (exit 4), never
 exit 5. A policy that trusts only main's CI identity does not need this.
+The [GitHub run action](github-actions.md) does it by default
+on the default branch; `min-trust-level: developer` opts out.
 
 ## The fields
 
