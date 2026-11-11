@@ -2496,8 +2496,8 @@ then pin the version and the archive's sha256 (from that release's
 <p>The entry for the runner's platform is required. A re-tagged release, a
 mirror serving another build, or a missing <code>cosign</code> fails the install.
 <code>--sha256</code>, <code>--require-verify</code> and <code>--require-provenance</code> first ship in the
-release after 0.7.0. Aval's own CI does the same with <code>main</code>'s copy
-(<code>.github/aval/install.sh</code>).</p>
+release after 0.7.0. Aval's GitHub actions (<code>integrations/github/run</code> and
+<code>publish</code>) install their pinned release the same way.</p>
 <h2 id="upgrade">Upgrade<a class="headerlink" href="#upgrade" title="Anchor link">&para;</a></h2>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>aval<span class="w"> </span>upgrade<span class="w">                    </span><span class="c1"># to the latest release</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>aval<span class="w"> </span>upgrade<span class="w"> </span>--version<span class="w"> </span>v0.4.0<span class="w">   </span><span class="c1"># to a given release</span>

@@ -2341,8 +2341,8 @@ job on <code>main</code> signs and publishes every result.</p>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">          </span><span class="nt">test</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unit</span>
 </span></code></pre></div>
 <p>The action <a href="https://github.com/TrianaLab/aval/blob/main/integrations/github/run/action.yml"><code>integrations/github/run</code></a>
-takes <code>test</code> (required), <code>file</code> (default <code>aval.yaml</code>) and <code>policy</code> (default
-<code>.github/aval/policy.yaml</code>). In order, it:</p>
+takes <code>test</code> (required), <code>file</code> (default <code>aval.yaml</code>), <code>policy</code> (default
+<code>.github/aval/policy.yaml</code>) and <code>shadow</code> (<code>true</code> adds <code>--shadow</code>). In order, it:</p>
 <ol>
 <li>Refuses <code>pull_request_target</code> and <code>workflow_run</code>, and fails when the job
    has <code>id-token: write</code>: a suite job can never sign.</li>
@@ -2353,7 +2353,8 @@ takes <code>test</code> (required), <code>file</code> (default <code>aval.yaml</
    <code>github.token</code>, on every event, never from the checkout. The registry
    comes from the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code> field
    (<a href="../trust-policy/">Write a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></a>); the job's <code>AVAL_REGISTRY</code> and
-   <code>AVAL_POLICY</code> are ignored. With no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> nothing is reused, the test
+   <code>AVAL_POLICY</code> are ignored; <code>AVAL_MIN_TRUST_LEVEL</code> is not, since it only
+   raises the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s minimum. With no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> nothing is reused, the test
    runs and a warning is logged.</li>
 <li>Runs <code>aval run -f &lt;file&gt; --test &lt;test&gt;</code> with the CI run URL, the
    repository and, on a push to the default branch, <code>--outputs-dir</code>.</li>
