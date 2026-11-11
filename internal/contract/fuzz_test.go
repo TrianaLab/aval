@@ -94,6 +94,12 @@ func FuzzParseAll(f *testing.F) {
 	f.Add([]byte(strings.Replace(set, "web:\n", "web:\n    use: [db]\n", 1)))
 	f.Add([]byte(strings.Replace(set, `toolchain: {postgres: "16"}`, `toolchain: {postgres: "16", go: "1.24"}`, 1)))
 	f.Add([]byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ntests: []\n"))
+	// Toolchain substitution (#255): per-leg values, a value holding "{x}",
+	// an unknown variable, a reference without a matrix.
+	f.Add([]byte(strings.Replace(set, "    cacheability: controlled", "    environment: {toolchain: {os: \"{index}/{total}\"}}\n    cacheability: controlled", 1)))
+	f.Add([]byte(strings.Replace(set, `total: ["2"]`, `total: ["{index}"]`, 1)))
+	f.Add([]byte(strings.Replace(set, `toolchain: {go: "1.25"}`, `toolchain: {go: "{index}"}`, 1)))
+	f.Add([]byte(strings.Replace(set, `toolchain: {postgres: "16"}`, `toolchain: {postgres: "{nope}"}`, 1)))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cs, err := ParseAll(data)
 		if err != nil {

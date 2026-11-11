@@ -181,6 +181,11 @@ var corpus = []corpusCase{
 	{name: "toolchain value with an embedded newline", change: func(f *fixture) {
 		f.c.Environment.Toolchain["go"] = "1.25\nsource " + sum([]byte("x")) + " - x.go"
 	}, want: differ},
+	{name: "matrix leg of another platform", setup: func(f *fixture) {
+		f.write("go.mod", "module x\n")
+		f.c = platformLeg(f.t, "unit-darwin")
+	},
+		change: func(f *fixture) { f.c = platformLeg(f.t, "unit-linux") }, want: differ},
 	{name: "env value", change: func(f *fixture) { f.env["DB_IMAGE"] = "postgres:17" }, want: differ},
 	{name: "env unset to set", change: func(f *fixture) { f.env["MODE"] = "fast" }, want: differ},
 	{name: "env set to unset", change: func(f *fixture) { delete(f.env, "DB_IMAGE") }, want: differ},
@@ -443,6 +448,22 @@ var corpus = []corpusCase{
 	{name: "repushed tag in runner.command", setup: func(f *fixture) {
 		f.c.Runner.Command = []string{"docker", "run", "--rm", "postgres:16"}
 	}, change: func(*fixture) {}, want: refused},
+}
+
+// platformLeg is the test named name of platformSet over the corpus tree.
+func platformLeg(t *testing.T, name string) *contract.Contract {
+	t.Helper()
+	cs, err := contract.LoadAll(platformSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cs {
+		if c.Metadata.Name == name {
+			return c
+		}
+	}
+	t.Fatalf("no test %s", name)
+	return nil
 }
 
 // symlinkTool adds pkg/web/node_modules/.bin/tool -> ../tool/bin/cli.js,

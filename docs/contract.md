@@ -162,17 +162,37 @@ Merge rules, in the order `defaults`, each used fragment, then the test:
   another fragment.
 
 `matrix` maps variables to lists of strings and creates one test per
-combination. It substitutes `{var}` into `metadata.name` and
-`runner.command` only, so each value is part of the fingerprinted argv. In a
-test with a matrix, every `{name}` in those two fields must be a matrix
-variable: write a shell variable as `$VAR`, not `${VAR}`. A set expands to
-at most 1024 tests.
+combination. It substitutes `{var}` into `metadata.name`, `runner.command`
+and the values of `environment.toolchain` (inherited ones too), in one pass,
+so a value that holds `{x}` is not substituted again. Each value is part of
+the fingerprinted argv or toolchain lines. In a test with a matrix, every
+`{name}` in those fields must be a matrix variable: write a shell variable as
+`$VAR`, not `${VAR}`. In a test without a matrix, a `{name}` in a toolchain
+value is an error. Probe argv, `env`, `scope` and `outputs` are not
+substituted. A set expands to at most 1024 tests.
+
+One test per platform, each with its own fingerprint, so a result recorded
+on darwin is never reused on linux:
+
+```yaml
+tests:
+  - metadata: {name: "unit-{os}"}
+    runner: {command: [go, test, ./...]}
+    matrix: {os: [linux, darwin]}
+    environment:
+      toolchain: {platform: "{os}"}
+      probe: {platform: [go, env, GOOS]}
+```
+
+`aval run --test unit-darwin` records a result only where the probe prints
+`darwin`. To reuse a result across platforms, do not declare `platform`.
 
 Each of these exits 2 and names the problem: an unknown fragment, a fragment
 no test uses, a fragment with `use`, `exclude`, `runner`, `metadata`,
 `outputs`, `matrix` or `cacheability`, a conflicting key, an unknown
-`{var}`, two tests with the same expanded name, and a `scope.contracts`
-entry that points at a TestSet (share scope with fragments instead).
+`{var}`, a `{var}` in a toolchain value of a test without a matrix, two
+tests with the same expanded name, and a `scope.contracts` entry that points
+at a TestSet (share scope with fragments instead).
 
 ### Select a test
 
