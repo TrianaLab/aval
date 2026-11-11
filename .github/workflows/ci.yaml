@@ -702,10 +702,24 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # The run action leaves the job's PATH alone (#248): the cosign a later
+      # step finds is the one it found before the action, or none.
+      - name: Record the job's cosign
+        id: cosign-before
+        run: echo "path=$(command -v cosign || echo none)" >> "$GITHUB_OUTPUT"
       - uses: ./integrations/github/run
         with:
           test: aval-engine
           shadow: "true"
+      - name: The run action did not change the job's cosign
+        env:
+          BEFORE: ${{ steps.cosign-before.outputs.path }}
+        run: |
+          now=$(command -v cosign || echo none)
+          if [ -z "$BEFORE" ] || [ "$now" != "$BEFORE" ]; then
+            echo "::error title=PATH changed::cosign was '$BEFORE' before the run action, '$now' after"
+            exit 1
+          fi
       # Run statistics (#88), informational: never fails the job. aval is built
       # from the commit and reads the public stats registry anonymously; records
       # are unsigned statistics that run and verify never read.

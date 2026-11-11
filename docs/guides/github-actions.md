@@ -34,21 +34,21 @@ takes `test` (required), `file` (default `aval.yaml`), `policy` (default
    comes from the policy's `registry` field
    ([Write a trust policy](trust-policy.md)); the job's `AVAL_REGISTRY` and
    `AVAL_POLICY` are ignored; `AVAL_MIN_TRUST_LEVEL` is not, since it only
-   raises the policy's minimum. With no policy nothing is reused, the test
-   runs and a warning is logged.
+   raises the policy's minimum. With no policy nothing is reused, the test runs and a warning is logged.
 4. Runs `aval run -f <file> --test <test>` with the CI run URL, the
    repository and, on a push to the default branch, `--outputs-dir`.
 5. Writes the outcome to the step summary and the `outcome` output. Exit 5
    sets the outcome to `verification-failed`, becomes an `aval SECURITY`
    error annotation and fails the step; a miss is routine.
-6. On a push to the default branch only, uploads `.aval/<test>/` as the
-   artifact `aval-<test>`.
-7. Warns when the policy trusts a `refs/pull/` subject at or above
-   `minTrustLevel`.
+6. On a push to the default branch only, uploads `.aval/<test>/` as the artifact `aval-<test>`.
+7. Warns when the policy trusts a `refs/pull/` subject at or above `minTrustLevel`.
 
 The policy is a separate file on the default branch, so `publicKey` paths in
 it are not fetched; use keyless identities. The action needs `/usr/bin/jq`
 (GitHub's Ubuntu images, macOS 15 and later).
+Neither action writes `GITHUB_PATH` or `GITHUB_ENV`: the cosign that checks
+the aval release is pinned by sha256 and installed in `$RUNNER_TEMP`, off the
+job's `PATH`, so the test and later steps see the job's own tools.
 
 !!! note "Pinned release"
     Pinning an action by commit SHA pins its aval release too, moved by a PR

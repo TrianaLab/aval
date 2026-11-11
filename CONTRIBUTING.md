@@ -560,6 +560,13 @@ ci.yaml --ref release-pins/main`. Review and merge the PR like any other.
 pinned release's `checksums.txt` and fails when a pin does not match it, so
 a pin moved to a version with no `checksums.txt` fails `ci-release`.
 
+The actions also pin the cosign that verifies the aval release
+(`COSIGN_VERSION` and `COSIGN_SHA256` of their `cosign` step), installed off
+the job's `PATH` by `integrations/github/get-cosign.sh`. No job moves it: to
+move it, copy the four `cosign-{linux,darwin}-{amd64,arm64}` lines of the new
+release's `cosign_checksums.txt` into both actions. `TestCosignPinMatchesRelease`
+in `tests/release` downloads that file and fails on a mismatch.
+
 To verify a downloaded release (`<tag>` is e.g. `v0.1.0`):
 
 ```sh

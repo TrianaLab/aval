@@ -25,6 +25,7 @@ type workflow struct {
 }
 
 type step struct {
+	ID              string            `yaml:"id"`
 	If              string            `yaml:"if"`
 	Env             map[string]string `yaml:"env"`
 	Run             string            `yaml:"run"`
@@ -599,9 +600,9 @@ func TestPublishExampleCheckCatchesDrift(t *testing.T) {
 	}
 }
 
-// installStep is the step of an action.yml that installs the pinned aval
-// release, as YAML, or "" when there is none.
-func installStep(t *testing.T, path string) string {
+// actionStep is the step with the given id of an action.yml, as YAML, or ""
+// when there is none.
+func actionStep(t *testing.T, path, id string) string {
 	t.Helper()
 	var a struct {
 		Runs struct {
@@ -612,7 +613,7 @@ func installStep(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	for _, s := range a.Runs.Steps {
-		if s["id"] == "install" {
+		if s["id"] == id {
 			out, err := yaml.Marshal(s)
 			if err != nil {
 				t.Fatal(err)
@@ -623,11 +624,64 @@ func installStep(t *testing.T, path string) string {
 	return ""
 }
 
+// actionFiles are the GitHub actions that install the pinned aval release.
+var actionFiles = []string{"integrations/github/run/action.yml", "integrations/github/publish/action.yml"}
+
 // Pinning either action by commit SHA pins the same verified aval release
-// (#212): the run and publish actions install it with identical steps.
+// (#212) and the same cosign (#248): the run and publish actions install
+// them with identical steps.
 func TestActionsInstallTheSameRelease(t *testing.T) {
-	run, publish := installStep(t, "integrations/github/run/action.yml"), installStep(t, "integrations/github/publish/action.yml")
-	if run == "" || run != publish {
-		t.Errorf("the install steps of the run and publish actions differ:\n--- run\n%s--- publish\n%s", run, publish)
+	for _, id := range []string{"cosign", "install"} {
+		run, publish := actionStep(t, actionFiles[0], id), actionStep(t, actionFiles[1], id)
+		if run == "" || run != publish {
+			t.Errorf("the %s steps of the run and publish actions differ:\n--- run\n%s--- publish\n%s", id, run, publish)
+		}
+	}
+}
+
+// jobEnvWrite matches what changes the environment of the rest of a
+// consumer's job: sigstore/cosign-installer (which always appends to
+// GITHUB_PATH) or an append to GITHUB_PATH or GITHUB_ENV.
+var jobEnvWrite = regexp.MustCompile(`(?m)^[^#\n]*(?:uses:\s*['"]?sigstore/cosign-installer@|>>\s*['"]?\$(?:\{)?(?:env:)?GITHUB_(?:PATH|ENV)\b)`)
+
+// The actions leave the job's PATH and environment untouched (#248): the test
+// aval run starts and every later step see the tools the job installed, not
+// the actions' cosign.
+func TestActionsLeaveJobEnvironmentAlone(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join(root, "integrations", "github", "*", "*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared, _ := filepath.Glob(filepath.Join(root, "integrations", "github", "*.sh"))
+	for _, f := range append(files, shared...) {
+		if !strings.HasSuffix(f, ".yml") && !strings.HasSuffix(f, ".sh") {
+			continue
+		}
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m := jobEnvWrite.FindAllString(string(data), -1); len(m) > 0 {
+			t.Errorf("%s changes the job's environment: %q", f, m)
+		}
+	}
+}
+
+func TestJobEnvWriteCatches(t *testing.T) {
+	for in, want := range map[string]bool{
+		"    - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2": true,
+		"  - uses: 'sigstore/cosign-installer@v3'":                                                true,
+		`echo "$dir" >> "$GITHUB_PATH"`:                                                           true,
+		`echo "$dir" >> $GITHUB_PATH`:                                                             true,
+		`echo "X=1" >> $GITHUB_ENV`:                                                               true,
+		`echo "X=1" >> "${GITHUB_ENV}"`:                                                           true,
+		`echo $d | Out-File >> $env:GITHUB_PATH`:                                                  true,
+		`echo "dir=$dir" >> "$GITHUB_OUTPUT"`:                                                     false,
+		`# never writes >> "$GITHUB_PATH"`:                                                        false,
+		"    # sigstore/cosign-installer is not used":                                             false,
+	} {
+		if got := jobEnvWrite.MatchString(in); got != want {
+			t.Errorf("%q: matched %v, want %v", in, got, want)
+		}
 	}
 }
