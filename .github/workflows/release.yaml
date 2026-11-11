@@ -19,7 +19,10 @@ name: release
 # A tag that does not match package.json fails verification and publishes
 # nothing. After the release, pin-actions opens a PR (branch
 # release-pins/main) that moves the GitHub actions' aval pins to it, and
-# pin-actions-ci dispatches ci.yaml on that branch.
+# pin-actions-ci dispatches ci.yaml on that branch. Once that PR merges,
+# pin-examples opens one more (branch release-pins/examples) that moves the
+# examples' action pins to the merge commit, and pin-examples-ci dispatches
+# ci.yaml on it.
 #
 # Write scopes only on push to main, on a tag, or on a successful ci run of a
 # push to main (workflow_run runs this file from main and checks out only that
@@ -362,6 +365,75 @@ jobs:
         run: |
           for _ in 1 2 3; do
             gh workflow run ci.yaml --ref release-pins/main && exit 0
+            sleep 15
+          done
+          exit 1
+
+  # Once a pin PR merges, a PR (branch release-pins/examples) moves the
+  # examples' uses of the GitHub actions (examples/*/.github/workflows) to
+  # the main commit that pins the new release, with a "# <tag>" comment, so
+  # the guides that embed them show the current release (#261). The pin PR
+  # cannot carry this: its squash-merge commit does not exist before it
+  # merges, and Dependabot would move them to the tag's commit, which still
+  # pins the previous release. Runs on every push to main; nothing is pushed
+  # when the examples already name main's DESIRED_VERSION. tests/architecture
+  # (TestExampleActionPins) allows the examples one pin behind only.
+  pin-examples:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push release-pins/examples
+      pull-requests: write # open the examples' pin PR
+    outputs:
+      pushed: ${{ steps.pr.outputs.pushed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Pin the examples to this commit
+        run: |
+          pinned=$(sed -n 's/^ *DESIRED_VERSION: *//p' integrations/github/run/action.yml)
+          git ls-files -z 'examples/*/.github/workflows/*.yml' |
+            xargs -0 scripts/pin-examples.sh "$GITHUB_SHA" "$pinned"
+      - name: Open or update the examples' pin PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pinned=$(sed -n 's/^ *DESIRED_VERSION: *//p' integrations/github/run/action.yml)
+          if git diff --quiet; then echo "the examples pin $pinned"; exit 0; fi
+          title="chore: pin the examples to aval $pinned"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C release-pins/examples
+          git commit -qam "$title"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            push --force origin release-pins/examples
+          body="Moves the examples' uses of integrations/github/run and integrations/github/publish to $GITHUB_SHA, the main commit that pins $pinned. Opened by the pin-examples job of release.yaml (#261)."
+          if [ -n "$(gh pr list --head release-pins/examples --state open --json number --jq '.[].number')" ]; then
+            gh pr edit release-pins/examples --title "$title" --body "$body"
+          else
+            gh pr create --base main --head release-pins/examples --title "$title" --body "$body"
+          fi
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+  # As pin-actions-ci, for the examples' pin PR.
+  pin-examples-ci:
+    needs: pin-examples
+    if: needs.pin-examples.outputs.pushed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Run ci on the examples' pin PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for _ in 1 2 3; do
+            gh workflow run ci.yaml --ref release-pins/examples && exit 0
             sleep 15
           done
           exit 1

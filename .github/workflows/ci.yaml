@@ -18,8 +18,9 @@ on:
     types: [opened, edited, synchronize, reopened]
   # release.yaml's version-pr-ci job dispatches this workflow on
   # changeset-release/main after changesets rewrites the version PR with
-  # GITHUB_TOKEN, a push that starts no run, and its pin-actions-ci job on
-  # release-pins/main after each release (#213). The `changes` job fails any
+  # GITHUB_TOKEN, a push that starts no run, its pin-actions-ci job on
+  # release-pins/main after each release (#213), and its pin-examples-ci job
+  # on release-pins/examples after a pin PR merges (#261). The `changes` job fails any
   # other dispatched ref. A dispatch run is treated as a PR against main: trust
   # policy and registry from main (integrations/github/run reads them there on
   # every event), developer signatures accepted, AVAL_GOLDEN_BASE and the API
@@ -60,11 +61,11 @@ jobs:
       # so whoever can push that ref controls this check anyway; trust still
       # comes from main and write scopes stay push-only.
       - name: Dispatch only on the version and pin PR branches
-        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/changeset-release/main' && github.ref != 'refs/heads/release-pins/main'
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/changeset-release/main' && github.ref != 'refs/heads/release-pins/main' && github.ref != 'refs/heads/release-pins/examples'
         env:
           REF: ${{ github.ref }}
         run: |
-          echo "::error::ci.yaml is dispatched only on refs/heads/changeset-release/main or refs/heads/release-pins/main, not $REF"
+          echo "::error::ci.yaml is dispatched only on refs/heads/changeset-release/main, refs/heads/release-pins/main or refs/heads/release-pins/examples, not $REF"
           exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -419,11 +420,11 @@ jobs:
   # each with a fresh OIDC token of this job, and aval verify then accepts
   # them under integrations/github/publish/testdata/policy.yaml, which trusts
   # only ci.yaml on main: the certificate names the calling workflow, not
-  # integrations/github/publish. bin/aval is built from the commit, because
-  # the action's pinned release has no --outputs-dir yet. The artifacts are
+  # integrations/github/publish. bin/aval is built from the commit, so the
+  # action's scripts are checked with this commit's aval before a release
+  # pins it; dogfood-publish runs the action itself. The artifacts are
   # named suite-*, not aval-*: dogfood-publish runs the action, which
   # downloads every aval-* artifact of the run.
-  # TODO(milestone-14): uses: ./integrations/github/publish once its pin has --outputs-dir (#213, #236).
   publish-action-suite:
     needs: changes
     if: needs.changes.outputs.code == 'true' && github.event_name == 'push'
@@ -562,9 +563,8 @@ jobs:
   # to trust any GitHub workflow, registry included, and the action must
   # still use the default branch's copy (or none, before it exists there),
   # so nothing the edit trusts is reused. bin/aval is built from the commit,
-  # because the example's unit test declares outputs and the action's pinned
-  # release has no --outputs-dir yet.
-  # TODO(milestone-14): uses: ./integrations/github/run once its pin has --outputs-dir (#213, #236).
+  # so the action's scripts are checked with this commit's aval before a
+  # release pins it.
   example-github-monorepo:
     needs: changes
     if: needs.changes.outputs.code == 'true'
