@@ -1,5 +1,6 @@
 #!/bin/bash
-# Steps 3, 4, 6 and 7 of the aval publish action (#212). Reads INPUT_FILE,
+# Steps 3, 4, 6 and 7 of the aval publish action (#212); it runs only
+# when there is an aval-* artifact (#260). Reads INPUT_FILE,
 # INPUT_POLICY, INPUT_STATS, AVAL (absolute path of the installed binary),
 # ARTIFACTS (the directory the aval-* artifacts were downloaded into),
 # REGISTRY_USERNAME, REGISTRY_PASSWORD, DEFAULT_BRANCH, GH_TOKEN and the
@@ -65,7 +66,7 @@ env_file=false
 if [[ "$help" == *--env-file* ]]; then env_file=true; fi
 
 # Step 6: one push per artifact, each with its own token.
-worst=0 pushed=0
+worst=0
 echo "| test | aval push |" >> "$GITHUB_STEP_SUMMARY"
 echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
 for dir in "$ARTIFACTS"/aval-*/; do
@@ -91,7 +92,6 @@ for dir in "$ARTIFACTS"/aval-*/; do
     echo "::error title=aval publish::$name: could not get an OIDC token for Sigstore"
     code=1
   else
-    pushed=$((pushed + 1))
     args=(push -f "$INPUT_FILE" --test "$name" --registry "$registry" --report-file "${dir}report.json" --result-file "${dir}result.json")
     # aval push checks every file under outputs/ against the contract's
     # outputs globs and refuses anything else, or a missing outputs/ when
@@ -116,7 +116,4 @@ for dir in "$ARTIFACTS"/aval-*/; do
       echo "::warning title=aval publish::$name: could not publish the run record"
   fi
 done
-if [ "$pushed" -eq 0 ] && [ "$worst" -eq 0 ]; then
-  echo "::warning title=aval publish::no aval-* artifacts in this workflow run: nothing to publish"
-fi
 exit "$worst"

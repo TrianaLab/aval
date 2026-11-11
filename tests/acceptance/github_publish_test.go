@@ -62,6 +62,7 @@ type publishStory struct {
 	dir, repo, policy, artifacts, log string
 	api, oidc                         *httptest.Server
 	contents                          *fakeContents
+	tokens                            *fakeOIDC
 }
 
 func newPublishStory(t *testing.T) *publishStory {
@@ -71,7 +72,8 @@ func newPublishStory(t *testing.T) *publishStory {
 	s := &publishStory{repo: strings.TrimPrefix(srv.URL, "http://") + "/acme/app-aval", contents: &fakeContents{}, artifacts: t.TempDir()}
 	s.api = httptest.NewServer(s.contents)
 	t.Cleanup(s.api.Close)
-	s.oidc = httptest.NewServer(&fakeOIDC{})
+	s.tokens = &fakeOIDC{}
+	s.oidc = httptest.NewServer(s.tokens)
 	t.Cleanup(s.oidc.Close)
 	keys := t.TempDir()
 	key, pub := keyPair(t, keys, "ci")
@@ -140,8 +142,10 @@ type publishRun struct {
 	calls        []string
 }
 
-// publish runs guard.sh and publish.sh in the project as the composite
-// action does, on a push to main, with the artifacts downloaded so far.
+// publish runs guard.sh, found.sh and, when found.sh set any=true,
+// publish.sh in the project as the composite action does (tests/architecture
+// keeps its steps in that order), on a push to main, with the artifacts
+// downloaded so far.
 func (s *publishStory) publish(t *testing.T, env ...string) publishRun {
 	t.Helper()
 	tmp := t.TempDir()
@@ -153,14 +157,18 @@ func (s *publishStory) publish(t *testing.T, env ...string) publishRun {
 	_ = os.Remove(s.log)
 	var out bytes.Buffer
 	code := 0
-	for _, script := range []string{"guard.sh", "publish.sh"} {
+	output := filepath.Join(tmp, "output")
+	for _, script := range []string{"guard.sh", "found.sh", "publish.sh"} {
+		if b, _ := os.ReadFile(output); script == "publish.sh" && !strings.Contains(string(b), "any=true\n") {
+			break
+		}
 		cmd := exec.Command("/bin/bash", filepath.Join(abs, script))
 		cmd.Dir, cmd.Stdout, cmd.Stderr = s.dir, &out, &out
 		cmd.Env = append(os.Environ(), "AVAL="+s.wrapper(), "ARTIFACTS="+s.artifacts,
 			"INPUT_FILE=aval.yaml", "INPUT_POLICY=.github/aval/policy.yaml", "INPUT_STATS=true",
 			"REGISTRY_USERNAME=bot", "REGISTRY_PASSWORD=pw", "ALLOW_UNPROTECTED=false",
 			"DEFAULT_BRANCH=main", "GH_TOKEN=tok", "GITHUB_API_URL="+s.api.URL, "GITHUB_REPOSITORY=acme/app",
-			"GITHUB_EVENT_NAME=push", "GITHUB_REF=refs/heads/main", "RUNNER_TEMP="+tmp, "GITHUB_STEP_SUMMARY="+summary,
+			"GITHUB_EVENT_NAME=push", "GITHUB_REF=refs/heads/main", "RUNNER_TEMP="+tmp, "GITHUB_STEP_SUMMARY="+summary, "GITHUB_OUTPUT="+output,
 			"ACTIONS_ID_TOKEN_REQUEST_URL="+s.oidc.URL+"/token?api-version=2.0", "ACTIONS_ID_TOKEN_REQUEST_TOKEN=req-tok",
 			"SIGSTORE_ID_TOKEN=job-token", "AVAL_REGISTRY=evil.example/x", "AVAL_POLICY=/nonexistent")
 		cmd.Env = append(cmd.Env, env...)
@@ -303,12 +311,36 @@ func TestGitHubPublishActionRefuses(t *testing.T) {
 		t.Fatalf("allow-unprotected: exit %d\n%s", r.code, r.out)
 	}
 	s.reset(t)
-	if r := s.publish(t); r.code != 0 || !strings.Contains(r.out, "no aval-* artifacts") {
-		t.Fatalf("no artifacts: exit %d\n%s", r.code, r.out)
-	}
 	s.artifact(t, "A_b", s.suite(t, "a"), nil)
 	if r := s.publish(t); r.code != 2 || len(pushes(r.calls)) != 0 || !strings.Contains(r.out, "is not a valid metadata.name") {
-		t.Fatalf("no artifacts: exit %d\n%s", r.code, r.out)
+		t.Fatalf("invalid name: exit %d\n%s", r.code, r.out)
+	}
+}
+
+// Without aval-* artifacts (the test jobs were skipped) the action exits 0
+// with a notice: no aval call, no policy fetch, no OIDC token, even when the
+// default branch has no policy yet (#260). The guard still refuses first.
+func TestGitHubPublishActionNothingToPublish(t *testing.T) {
+	s := newPublishStory(t)
+	for name, policy := range map[string]string{"policy": s.policy, "no policy": ""} {
+		s.contents.set(policy)
+		r := s.publish(t)
+		if r.code != 0 || len(r.calls) != 0 || len(s.contents.queries) != 0 || s.tokens.n != 0 ||
+			!strings.Contains(r.out, "::notice title=aval publish::no aval-* artifacts in this workflow run: nothing to publish") {
+			t.Errorf("%s: exit %d, %d calls, %d policy fetches, %d tokens; want 0, none, none, none and a notice\n%s",
+				name, r.code, len(r.calls), len(s.contents.queries), s.tokens.n, r.out)
+		}
+	}
+	if r := s.publish(t, "GITHUB_REF=refs/heads/feature"); r.code != 1 || !strings.Contains(r.out, "only the default branch (main) publishes") ||
+		strings.Contains(r.out, "nothing to publish") {
+		t.Errorf("feature branch: exit %d, want 1 from the guard\n%s", r.code, r.out)
+	}
+	// An empty directory that is not aval-* is no artifact either.
+	if err := os.MkdirAll(filepath.Join(s.artifacts, "other"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if r := s.publish(t); r.code != 0 || len(s.contents.queries) != 0 {
+		t.Errorf("other artifact: exit %d, %d policy fetches\n%s", r.code, len(s.contents.queries), r.out)
 	}
 }
 

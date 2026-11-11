@@ -60,14 +60,18 @@ default `false`). In order, it:
 1. Refuses a ref other than the default branch unless `allow-unprotected:
    true`, always refuses `pull_request_target` and `workflow_run`, and fails
    without `id-token: write`.
-2. Installs the same pinned, verified aval release as the run action.
-3. Fetches the policy from the default branch and logs in to the host of its
+2. Downloads this run's `aval-*` artifacts (so name no other artifact
+   `aval-*`) into `$RUNNER_TEMP`. With none, for example when path filters
+   skipped every test job, it prints a notice and exits 0: no install, no
+   policy fetch, no OIDC token, so a publish job on `!cancelled()` costs
+   seconds and passes before the policy is merged.
+3. Installs the same pinned, verified aval release as the run action.
+4. Fetches the policy from the default branch and logs in to the host of its
    `registry`, where results go. No policy or no `registry` fails the step.
-4. Downloads this run's `aval-*` artifacts (so name no other artifact
-   `aval-*`) into `$RUNNER_TEMP`. For each `aval-<name>`, fetches a fresh OIDC
-   token (audience `sigstore`) and runs `aval push --test <name>`. It tries
-   them all, then exits with the worst code; 5 is `aval SECURITY`, never downgraded.
-5. With `stats: true`, publishes each pushed test's run record; a failure
+5. For each `aval-<name>`, fetches a fresh OIDC token (audience `sigstore`)
+   and runs `aval push --test <name>`. It tries them all, then exits with the
+   worst code; 5 is `aval SECURITY`, never downgraded.
+6. With `stats: true`, publishes each pushed test's run record; a failure
    is a warning.
 
 What `aval push` does with each artifact:

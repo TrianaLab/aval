@@ -601,20 +601,28 @@ func TestPublishExampleCheckCatchesDrift(t *testing.T) {
 	}
 }
 
-// actionStep is the step with the given id of an action.yml, as YAML, or ""
-// when there is none.
-func actionStep(t *testing.T, path, id string) string {
-	t.Helper()
+// actionSteps are the steps of an action.yml.
+func actionSteps(action []byte) ([]map[string]any, error) {
 	var a struct {
 		Runs struct {
 			Steps []map[string]any `yaml:"steps"`
 		} `yaml:"runs"`
 	}
-	if err := yaml.Unmarshal([]byte(readFile(t, path)), &a); err != nil {
+	err := yaml.Unmarshal(action, &a)
+	return a.Runs.Steps, err
+}
+
+// actionStep is the step with the given id of an action.yml, as YAML without
+// its if key, or "" when there is none.
+func actionStep(t *testing.T, path, id string) string {
+	t.Helper()
+	steps, err := actionSteps([]byte(readFile(t, path)))
+	if err != nil {
 		t.Fatal(err)
 	}
-	for _, s := range a.Runs.Steps {
+	for _, s := range steps {
 		if s["id"] == id {
+			delete(s, "if") // the publish action skips it without artifacts (#260)
 			out, err := yaml.Marshal(s)
 			if err != nil {
 				t.Fatal(err)
@@ -637,6 +645,73 @@ func TestActionsInstallTheSameRelease(t *testing.T) {
 		if run == "" || run != publish {
 			t.Errorf("the %s steps of the run and publish actions differ:\n--- run\n%s--- publish\n%s", id, run, publish)
 		}
+	}
+}
+
+// publishFound is the condition of every publish action step after found.
+const publishFound = "steps.found.outputs.any == 'true'"
+
+// publishGateProblems reports a publish action.yml whose first steps are not
+// the guard, the artifact download and found, in that order and
+// unconditional, or whose later steps can run without found's any=true.
+func publishGateProblems(action []byte) ([]string, error) {
+	steps, err := actionSteps(action)
+	if err != nil {
+		return nil, err
+	}
+	var problems []string
+	first := []func(map[string]any) bool{
+		func(s map[string]any) bool { r, _ := s["run"].(string); return strings.Contains(r, "/guard.sh") },
+		func(s map[string]any) bool {
+			u, _ := s["uses"].(string)
+			return strings.HasPrefix(u, "actions/download-artifact@")
+		},
+		func(s map[string]any) bool { return s["id"] == "found" },
+	}
+	for i, ok := range first {
+		if i >= len(steps) || !ok(steps[i]) || steps[i]["if"] != nil {
+			problems = append(problems, fmt.Sprintf("step %d is not the unconditional %s step", i+1, []string{"guard", "download", "found"}[i]))
+		}
+	}
+	for i := len(first); i < len(steps); i++ {
+		if steps[i]["if"] != publishFound {
+			problems = append(problems, fmt.Sprintf("step %d: if is %v, want %s", i+1, steps[i]["if"], publishFound))
+		}
+	}
+	return problems, nil
+}
+
+// Without aval-* artifacts the publish action installs nothing, fetches no
+// policy and requests no OIDC token (#260), and the guard still runs first.
+func TestPublishActionNeedsArtifacts(t *testing.T) {
+	p, err := publishGateProblems([]byte(readFile(t, actionFiles[1])))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range p {
+		t.Error(s)
+	}
+}
+
+func TestPublishGateCheckCatchesDrift(t *testing.T) {
+	guard := "    - run: /bin/bash \"$GITHUB_ACTION_PATH/guard.sh\"\n"
+	download := "    - uses: actions/download-artifact@x\n"
+	found := "    - id: found\n"
+	install := "    - id: install\n      if: " + publishFound + "\n"
+	for in, want := range map[string]int{
+		guard + download + found + install:                                       0,
+		download + guard + found + install:                                       2,
+		guard + download + found + "    - id: install\n":                         1,
+		guard + "    - uses: actions/download-artifact@x\n      if: x\n" + found: 1,
+		guard + download: 1,
+	} {
+		got, err := publishGateProblems([]byte("runs:\n  steps:\n" + in))
+		if err != nil || len(got) != want {
+			t.Errorf("%q: %q %v, want %d problems", in, got, err, want)
+		}
+	}
+	if _, err := publishGateProblems([]byte("runs: [")); err == nil {
+		t.Error("bad YAML: no error")
 	}
 }
 
