@@ -1,13 +1,14 @@
 #!/bin/bash
 # Steps 3 to 7 of the aval run action (#211). Reads INPUT_TEST, INPUT_FILE,
-# INPUT_POLICY, AVAL (absolute path of the installed binary), DEFAULT_BRANCH,
-# GH_TOKEN and the runner's GITHUB_* variables.
+# INPUT_POLICY, INPUT_SHADOW, AVAL (absolute path of the installed binary),
+# DEFAULT_BRANCH, GH_TOKEN and the runner's GITHUB_* variables.
 #
 # The trust policy is fetched from the default branch through the contents
 # API on every event, never read from the checkout, so a pull request that
 # edits it does not change what its own run trusts. The registry comes from
 # inside the policy (#209); AVAL_REGISTRY and AVAL_POLICY from the job are
-# ignored. No policy means nothing is reused. Tools are called by absolute
+# ignored; AVAL_MIN_TRUST_LEVEL is not, since it can only raise the policy's
+# minimum (#214). No policy means nothing is reused. Tools are called by absolute
 # path, so an earlier step that writes GITHUB_PATH cannot shim them. A hostile
 # pull request still controls its own workflow file: required code-owner
 # review is what protects the default branch (docs/trust-model.md).
@@ -25,6 +26,13 @@ if ! [[ "$INPUT_POLICY" =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$ ]] || [[ "/$INPU
   echo "::error title=aval run::policy: \"$INPUT_POLICY\" must be a relative path in the repository"
   exit 2
 fi
+case "${INPUT_SHADOW:-false}" in
+  true | false) ;;
+  *)
+    echo "::error title=aval run::shadow: \"$INPUT_SHADOW\" must be true or false"
+    exit 2
+    ;;
+esac
 
 # Step 6: only a push to the default branch hands its result to a publish job.
 upload=false
@@ -63,6 +71,10 @@ if [ "$upload" = true ]; then
     echo "::error title=aval run::$INPUT_TEST declares outputs and the installed aval has no run --outputs-dir: carrying outputs to the publish job needs aval v0.8.2 or later (#236)"
     exit 1
   fi
+fi
+# Shadow mode verifies a published result and runs the test anyway (#216).
+if [ "${INPUT_SHADOW:-false}" = true ]; then
+  args+=(--shadow)
 fi
 if [ -n "${GITHUB_RUN_ID:-}" ]; then
   args+=(--ci-run-url "${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")

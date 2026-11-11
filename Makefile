@@ -247,17 +247,15 @@ ci-engine: coverage-check example
 # golden sets exec bits.
 ci-false-hit:
 	AVAL_GOLDEN_BASE="$${AVAL_GOLDEN_BASE-origin/main}" go test -count=1 ./internal/fingerprint/... ./internal/contract/...
-# Levels 2 and 4, the heavy suite, through `aval run` with the contract
-# aval.e2e.yaml. Locally (no AVAL_REGISTRY, AVAL_POLICY) it always runs. With
+# Levels 2 and 4, the heavy suite, through `aval run` with the test aval-e2e
+# of aval.yaml. Locally (no AVAL_REGISTRY, AVAL_POLICY) it always runs. With
 # both set (aval reads them itself), a verified passing result for the same
 # inputs is reused and anything unproven runs (invariant 3); a verification
-# failure runs the suite and exits 5. The report is in the `aval verify --output json` format. The
-# run record (statistics) goes to .aval/e2e-record.json; on main CI publishes
-# it with `aval stats publish` from a job that runs no tests. CI runs the same
-# `aval run` with the pinned release, not this target (#134).
+# failure runs the suite and exits 5. The result, report and run record go to
+# .aval/aval-e2e/. CI runs the same test through integrations/github/run and
+# its pinned release, not this target (#134, #216).
 ci-e2e: build
-	bin/aval run -f aval.e2e.yaml --result-file .aval/e2e-result.json --report-file .aval/e2e-report.json \
-		--stats-file .aval/e2e-record.json $${AVAL_CI_RUN_URL:+--ci-run-url "$$AVAL_CI_RUN_URL"} $${AVAL_REPOSITORY:+--source-repo "$$AVAL_REPOSITORY"}
+	bin/aval run -f aval.yaml --test aval-e2e $${AVAL_CI_RUN_URL:+--ci-run-url "$$AVAL_CI_RUN_URL"} $${AVAL_REPOSITORY:+--source-repo "$$AVAL_REPOSITORY"}
 ci-release: test-release
 ci-fuzz: fuzz
 ci-security: vuln

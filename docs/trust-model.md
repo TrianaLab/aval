@@ -208,7 +208,8 @@ workflow file, so a hostile PR can edit the step and make its own check
 green. No check in that run can stop it. What protects the default branch
 is review: CODEOWNERS for the workflows, the policy and the tests that guard
 them, a branch rule that requires code-owner review, and a default branch
-that trusts only its own CI (`main.yaml` in Aval's case).
+that trusts only its own CI (in Aval's case, `ci.yaml` on `main` at runner
+level, the minimum `main` raises to).
 
 ## Fail closed
 

@@ -173,8 +173,9 @@ func TestRejectedCandidateStory(t *testing.T) {
 	}
 }
 
-// The shape of .github/aval/main.yaml (#130): minTrustLevel runner, a CI
-// identity at runner and a maintainer listed at developer. A fingerprint whose
+// The policy main and releases apply (#130): .github/aval/policy.yaml with
+// the minimum raised to runner (#216), a CI identity at runner and a
+// maintainer listed at developer. A fingerprint whose
 // only result the maintainer signed is a miss (the test runs, verify exits 4,
 // so a release stops), not a verification failure; once a runner-signed
 // sibling exists it is reused from that one; an unlisted signer is still a

@@ -1,32 +1,82 @@
-# Aval dogfooding: the engine unit suite. tests/architecture is deliberately
-# out of scope (it reads .agents/ and .claude/, which hold symlinks) and
-# always runs. The scope is every file the suite reads (invariant 2):
-# testdata, the CLI reference cmd/aval checks, the contracts the contract
-# fuzz target seeds from, and the example the shard test reads.
-# tests/architecture/dogfood_test.go fails if a suite reads a repository file
-# outside its contract's scope.
+# Aval dogfooding (#28): Aval's own tests, run through the GitHub actions in
+# ci.yaml (#216).
+#
+# - aval-engine: the engine unit suite, in shadow mode (it always runs).
+#   tests/architecture is deliberately out of scope (it reads .agents/ and
+#   .claude/, which hold symlinks) and always runs.
+# - aval-e2e: the heavy suite, levels 2 (tests/integration: in-process
+#   registry) and 4 (tests/acceptance: run, push and verify through the CLI,
+#   with signing). `make ci-e2e` runs it through `aval run`; in CI a verified
+#   result for the same inputs is reused.
+#
+# Each scope is every file its suite builds or reads (invariant 2), including
+# the Makefile targets runner.command calls. tests/architecture/dogfood_test.go
+# fails if a suite reads a repository file outside its test's scope.
 apiVersion: aval.trianalab.io/v1
-kind: Test
-metadata:
-  name: aval-engine
-runner:
-  command: ["go", "test", "-race", "./cmd/...", "./internal/...", "./pkg/..."]
-scope:
-  source:
-    - "cmd/**"
-    - "internal/**"
-    - "pkg/**"
-    - "docs/cli-reference.md"
-    - "aval.yaml"
-    - "examples/go-compose/aval.yaml"
-    # internal/fingerprint's shard test. Top-level files and packages/ only:
-    # a local uv run leaves a .venv with symlinks at the example's root.
-    - "examples/uv-monorepo/*"
-    - "examples/uv-monorepo/packages/**"
-  # Redundant since #63 (Aval never hashes .aval/), kept so the canonical
-  # contract, and with it the published results, stay the same.
-  exclude: ["**/.aval/**"]
-  dependencies: [go.mod, go.sum]
-environment:
-  toolchain: {go: "1.27"}
-cacheability: hermetic
+kind: TestSet
+defaults:
+  scope:
+    # Redundant since #63 (Aval never hashes .aval/), kept so the canonical
+    # contracts, and with them the published results, stay the same.
+    exclude: ["**/.aval/**"]
+    dependencies: [go.mod, go.sum]
+  environment:
+    toolchain: {go: "1.27"}
+  cacheability: hermetic
+fragments:
+  engine:
+    scope:
+      source:
+        - "cmd/**"
+        - "internal/**"
+        - "pkg/**"
+        # Top-level files and packages/ only: a local uv run leaves a .venv
+        # with symlinks at the example's root.
+        - "examples/uv-monorepo/*"
+        - "examples/uv-monorepo/packages/**"
+tests:
+  - metadata: {name: aval-engine}
+    use: [engine]
+    runner:
+      command: ["go", "test", "-race", "./cmd/...", "./internal/...", "./pkg/..."]
+    scope:
+      source:
+        # The CLI reference cmd/aval checks, the contracts the contract fuzz
+        # target seeds from, and the example the shard test reads.
+        - "docs/cli-reference.md"
+        # The whole TestSet file: an edit to aval-e2e also changes this fingerprint.
+        - "aval.yaml"
+        - "examples/go-compose/aval.yaml"
+  - metadata: {name: aval-e2e}
+    use: [engine]
+    runner:
+      command: ["make", "test-integration", "test-acceptance"]
+    scope:
+      source:
+        - "tests/integration/**"
+        - "tests/acceptance/**"
+        - "examples/go-compose/**"
+        # tests/acceptance runs the docs quickstart as written.
+        - "docs/quickstart.md"
+        # tests/acceptance runs the history estimate script.
+        - "scripts/estimate-reuse.sh"
+        # tests/acceptance runs the GitHub actions' scripts (#211, #212).
+        - "integrations/github/**"
+        # tests/acceptance runs the example's suites through aval (#217), one
+        # with the runner image's npm.
+        - "examples/github-monorepo/**"
+      dependencies: [Makefile]
+      # The example's fixtures name this tag on purpose (#217); the suite
+      # only reads them, nothing pulls the image. One entry per file, as in
+      # the former aval.e2e.yaml, so the fingerprint and the published
+      # results stay the same.
+      allowMutable:
+        - file: examples/github-monorepo/data/fixtures/podinfo.yaml
+          ref: ghcr.io/stefanprodan/podinfo:6.5.0
+          reason: example fixture, read as text by tests/acceptance
+        - file: examples/github-monorepo/data/fixtures/podinfo-canary.yaml
+          ref: ghcr.io/stefanprodan/podinfo:6.5.0
+          reason: example fixture, read as text by tests/acceptance
+    environment:
+      toolchain: {uv: "0.9.18"}
+      env: [GOFLAGS, GOEXPERIMENT, CGO_ENABLED]

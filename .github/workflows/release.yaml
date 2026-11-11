@@ -147,24 +147,28 @@ jobs:
           echo "::notice title=release dispatched::tagged $SHA as $tag"
 
   # Dogfooding (#28): the tagged commit must carry a verified, passing
-  # result of the heavy suite (aval.e2e.yaml), signed by ci.yaml on main
-  # (.github/aval/main.yaml). The verifier is the aval release ci.yaml pins
-  # (AVAL_VERSION, AVAL_SHA256, read from this tag's ci.yaml), installed by
-  # .github/aval/install.sh: dogfood-publish signed the result with that
-  # release, and only the same release computes the same fingerprint. A
-  # binary built from the tag could compute a newer fingerprint manifest
-  # (aval-fingerprint/vN) and miss every time (#234). A miss (exit 4) or any
-  # error stops the release; a verification failure (exit 5) is a security
-  # event and stops it too. A job of its own with a read-only token, so
-  # neither the installer nor aval runs beside the release's write, signing
-  # and attestation scopes. GHCR is read anonymously; no token reaches aval.
+  # result of the heavy suite (aval-e2e in aval.yaml), signed by ci.yaml on
+  # main at runner level, under main's .github/aval/policy.yaml (read from
+  # origin/main, never from the checkout) and the registry inside it. The
+  # verifier is the aval release integrations/github/run pins at this tag
+  # (DESIRED_VERSION and its linux_amd64 sha256), installed by
+  # scripts/get-aval.sh with --require-verify and --require-provenance:
+  # dogfood-publish signed the result through integrations/github/publish,
+  # which pins the same release (#216), and only the same release computes
+  # the same fingerprint. A binary built from the tag could compute a newer
+  # fingerprint manifest (aval-fingerprint/vN) and miss every time (#234). A
+  # miss (exit 4) or any error stops the release; a verification failure
+  # (exit 5) is a security event and stops it too. A job of its own with a
+  # read-only token, so neither the installer nor aval runs beside the
+  # release's write, signing and attestation scopes. GHCR is read
+  # anonymously; no token reaches aval.
   e2e-gate:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      # fetch-depth 0 fetches origin/main, where install.sh reads the installer.
+      # fetch-depth 0 fetches origin/main, where the policy is read.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -172,29 +176,33 @@ jobs:
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
           cosign-release: v3.0.6
-      # ci.yaml declares the pin once, at workflow level; a missing, repeated
-      # or malformed value fails here (tests/architecture/dogfood_test.go).
-      - name: Read the release pin from ci.yaml
-        run: |
-          version=$(sed -n 's/^  AVAL_VERSION: *//p' .github/workflows/ci.yaml)
-          sha256=$(sed -n 's/^  AVAL_SHA256: *//p' .github/workflows/ci.yaml)
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$sha256" =~ ^[0-9a-f]{64}$ ]]; then
-            echo "::error title=no release pin::ci.yaml must declare AVAL_VERSION and AVAL_SHA256 once at workflow level"
-            exit 1
-          fi
-          { echo "AVAL_VERSION=$version"; echo "AVAL_SHA256=$sha256"; } >> "$GITHUB_ENV"
-      - name: Install the pinned aval release (verified)
+      # A missing or malformed pin fails here (tests/architecture/release_gate_test.go).
+      - name: Install the aval release the actions pin (verified)
         env:
           # gh attestation verify (--require-provenance) needs a token.
           GH_TOKEN: ${{ github.token }}
-        run: .github/aval/install.sh
-      - name: Require a verified e2e attestation for this commit
-        env:
-          AVAL_REGISTRY: ghcr.io/trianalab/aval-attestations
         run: |
+          version=$(sed -n 's/^ *DESIRED_VERSION: *//p' integrations/github/run/action.yml)
+          sha256=$(grep -o 'linux_amd64=[0-9a-f]\{64\}' integrations/github/run/action.yml)
+          if ! [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$sha256" =~ ^linux_amd64=[0-9a-f]{64}$ ]]; then
+            echo "::error title=no release pin::integrations/github/run/action.yml must pin DESIRED_VERSION and a linux_amd64 sha256 once"
+            exit 1
+          fi
+          cosign=$(command -v cosign)
+          gh=$(command -v gh)
+          git show origin/main:scripts/get-aval.sh > "$RUNNER_TEMP/get-aval.sh"
+          PATH="/usr/bin:/bin:${cosign%/*}:${gh%/*}" AVAL_INSTALL_DIR="$RUNNER_TEMP/aval" USE_SUDO=false \
+            /bin/bash "$RUNNER_TEMP/get-aval.sh" --version "$version" --sha256 "$sha256" --require-verify --require-provenance
+          echo "$RUNNER_TEMP/aval" >> "$GITHUB_PATH"
+      - name: Require a verified e2e attestation for this commit
+        run: |
+          git show origin/main:.github/aval/policy.yaml > "$RUNNER_TEMP/policy.yaml"
           code=0
-          aval verify -f aval.e2e.yaml --registry "$AVAL_REGISTRY" --policy .github/aval/main.yaml -o json > "$RUNNER_TEMP/e2e-verify.json" || code=$?
-          .github/aval/summary.sh aval-e2e "$RUNNER_TEMP/e2e-verify.json"
+          aval verify -f aval.yaml --test aval-e2e --policy "$RUNNER_TEMP/policy.yaml" --min-trust-level runner -o json > "$RUNNER_TEMP/e2e-verify.json" || code=$?
+          if [ "$code" -eq 5 ]; then
+            echo "::error title=aval SECURITY::an e2e attestation for this commit failed signature or policy verification; investigate before releasing"
+            exit 1
+          fi
           if [ "$code" -ne 0 ]; then
             echo "::error title=no verified e2e attestation::aval verify exited $code; wait for ci.yaml on main to publish the e2e result for this commit, then re-run"
             exit 1

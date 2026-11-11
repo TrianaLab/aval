@@ -75,8 +75,8 @@ bash .ci/get-aval.sh --version v0.8.0 \
 The entry for the runner's platform is required. A re-tagged release, a
 mirror serving another build, or a missing `cosign` fails the install.
 `--sha256`, `--require-verify` and `--require-provenance` first ship in the
-release after 0.7.0. Aval's own CI does the same with `main`'s copy
-(`.github/aval/install.sh`).
+release after 0.7.0. Aval's GitHub actions (`integrations/github/run` and
+`publish`) install their pinned release the same way.
 
 ## Upgrade
 

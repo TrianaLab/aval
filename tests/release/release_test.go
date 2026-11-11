@@ -446,22 +446,22 @@ func loadBundle(t *testing.T, path string) *bundle.Bundle {
 // it is the workflow file whose identity TestTaggedReleaseIsSignedWithProvenance
 // requires; renaming it would only surface at release time. It needs the
 // e2e-gate job, which verifies the e2e attestation with the aval release
-// ci.yaml pins, the one that signed it: a binary built from the tag can
-// compute another fingerprint manifest version and miss (#234;
-// tests/architecture checks the pin).
+// integrations/github/run pins, the one that signed it: a binary built from
+// the tag can compute another fingerprint manifest version and miss (#234,
+// #216; tests/architecture checks the pin).
 type releaseStep struct {
 	Run string            `yaml:"run"`
 	Env map[string]string `yaml:"env"`
 }
 
-// verifiesE2E: a step verifies aval.e2e.yaml under the main policy and checks
-// the report with summary.sh (#135: it fails on a verification failure among
-// the candidates, which verify exits 0 for beside a trusted result).
+// verifiesE2E: a step verifies the test aval-e2e under main's policy at
+// runner level (#216). Since #203 aval verify exits 5 on a verification
+// failure among the candidates, beside a trusted result too.
 func verifiesE2E(steps []releaseStep) bool {
 	return slices.ContainsFunc(steps, func(s releaseStep) bool {
-		return strings.Contains(s.Run, "aval verify -f aval.e2e.yaml") &&
-			strings.Contains(s.Run, "--policy .github/aval/main.yaml") &&
-			strings.Contains(s.Run, ".github/aval/summary.sh")
+		return strings.Contains(s.Run, "git show origin/main:.github/aval/policy.yaml") &&
+			strings.Contains(s.Run, "aval verify -f aval.yaml --test aval-e2e") &&
+			strings.Contains(s.Run, "--min-trust-level runner")
 	})
 }
 
@@ -498,7 +498,7 @@ func TestReleaseWorkflowVerifiesBeforePublishing(t *testing.T) {
 				t.Error("release job publishes before tests/release verifies the tagged dist/")
 			}
 			if !e2e {
-				t.Error("release job publishes without needing e2e-gate, which verifies the e2e attestation (aval.e2e.yaml) for the commit and checks the report with .github/aval/summary.sh")
+				t.Error("release job publishes without needing e2e-gate, which verifies the e2e attestation (aval-e2e in aval.yaml) for the commit under main's policy at runner level")
 			}
 			checkPublishedFiles(t, s.Run)
 		}

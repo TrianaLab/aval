@@ -231,56 +231,53 @@ rather than relying on a `major` bump from 0.x.
 | `ci-gates` | level 3 |
 | `ci-engine` | level 1 with `-race`, the `examples/go-compose` module |
 | `ci-false-hit` | the false-hit corpus, glob tables, the manifest golden and the append-only check on goldens: a change to the golden tree's manifests fails unless `fingerprint.Version` is bumped |
-| `ci-e2e` | levels 2 and 4, run through `aval run -f aval.e2e.yaml` (reused in CI on a verified hit), including the `examples/uv-monorepo` shards (needs uv) |
+| `ci-e2e` | levels 2 and 4, run through `aval run -f aval.yaml --test aval-e2e` (reused in CI on a verified hit), including the `examples/uv-monorepo` shards (needs uv) |
 | `ci-release` | level 5 against a snapshot dry-run of the release build |
 | `ci-fuzz` | every `Fuzz*` target for `FUZZTIME` each |
 | `ci-security` | govulncheck on both modules (needs network) |
 | `ci-docs` | markdownlint and vale (`make docs-lint`), `docs/cli-reference.md` matches the cobra commands, the site builds with `--strict` (`make docs-site`), the "Try it" terminal works in headless Chrome (`make docs-demo-smoke`), the mobile menu opens the site navigation on the home page and an inner page (`make docs-nav-smoke`), and `scripts/deploy-docs.sh` publishes the versions, default and root installers as expected and the outdated banner shows only on releases older than `latest` (`make docs-deploy-test`); on a PR, the built site is uploaded for preview |
 
-CI also dogfoods Aval (#28). `dogfood-fingerprint` and `dogfood-compare`
-check that Aval's own contracts (`aval.yaml`, `aval.e2e.yaml`) fingerprint
-identically across OSes and checkout paths. `ci-e2e` reuses a verified passing
-e2e result for the same inputs and otherwise runs the suite. `dogfood-shadow`
-runs the unit suite with `aval run --shadow` and fails on a false hit (exit 1).
-Both fail on a verification failure (exit 5), read
-`ghcr.io/trianalab/aval-attestations` anonymously and upload their reports
-(the `aval verify --output json` format) as artifacts. On `main`,
-`dogfood-publish`, the only job with `id-token: write`, signs keyless and
-pushes the results that were not reused; it runs no tests. Both suites also
-write a run record (`--stats-file`), and on `main` `dogfood-record`
-(`packages: write` only, no tests) publishes them with `aval stats publish`
-(the pinned release in ci.yaml still uses `aval record`) to the
-public stats registry `ghcr.io/trianalab/aval-stats`, whatever the suites'
-outcome; a record that cannot be published is a warning. `dogfood-shadow`
-adds `aval stats --by repository --since 30d` over that registry to its job
+CI also dogfoods Aval (#28) with the GitHub actions it ships (#216), as a
+user would. `aval.yaml` is a `kind: TestSet` with two tests: `aval-engine`
+(the unit suite) and `aval-e2e` (levels 2 and 4). `dogfood-fingerprint` and
+`dogfood-compare` check that both fingerprint identically across OSes and
+checkout paths. `ci-e2e` runs `aval-e2e` through `integrations/github/run`,
+which reuses a verified passing result for the same inputs and otherwise runs
+the suite. `dogfood-shadow` runs `aval-engine` through the same action with
+`shadow: true` and fails on a false hit (exit 1). Both fail on a verification
+failure (exit 5), read `ghcr.io/trianalab/aval-attestations` anonymously,
+have no `id-token`, and on `main` upload `.aval/<test>/` as the artifact
+`aval-<test>`. On `main`, `dogfood-publish` runs `integrations/github/publish`:
+the only dogfood job with `id-token: write`, it signs keyless and pushes the
+results that were not reused, and runs no tests. `dogfood-record`
+(`packages: write` only, no tests) publishes the suites' run records with
+`aval stats publish` to the public stats registry
+`ghcr.io/trianalab/aval-stats`, whatever the suites' outcome; a record that
+cannot be published is a warning. `dogfood-shadow` adds
+`aval stats --by repository --since 30d` over that registry to its job
 summary (read anonymously, informational), and `docs.yaml` publishes the same
 numbers as the site's `stats.json` twice an hour
 ([Stats](https://aval.run/main/stats/)).
-Trust comes from `.github/aval/main.yaml` (main and releases: only `ci.yaml`
-on `main`, runner level) and `.github/aval/pr.yaml` (pull requests: also
-developer signatures); `tests/architecture/dogfood_test.go` enforces both,
-and fails if a dogfood suite reads a tracked file outside its contract's
-scope. On a pull request, or any event other than a push to `main` (such as
-the version PR's dispatched run), `.github/aval/trust-from-base.sh` reads
-`pr.yaml` and the registry from `main` (never from the checked-out ref or a
-PR's base branch), so a PR cannot change them by editing those files, and
-the jobs that pass `--policy` verify with the pinned release (see below),
-not with an `aval` or a `Makefile` from the PR. Those jobs run `main`'s copies of
-`trust-from-base.sh` and `install.sh` with `/bin/bash`, and both scripts call
-their tools by absolute path (`install.sh` runs `main`'s `scripts/get-aval.sh`
-with a fixed `PATH`); if `main` has no `trust-from-base.sh` yet, no
-policy is set and nothing is reused. `tests/architecture/policy_source_test.go`
-fails if a pull request job names `AVAL_POLICY` or `AVAL_REGISTRY` anywhere
-but the trust step and the `--policy`/`--registry` values, runs anything but
-`actions/checkout`, `actions/setup-go` and `sigstore/cosign-installer` before
-the trust step, sets `PATH`, `BASH_ENV` or `ENV` there, or passes the policy
-through anything but one `aval` command. The jobs that use the policy need
+
+Trust comes from one policy, `.github/aval/policy.yaml`, which also names the
+registry: `ci.yaml` on `main` at runner level, maintainers at developer level,
+`minTrustLevel: developer`. The suite jobs set `AVAL_MIN_TRUST_LEVEL=runner`
+on a push to `main`, and the release gate passes `--min-trust-level runner`,
+so `main` and releases reuse only `ci.yaml` on `main`; pull requests and the
+version PR's dispatched run also reuse a maintainer's signature.
+`tests/architecture/dogfood_test.go` enforces the policy and those jobs, and
+fails if a test reads a tracked file outside its scope. The run action fetches
+the policy from `main` through the contents API on every event, never from
+the checkout, so a PR cannot change what its own run trusts by editing it.
+`tests/architecture/policy_source_test.go` fails if any workflow reads the
+policy from the checkout, or a pull request job passes `--policy` or names
+`AVAL_POLICY` or `AVAL_REGISTRY`. The jobs that use the run action need
 `ci-gates`, so their checks are skipped when the gates fail.
 
 None of this stops a hostile PR from turning its own checks green: on
 `pull_request`, GitHub runs the PR's own `ci.yaml`, which can skip the trust
 step or edit the tests. What protects `main` is review plus `main` trusting
-only its own CI (`main.yaml`): `.github/CODEOWNERS` names owners for
+only its own CI at runner level: `.github/CODEOWNERS` names owners for
 `.github/aval/`, `.github/workflows/`, `tests/architecture/`, `AGENTS.md`,
 the `Makefile` and the `aval*.yaml` contracts, and the `main` ruleset must
 require code-owner review for that to bind (a maintainer setting).
@@ -309,38 +306,30 @@ offline).
 
 #### Which aval a CI job runs
 
-A job that tests the PR's fingerprinting builds `aval` from source:
-`dogfood-fingerprint`. A job that uses Aval as a user would, or decides
-reuse, runs a pinned release instead: the heavy suite (`ci-e2e`, the same
-`aval run -f aval.e2e.yaml` as `make ci-e2e`, but not through the PR's
-`Makefile` and `bin/aval`, #134), the demo (`example-go-compose`), the shadow
-run (`dogfood-shadow`) and the publish steps (`dogfood-publish`,
-`dogfood-record`). The suites those jobs run still build and test the PR's
-code; only the `aval` that looks up, verifies, records and pushes results is
-the release. The jobs that test the GitHub actions (`publish-action`,
-`example-github-monorepo`) run the actions' scripts with `aval` built from
-source until the actions' pin has `--test` (milestone 14). The release gate
-(`e2e-gate` in `release.yaml`) runs the same pinned release: it reads
-`AVAL_VERSION` and `AVAL_SHA256` from the tag's `ci.yaml`, so it verifies
-with the `aval` that signed the result. A binary built from the tag can
-compute a newer fingerprint manifest (`aval-fingerprint/vN`), and its lookup
-would miss every time (#234).
-
-`ci.yaml` pins the release as `AVAL_VERSION` and `AVAL_SHA256` (the sha256 of
-`aval_<version>_linux_amd64.tar.gz`). `.github/aval/install.sh` runs
-`main`'s `scripts/get-aval.sh` with `--version`, `--sha256`,
-`--require-verify` and `--require-provenance` (PATH limited to `/usr/bin`,
-`/bin` and cosign's directory): the archive must have that sha256, so a
-re-tagged release cannot change what runs; `checksums.txt` must carry a
-keyless signature from the release workflow at that tag and list the archive
-with the same sha256; and the archive must match the release's SLSA
-provenance. A missing cosign or gh, or any failed check, fails the job before
-`aval` is installed. To move the pin, take the sha256 from the new release's verified
-`checksums.txt` (see [Changesets and releases](#changesets-and-releases)) and
-update both values; `tests/architecture` checks that the version has a
-`CHANGELOG.md` section, that each of these jobs installs the release and
-builds nothing, and that `release.yaml` declares no pin of its own and reads
-`ci.yaml`'s single declaration.
+A job that tests the commit's code builds `aval` from source:
+`dogfood-fingerprint`, the demo (`example-go-compose`), `dogfood-record`
+(unsigned statistics), and the jobs that test the GitHub actions
+(`publish-action`, `example-github-monorepo`), which run the actions' scripts
+with `aval` from source until the actions' pin has `--outputs-dir`
+(milestone 14). A job that decides reuse or publishes Aval's own results runs
+the release that `integrations/github/run` and `integrations/github/publish`
+pin (`DESIRED_VERSION` and the per-platform `AVAL_SHA256` of their install
+step, identical in both): `ci-e2e` (the same test as `make ci-e2e`, but not
+through the PR's `Makefile` and `bin/aval`, #134), `dogfood-shadow` and
+`dogfood-publish`. The suites still build and test the PR's code; only the
+`aval` that looks up, verifies and pushes results is the release. The actions
+install it with `scripts/get-aval.sh --require-verify --require-provenance`:
+the archive must have the pinned sha256, `checksums.txt` must carry a keyless
+signature from the release workflow at that tag, and the archive must match
+the release's SLSA provenance. The release gate (`e2e-gate` in
+`release.yaml`) reads the same pin from the tag's
+`integrations/github/run/action.yml` and installs it the same way, so it
+verifies with the `aval` that signed the result: a binary built from the tag
+can compute a newer fingerprint manifest (`aval-fingerprint/vN`), and its
+lookup would miss every time (#234). After each release, the `pin-actions`
+job of `release.yaml` opens a PR that moves the pin (#213);
+`tests/architecture` checks that the dogfood jobs reach `aval` only through
+the actions and that `release.yaml` declares no pin of its own.
 
 Markdown syntax rules live in `.markdownlint-cli2.jsonc`, prose rules (no
 marketing words, no filler) in `.vale.ini` and `.vale/styles/Aval/`. Both lint
@@ -348,13 +337,13 @@ every Markdown file except `.agents/`, `.claude/`, `CLAUDE.md`, `.changeset/` an
 
 ### Save PR CI time: sign a local run
 
-A maintainer whose keyless identity is in `.github/aval/pr.yaml` (trust level
-`developer`) can run the e2e suite on their laptop, sign the result with their
+A maintainer whose keyless identity is in `.github/aval/policy.yaml` (trust
+level `developer`) can run the e2e suite on their laptop, sign the result with their
 own Sigstore identity and publish it. When the PR's inputs have the same
 fingerprint, `ci-e2e` reuses that result instead of running the suite.
 
-1. Check out the exact commit you push, with no local changes inside the e2e
-   contract's scope and `GOFLAGS`, `GOEXPERIMENT` and `CGO_ENABLED` as in CI
+1. Check out the exact commit you push, with no local changes inside the
+   `aval-e2e` scope and `GOFLAGS`, `GOEXPERIMENT` and `CGO_ENABLED` as in CI
    (unset), or the fingerprint differs.
 2. Log in to GHCR with a token that can write the
    `aval-attestations` package (`write:packages`):
@@ -367,8 +356,7 @@ fingerprint, `ci-e2e` reuses that result instead of running the suite.
 
     ```sh
     make build
-    bin/aval run -f aval.e2e.yaml --registry ghcr.io/trianalab/aval-attestations \
-      --policy .github/aval/pr.yaml --push
+    bin/aval run -f aval.yaml --test aval-e2e --policy .github/aval/policy.yaml --push
     ```
 
     Without `--key` or `$SIGSTORE_ID_TOKEN` and with a terminal, Aval runs
@@ -387,10 +375,10 @@ reused passed result
 summary: aval-e2e reused: passed; saved <duration>
 ```
 
-`main` and releases never reuse this result. `.github/aval/main.yaml` lists
-your identity too, but at trust level `developer`, below its `minTrustLevel:
-runner`; only `ci.yaml` on `main` signs at runner level, and
-`tests/architecture` fails if any other identity gets runner level there. When
+The policy names the registry, so `--registry` is not needed. `main` and
+releases never reuse this result: they raise the minimum to runner, and only
+`ci.yaml` on `main` signs at runner level; `tests/architecture` fails if any
+other identity gets runner level. When
 a PR merges unchanged, `ci-e2e` on `main` computes the same fingerprint, finds
 only your result and prints a miss naming the minimum trust level, then runs
 the suite:
@@ -409,11 +397,11 @@ summary: aval-e2e ran: passed in <duration>
 `dogfood-publish` then pushes CI's own runner-signed result next to yours, and
 later runs on `main` reuse that one. A release requires a verified runner
 result: `release.yaml`'s `aval verify` exits 4 (a miss) on a developer-only
-fingerprint and stops. A signer that neither policy lists is still a
+fingerprint and stops. A signer that the policy does not list is still a
 verification failure (exit 5). To add a maintainer, add the identity at
-`developer` level to both `pr.yaml` and `main.yaml`. PR CI reads `pr.yaml` from
-`main`, so the new identity counts only after that change is merged,
-never in the PR that adds it.
+`developer` level to `.github/aval/policy.yaml`. PR CI reads the policy from
+`main`, so the new identity counts only after that change is merged, never
+in the PR that adds it.
 
 ### Join the public stats
 
@@ -528,11 +516,11 @@ the version; Aval is not an npm package. To release:
    is pending. A feature merge does not change the version, so its tag
    already exists and nothing is released. The `release` job needs
    `e2e-gate`, which refuses a tag without a verified, passing e2e
-   attestation for that commit (`aval verify -f aval.e2e.yaml --registry
-   ghcr.io/trianalab/aval-attestations --policy .github/aval/main.yaml`). The
-   gate runs the `aval` release `ci.yaml` pins, installed with
-   `.github/aval/install.sh`, because `dogfood-publish` signed the result with
-   that release ([Which aval a CI job runs](#which-aval-a-ci-job-runs)).
+   attestation for that commit (`aval verify -f aval.yaml --test aval-e2e
+   --policy <main's policy.yaml> --min-trust-level runner`). The gate runs the
+   `aval` release `integrations/github/run` pins, because `dogfood-publish`
+   signed the result with that release
+   ([Which aval a CI job runs](#which-aval-a-ci-job-runs)).
    A maintainer can still tag by hand: push the tag, or re-run a failed
    release with Actions > release > Run workflow on the tag (and Actions >
    docs > Run workflow on the tag if the docs deploy did not run). If a

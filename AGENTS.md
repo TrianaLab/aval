@@ -67,7 +67,7 @@ A change that breaks one of these is wrong, even if tests pass.
 | `make ci-gates` | level 3: architecture/invariant tests (`make test-architecture`) |
 | `make ci-engine` | level 1: unit tests with `-race` and the 100% coverage gate (`make coverage-check`), the example modules (`examples/go-compose`, `examples/evidence-consumer`) |
 | `make ci-false-hit` | false-hit suite: `internal/fingerprint` and `internal/contract` tests, uncached (corpus, manifest golden per `aval-fingerprint/vN`, append-only goldens against `AVAL_GOLDEN_BASE` or `origin/main`, glob tables) |
-| `make ci-e2e` | levels 2 and 4 (`make test-integration test-acceptance`) through `bin/aval run -f aval.e2e.yaml`; reuses a verified result only when `AVAL_REGISTRY` and `AVAL_POLICY` are set. CI runs the same `aval run` with the pinned, verified release instead (`.github/aval/install.sh`), not `bin/aval` built from the PR |
+| `make ci-e2e` | levels 2 and 4 (`make test-integration test-acceptance`) through `bin/aval run -f aval.yaml --test aval-e2e`; reuses a verified result only when `AVAL_REGISTRY` and `AVAL_POLICY` are set. CI runs the same test through `integrations/github/run` and its pinned, verified release instead, not `bin/aval` built from the PR |
 | `make ci-release` | level 5: release dry-run (GoReleaser snapshot of `.goreleaser.yaml`, needs syft) checked by `tests/release` (`make test-release`), plus the GitHub actions' aval pins against the pinned release's `checksums.txt` (needs network) |
 | `make ci-fuzz` | every `Fuzz*` target for `FUZZTIME` (default 10s) each (`make fuzz`); crashers land in `testdata/fuzz/` |
 | `make ci-security` | govulncheck (pinned version) on both modules against the go.mod toolchain (`make vuln`); needs network |

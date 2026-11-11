@@ -250,3 +250,20 @@ func TestGitHubRunActionWarnsOnPullRequestTrust(t *testing.T) {
 		}
 	}
 }
+
+// shadow: true runs the test beside a verified result, and a bad value is
+// refused before anything runs (#216). The job's AVAL_MIN_TRUST_LEVEL reaches
+// aval, which only lets it raise the policy's minimum: Aval's CI sets runner
+// on main.
+func TestGitHubRunActionShadowAndMinTrustLevel(t *testing.T) {
+	s := newActionStory(t)
+	s.publish(t, s.ciKey)
+	s.want(t, "shadow", s.pr(t, "INPUT_SHADOW=true"), 0, 2, "verified")
+	if r := s.pr(t, "INPUT_SHADOW=yes"); r.code != 2 || s.runs() != 2 || !strings.Contains(r.out, `shadow: "yes" must be true or false`) {
+		t.Fatalf("shadow: yes: exit %d, %d runs\n%s", r.code, s.runs(), r.out)
+	}
+	// A runner result below a raised minimum is a miss: the test runs.
+	s.want(t, "raised minimum", s.pr(t, "AVAL_MIN_TRUST_LEVEL=isolated"), 0, 3, "miss")
+	// Lowering it below the policy's minimum is a usage error.
+	s.want(t, "lowered minimum", s.pr(t, "AVAL_MIN_TRUST_LEVEL=developer"), 2, 3, "unknown")
+}
