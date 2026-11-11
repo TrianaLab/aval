@@ -2485,19 +2485,20 @@ an error with <code>--require-verify</code> / <code>--require-provenance</code>.
 installer at a release tag, so a change on <code>main</code> cannot alter your pipeline,
 then pin the version and the archive's sha256 (from that release's
 <code>checksums.txt</code>):</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-fsSLo<span class="w"> </span>.ci/get-aval.sh<span class="w"> </span>https://raw.githubusercontent.com/TrianaLab/aval/v0.8.0/scripts/get-aval.sh
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-fsSLo<span class="w"> </span>.ci/get-aval.sh<span class="w"> </span>https://raw.githubusercontent.com/TrianaLab/aval/v0.8.2/scripts/get-aval.sh
 </span></code></pre></div>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># cosign (and gh for --require-provenance) must be on PATH.</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>bash<span class="w"> </span>.ci/get-aval.sh<span class="w"> </span>--version<span class="w"> </span>v0.8.0<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--sha256<span class="w"> </span><span class="nv">linux_amd64</span><span class="o">=</span>&lt;sha256<span class="w"> </span>of<span class="w"> </span>aval_0.8.0_linux_amd64.tar.gz&gt;<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--sha256<span class="w"> </span><span class="nv">darwin_arm64</span><span class="o">=</span>&lt;sha256<span class="w"> </span>of<span class="w"> </span>aval_0.8.0_darwin_arm64.tar.gz&gt;<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>bash<span class="w"> </span>.ci/get-aval.sh<span class="w"> </span>--version<span class="w"> </span>v0.8.2<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--sha256<span class="w"> </span><span class="nv">linux_amd64</span><span class="o">=</span>&lt;sha256<span class="w"> </span>of<span class="w"> </span>aval_0.8.2_linux_amd64.tar.gz&gt;<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--sha256<span class="w"> </span><span class="nv">darwin_arm64</span><span class="o">=</span>&lt;sha256<span class="w"> </span>of<span class="w"> </span>aval_0.8.2_darwin_arm64.tar.gz&gt;<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>--require-verify<span class="w"> </span>--require-provenance
 </span></code></pre></div>
 <p>The entry for the runner's platform is required. A re-tagged release, a
 mirror serving another build, or a missing <code>cosign</code> fails the install.
-<code>--sha256</code>, <code>--require-verify</code> and <code>--require-provenance</code> first ship in the
-release after 0.7.0. Aval's GitHub actions (<code>integrations/github/run</code> and
-<code>publish</code>) install their pinned release the same way.</p>
+<code>--sha256</code>, <code>--require-verify</code> and <code>--require-provenance</code> first ship in
+v0.8.1 (the v0.8.0 tag has no release). Aval's GitHub actions
+(<code>integrations/github/run</code> and <code>publish</code>) install their pinned release the
+same way.</p>
 <h2 id="upgrade">Upgrade<a class="headerlink" href="#upgrade" title="Anchor link">&para;</a></h2>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>aval<span class="w"> </span>upgrade<span class="w">                    </span><span class="c1"># to the latest release</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>aval<span class="w"> </span>upgrade<span class="w"> </span>--version<span class="w"> </span>v0.4.0<span class="w">   </span><span class="c1"># to a given release</span>
