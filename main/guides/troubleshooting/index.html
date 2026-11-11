@@ -2487,8 +2487,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>pick a <a href="../write-a-contract/#step-by-step">class</a></td>
 </tr>
 <tr>
-<td><code>environment.toolchain: invalid key</code>, <code>invalid variable name</code>, <code>environment.probe.&lt;key&gt;: not a key of environment.toolchain</code>, <code>environment.probe.&lt;key&gt;: must be a non-empty argv list</code>, <code>environment.probe.&lt;key&gt;: environment.toolchain.&lt;key&gt; must not be empty</code>, <code>is set by aval run and is not an input</code></td>
-<td>lower case tool names, valid variable names other than <code>AVAL_RUN_STACK</code>; probe only declared, non-empty toolchain keys, each with an argv</td>
+<td><code>environment.toolchain: invalid key</code>, <code>invalid variable name</code>, <code>environment.probe.&lt;key&gt;: not a key of environment.toolchain</code>, <code>environment.probe.&lt;key&gt;: must be a non-empty argv list</code>, <code>environment.probe.&lt;key&gt;: environment.toolchain.&lt;key&gt; must not be empty</code>, <code>is set by aval run and is not an input</code>, <code>environment.paths[&lt;i&gt;]: &lt;x&gt;</code>, <code>must start with ~/, $NAME/ or ${NAME}/</code>, <code>spaces and control characters are not allowed</code>, <code>no globs, backslashes or variables after the base</code>, <code>is inside the contract tree</code></td>
+<td>lower case tool names, valid variable names other than <code>AVAL_RUN_STACK</code>; probe only declared, non-empty toolchain keys, each with an argv; <a href="../../contract/#files-outside-the-tree">paths</a> such as <code>~/.config/app</code> or <code>${XDG_CONFIG_HOME}/app</code>, outside the tree (files in it go in a <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> glob)</td>
 </tr>
 <tr>
 <td><code>scope.allowMutable[&lt;i&gt;]: ref and reason are both required</code>, <code>file &lt;x&gt; must be a slash-separated path relative to the contract root</code>, <code>file and files exclude each other</code>, <code>scope.allowMutable[&lt;i&gt;].files[&lt;j&gt;]: &lt;x&gt;</code>, <code>matches no file in scope</code></td>
@@ -2534,8 +2534,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>exclude the file by name</td>
 </tr>
 <tr>
-<td><code>only regular files are supported in scope</code>, <code>control characters in path are not supported</code></td>
-<td>keep symlinks and odd names out of <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr></td>
+<td><code>only regular files are supported</code>, <code>control characters in path are not supported</code>, <code>environment.paths &lt;entry&gt;: &lt;x&gt;</code></td>
+<td>keep symlinks, special files and odd names out of <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> and out of <a href="../../contract/#files-outside-the-tree">declared paths</a>; make them readable; set <code>$HOME</code> or the variable to an absolute path</td>
 </tr>
 <tr>
 <td><code>scope.contracts &lt;path&gt;: &lt;x&gt;</code></td>

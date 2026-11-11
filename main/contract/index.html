@@ -1913,6 +1913,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#files-outside-the-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files outside the tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#probe-the-toolchain" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2532,6 +2543,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#files-outside-the-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files outside the tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#probe-the-toolchain" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2814,6 +2836,12 @@ above it (<a href="#contracts-in-a-subdirectory">Contracts in a subdirectory</a>
 <td>list of strings</td>
 <td>no</td>
 <td>Variable names matching <code>^[A-Za-z_][A-Za-z0-9_]*$</code>, or prefix patterns: a name followed by <code>*</code> (<code>APP_*</code>), see <a href="#environment-variable-patterns">Environment variable patterns</a>. <code>AVAL_RUN_STACK</code> is rejected in any case (set by <code>aval run</code>, not an input), and so is a pattern that would match it (<code>AVAL_*</code>, <code>AVAL_RUN_*</code>).</td>
+</tr>
+<tr>
+<td><code>environment.paths</code></td>
+<td>list of strings</td>
+<td>no</td>
+<td>Files or directories outside the tree, each <code>~/&lt;path&gt;</code>, <code>$NAME/&lt;path&gt;</code> or <code>${NAME}/&lt;path&gt;</code> with a clean relative path: no globs, no <code>.</code> or <code>..</code> segments, no other variables, no spaces, no duplicates. See <a href="#files-outside-the-tree">Files outside the tree</a>.</td>
 </tr>
 <tr>
 <td><code>cacheability</code></td>
@@ -3146,8 +3174,9 @@ hashed, in this order:</p>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>dependency &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>toolchain &lt;key&gt;=&lt;value&gt;
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>env &lt;NAME&gt; &lt;sha256 of value | unset&gt;
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>path &lt;entry&gt; &lt;mode&gt; &lt;sha256&gt; | &lt;sha256&gt; | absent | unset
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
 </span></code></pre></div>
 <table>
 <thead>
@@ -3182,6 +3211,11 @@ hashed, in this order:</p>
 <td><code>env</code></td>
 <td>sha256 of the value, or <code>unset</code> (empty is not unset); values never appear in clear, but the hash of a short or guessable value (a low-entropy secret) can be found by trying values, so declare secrets only if <code>aval explain</code> output and the <a href="../artifact-format/#env-file">env file</a> may be seen. A prefix pattern gives one line per set variable it matches and none when nothing matches</td>
 <td></td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td>one line per <code>environment.paths</code> entry, as declared (not expanded): <code>&lt;mode&gt; &lt;sha256&gt;</code> for a file, for a directory the sha256 of its sorted <code>&lt;sha256&gt; &lt;mode&gt; &lt;relpath&gt;</code> lines, <code>absent</code> if nothing is there, <code>unset</code> if its variable is unset; only with <code>environment.paths</code>. The hash of a short or guessable file (a low-entropy secret) can be found by trying values, as for <code>env</code></td>
+<td>where <code>~</code> or the variable points, as long as the content is the same</td>
 </tr>
 <tr>
 <td><code>resolve</code></td>
@@ -3263,6 +3297,8 @@ depends on one of these can reuse a result it should not:</p>
 <li>a file the test reads that <code>scope</code> does not match, including a case or
   Unicode mismatch under a wildcard glob</li>
 <li>an environment variable the test reads that <code>environment.env</code> does not list</li>
+<li>a file outside the tree the test reads (<code>~/.config/&lt;app&gt;</code>, <code>~/.npmrc</code>) that
+  <code>environment.paths</code> does not list</li>
 <li>content behind a name the <a href="../pinning/">scanner</a> does not recognize, or a
   network service: use <code>scope.resolve</code> or <code>external-dependencies</code></li>
 <li>the installed toolchain, OS and architecture, unless <code>environment.probe</code>
@@ -3305,6 +3341,10 @@ test and records nothing; <code>aval explain</code>, <code>aval verify</code> an
 <td>remove the symlink, device or socket from <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr></td>
 </tr>
 <tr>
+<td><code>environment.paths &lt;entry&gt;: &lt;reason&gt;</code></td>
+<td>the entry or a file under it is a symlink, a special file or unreadable, or <code>~</code> or its variable is not an absolute path (<a href="#files-outside-the-tree">Files outside the tree</a>)</td>
+</tr>
+<tr>
 <td><code>"&lt;path&gt;" is a symlink a glob could match files under</code></td>
 <td>symlinks are not followed: remove it, or exclude it with no <code>dependencies</code> glob reaching it (<a href="#globs">Globs</a>). The message names the fix: its name alone for a link to a regular file, its name and contents (<code>pkg/bin</code> plus <code>pkg/bin/**</code>, or <code>**/node_modules/**</code>) for anything else. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory itself may be a symlink</td>
 </tr>
@@ -3326,6 +3366,33 @@ test and records nothing; <code>aval explain</code>, <code>aval verify</code> an
 </tr>
 </tbody>
 </table>
+<h2 id="files-outside-the-tree">Files outside the tree<a class="headerlink" href="#files-outside-the-tree" title="Anchor link">&para;</a></h2>
+<p>A program that reads per-user state (<code>~/.config/&lt;app&gt;</code>, <code>~/.npmrc</code>,
+<code>~/.docker/config.json</code>) has an input that <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> globs cannot reach.
+<code>environment.paths</code> declares it:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">XDG_CONFIG_HOME</span><span class="p p-Indicator">]</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nt">paths</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"~/.config/pacto"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"${XDG_CONFIG_HOME}/pacto"</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<ul>
+<li><code>~</code> is the home directory, <code>$NAME</code> and <code>${NAME}</code> the variable's value; both
+  must be absolute paths. Aval knows no application layout: if a program
+  falls back from <code>$XDG_CONFIG_HOME</code> to <code>~/.config</code>, declare both.</li>
+<li>The manifest holds the entry as written, so machines with a different
+  <code>$HOME</code> and the same content share a result.</li>
+<li><code>absent</code> means "require absent": a result recorded without the file is
+  reused only where the file is still missing. An empty file or directory is
+  not absent.</li>
+<li>A symlink at or under the entry, a device, socket or FIFO, an unreadable
+  file or directory, or any stat error other than "does not exist" fails the
+  <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> (<code>environment.paths &lt;entry&gt;: &lt;reason&gt;</code>, exit 1); none of them is
+  read as <code>absent</code>. An entry that leads inside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> root is a
+  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> error (exit 2): declare those files with a <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> glob.</li>
+<li>A whole directory is hashed, so keep caches out of it, or turn them off
+  with a variable in <code>environment.env</code>.</li>
+<li><code>aval push --env-file</code> carries only the <code>env</code> lines: <code>path</code> lines are hashed
+  again on the machine that pushes.</li>
+</ul>
 <h2 id="probe-the-toolchain">Probe the toolchain<a class="headerlink" href="#probe-the-toolchain" title="Anchor link">&para;</a></h2>
 <p><code>environment.toolchain</code> is a claim. <code>environment.probe</code> checks it: before the
 lookup, <code>aval run</code> runs each probe in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, without a
@@ -3334,11 +3401,11 @@ value must appear in the output (stdout and stderr) as a version token: not
 preceded by a digit or a dot, not followed by a digit. <code>3.13</code> matches
 <code>Python 3.13.1</code>; it does not match <code>Python 3.130</code>, and <code>3.1</code> does not match
 <code>Python 3.13</code>.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">environment</span><span class="p">:</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
 <p>On a mismatch, a probe that cannot start, a non-zero exit, a timeout or
 output over 4 KiB (it is signed into the predicate),
