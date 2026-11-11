@@ -89,6 +89,7 @@ above it ([Contracts in a subdirectory](#contracts-in-a-subdirectory)). A
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
 | `environment.probe` | map string to list of strings | no | Each key must be an `environment.toolchain` key with a non-empty value; each value a non-empty argv, first element not blank. See [Probe the toolchain](#probe-the-toolchain). |
 | `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`, except `AVAL_RUN_STACK` in any case (set by `aval run`, not an input). |
+| `environment.paths` | list of strings | no | Files or directories outside the tree, each `~/<path>`, `$NAME/<path>` or `${NAME}/<path>` with a clean relative path: no globs, no `.` or `..` segments, no other variables, no spaces, no duplicates. See [Files outside the tree](#files-outside-the-tree). |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
 | `outputs` | list of globs | no | Files the test writes that a reused result restores, such as `coverage.xml` ([Restore coverage and reports on reuse](guides/write-a-contract.md#restore-coverage-and-reports-on-reuse)). Same glob rules as `scope`. When publishing, each glob must match a regular file (no symlink) that is not the contract file, outside the scope, `.git` and `.aval`; at most 256 files, 16 MiB each, 64 MiB in total. Otherwise nothing is published (exit 1). To push from another job, `aval run --outputs-dir` copies them and `aval push --outputs-dir` publishes them from that copy ([the artifact](guides/github-actions.md#split-credentials)). Omitted from the fingerprint when empty, so existing contracts keep theirs; adding it changes the fingerprint, so a result without outputs is never reused for it. |
 
@@ -314,6 +315,7 @@ source <sha256> <mode> <path>
 dependency <sha256> <mode> <path>
 toolchain <key>=<value>
 env <NAME> <sha256 of value | unset>
+path <entry> <mode> <sha256> | <sha256> | absent | unset
 resolve <kind> <reference> <version> <immutable id>
 contract <path> <name> <fingerprint>
 ```
@@ -325,6 +327,7 @@ contract <path> <name> <fingerprint>
 | `source`, `dependency` | sha256 of the content, `x` (any exec bit) or `-`, path. A file in both sets appears twice | owner, timestamps, other permission bits |
 | `toolchain` | `key=value` as written; checked against the installed tools only by `environment.probe` | |
 | `env` | sha256 of the value, or `unset` (empty is not unset); values never appear in clear, but the hash of a short or guessable value (a low-entropy secret) can be found by trying values, so declare secrets only if `aval explain` output and the [env file](artifact-format.md#env-file) may be seen | |
+| `path` | one line per `environment.paths` entry, as declared (not expanded): `<mode> <sha256>` for a file, for a directory the sha256 of its sorted `<sha256> <mode> <relpath>` lines, `absent` if nothing is there, `unset` if its variable is unset; only with `environment.paths`. The hash of a short or guessable file (a low-entropy secret) can be found by trying values, as for `env` | where `~` or the variable points, as long as the content is the same |
 | `resolve` | kind, reference, version or `floating`, immutable id; only with `scope.resolve`, and needs the network ([Resolve references](resolve/index.md)) | the registry address |
 | `contract <path>` | one line per `scope.contracts` entry: the path as written, the referenced contract's `metadata.name` and its fingerprint, computed from its own directory and inputs (so references are transitive). `aval explain` also prints the tree, one `depends on <path> (<name>) <fingerprint>` line per reference | |
 
@@ -351,6 +354,8 @@ depends on one of these can reuse a result it should not:
 - a file the test reads that `scope` does not match, including a case or
   Unicode mismatch under a wildcard glob
 - an environment variable the test reads that `environment.env` does not list
+- a file outside the tree the test reads (`~/.config/<app>`, `~/.npmrc`) that
+  `environment.paths` does not list
 - content behind a name the [scanner](pinning.md) does not recognize, or a
   network service: use `scope.resolve` or `external-dependencies`
 - the installed toolchain, OS and architecture, unless `environment.probe`
@@ -373,12 +378,43 @@ test and records nothing; `aval explain`, `aval verify` and `aval push` exit 1
 | `scope.source matched no files` | `exclude` removed every `source` and `optionalSource` file, or `optionalSource` matched nothing and `exclude` removed every `source` file |
 | `source "<path>" is excluded only by a trailing "**"` | exclude it by name, or narrow the glob |
 | `dependency glob "<glob>" matched no files` | fix the glob |
-| `only regular files are supported in scope` | remove the symlink, device or socket from scope |
+| `only regular files are supported` | remove the symlink, device, socket or FIFO from scope |
+| `environment.paths <entry>: <reason>` | the entry or a file under it is a symlink, a special file or unreadable, or `~` or its variable is not an absolute path ([Files outside the tree](#files-outside-the-tree)) |
 | `"<path>" is a symlink a glob could match files under` | symlinks are not followed: remove it, or exclude its name and contents (`**/node_modules/**`, or `pkg/bin` plus `pkg/bin/**`) with no `dependencies` glob reaching it ([Globs](#globs)); the contract directory itself may be a symlink |
 | `control characters in path are not supported` | rename the file (newline or carriage return) |
 | `resolve <kind> <reference>: <reason>` | see [When resolution fails](resolve/index.md#when-resolution-fails) |
 | `scope.contracts <path>: <reason>` | any error above in the referenced contract, or: missing or invalid contract, `leads outside the repository root` (also its `scope.root`), `no git working tree (.git) at or above <dir>`, `<path> is a symlink`, `<path> is not a regular file`, `cycle: a/aval.yaml -> b/aval.yaml -> a/aval.yaml`, `more than 8 levels or 64 contracts` |
 | any I/O error while walking or reading | make the file or directory readable; the walk only enters directories a glob can match |
+
+## Files outside the tree
+
+A program that reads per-user state (`~/.config/<app>`, `~/.npmrc`,
+`~/.docker/config.json`) has an input that scope globs cannot reach.
+`environment.paths` declares it:
+
+```yaml
+environment:
+  env: [XDG_CONFIG_HOME]
+  paths: ["~/.config/pacto", "${XDG_CONFIG_HOME}/pacto"]
+```
+
+- `~` is the home directory, `$NAME` and `${NAME}` the variable's value; both
+  must be absolute paths. Aval knows no application layout: if a program
+  falls back from `$XDG_CONFIG_HOME` to `~/.config`, declare both.
+- The manifest holds the entry as written, so machines with a different
+  `$HOME` and the same content share a result.
+- `absent` means "require absent": a result recorded without the file is
+  reused only where the file is still missing. An empty file or directory is
+  not absent.
+- A symlink at or under the entry, a device, socket or FIFO, an unreadable
+  file or directory, or any stat error other than "does not exist" fails the
+  fingerprint (`environment.paths <entry>: <reason>`, exit 1); none of them is
+  read as `absent`. An entry that leads inside the contract's scope root is a
+  contract error (exit 2): declare those files with a scope glob.
+- A whole directory is hashed, so keep caches out of it, or turn them off
+  with a variable in `environment.env`.
+- `aval push --env-file` carries only the `env` lines: `path` lines are hashed
+  again on the machine that pushes.
 
 ## Probe the toolchain
 

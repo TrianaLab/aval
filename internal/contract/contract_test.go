@@ -50,6 +50,20 @@ func TestParseProbe(t *testing.T) {
 	}
 }
 
+func TestParsePaths(t *testing.T) {
+	c, err := Parse([]byte(strings.Replace(valid, "env: [DB_IMAGE]", `paths: ["~/.config/app", "$XDG_CONFIG_HOME/app", "${XDG_CONFIG_HOME}/a/b.json"]`, 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][2]string{{HomePath, ".config/app"}, {"XDG_CONFIG_HOME", "app"}, {"XDG_CONFIG_HOME", "a/b.json"}}
+	for i, p := range c.Environment.Paths {
+		base, rel, err := SplitPath(p)
+		if err != nil || base != want[i][0] || rel != want[i][1] {
+			t.Errorf("SplitPath(%q) = %q, %q, %v; want %q", p, base, rel, err, want[i])
+		}
+	}
+}
+
 func TestParseInvalid(t *testing.T) {
 	cases := map[string]struct{ from, to, wantErr string }{
 		"bad apiVersion": {"aval.trianalab.io/v1", "aval.trianalab.io/v9", "apiVersion"},
@@ -69,6 +83,26 @@ func TestParseInvalid(t *testing.T) {
 		// same inputs: hashing it would split their fingerprints (#196).
 		"run stack in env":            {"[DB_IMAGE]", "[DB_IMAGE, AVAL_RUN_STACK]", "environment.env[1]: AVAL_RUN_STACK is set by aval run and is not an input"},
 		"run stack in env, any case":  {"[DB_IMAGE]", "[aval_run_stack]", "environment.env[0]: aval_run_stack is set by aval run"},
+		"paths glob":                  {"env: [DB_IMAGE]", `paths: ["~/.config/*"]`, `environment.paths[0]: "~/.config/*": no globs`},
+		"paths class":                 {"env: [DB_IMAGE]", `paths: ["~/.config/[ab]"]`, "environment.paths[0]"},
+		"paths dotdot":                {"env: [DB_IMAGE]", `paths: ["~/../etc"]`, "clean relative path"},
+		"paths inner dotdot":          {"env: [DB_IMAGE]", `paths: ["~/a/../b"]`, "clean relative path"},
+		"paths dot":                   {"env: [DB_IMAGE]", `paths: ["~/."]`, "clean relative path"},
+		"paths trailing slash":        {"env: [DB_IMAGE]", `paths: ["~/.config/"]`, "clean relative path"},
+		"paths empty":                 {"env: [DB_IMAGE]", `paths: [""]`, "must start with ~/, $NAME/ or ${NAME}/"},
+		"paths only home":             {"env: [DB_IMAGE]", `paths: ["~"]`, "must start with"},
+		"paths only home slash":       {"env: [DB_IMAGE]", `paths: ["~/"]`, "clean relative path"},
+		"paths only var":              {"env: [DB_IMAGE]", `paths: ["$HOME"]`, "must start with"},
+		"paths only braced var":       {"env: [DB_IMAGE]", `paths: ["${HOME}"]`, "must start with"},
+		"paths relative":              {"env: [DB_IMAGE]", `paths: [".config/app"]`, "must start with"},
+		"paths absolute":              {"env: [DB_IMAGE]", `paths: ["/etc/app"]`, "must start with"},
+		"paths other user":            {"env: [DB_IMAGE]", `paths: ["~root/x"]`, "must start with"},
+		"paths bad var":               {"env: [DB_IMAGE]", `paths: ["$1A/x"]`, "must start with"},
+		"paths second var":            {"env: [DB_IMAGE]", `paths: ["$HOME/$APP"]`, "variables after the base"},
+		"paths backslash":             {"env: [DB_IMAGE]", `paths: ["~/a\\b"]`, "backslashes"},
+		"paths space":                 {"env: [DB_IMAGE]", `paths: ["~/a b"]`, "spaces"},
+		"paths duplicate":             {"env: [DB_IMAGE]", `paths: ["~/.npmrc", "$HOME/.npmrc", "~/.npmrc"]`, `environment.paths[2]: "~/.npmrc" is listed twice`},
+		"paths not a list":            {"env: [DB_IMAGE]", `paths: "~/.npmrc"`, "paths"},
 		"missing scope":               {`source: ["**/*.go", "compose.yaml"]`, `source: []`, "scope.source"},
 		"bad kind":                    {"kind: Test", "kind: Suite", "kind"},
 		"bad tool key":                {"{go: ", "{Go: ", "environment.toolchain"},

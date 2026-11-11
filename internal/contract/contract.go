@@ -198,6 +198,36 @@ type Environment struct {
 	Probe map[string][]string `yaml:"probe,omitempty" json:"probe,omitempty"`
 	// Env lists environment variable names whose values are hashed.
 	Env []string `yaml:"env,omitempty" json:"env"`
+	// Paths are files or directories outside the tree whose content is
+	// hashed: `~/rel`, `$NAME/rel` or `${NAME}/rel` (SplitPath). Omitted
+	// when empty, so contracts without it hash as before.
+	Paths []string `yaml:"paths,omitempty" json:"paths,omitempty"`
+}
+
+// HomePath is the base SplitPath returns for an entry that starts with ~/.
+const HomePath = "~"
+
+var pathBaseRe = regexp.MustCompile(`^(?:(~)|\$([A-Za-z_][A-Za-z0-9_]*)|\$\{([A-Za-z_][A-Za-z0-9_]*)\})/(.*)$`)
+
+// SplitPath splits an environment.paths entry into its base, HomePath or
+// a variable name, and the clean relative path after it. No globs, no
+// '..', no further expansion, no spaces or control characters (the entry
+// goes into a manifest line as written).
+func SplitPath(p string) (base, rel string, err error) {
+	m := pathBaseRe.FindStringSubmatch(p)
+	if m == nil {
+		return "", "", fmt.Errorf("%q: must start with ~/, $NAME/ or ${NAME}/", p)
+	}
+	base, rel = m[1]+m[2]+m[3], m[4]
+	switch {
+	case strings.IndexFunc(rel, func(c rune) bool { return unicode.IsSpace(c) || unicode.IsControl(c) }) >= 0:
+		return "", "", fmt.Errorf("%q: spaces and control characters are not allowed", p)
+	case strings.ContainsAny(rel, "*?[]\\$"):
+		return "", "", fmt.Errorf("%q: no globs, backslashes or variables after the base", p)
+	case !fs.ValidPath(rel) || rel == ".":
+		return "", "", fmt.Errorf("%q: the path after %s must be a clean relative path (no '.', '..' or empty segments)", p, p[:len(p)-len(rel)-1])
+	}
+	return base, rel, nil
 }
 
 var (
@@ -570,6 +600,13 @@ func (e Environment) validate(add func(string, ...any)) {
 			add("environment.env[%d]: invalid variable name %q", i, v)
 		} else if strings.EqualFold(v, RunStackEnv) {
 			add("environment.env[%d]: %s is set by aval run and is not an input", i, v)
+		}
+	}
+	for i, p := range e.Paths {
+		if _, _, err := SplitPath(p); err != nil {
+			add("environment.paths[%d]: %v", i, err)
+		} else if slices.Index(e.Paths, p) < i {
+			add("environment.paths[%d]: %q is listed twice", i, p)
 		}
 	}
 }

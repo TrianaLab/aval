@@ -1,0 +1,15 @@
+aval-fingerprint/v2
+contract 4fd04ccd662d01973d4d2bb15a5b6819b4ae07b32bf3d8a8cedd926e67acbc17
+source fa6ccea1ca4e3a031d9e99f25cc05db803aa9bac642c000ddab14f6d9da54b52 - compose.yaml
+source df1d036cbbf3df46e2045071e082245ece204c7f53ecf0a4e022bff9bb228f47 - main.go
+source 7b39baa38a2ec2b8d111bbbd8e448e80226477ab40105d9d2123d4dc18067438 - pkg/a/a.go
+dependency d4e972075031dd5d2bb756563d9fd6043ae8bb5210214b70436f0a3fde885cd7 - go.sum
+toolchain docker=27
+toolchain go=1.25
+env DB_IMAGE 59ab5ab3c94d2f5bf4f2895b2c7d1ee62ccb27127ac7f9da36862593d17ed34e
+env MODE unset
+path $CFG/app - 4d523dee6bc8c17a3e283570526d8d6ed3d1edda07c53e94c55e491bbf780337
+path ${UNSET}/app unset
+path ~/.absent absent
+path ~/.config/app ca4e1221c71bd7e520030761230d9c2186caf5f40f325258a2f917e2b9d749a3
+path ~/.npmrc - b5610e09438e7df6e09efd6551c2a40ce331d34a898dbdb4d9e2b90e3d6df95e
