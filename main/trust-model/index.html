@@ -2812,6 +2812,11 @@ the test runs.</p>
 <ul>
 <li><code>$SIGSTORE_ID_TOKEN</code> is removed from the environment before
   <code>runner.command</code> starts, so the code under test cannot sign as the CI job.</li>
+<li><code>$AVAL_DOCKER_CONFIG</code>, the registry credentials Aval uses instead of
+  <code>$DOCKER_CONFIG</code>'s, is removed the same way, so a CI step can hand Aval a
+  read token the test does not get through its environment. It is not a
+  sandbox: code in the same job, as the same user, can still reach the
+  job's files and processes.</li>
 <li>A <code>--report-file</code> that cannot be written disables reuse: the test runs, and a
   verification failure still exits 5.</li>
 <li>Reasons from attestations are escaped on text output and stderr (<code>\n</code>,

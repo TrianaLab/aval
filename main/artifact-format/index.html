@@ -3246,7 +3246,10 @@ is not set, including the credential helpers it names (<code>credsStore</code>,
 <code>credHelpers</code>, for example <code>docker-credential-osxkeychain</code> or
 <code>docker-credential-ecr-login</code>). Log in with <code>docker login &lt;registry&gt;</code> (or
 <code>oras login</code>, which writes the same file). Without an entry for the registry,
-Aval connects anonymously, which is enough to read a public repository.</p>
+Aval connects anonymously, which is enough to read a public repository.
+<code>$AVAL_DOCKER_CONFIG</code>, when set, names a directory whose <code>config.json</code> Aval
+reads instead, for every command; <code>runner.command</code> never sees it, and keeps
+the job's <code>$DOCKER_CONFIG</code>.</p>
 <p>A config file that cannot be parsed, or a helper that fails, is <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>
 <code>error</code> (exit 1): <code>aval run</code> runs the test and nothing is reused. Loopback
 registries (<code>localhost</code>, <code>127.0.0.1</code>, <code>::1</code>) use plain HTTP; every other
