@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -40,12 +41,7 @@ var baseFiles = map[string]string{
 	"vendor/v/v.go": "package v\n",
 }
 
-var fixedEnv LookupEnv = func(k string) (string, bool) {
-	if k == "DB_IMAGE" {
-		return "postgres:16", true
-	}
-	return "", false
-}
+var fixedEnv = Env{"DB_IMAGE": "postgres:16"}
 
 func TestHexStripsAlgorithm(t *testing.T) {
 	if got := (Fingerprint{Digest: "sha256:abc"}).Hex(); got != "abc" {
@@ -196,6 +192,57 @@ func TestOptionalSourceFailsClosed(t *testing.T) {
 			f.c.Scope = scope
 			if fp, err := f.compute(); err == nil {
 				t.Fatalf("want an error, got %s", fp.Digest)
+			}
+		})
+	}
+}
+
+// TestEnvLines: a prefix pattern hashes every set variable it matches,
+// one line each, merged with exact names and sorted (#253).
+func TestEnvLines(t *testing.T) {
+	h := func(v string) string { return sum([]byte(v)) }
+	env := Env{"APP_A": "1", "APP_B": "2", "OTHER": "3", "APPX": "4", "app_c": "5", contract.RunStackEnv: "/outer/aval.yaml"}
+	want := []string{"env APP_A " + h("1"), "env APP_B " + h("2")}
+	for _, entries := range [][]string{{"APP_*"}, {"APP_*", "APP_A"}, {"APP_A", "APP_*", "APP_*"}} {
+		if got := envLines(entries, env); !slices.Equal(got, want) {
+			t.Errorf("envLines(%q) = %q, want %q", entries, got, want)
+		}
+	}
+	if got := envLines([]string{"NOPE_*"}, env); got != nil {
+		t.Errorf("pattern matching nothing: %q", got)
+	}
+	if got := envLines([]string{"NOPE"}, env); !slices.Equal(got, []string{"env NOPE unset"}) {
+		t.Errorf("unset exact name: %q", got)
+	}
+	// No pattern contract validation accepts can name the run stack, and
+	// none other matches it.
+	for _, p := range []string{"APP_*", "OTHER*", "P*"} {
+		for _, l := range envLines([]string{p}, env) {
+			if strings.Contains(l, contract.RunStackEnv) {
+				t.Errorf("%s hashed %s: %q", p, contract.RunStackEnv, l)
+			}
+		}
+	}
+}
+
+// TestEnvLinesCase: names compare case-sensitively on POSIX and
+// case-insensitively, upper-cased, on Windows, where an exact name keeps
+// the spelling of the contract.
+func TestEnvLinesCase(t *testing.T) {
+	if foldEnv != (runtime.GOOS == "windows") {
+		t.Fatalf("foldEnv = %v on %s", foldEnv, runtime.GOOS)
+	}
+	h := func(v string) string { return sum([]byte(v)) }
+	env := Env{"app_a": "1", "App_B": "2", "db_image": "3"}
+	for fold, want := range map[bool][]string{
+		false: {"env DB_IMAGE unset"},
+		true:  {"env APP_A " + h("1"), "env APP_B " + h("2"), "env DB_IMAGE " + h("3")},
+	} {
+		t.Run(map[bool]string{false: "posix", true: "windows"}[fold], func(t *testing.T) {
+			defer func(old bool) { foldEnv = old }(foldEnv)
+			foldEnv = fold
+			if got := envLines([]string{"APP_*", "DB_IMAGE"}, env); !slices.Equal(got, want) {
+				t.Errorf("envLines = %q, want %q", got, want)
 			}
 		})
 	}

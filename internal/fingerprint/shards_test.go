@@ -22,7 +22,7 @@ func TestShardFingerprints(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, err := Compute(context.Background(), dir, c, func(k string) (string, bool) { v, ok := env[k]; return v, ok })
+		got, err := Compute(context.Background(), dir, c, env)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +93,7 @@ func TestShardMatrixFingerprints(t *testing.T) {
 	}
 	var c [2]string
 	for i := range cs {
-		got, err := Compute(context.Background(), dir, cs[i], func(string) (string, bool) { return "", false })
+		got, err := Compute(context.Background(), dir, cs[i], noEnv)
 		if err != nil {
 			t.Fatal(err)
 		}

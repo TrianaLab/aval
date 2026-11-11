@@ -127,7 +127,7 @@ func (f *fixture) parse(yaml string) {
 }
 
 func (f *fixture) compute() (Fingerprint, error) {
-	return Compute(context.Background(), f.dir, f.c, func(k string) (string, bool) { v, ok := f.env[k]; return v, ok }, f.outputs...)
+	return Compute(context.Background(), f.dir, f.c, f.env, f.outputs...)
 }
 
 type corpusCase struct {
@@ -135,6 +135,12 @@ type corpusCase struct {
 	setup  func(*fixture) // optional, applied before the base fingerprint
 	change func(*fixture)
 	want   outcome
+}
+
+// appEnv declares APP_* beside MODE, with two matching variables set.
+func appEnv(f *fixture) {
+	f.c.Environment.Env = []string{"APP_*", "MODE"}
+	f.env["APP_A"], f.env["APP_B"] = "1", "2"
 }
 
 var corpus = []corpusCase{
@@ -188,6 +194,14 @@ var corpus = []corpusCase{
 	{name: "env set-but-empty to unset", setup: func(f *fixture) { f.env["MODE"] = "" }, change: func(f *fixture) { delete(f.env, "MODE") }, want: differ},
 	{name: "env name declared", change: func(f *fixture) { f.c.Environment.Env = append(f.c.Environment.Env, "CGO_ENABLED") }, want: differ},
 	{name: "env name undeclared", change: func(f *fixture) { f.c.Environment.Env = []string{"DB_IMAGE"} }, want: differ},
+	// Prefix patterns (#253): every set variable the prefix matches is an input.
+	{name: "env pattern: matching variable set", setup: appEnv, change: func(f *fixture) { f.env["APP_C"] = "3" }, want: differ},
+	{name: "env pattern: matching variable unset", setup: appEnv, change: func(f *fixture) { delete(f.env, "APP_A") }, want: differ},
+	{name: "env pattern: matching value changed", setup: appEnv, change: func(f *fixture) { f.env["APP_B"] = "3" }, want: differ},
+	{name: "env pattern: set-but-empty match added", setup: appEnv, change: func(f *fixture) { f.env["APP_C"] = "" }, want: differ},
+	{name: "env pattern vs exact name unset", setup: func(f *fixture) { f.c.Environment.Env = []string{"APP_*"} }, change: func(f *fixture) { f.c.Environment.Env = []string{"APP_A"} }, want: differ},
+	{name: "env pattern vs no env", setup: func(f *fixture) { f.c.Environment.Env = []string{"APP_*"} }, change: func(f *fixture) { f.c.Environment.Env = nil }, want: differ},
+	{name: "env pattern widened", setup: appEnv, change: func(f *fixture) { f.c.Environment.Env = []string{"APP*"} }, want: differ},
 
 	// Command and contract fields.
 	{name: "command argument changed", change: func(f *fixture) { f.c.Runner.Command = []string{"go", "test", "./pkg/..."} }, want: differ},
@@ -350,6 +364,10 @@ var corpus = []corpusCase{
 	{name: "duplicate globs", change: func(f *fixture) { f.c.Scope.Source = append(f.c.Scope.Source, "**/*.go") }, want: same},
 	{name: "env name order", change: func(f *fixture) { f.c.Environment.Env = []string{"MODE", "DB_IMAGE"} }, want: same},
 	{name: "duplicate env names", change: func(f *fixture) { f.c.Environment.Env = append(f.c.Environment.Env, "MODE") }, want: same},
+	{name: "env pattern: non-matching variables", setup: appEnv, change: func(f *fixture) {
+		f.env["OTHER"], f.env["APPX"], f.env["APP"], f.env[contract.RunStackEnv] = "1", "2", "3", "/outer/aval.yaml"
+	}, want: same},
+	{name: "env pattern order", setup: appEnv, change: func(f *fixture) { f.c.Environment.Env = []string{"MODE", "APP_*"} }, want: same},
 	{name: "empty lists and maps as omitted", setup: func(f *fixture) {
 		f.c.Scope.Exclude, f.c.Environment.Toolchain, f.c.Environment.Probe = nil, nil, nil
 	}, change: func(f *fixture) {
