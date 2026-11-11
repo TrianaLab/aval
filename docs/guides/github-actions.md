@@ -50,10 +50,9 @@ it are not fetched; use keyless identities. The action needs `/usr/bin/jq`
 (GitHub's Ubuntu images, macOS 15 and later).
 
 !!! note "Pinned release"
-    Pinning an action by commit SHA pins its aval release too (version and
-    sha256, moved by a PR after each release). The actions need `--test` and
-    the policy's `registry`, which ship after 0.7.0; until that pin merges
-    (milestone 14), `aval run` and `aval push` exit 2 and the step fails.
+    Pinning an action by commit SHA pins its aval release too, moved by a PR
+    after each release. Until a pin with `--outputs-dir` (after 0.8.1,
+    milestone 14), a test with `outputs` fails with exit 1; others work.
 
 ## Split credentials
 

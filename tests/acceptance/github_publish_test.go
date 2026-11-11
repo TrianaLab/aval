@@ -307,7 +307,7 @@ func TestGitHubPublishActionRefuses(t *testing.T) {
 		t.Fatalf("no artifacts: exit %d\n%s", r.code, r.out)
 	}
 	s.artifact(t, "A_b", s.suite(t, "a"), nil)
-	if r := s.publish(t); r.code != 2 || len(r.calls) != 0 || !strings.Contains(r.out, "is not a valid metadata.name") {
+	if r := s.publish(t); r.code != 2 || len(pushes(r.calls)) != 0 || !strings.Contains(r.out, "is not a valid metadata.name") {
 		t.Fatalf("no artifacts: exit %d\n%s", r.code, r.out)
 	}
 }
@@ -364,7 +364,7 @@ func outputsStory(t *testing.T) (*publishStory, func(t *testing.T, edit func(dst
 func TestGitHubActionsCarryOutputs(t *testing.T) {
 	s, artifact := outputsStory(t)
 	artifact(t, nil)
-	if r := s.publish(t); r.code != 0 || len(pushes(r.calls)) != 1 || !strings.Contains(r.calls[0], "--outputs-dir "+filepath.Join(s.artifacts, "aval-cov", "outputs")) {
+	if r := s.publish(t); r.code != 0 || len(pushes(r.calls)) != 1 || !strings.Contains(pushes(r.calls)[0], "--outputs-dir "+filepath.Join(s.artifacts, "aval-cov", "outputs")) {
 		t.Fatalf("publish: exit %d\n%s\n%s", r.code, r.out, strings.Join(r.calls, "\n"))
 	}
 	if code := s.verify(t, "cov"); code != 0 {
@@ -418,5 +418,64 @@ func TestGitHubActionsRefuseBadOutputs(t *testing.T) {
 	}
 	if r := s.publish(t); r.code != 1 || !strings.Contains(r.out, "outputs: no such file or directory") || s.verify(t, "cov") != 4 {
 		t.Fatalf("no outputs/: exit %d, want 1 and nothing published\n%s", r.code, r.out)
+	}
+}
+
+// oldAval is real as a release without --outputs-dir (v0.8.1): its help
+// does not list the flag and it rejects it as cobra does.
+func oldAval(t *testing.T, real string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "aval")
+	script := fmt.Sprintf(`#!/bin/bash
+for a in "$@"; do
+  if [ "$a" = --outputs-dir ]; then echo 'Error: unknown flag: --outputs-dir' >&2; exit 2; fi
+done
+if [ "${2:-}" = --help ]; then %q "$@" | grep -v -- --outputs-dir; exit 0; fi
+exec %q "$@"
+`, real, real)
+	if err := os.WriteFile(p, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// With a pinned release that has no --outputs-dir (v0.8.1), the actions
+// still run and publish a test without outputs, and refuse a test with
+// outputs (exit 1, naming the release it needs) instead of running it
+// without carrying them or publishing the checkout's files (#236).
+func TestGitHubActionsOldReleaseOutputs(t *testing.T) {
+	s, _ := outputsStory(t)
+	set := outputsSet + `  - metadata: {name: plain}
+    runner: {command: ["true"]}
+    scope: {source: ["src/**"]}
+    cacheability: hermetic
+`
+	if err := os.WriteFile(filepath.Join(s.dir, "aval.yaml"), []byte(set), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := oldAval(t, aval)
+	r := action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", "INPUT_TEST=cov", "AVAL="+old)
+	if _, err := os.Stat(filepath.Join(s.dir, ".aval", "cov", "result.json")); r.code != 1 || !strings.Contains(r.out, "cov declares outputs and the installed aval has no run --outputs-dir") ||
+		!strings.Contains(r.out, "aval v0.8.2 or later") || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("run action cov: exit %d, want 1 and no run (%v)\n%s", r.code, err, r.out)
+	}
+	if r := action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", "INPUT_TEST=plain", "AVAL="+old); r.code != 0 || r.outputs["upload"] != "true" {
+		t.Fatalf("run action plain: exit %d\n%s", r.code, r.out)
+	}
+	s.artifact(t, "plain", filepath.Join(s.dir, ".aval", "plain"), nil)
+	s.artifact(t, "cov", s.suite(t, "cov"), nil)
+	if err := os.Remove(filepath.Join(s.dir, "coverage.out")); err != nil {
+		t.Fatal(err)
+	}
+	// The publish wrapper signs with a key; the old release wraps it.
+	p := s.publish(t, "AVAL="+oldAval(t, s.wrapper()))
+	if p.code != 1 || !strings.Contains(p.out, "cov declares outputs and the installed aval has no push --outputs-dir") || len(pushes(p.calls)) != 1 {
+		t.Fatalf("publish: exit %d, want 1 and one push\n%s\n%s", p.code, p.out, strings.Join(p.calls, "\n"))
+	}
+	if strings.Contains(pushes(p.calls)[0], "--outputs-dir") {
+		t.Fatalf("push of plain passed --outputs-dir to a release without it: %s", pushes(p.calls)[0])
+	}
+	if s.verify(t, "plain") != 0 || s.verify(t, "cov") != 4 {
+		t.Fatal("want plain published and cov not")
 	}
 }

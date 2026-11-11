@@ -47,9 +47,22 @@ if [ -n "${DEFAULT_BRANCH:-}" ]; then
 fi
 args=(run -f "$INPUT_FILE" --test "$INPUT_TEST" --source-repo "$GITHUB_REPOSITORY")
 # The files the outputs globs matched travel in the artifact, for the
-# publish job's aval push --outputs-dir (#236); aval resolves them.
+# publish job's aval push --outputs-dir (#236); aval resolves them. A
+# release without the flag (v0.8.1 and older) still runs a test without
+# outputs; for one with outputs, which aval explain --expand lists, the
+# action refuses rather than upload a result whose outputs the publish job
+# would take from its own checkout.
 if [ "$upload" = true ]; then
-  args+=(--outputs-dir ".aval/$INPUT_TEST/outputs")
+  help=$("$AVAL" run --help) || help=""
+  if [[ "$help" == *--outputs-dir* ]]; then
+    args+=(--outputs-dir ".aval/$INPUT_TEST/outputs")
+  elif ! expanded=$("$AVAL" explain -f "$INPUT_FILE" --test "$INPUT_TEST" --expand); then
+    echo "::error title=aval run::$INPUT_TEST: aval explain could not read the test, so the action cannot tell whether it declares outputs"
+    exit 1
+  elif [[ $'\n'"$expanded" == *$'\n'outputs:* ]]; then
+    echo "::error title=aval run::$INPUT_TEST declares outputs and the installed aval has no run --outputs-dir: carrying outputs to the publish job needs aval v0.8.2 or later (#236)"
+    exit 1
+  fi
 fi
 if [ -n "${GITHUB_RUN_ID:-}" ]; then
   args+=(--ci-run-url "${GITHUB_SERVER_URL:-https://github.com}/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
