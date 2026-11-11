@@ -1,0 +1,3675 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.">
+      
+      
+      
+        <link rel="canonical" href="https://aval.run/0.9.0/changelog/">
+      
+      
+        <link rel="prev" href="../integrations/">
+      
+      
+        <link rel="next" href="../vision/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Changelog - Aval</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/brand.css">
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You are viewing an old version of these docs.
+  <a href="../.."><strong>Go to the latest version.</strong></a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("..",location),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Aval" class="md-header__button md-logo" aria-label="Aval" data-md-component="logo">
+      
+<svg class="aval-wordmark" viewBox="1 2.5 66.5 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="aval-wordmark__mark"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></g><g class="aval-wordmark__word"><circle cx="34" cy="12" r="4"/><path d="M38 8v8"/><path d="m42 8 4 8 4-8"/><circle cx="57.5" cy="12" r="4"/><path d="M61.5 8v8"/><path d="M66.5 4.5V16"/></g></svg>
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Aval
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/TrianaLab/aval" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TrianaLab/aval
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../install/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../concepts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/write-a-contract/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cli-reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Aval" class="md-nav__button md-logo" aria-label="Aval" data-md-component="logo">
+      
+<svg class="aval-wordmark" viewBox="1 2.5 66.5 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="aval-wordmark__mark"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></g><g class="aval-wordmark__word"><circle cx="34" cy="12" r="4"/><path d="M38 8v8"/><path d="m42 8 4 8 4-8"/><circle cx="57.5" cy="12" r="4"/><path d="M61.5 8v8"/><path d="M66.5 4.5V16"/></g></svg>
+    </a>
+    Aval
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/TrianaLab/aval" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TrianaLab/aval
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../concepts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/trust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/outcomes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outcomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/write-a-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/depend-on-a-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/integrate-in-5-files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrate Aval in 5 files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/trust-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a trust policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pinning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pin your dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/measure-reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure reuse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/go-consumer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume from Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../resolve/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve references
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resolve references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container images
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/npm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    npm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/pypi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/go/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/maven/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maven
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/crates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust crates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/gems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ruby gems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/git/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Git
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resolve/urls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Downloaded files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Specs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The test contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifact-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#090" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.9.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.9.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#082" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.8.2
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.8.2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#081" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.8.1
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.8.1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#080" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.8.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.8.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#070" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.7.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.7.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#061" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.6.1
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.6.1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#060" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.6.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.6.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#050" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.5.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.5.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.4.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.4.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#030" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.3.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.3.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#020" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.1.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.1.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision and roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/SECURITY.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/CODE_OF_CONDUCT.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code of conduct
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#090" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.9.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.9.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#082" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.8.2
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.8.2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#081" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.8.1
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.8.1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#080" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.8.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.8.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#070" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.7.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.7.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#061" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.6.1
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.6.1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#060" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.6.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.6.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#050" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.5.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.5.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.4.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.4.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#030" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.3.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.3.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#020" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.1.0
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.1.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minor-changes_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minor Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-changes_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href=".." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="./" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Project
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/TrianaLab/aval/edit/main/docs/changelog.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Anchor link">&para;</a></h1>
+<h2 id="090">0.9.0<a class="headerlink" href="#090" title="Anchor link">&para;</a></h2>
+<h3 id="minor-changes">Minor Changes<a class="headerlink" href="#minor-changes" title="Anchor link">&para;</a></h3>
+<ul>
+<li>52911eb: <code>environment.env</code> accepts prefix patterns such as <code>APP_*</code> (#253): every
+  set variable whose name starts with the prefix is hashed, one <code>env NAME
+  &lt;sha256&gt;</code> line each, so a tool configured by prefix no longer needs every
+  name listed by hand. <code>*</code> may only end the entry; <code>*</code>, <code>*_TOKEN</code> and patterns
+  that would match <code>AVAL_RUN_STACK</code> (<code>AVAL_*</code>) are rejected. Names compare
+  case-sensitively on Linux and macOS and case-insensitively on Windows. A
+  pattern also hashes credentials that share the prefix; list exact names when
+  it covers secrets. <code>aval run</code> records the matched variables in its env file,
+  and <code>aval push --env-file</code> accepts the names a pattern matches. Contracts
+  without a pattern keep their <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; older <code>aval</code> binaries reject a
+  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> that uses one.</li>
+<li>0c4a8b7: <code>environment.paths</code> declares files and directories outside the tree as
+  <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> inputs (#254), such as <code>~/.config/pacto</code> or
+  <code>${XDG_CONFIG_HOME}/pacto</code>. Each entry adds a <code>path &lt;entry&gt; &lt;hash&gt;</code> manifest
+  line with the entry as written, so another <code>$HOME</code> with the same content
+  shares a result; <code>absent</code> and <code>unset</code> are hashed too. A symlink, a special or
+  unreadable file fails the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, and an entry inside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> tree
+  is a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> error. <code>aval explain</code> lists the lines. Format change: an
+  additive optional <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field under the same <code>apiVersion</code>, with a manifest
+  line kind only it brings; the manifest stays <code>aval-fingerprint/v2</code> and
+  existing contracts hash as before. An older <code>aval</code> rejects a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> that
+  uses <code>paths</code> (unknown field), which fails closed.</li>
+<li>cef4b7b: A TestSet matrix variable can be <code>{count: N}</code> (N from 1 to 1024): it takes
+  the values "1" to "N" and defines <code>{v_count}</code> = N, so a sharded runner
+  writes <code>PW_SHARD={shard}/{shard_count}</code> and the total is stated once. The
+  expanded tests and their fingerprints are the same as the list form. A bad
+  count, an extra key in the mapping, or a <code>v_count</code> variable beside a count
+  variable <code>v</code> is a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> error (exit 2). Additive within
+  <code>aval.trianalab.io/v1</code>: older aval binaries reject the mapping form.</li>
+<li>6c24fde: A TestSet <code>matrix</code> now substitutes <code>{var}</code> into <code>environment.toolchain</code>
+  values, so one test can declare a value per leg (for example
+  <code>platform: "{os}"</code>) and each leg gets its own <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. An unknown
+  <code>{var}</code> in a toolchain value, or a <code>{var}</code> in a toolchain value of a test
+  without a matrix, is now a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> error (exit 2); before, it was hashed as
+  literal text. Contracts without <code>{var}</code> in toolchain values keep their
+  fingerprints.</li>
+<li>7fa8978: <code>scope.optionalSource</code> declares source globs that may match no file yet
+  (#257), for inputs a test discovers by pattern such as <code>**/*testdata*.yaml</code>.
+  Matching files are hashed as <code>source</code> lines, with the same <code>exclude</code> rules,
+  so adding the first one is a miss. A glob may not be in both <code>source</code> and
+  <code>optionalSource</code>, and <code>source</code> plus <code>optionalSource</code> must still hash at least
+  one file. <code>aval explain</code> names optional globs that matched nothing on
+  stderr. Format change: an additive optional <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field under the same
+  <code>apiVersion</code>; the manifest stays <code>aval-fingerprint/v2</code>. Existing contracts
+  hash as before; an older <code>aval</code> rejects a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> that uses
+  <code>optionalSource</code> (unknown field), which fails closed.</li>
+<li>597b9d6: The GitHub run action takes <code>lookup-only: "true"</code> (#252): it runs <code>aval
+  verify</code> with the default branch's trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> and trust minimum, sets the
+  <code>outcome</code> output and never runs the test, uploads or writes <code>.aval/</code>. A
+  later setup step can be skipped on <code>verified</code>; the run step after it still
+  decides reuse. A miss succeeds the step, exit 5 fails it with the <code>aval
+  SECURITY</code> annotation, and <code>lookup-only</code> with <code>shadow: true</code> exits 2.</li>
+<li>da68465: The GitHub run action raises the trust minimum to <code>runner</code> on the default
+  branch (#251), so <code>main</code> no longer goes green on a developer-signed result that
+  <code>aval push</code> would then not publish. The new <code>min-trust-level</code> input (<code>auto</code> by
+  default, or <code>developer</code>, <code>runner</code>, <code>isolated</code>) passes the highest of itself,
+  the job's <code>AVAL_MIN_TRUST_LEVEL</code> and the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>minTrustLevel</code>, so it never
+  lowers the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s minimum; <code>min-trust-level: developer</code> opts out. A <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>
+  minimum of <code>isolated</code> is kept instead of failing with exit 2, and the log and
+  step summary show the effective minimum. Workflows can drop their hand-written
+  <code>AVAL_MIN_TRUST_LEVEL</code> expression.</li>
+<li>c17e62f: The GitHub run action reads a private attestations registry: new optional
+  inputs <code>registry-username</code> and <code>registry-password</code> (default empty, anonymous
+  as before) write credentials for the host of the default-branch <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s
+  <code>registry</code> only, in a directory of the step that is deleted when it ends.
+  aval reads it through the new <code>AVAL_DOCKER_CONFIG</code>, a directory whose
+  <code>config.json</code> replaces <code>$DOCKER_CONFIG</code>'s for Aval's registry client and that
+  <code>runner.command</code> never gets; the test keeps the job's <code>DOCKER_CONFIG</code>. The test
+  no longer sees the job's <code>GH_TOKEN</code>.</li>
+</ul>
+<h3 id="patch-changes">Patch Changes<a class="headerlink" href="#patch-changes" title="Anchor link">&para;</a></h3>
+<ul>
+<li>d87eec2: The GitHub actions no longer put cosign on the job's <code>PATH</code>. They install the
+  cosign that verifies the aval release into <code>$RUNNER_TEMP</code>, checked against a
+  per-platform sha256, instead of using <code>sigstore/cosign-installer</code>, which
+  writes <code>GITHUB_PATH</code>. The test and later steps see the job's own tools again.</li>
+<li>1261177: <code>examples/github-monorepo</code> and the "Integrate Aval in 5 files" guide that
+  embeds it pin the GitHub actions at the commit that pins v0.8.2, with a
+  <code># v0.8.2</code> comment, instead of a commit that installed v0.7.0 (#261). After
+  each pin PR merges, the new <code>pin-examples</code> job of <code>release.yaml</code> opens a PR
+  (branch <code>release-pins/examples</code>) that moves the examples to the merge
+  commit, and <code>pin-examples-ci</code> dispatches <code>ci</code> on it. An architecture test
+  fails when an example's action pin installs an older release than main pins
+  (one pin behind is allowed while that PR is open) or when its comment names
+  another version, and when a doc other than <code>docs/install.md</code> names a
+  hard-coded aval version. <code>docs/install.md</code> now pins v0.8.2 in its example
+  and says the verified-install flags first ship in v0.8.1. No CLI or format
+  change.</li>
+<li>8f1912d: The pinning scanner no longer reports <code>npx --no</code>, <code>npx --no-install</code>,
+  <code>npm exec --no</code>, <code>pnpm exec</code> and <code>yarn exec</code>: they run only what is already
+  installed. Plain <code>npx</code>, <code>npm exec</code>, <code>pnpm dlx</code>, <code>yarn dlx</code> and <code>bunx</code> are still
+  reported, as are packages named by <code>-p</code>, and the fix text now mentions
+  <code>npx --no &lt;bin&gt;</code>.</li>
+<li>01177a9: The GitHub publish action downloads the <code>aval-*</code> artifacts right after its
+  guard (#260). With none, it prints a notice and exits 0 without installing
+  cosign or aval, fetching the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or requesting an OIDC token, so a publish
+  job that runs on <code>!cancelled()</code> after path-filtered test jobs no longer fails
+  in a repository whose <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> is not merged yet. With artifacts and no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>
+  it still exits 1.</li>
+<li>311b2fc: <code>aval push</code> accepts a result from a job with other environment variables
+  (#247). <code>aval run</code> writes an env file next to the result (<code>--env-file</code>,
+  default <code>.aval/env.txt</code>, <code>.aval/&lt;test&gt;/env.txt</code> with <code>--test</code>): the
+  <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> manifest version, then the manifest's <code>env NAME unset|&lt;sha256&gt;</code>
+  lines, hashes only, neither signed nor published. <code>aval push --env-file
+  FILE</code> takes the <code>env</code> section from it instead of its own environment; every
+  source, dependency, toolchain and <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> line is still hashed from the
+  checkout, and the digest must still match the result and the report. A file
+  with another manifest version, a malformed or repeated line, or names other
+  than <code>environment.env</code> exits 1 and publishes nothing; inside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
+  <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> and outside <code>.aval/</code> it exits 2, as <code>--result-file</code> does. Without the
+  flag push is unchanged. The publish action passes the artifact's <code>env.txt</code>
+  when the installed aval has the flag, so a variable such as
+  <code>GOTOOLCHAIN=local</code> from setup-go no longer fails the push. No format
+  change: the manifest stays <code>aval-fingerprint/v2</code>. docs/artifact-format.md
+  documents the env file.</li>
+<li>5312533: The run action uploads <code>aval-&lt;test&gt;</code> with <code>overwrite: true</code>. Re-running a
+  failed job no longer fails with 409 on the earlier attempt's artifact, and the
+  publish job signs the result of the attempt that just ran. Run each test in
+  only one job per workflow run.</li>
+<li>1634652: A symlink to a regular file under a <code>**</code> source glob now needs only its name
+  in <code>exclude</code> (#258); <code>&lt;link&gt;/**</code> is no longer required, since no path exists
+  under a file. A link to a directory, a dangling link or a loop still needs
+  both. The link is never followed nor hashed; Aval only checks its target's
+  type. The error names the exclude that would fix it. Dropping <code>&lt;link&gt;/**</code>
+  from a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> changes its hash, so the next run is a miss.</li>
+</ul>
+<h2 id="082">0.8.2<a class="headerlink" href="#082" title="Anchor link">&para;</a></h2>
+<h3 id="patch-changes_1">Patch Changes<a class="headerlink" href="#patch-changes_1" title="Anchor link">&para;</a></h3>
+<ul>
+<li>422352d: The GitHub actions carry a test's <code>outputs</code> from run to publish (#236).
+  <code>aval run --outputs-dir DIR</code> copies the files the <code>outputs</code> globs matched
+  into an empty DIR when it records the result, and <code>aval push --outputs-dir
+  DIR</code> publishes them from there instead of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, refusing
+  (exit 1, nothing published) any entry that is not a regular file matched by
+  an <code>outputs</code> glob: a symlink, an extra file, an input, <code>.git</code> or <code>.aval</code>.
+  The run action passes <code>--outputs-dir .aval/&lt;test&gt;/outputs</code> on a push to the
+  default branch; the publish action passes the artifact's <code>outputs/</code>, so a test with outputs and no <code>outputs/</code> exits 1 instead of
+  publishing the checkout's files, and it refuses an artifact with any entry
+  outside <code>result.json</code>, <code>report.json</code>, <code>record.json</code> and <code>outputs/</code>. docs/guides/github-actions.md
+  documents the artifact layout. No format change. This closes the known gap
+  noted in 0.8.1 (the publish action could not push a test with <code>outputs</code>).
+  With a pinned release without <code>--outputs-dir</code> (0.8.1), the actions keep
+  running and publishing tests without <code>outputs</code>, and refuse a test with
+  <code>outputs</code>, as <code>aval explain --expand</code> reports it, with exit 1 naming aval
+  v0.8.2 or later, instead of dropping its outputs or signing the checkout's
+  files.</li>
+<li>8f78554: The aval run action takes a <code>shadow</code> input (default <code>false</code>): <code>true</code> passes
+  <code>aval run --shadow</code>, so the test runs beside a verified result and a false
+  hit fails the step; any value other than <code>true</code> or <code>false</code> exits 2 before
+  anything runs (#216). The job's <code>AVAL_MIN_TRUST_LEVEL</code> still reaches aval,
+  which only lets it raise the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s minimum. Aval's own CI now runs its
+  suites through <code>integrations/github/run</code> and publishes through
+  <code>integrations/github/publish</code>: <code>aval.yaml</code> is a <code>kind: TestSet</code> with the
+  tests <code>aval-engine</code> and <code>aval-e2e</code> (same fingerprints as the former
+  <code>aval.yaml</code> and <code>aval.e2e.yaml</code>), one <code>.github/aval/policy.yaml</code> carries the
+  registry and replaces <code>main.yaml</code> and <code>pr.yaml</code> (main and releases raise the
+  minimum to <code>runner</code>), and <code>.github/aval/install.sh</code>, <code>trust-from-base.sh</code>
+  and <code>summary.sh</code> are removed. The release gate verifies with the release
+  the actions pin, under main's <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>. No change to the aval binary, its
+  exit codes or formats.</li>
+<li>15cc546: Build with Go 1.27.4, which fixes GO-2026-6859 in <code>net/http</code> (govulncheck
+  reports it as reachable from required modules, not from Aval's code).</li>
+</ul>
+<h2 id="081">0.8.1<a class="headerlink" href="#081" title="Anchor link">&para;</a></h2>
+<h3 id="patch-changes_2">Patch Changes<a class="headerlink" href="#patch-changes_2" title="Anchor link">&para;</a></h3>
+<ul>
+<li>806588c: New guide "Integrate Aval in 5 files" and the example <code>examples/github-monorepo</code>
+  (#217): a monorepo with a Go module, a Node UI, a Dockerfile, a data
+  directory and an end-to-end suite in 3 shards, put on Aval by adding
+  <code>aval.yaml</code> and <code>.github/aval/policy.yaml</code> and editing <code>ci.yml</code> and
+  <code>.gitignore</code>. Aval's tests check that the integration is exactly those files,
+  run every test through the CLI (miss and push, reuse per shard, a fragment
+  edit reruns only its tests, an unaccepted <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr>, exit 5 on a
+  tampered <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr>), and CI checks that the run action ignores a trust
+  <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> edited in a pull request. No CLI or format change. Known gap: the
+  GitHub publish action cannot push a test with <code>outputs</code> yet, because the run
+  action's artifact holds <code>.aval/&lt;test&gt;/</code> only.</li>
+<li>6815771: The release gate verifies the e2e <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> with the aval release <code>ci.yaml</code>
+  pins, the one that signed it, instead of a binary built from the tag (#234).
+  A newer <code>aval</code> computes <code>aval-fingerprint/v2</code>, so the gate missed (exit 4) on
+  v0.8.0 and published nothing: the v0.8.0 tag has no GitHub Release, and this
+  patch ships its changes as v0.8.1.</li>
+</ul>
+<h2 id="080">0.8.0<a class="headerlink" href="#080" title="Anchor link">&para;</a></h2>
+<h3 id="minor-changes_1">Minor Changes<a class="headerlink" href="#minor-changes_1" title="Anchor link">&para;</a></h3>
+<ul>
+<li>7de8cd6: <code>scope.allowMutable</code> entries take an optional <code>files</code> list of globs (#208).
+  One entry accepts its exact <code>ref</code> in every file in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> a glob matches,
+  instead of one entry per file. <code>files</code> excludes <code>file</code>, which stays an exact
+  path; each glob must match a file in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, otherwise <code>aval</code> exits 2. Format
+  change: an additive optional <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field under the same <code>apiVersion</code>.
+  Existing contracts hash as before; an older <code>aval</code> rejects a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> that
+  uses <code>files</code> (unknown field), which fails closed.</li>
+<li>b0b968a: Every security event Aval detects now exits 5 (#195). A verified result beside
+  an <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> that failed verification is no longer reused: <code>aval run</code> runs
+  the test and exits 5, and <code>aval verify</code> exits 5 with the unchanged report
+  (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>, the bad <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> in <code>rejected</code>). More than 64
+  attestations for one <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is now <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verification-failed</code> (exit 5
+  in <code>aval run</code> and <code>aval verify</code>) instead of <code>error</code>. The run record of such a
+  run says <code>verification-failed</code>, so <code>aval stats</code> counts it under
+  <code>verificationFailures</code>. Consumers no longer need to inspect <code>rejected</code>: the
+  exit code alone separates miss, error and security event. No new <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> or
+  exit code; the verify report, predicate and <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> are unchanged.</li>
+<li>b518636: New GitHub composite action <code>integrations/github/publish</code> (#212): one step in
+  the consumer's own publish job signs and pushes every <code>aval-&lt;test&gt;</code> artifact
+  the run action uploaded in the workflow run. It refuses any ref but the
+  default branch unless <code>allow-unprotected: true</code>, always refuses
+  <code>pull_request_target</code> and <code>workflow_run</code>, and needs <code>id-token: write</code>;
+  installs the same pinned, verified aval release as the run action; fetches
+  the trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from the default branch and pushes to its <code>registry</code>
+  (credentials default to <code>github.actor</code> and <code>github.token</code>); downloads the
+  artifacts into <code>$RUNNER_TEMP</code>; and runs <code>aval push --test &lt;name&gt;</code> per
+  artifact with a fresh OIDC token, trying every artifact and exiting with the
+  worst code (5 is never downgraded). <code>stats: true</code> also publishes each pushed
+  test's run record, best effort. It is a composite action, not a reusable
+  workflow, so the certificate names the calling workflow; CI checks this on
+  Aval's <code>main</code>. No change to the aval binary, its exit codes or formats.</li>
+<li>15ade1b: New GitHub composite action <code>integrations/github/run</code> (#211): a CI job runs
+  one test through Aval with <code>uses: TrianaLab/aval/integrations/github/run@&lt;sha&gt;</code>
+  and <code>with: {test: &lt;name&gt;}</code> (inputs <code>file</code> and <code>policy</code> are optional). It
+  refuses <code>pull_request_target</code>, <code>workflow_run</code> and any job with
+  <code>id-token: write</code>; installs the aval release pinned in its <code>action.yml</code>,
+  checked against the per-platform sha256, signature and provenance; fetches
+  the trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, and the registry inside it, from the default branch
+  through the contents API on every event (no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>: nothing is reused, with
+  a warning); writes the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> to the step summary; turns exit 5 into an
+  <code>aval SECURITY</code> error annotation; uploads <code>.aval/&lt;test&gt;/</code> as the artifact
+  <code>aval-&lt;test&gt;</code> on a push to the default branch only; and warns when the
+  <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> trusts a <code>refs/pull/</code> subject at or above <code>minTrustLevel</code>. The
+  action pins 0.7.0 until the next release, which has <code>--test</code> and the
+  <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code> (#213). <code>docs/guides/github-actions.md</code> is rewritten
+  around it. No change to the aval binary, its exit codes or formats.</li>
+<li>ecc519f: <code>aval init --set</code> writes a two-file starting layout (#215): <code>aval.yaml</code> as a
+  <code>kind: TestSet</code> with the test and one fragment holding the source globs, and
+  <code>.github/aval/policy.yaml</code> with one placeholder keyless identity whose
+  anchored <code>subjectRegexp</code> trusts no <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> until <code>&lt;OWNER&gt;/&lt;REPO&gt;</code> is replaced.
+  Scope and <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> stay required. An existing file exits 2 unless
+  <code>--force</code>. No format change.</li>
+<li>6a91ec3: The installers can pin and require verification for CI (#202).
+  <code>get-aval.sh --sha256 &lt;hex&gt;</code> (or <code>AVAL_SHA256</code>; <code>&lt;os&gt;_&lt;arch&gt;=&lt;hex&gt;</code> per
+  platform, the entry for the detected platform required) refuses an archive
+  with another digest or one that <code>checksums.txt</code> does not list with it.
+  <code>--require-verify</code> (<code>AVAL_REQUIRE_VERIFY=1</code>) makes a missing <code>cosign</code> an
+  error, <code>--require-provenance</code> (<code>AVAL_REQUIRE_PROVENANCE=1</code>) does the same for
+  <code>gh</code>; both need <code>--version</code> and exclude <code>--no-verify</code>. <code>install.ps1</code> reads the
+  same variables. Interactive installs behave as before. <code>docs/install.md</code>
+  has a CI recipe, and Aval's own CI installs its pinned release this way.</li>
+<li>4f70316: <code>aval run</code> and <code>aval verify</code> take <code>--min-trust-level</code> (or
+  <code>AVAL_MIN_TRUST_LEVEL</code>) to raise the trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>minTrustLevel</code> for one
+  run (#214), so one <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> can trust developer keys on PRs and require
+  <code>runner</code> on main. A value below the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s minimum, or an unknown level,
+  exits 2. A result below the raised minimum is a miss (exit 4), never exit 5.
+  The verify report is unchanged. <code>runner.command</code> does not see
+  <code>AVAL_MIN_TRUST_LEVEL</code>.</li>
+<li>e5cf98f: The trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> takes an optional <code>registry</code> field (#209). <code>aval run</code> and
+  <code>aval verify</code> use it when neither <code>--registry</code> nor <code>AVAL_REGISTRY</code> is set, and
+  the <code>config:</code> line names the source that won (<code>registry=&lt;x&gt; (policy &lt;file&gt;)</code>).
+  Reading the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from a protected branch now carries the registry too.
+  A <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> <code>registry</code> with credentials (<code>user:password@</code>) exits 2 without
+  printing them.</li>
+</ul>
+<p>Format change (additive): <code>kind: Policy</code> gains an optional field under the
+  same <code>apiVersion</code>. Older aval releases reject a <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> that uses it (unknown
+  field), which fails closed; policies without it work everywhere.
+- 83ba4b5: <code>aval push --report-file FILE</code> reads the report written by the <code>aval run</code> that
+  recorded the result (#201). When its <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is <code>verified</code>, push prints
+  <code>nothing to push: ...</code>, signs nothing and exits 0, so split-credential
+  publishing is one command and a stale result file is not published again.
+  Any other <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> publishes the result as before. A report for another test id
+  or <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, an unknown report version or an unreadable report exits 1. No
+  format changes: the predicate, verify report, <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and exit codes are
+  unchanged.
+- 1c8baae: <code>aval push --test &lt;name&gt;</code> publishes only the test an artifact is named after
+  (#210). A result or report for another test, or for inputs other than the
+  ones push recomputes from the checkout (a changed file or declared env value),
+  exits 1 and publishes nothing. Behaviour changes: a report that records a
+  security event (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verification-failed</code>, or a <code>rejected</code> entry that
+  failed verification) now makes push sign nothing and exit 5, where it used to
+  publish; and <code>aval push</code> never publishes a <code>non-deterministic</code> test, it prints
+  <code>nothing to push: ...</code> and exits 0. <code>aval run --push</code> is unchanged.
+- 8efc307: New optional <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field <code>scope.root</code> (#200): the path from the
+  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s directory up to the root of its tree, <code>..</code> segments only (<code>..</code>,
+  <code>../..</code>). A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> such as <code>aval/unit.yaml</code> with <code>root: ..</code> behaves as if
+  its file sat in the root: globs, <code>outputs</code>, <code>allowMutable[].file</code> and <code>files</code>, manifest
+  and finding paths, and <code>execution.outputs.files[].path</code> are relative to the
+  root; <code>runner.command</code> and <code>environment.probe</code> run there; the
+  <code>--result-file</code>, <code>--report-file</code> and <code>--stats-file</code> skip set is computed
+  against it. <code>scope.contracts</code> paths stay relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file. The
+  root must lie inside the git working tree that holds the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, otherwise
+  <code>aval run</code>, <code>explain</code>, <code>verify</code> and <code>push</code> exit 2. <code>aval explain</code> prints the resolved
+  root. Globs still cannot contain <code>..</code>.</p>
+<p>Format changes: additive change to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> schema
+  (<code>aval.trianalab.io/v1</code> stays). Contracts without <code>scope.root</code> keep their
+  <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> byte for byte; setting or changing it changes the <code>contract</code>
+  manifest line and so the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. The manifest version
+  (<code>aval-fingerprint/v2</code>) does not change. Older <code>aval</code> binaries reject a
+  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> that uses the field.
+- a4e260c: <code>-t/--test &lt;name&gt;</code> on <code>aval run</code>, <code>explain</code>, <code>verify</code> and <code>push</code> selects one
+  test of a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file (#207). A TestSet of more than one test without
+  <code>--test</code> exits 2 and lists the names; on a <code>kind: Test</code> the flag is optional
+  and must equal <code>metadata.name</code>. With <code>--test</code> the output files default to
+  <code>.aval/&lt;name&gt;/{result,report,record}.json</code>, and <code>aval run</code> removes a stale
+  <code>.aval/&lt;name&gt;/</code> first; without it nothing changes. <code>aval explain --test
+  &lt;name&gt; --expand</code> prints the expanded standalone <code>kind: Test</code>, and
+  <code>aval explain --all [-o json]</code> fingerprints every test without running
+  anything, reports every failing test by name and exits 2 (or 1). A TestSet
+  expands to at most 1024 tests in total, plain tests included.</p>
+<p>Format changes: additive CLI flags only. No new exit code; the verify report,
+  predicate and manifest version do not change.
+- 013ebd5: The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> skips every entry named exactly <code>.git</code>, whatever its type
+  (#199). A linked worktree or a submodule has a <code>.git</code> file that holds a
+  machine-specific path; a <code>**</code> source glob used to hash it, so the main
+  checkout, each worktree and each machine got a different <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> for the
+  same commit and <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. They now share one, and the <code>exclude: ["**/.git"]</code>
+  workaround is no longer needed. A <code>.git</code> symlink is skipped instead of failing
+  the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. The match stays case-sensitive (<code>.GIT</code> is still an input). An
+  exact glob such as <code>source: ["pkg/.git"]</code> now matches no file and fails the
+  <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> (exit 1, <code>matched no files</code>). <code>outputs</code> skip a <code>.git</code> file too, so
+  it is never published.</p>
+<p>Format changes: the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> manifest moves from <code>aval-fingerprint/v1</code> to
+  <code>aval-fingerprint/v2</code>. Every existing <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> becomes a miss once, so each
+  test runs again and publishes a v2 result; there is no fallback lookup by v1.
+- 26058a5: New <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> kind <code>kind: TestSet</code> (#206): many tests in one file, with
+  <code>defaults</code>, named <code>fragments</code> a test pulls in with <code>use</code>, and a <code>matrix</code>
+  that creates one test per value. Merge order is defaults, the used
+  fragments, then the test; lists are unioned, so nothing inherited is
+  removed, and a toolchain, probe or <code>scope.root</code> key set to two values exits
+  2 naming both sources. <code>matrix</code> substitutes <code>{var}</code> into <code>metadata.name</code> and
+  <code>runner.command</code> only. Each test expands to a standalone <code>kind: Test</code> and
+  fingerprints byte for byte like it. Unknown or unused fragments, a fragment
+  that uses another or sets <code>exclude</code>, <code>runner</code>, <code>metadata</code>, <code>outputs</code>,
+  <code>matrix</code> or <code>cacheability</code>, an unknown <code>{var}</code>, duplicate expanded names and
+  a <code>scope.contracts</code> entry that points at a TestSet exit 2. <code>aval run</code>,
+  <code>explain</code>, <code>verify</code> and <code>push</code> take a TestSet of one test; selecting one test
+  of many comes with #207.</p>
+<p>Format changes: additive new kind under <code>aval.trianalab.io/v1</code>. Older
+  <code>aval</code> binaries reject <code>kind: TestSet</code> with exit 2 (fail closed). The
+  manifest version (<code>aval-fingerprint/v2</code>) does not change.</p>
+<h3 id="patch-changes_3">Patch Changes<a class="headerlink" href="#patch-changes_3" title="Anchor link">&para;</a></h3>
+<ul>
+<li>f8dbb8a: <code>aval run</code> no longer exits 1 when an <code>environment.probe</code> fails without
+  <code>--push</code> (#197). It still looks nothing up (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>), runs the test
+  and records nothing to <code>--result-file</code>, so <code>aval push</code> cannot publish the
+  result; it now warns <code>result not recorded: &lt;reason&gt;</code> and exits with the
+  test's code (0 passed, 3 failed). With <code>--push</code> it still exits 1
+  (<code>result not published: &lt;reason&gt;</code>), or 3 when the test failed. No new exit
+  code or <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>; the verify report, predicate and <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> are unchanged.</li>
+<li>fb575db: <code>aval run</code> no longer loops without end when <code>runner.command</code> starts <code>aval run</code>
+  on the same <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> again, directly or through other contracts (#196). It
+  passes <code>AVAL_RUN_STACK</code> to <code>runner.command</code>, and a nested run of a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
+  already in it exits 2; the outer run records the test as failed (exit 3). A
+  nested run of a different <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> still works. <code>environment.env</code> may no
+  longer list <code>AVAL_RUN_STACK</code>. No format changes: the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, predicate
+  and verify report are unchanged.</li>
+<li>21f9727: After each release, the release workflow opens a PR that moves the aval
+  version and per-platform sha256 pinned in <code>integrations/github/run</code> and
+  <code>integrations/github/publish</code> to that release, from its <code>checksums.txt</code>
+  (#213). Pinning either action by commit SHA pins the aval binary too, and one
+  Dependabot bump upgrades both. <code>tests/release</code> fails when a pin does not
+  match the pinned release's <code>checksums.txt</code>. No change to the aval binary,
+  its exit codes or formats.</li>
+<li>9cc6596: The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> no longer refuses a symlink that <code>scope.exclude</code> covers by
+  name and contents, such as <code>node_modules/.bin/tool</code> under <code>pkg/**</code> with
+  <code>**/node_modules/**</code> excluded (#198). The symlink is skipped, not followed,
+  and stays out of the manifest. A symlink a <code>dependencies</code> glob reaches, or
+  one excluded only by name or only by its contents, is still an error. No
+  format changes: every tree that fingerprinted before keeps its <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</li>
+</ul>
+<h2 id="070">0.7.0<a class="headerlink" href="#070" title="Anchor link">&para;</a></h2>
+<h3 id="minor-changes_2">Minor Changes<a class="headerlink" href="#minor-changes_2" title="Anchor link">&para;</a></h3>
+<ul>
+<li>
+<p>f5c436b: New <code>aval explain [--digest]</code>: it prints <code>fingerprint manifest for &lt;test&gt; (aval-fingerprint/v1)</code>, the manifest, and <code>fingerprint sha256:...</code> as the last line; <code>--digest</code> prints only the digest. It never looks up a result and never runs the test; a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> error exits 1 with <code>aval: fingerprint: ...</code>, as <code>run --explain</code> does. <code>run --explain</code> and <code>run --fingerprint-only</code> keep their behaviour. New <code>aval stats publish FILE</code> publishes a run record and replaces <code>aval record</code>. Flags are named for what they hold; the old names keep working, hidden from help, and print a deprecation notice on stderr only (stdout, files and exit codes are unchanged). Deprecated in 0.7.0, removable no earlier than 0.8.0:</p>
+</li>
+<li>
+<p><code>aval run --result</code> and <code>aval push --result</code>: use <code>--result-file</code></p>
+</li>
+<li><code>aval run --report</code>: use <code>--report-file</code></li>
+<li><code>aval run --record</code>: use <code>--stats</code></li>
+<li><code>aval run --record-file</code>: use <code>--stats-file</code></li>
+<li><code>aval run --repository</code> and <code>aval record --repository</code>: use <code>--source-repo</code></li>
+<li><code>aval record --record-file FILE</code>: use <code>aval stats publish FILE</code></li>
+</ul>
+<p>Messages that name these flags use the new names (for example <code>--stats requires --registry</code>), and <code>aval record</code> without a file now says <code>a run record file is required</code>. The browser demo accepts <code>aval explain</code> and <code>aval explain --digest</code>.
+- f5c436b: <code>--registry</code> and <code>--policy</code> fall back to <code>AVAL_REGISTRY</code> and <code>AVAL_POLICY</code> (flag &gt; environment &gt; unset; an empty value counts as unset). There is no config file and no <code>aval.yaml</code> field: an architecture test keeps the registry and <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> out of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and out of any file in the tree. When a value comes from the environment, <code>aval run</code> prints one <code>config:</code> line on stdout, and <code>verify</code>, <code>push</code>, <code>stats</code> and <code>record</code> print it on stderr. <code>runner.command</code> no longer sees <code>AVAL_REGISTRY</code> and <code>AVAL_POLICY</code>, like the signing token. <code>aval record</code> without <code>--record-file</code> now says <code>--record-file is required</code>. Exit codes and the verify report are unchanged.
+- f5c436b: Error messages say what to do (#167). Exit codes, outcomes and the verify report are unchanged: a report's <code>reason</code> keeps the raw error.</p>
+<ul>
+<li>A registry that cannot be dialled or does not answer in time reads <code>cannot reach &lt;host&gt; (&lt;cause&gt;); is the registry running? check AVAL_REGISTRY or --registry</code>: in <code>aval run</code>'s reuse-off warning, on stderr for <code>aval verify</code> (stdout unchanged), and for <code>push</code>, <code>run --push</code> and <code>stats publish</code>.</li>
+<li><code>--registry</code> with a scheme says <code>drop https://: try --registry &lt;host/name&gt;</code> (exit 2, as before).</li>
+<li>A public key passed as <code>--key</code> says <code>&lt;x&gt;.pub is a public key; pass the private key (&lt;x&gt;.key)</code>.</li>
+<li>Signing without a key, a token or a terminal lists the three ways to sign, one indented line each.</li>
+<li><code>aval push</code> without a saved result adds <code>run aval run first, or use aval run --push</code> (exit 1, as before).</li>
+<li><code>aval run --push --key</code> with a <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> that does not list the key warns <code>aval: warning: key &lt;file&gt; (key id &lt;x&gt;) is not in &lt;policy&gt;; consumers with this policy will reject the result</code>. The result is still published.</li>
+<li>Contract errors print as <code>aval: &lt;file&gt;: invalid contract:</code> and one indented, escaped line per problem, in YAML terms: <code>line 8: scope.sources: unknown field; did you mean source?</code>, <code>line 6: runner.command: got a string ..., want a list of strings</code>. The browser demo prints them the same way.</li>
+<li>f5c436b: <code>aval --help</code> groups commands into Core, Publishing and Statistics, and every command has an example. A mistyped command gets a suggestion (<code>aval rn</code> and <code>aval help rn</code> print <code>unknown command "rn"; did you mean "run"?</code> and exit 2; <code>aval help rn</code> used to print the root help and exit 0). A mistyped flag gets the closest flag of that command and a pointer to its help (<code>unknown flag: --registy; did you mean --registry? see aval run --help</code>). <code>aval run --help</code> is shorter. The exit code constants are unchanged; <code>aval help &lt;typo&gt;</code> now exits 2 (usage) instead of 0.</li>
+<li>f5c436b: <code>aval init --name NAME --source GLOB... --cacheability CLASS --key NAME|--keyless [--force] -- &lt;command&gt;</code> writes <code>aval.yaml</code> (validated before it is written), with <code>--key</code> a signing key pair (<code>NAME.key</code> and <code>NAME.pub</code>) and <code>policy.yaml</code> trusting it at <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> developer, and adds the key and <code>.aval/</code> to <code>.gitignore</code>. Nothing is inferred: <code>--source</code> and <code>--cacheability</code> have no default, init lists the files the globs match, rejects a glob that matches nothing and never runs the test. It never replaces a file without <code>--force</code> (exit 1); with <code>--force</code> it removes the old file and creates a new one, so a symlink is replaced, not written through, and a failed write removes the key pair it wrote. A file name in the preview or an answer is escaped before it reaches the terminal. When a value is missing it asks numbered questions only if stdin and stdout are terminals; otherwise it exits 2 and names the missing flags. The quickstart now starts with <code>aval init</code>.</li>
+<li>f5c436b: <code>aval keygen [name]</code> writes a signing key without openssl: <code>name.key</code> (unencrypted PKCS#8 ECDSA P-256 PEM, mode 0600) and <code>name.pub</code> (PKIX PEM, the file a <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> trusts with <code>publicKey</code>), with <code>aval</code> as the default name (a trailing <code>.key</code> is dropped; an empty name is a usage error, exit 2). It prints the key id the verify report shows for this <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> and refuses to replace either file without <code>--force</code> (exit 1). The key hints of <code>aval run --push</code> and <code>aval push</code> now point to <code>aval keygen</code>, and the quickstart and the uv-monorepo example no longer need openssl.</li>
+<li>
+<p>f5c436b: Plain output of <code>aval run</code> v2 (CI logs and pipes). Every line CI greps today keeps its shape: <code>&lt;outcome&gt; &lt;test&gt; &lt;digest&gt;</code>, <code>signer:</code>, <code>reference:</code>, <code>reason:</code>, <code>rejected:</code>, <code>ran &lt;test&gt;: &lt;result&gt; (exit N)</code>, <code>reused &lt;result&gt; result</code>, <code>pushed</code>, <code>restored</code>, <code>recorded</code>, <code>config:</code>. <code>aval verify</code> text and <code>-o json</code> are unchanged, and so are all exit codes. Changed lines:</p>
+</li>
+<li>
+<p>Added: <code>--- run &lt;test&gt;: &lt;command&gt;</code> before and <code>--- end &lt;test&gt;: &lt;passed|failed&gt; (exit N) in &lt;time&gt;</code> after the test's own output, which passes through untouched.</p>
+</li>
+<li>Added: a closing <code>summary: &lt;test&gt; &lt;ran|reused&gt;: &lt;passed|failed&gt;[ in &lt;time&gt;][; saved &lt;time&gt;][; result pushed][; reuse was off][; SECURITY]</code>. <code>saved</code> is the reused run's signed <code>finishedAt</code> minus <code>startedAt</code>, for display only.</li>
+<li>Added on stderr: <code>aval: warning: reuse off: &lt;cause&gt;</code> when an unreadable <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, a registry error or inputs that cannot be fingerprinted turn reuse off. The test still runs.</li>
+<li>When the test command cannot start, <code>--- run</code> is not closed and no <code>summary:</code> follows; stderr says <code>aval: running "&lt;command&gt;": ...</code> and the exit code stays 1.</li>
+<li>A <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> flooded with more attestations than Aval lists (#135) is a security event in <code>aval run</code> too: no reuse-off warning, <code>; SECURITY</code> in the summary and the flooding SECURITY line repeated last on stderr. The exit code is unchanged.</li>
+<li>On a verification failure <code>aval run</code> prints the <code>aval: SECURITY:</code> line when it finds it and again as the last stderr line, after any other error.</li>
+<li>The SECURITY lines link to <code>https://aval.run/&lt;version&gt;/trust-model/</code> (<code>latest</code> for dev, snapshot and pre-release builds) instead of the GitHub file.</li>
+<li>Removed: <code>test &lt;name&gt; fingerprint &lt;digest&gt;</code> (the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> line carries the digest), the <code>cacheability &lt;class&gt;: ...</code> note when the reason already names the class, and <code>aval: test failed</code> / <code>aval: reused result failed: test failed</code> (the summary and exit 3 say it).</li>
+<li>Reworded reasons in <code>aval run</code>: <code>no registry configured: pass --registry to reuse verified results</code> is now <code>reuse off: no registry (set AVAL_REGISTRY or --registry)</code>, <code>reuse disabled (--no-reuse)</code> is now <code>reuse off: --no-reuse</code>, and a missing <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> is <code>reuse off: no trust policy (set AVAL_POLICY or --policy)</code>. The <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> stays <code>miss</code>. <code>aval verify</code> keeps <code>no trust policy configured: pass --policy to reuse verified results</code>.</li>
+<li>The browser demo prints the same lines.</li>
+<li>The quickstart GIFs still show the old output until they are re-recorded (#181).</li>
+<li>f5c436b: <code>aval run</code> on a terminal prints the styled output of Epic 13 (style A): one line per step behind a glyph (<code>✓</code> done, <code>↺</code> reused, <code>✗</code> failed or SECURITY, <code>⚠</code> reuse off, <code>·</code> neutral), labelled detail lines, digests as 8 hex characters (whole on the <code>REJECTED</code> line), and one closing sentence. A flooded <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and a non-deterministic <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> get their own closing sentence. After a verification failure nothing is green and no <code>✓</code> appears; the SECURITY block goes to stderr when found, and stderr still ends with the plain <code>aval: SECURITY:</code> line. <code>NO_COLOR</code> drops the colour only, Windows gets no colour, and stderr is styled only when it is a terminal too. Plain output is unchanged and applies when stdout is not a terminal, with <code>TERM=dumb</code>, <code>AVAL_OUTPUT=plain</code> (any case) or the new global <code>--plain</code> flag. The browser demo accepts <code>aval run --plain</code>. Exit codes, <code>-o json</code>, the report file and <code>aval verify</code> are unchanged. The browser demo uses the styled form without colour.</li>
+<li>f5c436b: <code>aval verify -o json</code> (verify-report/v1) gains the optional <code>signer.trustLevelName</code> (<code>developer</code>, <code>runner</code> or <code>isolated</code>) next to the numeric <code>signer.trustLevel</code>. It is derived from the matched trust-<abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> entry, never from the predicate. Additive: older reports still parse, and in <code>pkg/evidence</code> <code>MatchIdentity</code> and <code>MatchSigner</code> now set <code>Identity.TrustLevelName</code>. Older aval binaries (0.4.0 and earlier) do not recognise a report with this field as Aval output, so such a file in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> counts as an ordinary input for them (a miss, never a false hit) until they upgrade.</li>
+</ul>
+<h3 id="patch-changes_4">Patch Changes<a class="headerlink" href="#patch-changes_4" title="Anchor link">&para;</a></h3>
+<ul>
+<li>f5c436b: The quickstart follows the new flow: it removes a leftover registry before starting one, exports <code>AVAL_REGISTRY</code> and <code>AVAL_POLICY</code> once after <code>aval init</code>, and runs <code>aval run --push</code>, <code>aval verify</code>, <code>aval run</code>, a changed input and an untrusted push (<code>AVAL_POLICY= aval run --push --key other.key</code>) that ends in exit 5, with no flags repeated. The GIFs are re-recorded in the styled output, and the "Try it" terminal's <code>help</code> describes the same setup.</li>
+<li>f5c436b: On a terminal, Aval shows a spinner on stderr when looking up and fetching a result, pushing one (<code>aval run --push</code>, <code>aval push</code>) or reading run records (<code>aval stats</code>) takes more than 300ms, for example <code>⠹ looking up localhost:5001… 4s</code>. It runs only in styled mode with stderr a terminal, is erased before the decision or the test's output prints, erases itself before a warning, and leaves the terminal clean on Ctrl-C. Windows gets no spinner. Plain output, exit codes and <code>aval verify</code> are unchanged.</li>
+<li>6677ad3: Docs site: the install command on the home page has a copy button.</li>
+<li>f5c436b: Shorter docs: each page answers one question in its first line and opens with a diagram or a terminal snippet; guides and concept pages use short bullets and tables. Edge cases moved to two new Reference pages: CLI output (plain and terminal output, spinner, stderr lines) and Mutable reference scan (the full scanner rules and limits from Pin your dependencies). No behaviour changes.</li>
+<li>58d3f3c: Docs site: on phones narrower than about 430px the version pill no longer overlaps the theme toggle in the header; it is hidden there.</li>
+</ul>
+<h2 id="061">0.6.1<a class="headerlink" href="#061" title="Anchor link">&para;</a></h2>
+<h3 id="patch-changes_5">Patch Changes<a class="headerlink" href="#patch-changes_5" title="Anchor link">&para;</a></h3>
+<ul>
+<li>a0395af: <code>aval upgrade</code> names the HTTP status when GitHub answers the latest-release lookup with something other than a redirect (for example <code>504 Gateway Timeout</code> during a GitHub incident), instead of <code>no Location header in response</code>. Nothing is downloaded or replaced in that case, as before.</li>
+</ul>
+<h2 id="060">0.6.0<a class="headerlink" href="#060" title="Anchor link">&para;</a></h2>
+<h3 id="minor-changes_3">Minor Changes<a class="headerlink" href="#minor-changes_3" title="Anchor link">&para;</a></h3>
+<ul>
+<li>750feac: New <code>aval version</code> (prints <code>aval &lt;version&gt; (&lt;go version&gt; &lt;os&gt;/&lt;arch&gt;)</code>) and <code>aval upgrade [--version vX.Y.Z] [--check]</code>. <code>upgrade</code> resolves the latest release from the GitHub Releases redirect (no API call), verifies the keyless Sigstore signature of <code>checksums.txt</code> against Aval's release workflow at that tag, checks the archive's sha256 against its exact entry, and only then replaces the running binary atomically on Unix (on Windows the old one is kept as <code>aval.exe.old</code> and moved back if the swap fails). Without <code>--version</code> it refuses to move to an older release. Any failed check replaces nothing and exits 1; downloads are capped at 256 MiB (1 MiB for <code>checksums.txt</code> and its bundle).</li>
+</ul>
+<h2 id="050">0.5.0<a class="headerlink" href="#050" title="Anchor link">&para;</a></h2>
+<h3 id="minor-changes_4">Minor Changes<a class="headerlink" href="#minor-changes_4" title="Anchor link">&para;</a></h3>
+<ul>
+<li>028329d: A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> can list <code>outputs</code> (globs such as <code>coverage.xml</code>, <code>junit.xml</code>): <code>run --push</code> and <code>push</code> publish those files with the result, and a reused result restores them, so a coverage gate or a junit report downstream keeps working when the test is skipped. Outputs must not be inputs or the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> file, each glob must match a regular file, and the caps are 256 files, 16 MiB each and 64 MiB in total; otherwise nothing is published (exit 1). On reuse the files are fetched by the digests the signature covers; a missing, changed or undeclared output is a verification failure (exit 5). Format changes, all additive: <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field <code>outputs</code> (omitted when empty, so existing fingerprints do not change; older <code>aval</code> binaries reject a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> that uses it), predicate field <code>execution.outputs</code> within <code>execution/v2</code>, and the OCI identifiers <code>application/vnd.trianalab.aval.outputs.v1</code> and <code>application/vnd.trianalab.aval.output.v1</code>. Outputs are published to the registry: do not list files that hold secrets.</li>
+<li>b3758d5: The mutable-reference scanner now reports container images named in test code that uses testcontainers: a quoted <code>name:tag</code> without a digest in a <code>*.go</code>, <code>*.py</code>, <code>*.java</code>, <code>*.kt</code>, <code>*.ts</code>, <code>*.js</code> or <code>*.cs</code> file that mentions testcontainers. Adopters may see new findings that turn hits into misses for <code>hermetic</code> and <code>controlled-environment</code> tests: pin the image by digest, or accept it in <code>scope.allowMutable</code>.</li>
+<li>318966e: New optional <code>environment.probe</code> in <code>aval.yaml</code> (additive to <code>aval.trianalab.io/v1</code>; older <code>aval</code> binaries reject contracts that use it): a map from an <code>environment.toolchain</code> key to an argv such as <code>python: [python3, --version]</code>. <code>aval run</code> runs each probe before the lookup, without a shell, with a 10 s timeout and without <code>$SIGSTORE_ID_TOKEN</code>, and requires the declared value in the output as a version token (<code>3.13</code> matches <code>Python 3.13.1</code>, not <code>Python 3.130</code>). A mismatch, a probe that cannot start, a non-zero exit, a timeout or output over 4 KiB skips the lookup (<abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>), runs the test, records and publishes nothing and exits 1. The observed output goes into <code>execution.environment</code> as <code>probe.&lt;key&gt;</code>. <code>verify</code>, <code>push</code>, <code>--fingerprint-only</code> and the browser demo never run probes. Fix: a toolchain key named <code>os</code> or <code>arch</code> no longer overwrites the real values in <code>execution.environment</code>.</li>
+</ul>
+<h3 id="patch-changes_6">Patch Changes<a class="headerlink" href="#patch-changes_6" title="Anchor link">&para;</a></h3>
+<ul>
+<li>554569c: Adoption guides: find undeclared inputs with strace, fs_usage, Process Monitor or a <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>-only copy (Write a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>); map uv, pnpm and cargo workspaces to contracts (Depend on another part of the repo); estimate reuse from past commits with <code>scripts/estimate-reuse.sh</code>, which runs <code>aval run --fingerprint-only</code> over a scratch worktree and counts <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> errors and unacknowledged mutable references as misses (Measure reuse).</li>
+<li>176cfc2: Docs: the guide "Shards and matrices" shows two ways to split a suite across CI matrix jobs with existing fields: one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> per shard (<code>aval.shard-1.yaml</code>, run with <code>-f</code>) or one <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> with <code>SHARD_INDEX</code> and <code>SHARD_TOTAL</code> in <code>environment.env</code>. New example <code>examples/uv-monorepo</code>: a uv workspace with two packages, two shard contracts and coverage restored on reuse. No behaviour or format change.</li>
+</ul>
+<h2 id="040">0.4.0<a class="headerlink" href="#040" title="Anchor link">&para;</a></h2>
+<h3 id="minor-changes_5">Minor Changes<a class="headerlink" href="#minor-changes_5" title="Anchor link">&para;</a></h3>
+<ul>
+<li>4c8029a: <code>run --push</code> and <code>push</code> sign keyless from a laptop: without <code>--key</code> or <code>$SIGSTORE_ID_TOKEN</code> and with a terminal (or with the new <code>--login</code> flag), they open the interactive Sigstore login in the browser (<code>oauth2.sigstore.dev</code>, client id <code>sigstore</code>; <code>$SIGSTORE_OIDC_ISSUER</code> and <code>$SIGSTORE_OIDC_CLIENT_ID</code> override them) right before signing, after the test ran. The token is used for that signature only and never stored. Without a terminal and without <code>--login</code>, a run with no key and no token still fails fast with exit 2. <code>--key</code> and <code>--login</code> exclude each other.</li>
+</ul>
+<h3 id="patch-changes_7">Patch Changes<a class="headerlink" href="#patch-changes_7" title="Anchor link">&para;</a></h3>
+<ul>
+<li>b619b24: More than 64 attestations for a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> now prints an <code>aval: SECURITY:</code> line naming the cap, as a possible flooding attempt; the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> stays <code>error</code> and the test runs. Aval's own CI and release jobs fail when a verify report lists a verification failure in <code>rejected</code>, even when a trusted result verified.</li>
+</ul>
+<h2 id="030">0.3.0<a class="headerlink" href="#030" title="Anchor link">&para;</a></h2>
+<h3 id="minor-changes_6">Minor Changes<a class="headerlink" href="#minor-changes_6" title="Anchor link">&para;</a></h3>
+<ul>
+<li>4b68dd5: <code>aval stats --registry &lt;repo&gt; [--test &lt;id&gt;] [--since &lt;duration|date&gt;] [--by test|repository] [--output text|json]</code> reads the run records in the registry and aggregates them on demand: runs, hit rate, misses by cause, verification failures, shadow false hits, and total and saved test time, per test (or per source repository with <code>--by repository</code>) and in total. It writes nothing. Records that are unreadable, oversized, malformed or inconsistent are skipped and counted; reading stops after 1000 records or 64 pages per listing, with a warning. New format, provisional: <code>aval.trianalab.io/stats-report/v1</code> (<code>pkg/evidence</code> adds <code>StatsReport</code>, <code>TestStats</code>, <code>RepositoryStats</code>, <code>RunStats</code>, <code>MissCauses</code>, <code>StatsReportVersion</code> and <code>StatsUnknownRepository</code>). Run records gain the optional <code>verifiedResult</code> and <code>repository</code> (<code>--repository</code> on <code>aval run</code> and <code>aval record</code>; records without it count as <code>unknown</code>), and <code>evidence.ParseRunRecord</code> now rejects inconsistent records (<code>reused: true</code> requires <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code> and <code>testDurationMs</code> 0; <code>verifiedResult</code> requires <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>verified</code>), so <code>aval record</code> refuses a hand-edited record that claims a reuse that never happened. Docs explain pruning old records with ORAS.</li>
+<li>6351105: Registry I/O is bounded. <code>run</code>, <code>verify</code> and <code>push</code> take <code>--registry-timeout</code> (default <code>1m</code>). A registry that stalls past the timeout gives <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>error</code>, and <code>aval run</code> still runs the test. Lookup follows at most 64 referrers pages. A listed <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> whose manifest was deleted (404) counts as absent: the remaining candidates can still be reused, and the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> is a miss if every candidate is gone. One credential store and one auth cache are shared by every registry call. The keyless trusted root (a TUF fetch when <code>trustedRoot</code> is not pinned) is loaded only when a candidate's bundle carries a certificate. After pushing, <code>push</code> and <code>run --push</code> confirm that the new digest is listed among the referrers, re-pushing up to three times, and fail if it never appears.</li>
+<li>7cd688f: Aval detects mutable references in a test's inputs and refuses to reuse them. A static, offline scanner reads the files in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> and <code>runner.command</code>, one detector per ecosystem: container images without a digest (Compose and Kubernetes <code>image:</code>, Dockerfile <code>FROM</code> and <code>COPY --from</code>, <code>docker run</code> and <code>podman run</code>, compose files the command uses but the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> does not hold), Go (<code>go.mod</code> without <code>go.sum</code>, <code>go install pkg@latest</code>), npm, yarn, pnpm and bun (<code>package.json</code> without a lockfile, unpinned <code>npm i</code> and <code>npx</code>), Python (unpinned <code>requirements*.txt</code> entries, missing hashes, Poetry and Pipenv without a lockfile, unpinned <code>pip install</code>), Rust (<code>Cargo.toml</code> without <code>Cargo.lock</code>), Java (Maven and Gradle <code>SNAPSHOT</code>, <code>LATEST</code>, <code>RELEASE</code>, dynamic versions and ranges), Ruby (<code>Gemfile</code> without <code>Gemfile.lock</code>), PHP (<code>composer.json</code> without <code>composer.lock</code>), OS packages (<code>apt-get install</code> and <code>apk add</code> without versions), remote scripts (<code>curl … | sh</code>, remote <code>ADD</code> without <code>--checksum</code>) and git (<code>git clone</code> without a commit, submodules that track a branch). For <code>hermetic</code> and <code>controlled-environment</code> contracts any unacknowledged finding makes the lookup a <code>miss</code> (exit 4 for <code>verify</code>) whose reason lists each reference, the test runs, and <code>run --push</code> and <code>push</code> do not publish (exit 1). <code>external-dependencies</code> contracts get the findings as information; <code>non-deterministic</code> is unchanged. <code>aval run</code> prints each finding as a <code>mutable:</code> line (<code>--fingerprint-only</code> prints them on stderr). Contract format change, additive within <code>aval.trianalab.io/v1</code>: the optional <code>scope.allowMutable</code> list (<code>ref</code> and <code>reason</code>) acknowledges a reference by the exact text Aval reports. It is part of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash; contracts without it keep their <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, and the manifest stays <code>aval-fingerprint/v1</code>. Older <code>aval</code> binaries reject contracts that use the new field. A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> whose <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> holds a <abbr title="A tag or range that can point at other content later; pin it or list it in scope.allowMutable.">mutable reference</abbr> that earlier versions reused now misses until the reference is pinned or acknowledged. Guide: "Pin your dependencies" (<code>docs/pinning.md</code>).</li>
+<li>0e259b7: Aval resolves declared artifacts to immutable ids at <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> time. The optional <code>scope.resolve</code> list takes <code>kind: reference</code> entries for container images (<code>image</code>, tag to manifest or index digest), npm, PyPI, Go modules (through the module proxy, <code>h1:</code> hash), Maven, crates.io, RubyGems, git (ref to commit with <code>git ls-remote</code>) and plain URLs (sha256 of the download, up to 256 MiB). Each resolves a tag, a version range or a branch to its digest, checksum or commit, which goes into the manifest as a <code>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;id&gt;</code> line: a repushed tag, a new release inside a range or a moved branch changes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. Resolution is opt-in and stateless, bounded by a 2-minute deadline; a reference that cannot be resolved fails the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so nothing is looked up, the test runs and nothing is published, and the reason names the reference. <code>aval run --explain</code> prints the time each lookup took on stderr. <code>scope.resolve</code> never clears a finding of the mutable-reference scanner: it makes a move change the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, and the reference still blocks reuse until it is pinned in place or accepted with <code>scope.allowMutable</code>. <code>scope.resolve</code> binds the named artifact, not its transitive dependencies. Registries come from <code>$npm_config_registry</code>, <code>$GOPROXY</code>, <code>$AVAL_PYPI_URL</code>, <code>$AVAL_MAVEN_URL</code>, <code>$AVAL_CRATES_INDEX</code> and <code>$AVAL_RUBYGEMS_URL</code>; credentials from the Docker config, <code>~/.npmrc</code> tokens, <code>~/.netrc</code> machine entries and git, sent only over https or to a loopback host. Format changes, additive: the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field within <code>aval.trianalab.io/v1</code> (older binaries reject contracts that use it), and the <code>resolve</code> manifest lines within <code>aval-fingerprint/v1</code>, which only contracts with the field have; every other manifest is unchanged. Guide: "Resolve references" (<code>docs/resolve/</code>).</li>
+<li>8d4b8d8: Run statistics in the registry. <code>aval run --record</code> publishes one run record per run, for every <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>, with the test id, <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr>, whether the result was reused, the result, the test duration, the saved duration, the aval version, a timestamp and an optional <code>--ci-run-url</code>. Records hang off a per-test stats anchor tagged <code>stats-&lt;test id&gt;</code>, never off a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> anchor. <code>run</code> and <code>verify</code> never read them, so a record cannot cause reuse or count toward the candidate cap. Recording is best-effort: a record that cannot be published, for example without write credentials, is a warning and never changes the exit code. <code>--record-file</code> writes the record to a file and <code>aval record</code> publishes it later. New format identifiers, provisional: <code>aval.trianalab.io/run-record/v1</code>, <code>application/vnd.trianalab.aval.run.v1</code> (<code>+json</code> for the layer) and <code>application/vnd.trianalab.aval.stats.v1</code>. <code>pkg/evidence</code> adds <code>RunRecord</code>, <code>ParseRunRecord</code> and these constants.</li>
+<li>ff2a2c8: A <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> can depend on other contracts in the same repository. The optional <code>scope.contracts</code> list takes paths to other <code>aval.yaml</code> files, relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (<code>../backend/aval.yaml</code>). Each referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> is fingerprinted from its own directory and <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, and its <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> goes into the manifest as a <code>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;</code> line, transitively: a change inside a referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> makes the dependent miss and run, a change outside it does not. References must stay inside the git working tree of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> (the nearest directory with a <code>.git</code> entry); a missing, invalid, symlinked or cyclic reference, or more than 8 levels or 64 contracts, fails the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so the test runs. A referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s mutable references block the dependent's reuse unless the referenced <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s own <code>scope.allowMutable</code> accepts them. <code>aval run --explain</code> prints the dependency tree after the manifest. Format changes, additive: the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> field within <code>aval.trianalab.io/v1</code> (older binaries reject contracts that use it), and the <code>contract &lt;path&gt;</code> manifest lines within <code>aval-fingerprint/v1</code>, which only contracts with the field have; every other manifest is unchanged. Guide: "Depend on another part of the repo".</li>
+<li>6b94c21: One-line installers: <code>scripts/get-aval.sh</code> (Linux and macOS, <code>curl | bash</code>) and <code>scripts/install.ps1</code> (Windows, <code>irm | iex</code>). Both refuse a download whose sha256 does not match the release's <code>checksums.txt</code>, and verify the release signature (cosign) and SLSA provenance (<code>gh attestation verify</code>) when those tools are installed. See docs/install.md.</li>
+</ul>
+<h3 id="patch-changes_8">Patch Changes<a class="headerlink" href="#patch-changes_8" title="Anchor link">&para;</a></h3>
+<ul>
+<li>0553f1e: <code>scope.allowMutable</code> entries take an optional <code>file:</code> (the path a finding prints, relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>, or <code>runner.command</code>): the entry then accepts the reference in that file only. A ref-only entry still accepts a reference that one file reports; when several files report it (generic refs such as <code>resources[0]</code> or <code>patches[0]</code> repeat across kustomizations), nothing is accepted and the finding asks for <code>file:</code>. With <code>scope.contracts</code>, each <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>'s entries apply to its own findings. The scanner also reports kustomize <code>helmCharts</code> entries other than a local chart in the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, and patches given by a path outside the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>; checks instructions behind <code>ONBUILD</code>; uses the <code># escape=</code> character when it splits heredoc words; and no longer reports a <code>range</code> loop's key variable used as a key directly under <code>labels:</code> or <code>annotations:</code> in a Helm template. Since the previous release, image refs in JSON files (<code>"image": "postgres:16",</code>) no longer end in <code>",</code>: update an acknowledgement written with the trailing characters to the bare reference (<code>postgres:16</code>).</li>
+<li>2df8ee2: A <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> the trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> lists but below <code>minTrustLevel</code> is now reported as <code>miss</code> (exit 4), and with <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> <code>miss</code> in the verify report's <code>rejected</code> list, instead of <code>verification-failed</code> (exit 5). Such an <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> is still never reused, and a false claim from that <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> stays <code>verification-failed</code>. The report stays <code>aval.trianalab.io/verify-report/v1</code>; <code>rejected[].outcome</code> may now also be <code>miss</code>. Rejected verification failures are printed with the <code>aval: SECURITY:</code> prefix even when another candidate verifies. <code>evidence.Verify</code> is unchanged.</li>
+<li>e5497e1: <code>--registry-timeout</code> help no longer claims "push has its own" deadline on <code>aval push</code>, <code>aval record</code> and <code>aval stats</code>; only <code>aval run</code> says lookup and fetch share one. Shorter <code>aval run</code>, <code>aval record</code> and <code>aval stats</code> help. The docs site is shorter and single-sourced: the README links into the site instead of copying the quickstart, and the resolver pages and vision move under Reference and Project.</li>
+<li>7fae6b0: The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> no longer hashes Aval's own outputs: <code>.aval</code> directories at any depth, and the <code>--result</code> and <code>--report</code> paths of the command when they fall inside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root. A broad <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> such as <code>scope.source: ["**"]</code> now keeps its <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> across <code>aval run</code>s, and <code>aval push</code> accepts the result <code>aval run</code> recorded. The manifest format stays <code>aval-fingerprint/v1</code>: trees with no Aval output in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> keep byte-identical manifests and digests (the committed v1 golden and Aval's own contracts are unchanged). Only manifests that listed a file under <code>.aval/</code> or a <code>--result</code>/<code>--report</code> file change, to the manifest of the same tree without those files. Such a manifest held a result from an earlier run, so it changed on every run and was not reusable in practice; results published from a clean checkout (no Aval output yet) keep their <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and stay reusable. <code>.aval/</code> is now reserved for Aval: a file the test reads must not live there.</li>
+<li>91a57b8: <code>run --push</code> and <code>push</code> check their preconditions before anything runs and exit 2 (usage) instead of failing with exit 1 after the test: a <code>--key</code> that cannot be read or is not an unencrypted ECDSA P-256 PEM key (the error names the requirement and the <code>openssl</code> command to create one; cosign keys are encrypted and not supported), or no <code>--key</code> and no <code>$SIGSTORE_ID_TOKEN</code>. <code>run</code>, <code>verify</code> and <code>push</code> reject a <code>--registry</code> that is not an OCI repository (a scheme, no repository, a tag or a digest) with exit 2 and an example. A <code>--result</code> or <code>--report</code> path that the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> includes and that holds a real input (anything other than an Aval result or report) exits 2 before the test runs, because skipping it would drop that input from the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>; <code>run</code> also refuses to overwrite any existing file at those paths that is not exactly an Aval result or report. Exit codes keep their values; only these cases move from exit 1 to the existing exit 2.</li>
+<li>c7c5888: Docs site: live run statistics. The home metric strip and a new Stats page (Project &gt; Stats) read <code>stats.json</code>, which the docs workflow rebuilds twice an hour and on every push from <code>aval stats --by repository --since 30d</code> over the public stats registry <code>ghcr.io/trianalab/aval-stats</code>, without rebuilding any page; a failed refresh keeps the previous file, and a missing or stale file shows a neutral state. Aval's own CI now publishes its run records there. The Stats page explains how to keep statistics in your own registry and how a repository joins the public aggregate.</li>
+<li>f14b7b4: Docs site: the mobile menu (hamburger) now slides in the site navigation on every page. On inner pages the panel opened under the dark overlay; on the home page there was no panel at all. <code>make docs-nav-smoke</code>, part of <code>make ci-docs</code>, opens the menu at a phone width on the home page and an inner page and checks the panel is on screen with links.</li>
+<li>133adf0: The README now has an Install section and a local quickstart (registry:2, an openssl P-256 key, <code>aval run --push --key</code>, <code>aval verify</code>) that reaches <code>verified</code>; an acceptance test runs it as written. A missing <code>aval.yaml</code> and a pre-freeze <code>aval.dev/</code> <code>apiVersion</code> (<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> or <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>) now print a next step. <code>aval verify --help</code> lists exit codes 1 and 2, and <code>docs/cli-reference.md</code> has one exit-code table for every command. New docs: registry credentials, the network and HOME needs of keyless verification and how to pin <code>trustedRoot</code>, and the 64-candidate cap with its cleanup.</li>
+<li>ed37d7e: New docs Quickstart page: copy-paste steps with the expected output from an empty folder to a verified reuse, a changed input and a rejected <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> (exit 5), with terminal recordings of real runs and a "what just happened" diagram; an acceptance test runs the page and checks every output it shows. <code>make docs-demos</code> re-records the GIFs from VHS tapes. The Install page now shows a manual release download with cosign and checksum checks.</li>
+<li>5871b37: Readable errors and reasons. Output escapes only control and non-printable characters (quotes and backslashes print as they are), and each cause of a joined error gets its own <code>aval:</code> line (an invalid <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>) or is separated by <code>;</code> in the report reason (an invalid <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>). A reason is printed once, in the report: stderr no longer repeats it, and a verification failure adds a single <code>aval: SECURITY: ...</code> line that links to <code>docs/trust-model.md</code>. A <abbr title="Who signed a result: a CI job (keyless) or a key.">signer</abbr> missing from the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> gets the reason <code>signer key id "&lt;id&gt;" is not in the trust policy (trust policy &lt;file&gt;)</code> instead of the Sigstore error. Skipped lookups (no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>, no registry, <code>--no-reuse</code>, a <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr> class that is never or not allowed to be reused) say only why they did not look; they stay misses. No <code>attest.Sign:</code> or <code>registry.Lookup</code> prefixes reach users. Text-mode <code>verify</code> prints <code>signer:</code> (with the <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> name) and <code>reference:</code> lines for a verified result. <code>non-deterministic</code> is called "never reusable" everywhere. The JSON verify report is unchanged except for the wording of <code>reason</code>, where joined causes are now separated by <code>;</code>.</li>
+<li>cb81760: <code>scope.resolve</code> detects registry overrides as the tools read them. pip variables match in any spelling pip reads (<code>PIP_</code> then any letter case, <code>-</code> equal to <code>_</code>, one optional leading <code>--</code>: <code>PIP_index-url</code>, <code>PIP___INDEX_URL</code>). <code>~/.npmrc</code> is read as ini, like npm: quotes stripped from keys and values, <code>;</code> and <code>#</code> comments, keys under a <code>[section]</code> ignored, <code>${VAR}</code> expanded in keys and values as npm does (an undefined variable stays literal); a line Aval cannot read (including one with U+2028 or U+2029, or a quoted key or value that is JSON other than a string) fails the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and sends no token. A floating Maven version fails when <code>&lt;latest&gt;</code> or <code>&lt;release&gt;</code> is a SNAPSHOT or not in <code>&lt;versions&gt;</code>. Errors show only the host of a URL, so a token in a registry path (<code>https://npm-proxy.fury.io/&lt;token&gt;/user/</code>) is masked too.</li>
+<li>9082a6c: <code>pkg/evidence</code>: <code>ErrNotImplemented</code>, <code>Verification.TrustLevel</code> (use <code>Verification.Signer.TrustLevel</code>) and <code>Runner.Issuer</code>/<code>Runner.TrustLevel</code> are deprecated; nothing is removed. Pushing an <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> without a Sigstore bundle is now refused, since it could never verify. Keyless signing always uses the Sigstore public-good instance, as the CLI already did.</li>
+<li>9556f78: The mutable-reference scanner adds parser-based detection to its line-by-line pass, which still runs on every file it ran on before, so it finds everything it found before. Dockerfiles named as such (<code>Dockerfile</code>, <code>Containerfile</code>, <code>Dockerfile.*</code>, <code>Dockerfile-dev</code>, <code>Dockerfile_windows</code>, <code>*.dockerfile</code>) are also split the way BuildKit does: a comment line ending in <code>\</code> no longer swallows the next instruction, continued lines join with nothing (<code>FROM db:1\</code> then <code>6</code> is <code>db:16</code>), comment and blank lines inside a continuation are dropped, a leading <code># escape=</code> sets the continuation character, and heredoc bodies are kept apart. YAML is also decoded: <code>image:</code> keys are matched by their decoded value (<code>"ima\x67e":</code>, <code>? image</code>, <code>!!binary</code>, tagged, anchored or alias keys, nested sequences), after an anchor or an empty flow value, or after a lone CR, NEL or LS line break. The scanner also reports kustomize <code>images:</code> and <code>imageTags:</code> entries with <code>newName</code>, <code>newTag</code> or <code>tagSuffix</code> and no digest, kustomize patches, replacements, transformers, generators and <code>helmCharts</code> that set an image (by ref, such as <code>patches[0]</code>), <code>kind: ImageTagTransformer</code>, images in Helm <code>*.tpl</code> helpers, <code>RUN --mount=...,from=</code> images, JSON manifests under <code>templates/</code> or listed in kustomize <code>resources</code>, Compose <code>build.dockerfile_inline</code> and <code>docker-image://</code> <code>additional_contexts</code>, and every name of a multi-name or lowercase Dockerfile <code>ARG</code>. What Aval reports because it cannot tell (a templated key in a Helm template, a YAML key with an unknown tag or an undecodable escape, an undecodable heredoc name, a <code>FROM</code> image with a variable that is not a global <code>ARG</code> with a value, a kustomize resource that is remote or outside the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> (<code>resources[2]</code>), a tagged key in a template the parser rejects, a Dockerfile BuildKit refuses) is in the <code>container</code> ecosystem, so <code>scope.allowMutable</code> can acknowledge it; only an unreadable or oversized file stays in <code>scan</code>. A shell continuation at the very end of a file is no longer dropped. docs/pinning.md now says the scanner is a best-effort safety net and lists its known limits.</li>
+<li>59adaf5: The installers are served from the docs site: <code>curl -fsSL https://aval.run/install.sh | bash</code> and <code>irm https://aval.run/install.ps1 | iex</code>. The site root redirects to the latest release (to <code>main</code> before the first one), and the outdated-version banner shows only on releases older than <code>latest</code>, never on <code>main</code>.</li>
+<li>6a2a118: <code>aval stats</code> finds run records on registries that do not sort tags, such as GHCR: it lists every tag and filters by the <code>stats-</code> prefix instead of starting the listing after <code>stats</code>. Up to 64 pages of tags are read (6400 tags at a registry page size of 100); past that the report carries a truncation warning.</li>
+<li>843f7a3: A symlink in the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory under which a <code>source</code> or <code>dependencies</code> glob could match files (for example <code>pkg/sub -&gt; /elsewhere</code> with <code>**/*.go</code>), now fails the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> with an error naming the path. Before, it was skipped, so edits behind it kept the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> and a stale result could be reused. A symlink no glob can reach is still ignored, and a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> directory that is itself a symlink fingerprints like its target.</li>
+<li>27d7391: Try Aval in the browser: click the terminal on the home page of the docs site (or its "Try it live" button) and it runs the real Aval compiled to WebAssembly, with a simulated test, an in-memory registry and a throwaway key generated in the browser. It supports <code>aval run</code> (a miss, then a verified reuse), <code>aval run --explain</code>, <code>aval verify -o json</code>, <code>edit &lt;file&gt;</code>, <code>tamper</code> (the next verify fails with exit 5), <code>reset</code> and <code>help</code>. Nothing is fetched until the visitor clicks the terminal or presses a key in it, and without WebAssembly the page keeps the recorded transcript. Keyless signing is not available in the browser.</li>
+</ul>
+<h2 id="020">0.2.0<a class="headerlink" href="#020" title="Anchor link">&para;</a></h2>
+<h3 id="minor-changes_7">Minor Changes<a class="headerlink" href="#minor-changes_7" title="Anchor link">&para;</a></h3>
+<ul>
+<li>0148c76: Formats are frozen. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> and <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> <code>apiVersion</code> is now <code>aval.trianalab.io/v1</code> and the verify report <code>version</code> is <code>aval.trianalab.io/verify-report/v1</code>; <code>aval.dev/v1alpha1</code> contracts and <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> files are rejected, so change that line in yours. The <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> hash covers <code>apiVersion</code>, so results published before are misses and each test runs once. The predicate type (<code>https://aval.trianalab.io/attestation/execution/v2</code>), media and artifact types (<code>application/vnd.trianalab.aval.execution.v2</code>, <code>application/vnd.trianalab.aval.fingerprint.v1</code>) and predicate <code>schemaVersion</code> <code>v2</code> are unchanged and now frozen, so attestations written by v0.1.0 keep a valid, readable format. Compatibility rules (additive changes within a version, what needs a new version, how consumers treat unknown fields and values, deprecation) are in <code>docs/artifact-format.md</code>, and golden files guard the JSON shape of the statement, predicate and verify report.</li>
+</ul>
+<h3 id="patch-changes_9">Patch Changes<a class="headerlink" href="#patch-changes_9" title="Anchor link">&para;</a></h3>
+<ul>
+<li>c17dc26: <code>aval run</code> and <code>aval verify</code> escape newlines and control characters in reasons printed as text and on stderr, so text from an untrusted <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> cannot start a log line of its own. Aval's own CI now reuses its signed e2e results, and a release requires a verified e2e <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> for its commit.</li>
+<li>59b9b66: <code>pkg/evidence</code> is semver-stable Go API: within a major version it changes additively only, and CI fails when an exported identifier is removed or changes type or signature without a new major module path. <code>examples/evidence-consumer</code> is a separate module that consumes Aval evidence through <code>pkg/evidence</code> alone, with its own signature verifier. The <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> is in <code>docs/integrations.md</code>.</li>
+<li>bbf9e55: Fingerprinting fails closed in two more cases: a <code>scope.source</code> glob that matches no file (a typo, or a name that differs on disk by case or Unicode form), and a file excluded only because a trailing <code>**</code> in <code>exclude</code> matched zero segments (<code>build/**</code> against a file named <code>build</code>). Trees that fingerprinted before and still do keep the same <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. A table-driven false-hit corpus now pins every kind of relevant and irrelevant change.</li>
+</ul>
+<h2 id="010">0.1.0<a class="headerlink" href="#010" title="Anchor link">&para;</a></h2>
+<h3 id="minor-changes_8">Minor Changes<a class="headerlink" href="#minor-changes_8" title="Anchor link">&para;</a></h3>
+<ul>
+<li>a6d2b1a: First release: signed <code>aval</code> binaries for Linux, macOS and Windows with checksums, SBOMs and SLSA provenance. <code>aval --version</code> prints the release version.</li>
+</ul>
+<h3 id="patch-changes_10">Patch Changes<a class="headerlink" href="#patch-changes_10" title="Anchor link">&para;</a></h3>
+<ul>
+<li>59664a3: Dependency updates: <code>oras.land/oras-go/v2</code> 2.6.4 to 2.7.0; GitHub Actions <code>actions/checkout</code> to v7.0.1, <code>actions/setup-go</code> to v7.0.0, <code>actions/upload-artifact</code> to v7.0.2, <code>actions/download-artifact</code> to v8.0.2 and <code>actions/dependency-review-action</code> to v5.0.0 (Node 24 runtime).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../integrations/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Consume evidence">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Consume evidence
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../vision/" class="md-footer__link md-footer__link--next" aria-label="Next: Vision and roadmap">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Vision and roadmap
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      
+<div class="md-copyright aval-footer">
+  <svg class="aval-footer__mark" viewBox="1 2.5 22 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></svg>
+  <span>Aval · <a href="https://github.com/TrianaLab/aval/blob/main/LICENSE">Apache-2.0</a> · © 2026 TrianaLab</span>
+  <span class="aval-footer__links">
+    <a href="https://github.com/TrianaLab/aval">GitHub</a>
+    <a href="./">Changelog</a>
+    <span>Made with <a href="https://squidfunk.github.io/mkdocs-material/">Material for MkDocs</a></span>
+  </span>
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": ["^latest$", "^main$"], "provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/version-selector.js"></script>
+      
+        <script src="../javascripts/diagrams.js"></script>
+      
+        <script src="../javascripts/stats.js"></script>
+      
+        <script src="../javascripts/try-aval.js"></script>
+      
+        <script src="../javascripts/copy.js"></script>
+      
+    
+  </body>
+</html>
