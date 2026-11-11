@@ -1810,6 +1810,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Globs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-source-globs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional source globs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2401,6 +2418,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Globs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-source-globs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional source globs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2700,10 +2734,16 @@ above it (<a href="#contracts-in-a-subdirectory">Contracts in a subdirectory</a>
 <td>At least one glob. Each glob must match a file, and at least one file must remain after <code>exclude</code>.</td>
 </tr>
 <tr>
+<td><code>scope.optionalSource</code></td>
+<td>list of globs</td>
+<td>no</td>
+<td>Hashed like <code>source</code>, but a glob may match nothing yet. A glob may not also be in <code>source</code>. See <a href="#optional-source-globs">Optional source globs</a>.</td>
+</tr>
+<tr>
 <td><code>scope.exclude</code></td>
 <td>list of globs</td>
 <td>no</td>
-<td>Removes files from the <code>source</code> set (not from <code>dependencies</code>). May match nothing.</td>
+<td>Removes files from the <code>source</code> and <code>optionalSource</code> set (not from <code>dependencies</code>). May match nothing.</td>
 </tr>
 <tr>
 <td><code>scope.dependencies</code></td>
@@ -2864,8 +2904,8 @@ as that file would be: the set above fingerprints <code>shard-1</code> like a
 <code>scope.root</code> resolve from the TestSet file's directory.</p>
 <p>Merge rules, in the order <code>defaults</code>, each used fragment, then the test:</p>
 <ul>
-<li>Lists (<code>source</code>, <code>exclude</code>, <code>dependencies</code>, <code>allowMutable</code>, <code>resolve</code>,
-  <code>contracts</code>, <code>env</code>) are merged as a set union. Nothing inherited can be
+<li>Lists (<code>source</code>, <code>optionalSource</code>, <code>exclude</code>, <code>dependencies</code>,
+  <code>allowMutable</code>, <code>resolve</code>, <code>contracts</code>, <code>env</code>) are merged as a set union. Nothing inherited can be
   removed, so a merge can only widen a test's inputs. <code>exclude</code> is the one
   way to narrow them, and it is only allowed in <code>defaults</code> or in the test
   itself, where it is visible.</li>
@@ -2930,8 +2970,8 @@ and a cycle through several contracts. A <code>runner.command</code> that runs <
 on a different <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> works. <code>AVAL_RUN_STACK</code> is not an input: it is never
 hashed nor recorded, and <code>environment.env</code> cannot list it.</p>
 <h2 id="globs">Globs<a class="headerlink" href="#globs" title="Anchor link">&para;</a></h2>
-<p><code>scope.source</code>, <code>scope.exclude</code>, <code>scope.dependencies</code> and <code>outputs</code> use the
-same globs:</p>
+<p><code>scope.source</code>, <code>scope.optionalSource</code>, <code>scope.exclude</code>,
+<code>scope.dependencies</code> and <code>outputs</code> use the same globs:</p>
 <table>
 <thead>
 <tr>
@@ -2973,6 +3013,29 @@ same globs:</p>
   it: <code>**/node_modules/**</code> skips <code>pkg/web/node_modules/.bin/tool</code>, and
   <code>["pkg/bin", "pkg/bin/**"]</code> skips a symlinked <code>pkg/bin</code>. <code>pkg/bin</code> or
   <code>pkg/bin/**</code> alone does not.</li>
+</ul>
+<h3 id="optional-source-globs">Optional source globs<a class="headerlink" href="#optional-source-globs" title="Anchor link">&para;</a></h3>
+<p>Every <code>source</code> glob must match a file, which catches typos. A test that
+finds its inputs by pattern (it walks the tree for every
+<code>*testdata*.yaml</code>) reads files that may not exist yet. Leaving the pattern
+out of the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> means the first such file is not hashed, and a stale result
+is reused. Declare it in <code>optionalSource</code>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"src/**"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">optionalSource</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"**/*testdata*.yaml"</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<ul>
+<li>Files it matches are hashed as <code>source</code> lines, with the same <code>exclude</code>,
+  symlink and path rules. Adding the first matching file is a miss; removing
+  the last one returns to the earlier <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</li>
+<li>The only difference is that a glob may match nothing. At least one file
+  from <code>source</code> and <code>optionalSource</code> together must still remain after
+  <code>exclude</code>.</li>
+<li><code>aval explain</code> names each optional glob that matched nothing on stderr
+  (<code>optional: scope.optionalSource glob "&lt;glob&gt;" matched no files yet</code>), so
+  check it after writing one.</li>
+<li>Use it only for patterns the test discovers, not to silence a <code>source</code>
+  glob that matches nothing: that is usually a typo.</li>
 </ul>
 <h2 id="test-identity-vs-execution-fingerprint">Test identity vs execution <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr><a class="headerlink" href="#test-identity-vs-execution-fingerprint" title="Anchor link">&para;</a></h2>
 <p><code>metadata.name</code> says what is checked. The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> says with which inputs.
@@ -3018,14 +3081,14 @@ does not accept is a miss, and its result is not published
 <p>The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>sha256:&lt;hex&gt;</code> of a line-oriented manifest (format
 <code>aval-fingerprint/v2</code>). <code>aval explain</code> prints the exact text that was
 hashed, in this order:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>aval-fingerprint/v2
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>source &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>dependency &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>toolchain &lt;key&gt;=&lt;value&gt;
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>env &lt;NAME&gt; &lt;sha256 of value | unset&gt;
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>aval-fingerprint/v2
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>source &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>dependency &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>toolchain &lt;key&gt;=&lt;value&gt;
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>env &lt;NAME&gt; &lt;sha256 of value | unset&gt;
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
 </span></code></pre></div>
 <table>
 <thead>
@@ -3086,7 +3149,7 @@ executable file fingerprints differently there than on Unix.</p>
 </thead>
 <tbody>
 <tr>
-<td>files no <code>source</code> or <code>dependencies</code> glob matches</td>
+<td>files no <code>source</code>, <code>optionalSource</code> or <code>dependencies</code> glob matches</td>
 <td>the main risk: keep the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> honest</td>
 </tr>
 <tr>
@@ -3145,7 +3208,7 @@ test and records nothing; <code>aval explain</code>, <code>aval verify</code> an
 </tr>
 <tr>
 <td><code>scope.source matched no files</code></td>
-<td><code>exclude</code> removed every source file</td>
+<td><code>exclude</code> removed every <code>source</code> and <code>optionalSource</code> file, or <code>optionalSource</code> matched nothing and <code>exclude</code> removed every <code>source</code> file</td>
 </tr>
 <tr>
 <td><code>source "&lt;path&gt;" is excluded only by a trailing "**"</code></td>
@@ -3189,11 +3252,11 @@ value must appear in the output (stdout and stderr) as a version token: not
 preceded by a digit or a dot, not followed by a digit. <code>3.13</code> matches
 <code>Python 3.13.1</code>; it does not match <code>Python 3.130</code>, and <code>3.1</code> does not match
 <code>Python 3.13</code>.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">environment</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
 <p>On a mismatch, a probe that cannot start, a non-zero exit, a timeout or
 output over 4 KiB (it is signed into the predicate),

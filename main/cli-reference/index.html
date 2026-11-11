@@ -2637,7 +2637,8 @@ header, then the <abbr title="One sha256 hash of every input the contract declar
 <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>. explain never looks up a result and never runs the test; the
 <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is the one 'aval run' computes with its default --result-file and
 without --report-file or --stats-file inside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root. With
-<abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.root it prints the resolved root after the header.</p>
+<abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.root it prints the resolved root after the header. Each
+<abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.optionalSource glob that matched no file is named on stderr.</p>
 <p>--expand prints the test as the standalone kind: Test it expands to (a test
 of a TestSet with defaults, fragments and matrix applied). --all checks every
 test of the file: it prints one "name <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>" line per test (-o json:

@@ -2479,8 +2479,8 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <td>list the files the test reads</td>
 </tr>
 <tr>
-<td><code>empty glob</code>, <code>must be a relative, slash-separated path</code>, <code>empty, '.' or '..' segments are not allowed</code>, <code>'**' must be a whole path segment</code></td>
-<td>write globs like <code>src/**/*.go</code></td>
+<td><code>empty glob</code>, <code>must be a relative, slash-separated path</code>, <code>empty, '.' or '..' segments are not allowed</code>, <code>'**' must be a whole path segment</code>, <code>scope.optionalSource[&lt;i&gt;]: &lt;x&gt; is also in scope.source</code></td>
+<td>write globs like <code>src/**/*.go</code>; list each one in <code>source</code> or in <code>optionalSource</code>, not both</td>
 </tr>
 <tr>
 <td><code>cacheability: required</code>, <code>cacheability: unknown class</code></td>
@@ -2527,7 +2527,7 @@ result the <abbr title="Your file that lists trusted signers and their trust lev
 <tbody>
 <tr>
 <td><code>scope.source matched no files</code>, <code>glob &lt;x&gt; matched no files</code></td>
-<td>fix the glob, or create the file</td>
+<td>fix the glob, or create the file; a pattern the test discovers and that may match nothing yet goes in <code>scope.optionalSource</code> (<a href="../../contract/#optional-source-globs">Optional source globs</a>)</td>
 </tr>
 <tr>
 <td><code>is excluded only by a trailing</code></td>
