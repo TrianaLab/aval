@@ -166,6 +166,35 @@ tests:
 	}
 }
 
+// platformSet is the per-platform matrix of #255, as the shards guide
+// shows it.
+var platformSet = filepath.Join("testdata", "shards", "platforms.yaml")
+
+// False hit: each matrix leg hashes its own toolchain value, so a result
+// recorded for unit-darwin is a miss for unit-linux (#255).
+func TestTestSetMatrixToolchain(t *testing.T) {
+	dir := writeTree(t, map[string]string{"a.go": "package a\n", "go.mod": "module a\n"})
+	cs, err := contract.LoadAll(platformSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fps := map[string]Fingerprint{}
+	for _, c := range cs {
+		if fps[c.Metadata.Name], err = Compute(context.Background(), dir, c, noEnv); err != nil {
+			t.Fatal(err)
+		}
+	}
+	linux, darwin := fps["unit-linux"], fps["unit-darwin"]
+	if linux.Digest == darwin.Digest {
+		t.Fatal("unit-linux and unit-darwin share a fingerprint (false hit)")
+	}
+	for fp, line := range map[*Fingerprint]string{&linux: "toolchain platform=linux\n", &darwin: "toolchain platform=darwin\n"} {
+		if !strings.Contains(fp.Manifest, line) {
+			t.Errorf("manifest lacks %q:\n%s", line, fp.Manifest)
+		}
+	}
+}
+
 // Paths and scope.root resolve from the TestSet file's directory, as for a
 // standalone contract next to it.
 func TestTestSetRoot(t *testing.T) {

@@ -98,3 +98,5 @@ runs:
         path: .aval/${{ inputs.test }}/
         include-hidden-files: true
         if-no-files-found: ignore
+        # A re-run replaces the earlier attempt's artifact (#249).
+        overwrite: true
