@@ -1,7 +1,7 @@
 {
   "version": "aval.trianalab.io/stats-report/v1",
   "registry": "ghcr.io/trianalab/aval-stats",
-  "since": "2026-10-12T19:02:11.864035197Z",
+  "since": "2026-10-12T19:18:57.721917991Z",
   "total": {
     "runs": 156,
     "reused": 24,
@@ -72,5 +72,5 @@
     }
   ],
   "skipped": 0,
-  "generatedAt": "2026-11-11T19:03:11Z"
+  "generatedAt": "2026-11-11T19:21:28Z"
 }
