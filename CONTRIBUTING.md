@@ -253,8 +253,11 @@ results that were not reused, and runs no tests. `dogfood-record`
 (`packages: write` only, no tests) publishes the suites' run records with
 `aval stats publish` to the public stats registry
 `ghcr.io/trianalab/aval-stats`, whatever the suites' outcome; a record that
-cannot be published is a warning. `docs.yaml` publishes those numbers as the
-site's `stats.json` twice an hour ([Stats](https://aval.run/main/stats/)).
+cannot be published is a warning. `dogfood-shadow` adds
+`aval stats --by repository --since 30d` over that registry to its job
+summary (read anonymously, informational), and `docs.yaml` publishes the same
+numbers as the site's `stats.json` twice an hour
+([Stats](https://aval.run/main/stats/)).
 
 Trust comes from one policy, `.github/aval/policy.yaml`, which also names the
 registry: `ci.yaml` on `main` at runner level, maintainers at developer level,

@@ -100,8 +100,37 @@ func mentionsTrustVar(v any) bool {
 }
 
 type policyJob struct {
-	If    string `yaml:"if"`
-	Steps []step `yaml:"steps"`
+	If    string            `yaml:"if"`
+	Env   map[string]string `yaml:"env"`
+	Steps []step            `yaml:"steps"`
+}
+
+// envProblems: env sets a variable that runs code before, or changes, the
+// program the run action's bash steps execute (PATH, BASH_ENV, ENV).
+func envProblems(where string, env map[string]string) []string {
+	var problems []string
+	for _, k := range []string{"PATH", "BASH_ENV", "ENV"} {
+		if _, ok := env[k]; ok {
+			problems = append(problems, where+" sets "+k)
+		}
+	}
+	return problems
+}
+
+// runActionEnvProblems: envProblems of every env a job that uses runAction
+// sees, on any event.
+func runActionEnvProblems(env map[string]string, jobs map[string]policyJob) []string {
+	var problems []string
+	for name, j := range jobs {
+		if slices.ContainsFunc(j.Steps, func(s step) bool { return s.Uses == runAction }) {
+			problems = append(problems, envProblems("workflow", env)...)
+			problems = append(problems, envProblems(name, j.Env)...)
+			for _, s := range j.Steps {
+				problems = append(problems, envProblems(name+" step", s.Env)...)
+			}
+		}
+	}
+	return problems
 }
 
 // policySourceProblems: no step of any workflow reads Aval's trust policy
@@ -113,6 +142,7 @@ type policyJob struct {
 func policySourceProblems(data []byte) ([]string, error) {
 	var wf struct {
 		On   yaml.Node            `yaml:"on"`
+		Env  map[string]string    `yaml:"env"`
 		Jobs map[string]policyJob `yaml:"jobs"`
 	}
 	var raw map[string]any
@@ -128,6 +158,7 @@ func policySourceProblems(data []byte) ([]string, error) {
 			problems = append(problems, "reads the trust policy from the checkout: "+l)
 		}
 	}
+	problems = append(problems, runActionEnvProblems(wf.Env, wf.Jobs)...)
 	if !onPullRequest(wf.On) {
 		return problems, nil
 	}
@@ -201,6 +232,10 @@ func TestPolicySourceCheckCatchesWorkingTreePolicies(t *testing.T) {
 		"not push":              "on: [push, pull_request]\njobs:\n  a:\n    if: github.event_name != 'push'\n    steps: [{run: aval run --policy p.yaml}]\n",
 		"dispatch job":          "on: [push, pull_request, workflow_dispatch]\njobs:\n  a:\n    if: github.event_name == 'workflow_dispatch'\n    steps: [{run: aval run --policy p.yaml}]\n",
 		"pull_request_target":   "on: pull_request_target\njobs:\n  a:\n    steps: [{run: aval verify --policy p.yaml}]\n",
+		// BASH_ENV, ENV and PATH run code before the run action's bash steps, on any event.
+		"job BASH_ENV":  "on: push\njobs:\n  a:\n    env: {BASH_ENV: x}\n    steps: [{uses: " + runAction + ", with: {test: unit}}]\n",
+		"workflow PATH": "on: push\nenv: {PATH: x}\njobs:\n  a:\n    steps: [{uses: " + runAction + ", with: {test: unit}}]\n",
+		"step ENV":      "on: push\njobs:\n  a:\n    steps: [{env: {ENV: x}, run: 'true'}, {uses: " + runAction + ", with: {test: unit}}]\n",
 		// Push-only and dispatch-only workflows read main's copy too.
 		"checkout policy on push": "on: push\njobs:\n  a:\n    steps: [{run: aval verify --policy .github/aval/policy.yaml}]\n",
 		"checkout policy, ./":     "on: workflow_dispatch\njobs:\n  a:\n    steps: [{run: 'aval verify --policy=./.github/aval/policy.yaml'}]\n",

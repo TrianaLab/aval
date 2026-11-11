@@ -706,6 +706,20 @@ jobs:
         with:
           test: aval-engine
           shadow: "true"
+      # Run statistics (#88), informational: never fails the job. aval is built
+      # from the commit and reads the public stats registry anonymously; records
+      # are unsigned statistics that run and verify never read.
+      - name: Run statistics
+        if: always()
+        continue-on-error: true
+        run: |
+          go build -o "$RUNNER_TEMP/stats-bin/aval" ./cmd/aval
+          {
+            echo "### aval stats, last 30 days"
+            echo '```'
+            "$RUNNER_TEMP/stats-bin/aval" stats --registry "$AVAL_STATS_REGISTRY" --by repository --since 30d --registry-timeout 10m 2>&1 || echo "aval stats failed"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Dogfooding M2 (#28): on main, integrations/github/publish (#216) signs
   # keyless and pushes every result that ci-e2e and dogfood-shadow uploaded
