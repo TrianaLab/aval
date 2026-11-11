@@ -84,6 +84,43 @@ func TestParseAllTestSet(t *testing.T) {
 	}
 }
 
+// A matrix substitutes {var} into toolchain values, inherited ones too, in
+// one pass: a value that holds "{x}" is kept as is. Probe argv is not
+// substituted (#255); env names cannot hold braces.
+func TestParseAllMatrixToolchain(t *testing.T) {
+	doc := `apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope: {source: [a.txt]}
+  environment: {toolchain: {arch: "{arch}"}}
+  cacheability: hermetic
+tests:
+  - metadata: {name: "unit-{os}"}
+    runner: {command: [echo, "{os}"]}
+    matrix: {os: [linux, darwin], arch: ["{os}"]}
+    environment:
+      toolchain: {platform: "{os}", go: "1.25", both: "{os}/{arch}"}
+      probe: {platform: [go, env, "{os}"]}
+`
+	cs, err := ParseAll([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, goos := range []string{"linux", "darwin"} {
+		c := cs[i]
+		want := map[string]string{"platform": goos, "go": "1.25", "arch": "{os}", "both": goos + "/{os}"}
+		if c.Metadata.Name != "unit-"+goos || !reflect.DeepEqual(c.Environment.Toolchain, want) {
+			t.Errorf("leg %s: %s %v, want %v", goos, c.Metadata.Name, c.Environment.Toolchain, want)
+		}
+		if c.Environment.Probe["platform"][2] != "{os}" {
+			t.Errorf("leg %s: probe substituted: %v", goos, c.Environment.Probe)
+		}
+	}
+	if cs[0].Environment.Toolchain["platform"] == cs[1].Environment.Toolchain["platform"] {
+		t.Fatal("legs share one toolchain map")
+	}
+}
+
 // The order of use never changes the expanded test.
 func TestParseAllUseOrder(t *testing.T) {
 	a, err := ParseAll([]byte(set))
@@ -113,29 +150,32 @@ func TestParseAllInheritedListsStay(t *testing.T) {
 
 func TestParseAllTestSetInvalid(t *testing.T) {
 	cases := map[string]struct{ from, to, want string }{
-		"unknown fragment":   {"use: [web, db]", "use: [web, db, cache]", `tests[1] (shard-{index}-of-{total}): use: unknown fragment "cache"`},
-		"unused fragment":    {"use: [web, db]", "use: [db]", "fragments.web: not used by any test"},
-		"fragment uses":      {"web:\n    scope:", "web:\n    use: [db]\n    scope:", "fragments.web: use is not allowed here: a fragment cannot use another fragment"},
-		"fragment exclude":   {`scope: {source: ["db/**"]}`, `scope: {source: ["db/**"], exclude: [x]}`, "fragments.db: scope.exclude is not allowed here"},
-		"fragment runner":    {"web:\n", "web:\n    runner: {command: [x]}\n", "fragments.web: runner is not allowed here"},
-		"fragment metadata":  {"web:\n", "web:\n    metadata: {name: x}\n", "fragments.web: metadata is not allowed here"},
-		"fragment cache":     {"web:\n", "web:\n    cacheability: hermetic\n", "fragments.web: cacheability is not allowed here"},
-		"fragment outputs":   {"web:\n", "web:\n    outputs: [x]\n", "fragments.web: outputs is not allowed here"},
-		"fragment matrix":    {"web:\n", "web:\n    matrix: {a: [b]}\n", "fragments.web: matrix is not allowed here"},
-		"fragment name":      {"web:", "Web:", "fragments.Web: the name must be"},
-		"defaults runner":    {"  cacheability: hermetic\nfragments", "  runner: {command: [x]}\n  cacheability: hermetic\nfragments", "defaults: runner is not allowed here"},
-		"defaults use":       {"  cacheability: hermetic\nfragments", "  use: [db]\n  cacheability: hermetic\nfragments", "defaults: use is not allowed here: it belongs to a test only"},
-		"toolchain conflict": {`toolchain: {postgres: "16"}`, `toolchain: {postgres: "16", go: "1.24"}`, `environment.toolchain.go: "1.25" from defaults conflicts with "1.24" from fragment db`},
-		"probe conflict":     {"[web, db]\n", "[web, db]\n    environment: {probe: {postgres: [pg, -V]}}\n", `environment.probe.postgres: ["postgres" "--version"] from fragment db conflicts with ["pg" "-V"] from the test`},
-		"unknown var":        {`"{literal x}"`, `"{totl}"`, `unknown matrix variable {totl} in "{totl}" (the matrix has index, total)`},
-		"duplicate expanded": {`index: ["1", "2"]`, `index: ["1", "1"]`, `metadata.name "shard-1-of-2" is also the name of tests[1]`},
-		"duplicate name":     {"name: unit}", "name: shard-1-of-2}", `metadata.name "shard-1-of-2" is also the name of tests[0]`},
-		"empty matrix":       {`matrix: {index: ["1", "2"], total: ["2"]}`, `matrix: {}`, "matrix: at least one variable is required"},
-		"empty values":       {`total: ["2"]`, `total: []`, "matrix.total: at least one value is required"},
-		"bad var":            {`total: ["2"]}`, `total: ["2"], 1x: [a]}`, `matrix: invalid variable name "1x"`},
-		"invalid test":       {"name: unit}", "name: Unit}", `tests[0] (Unit): metadata.name: "Unit"`},
-		"apiVersion":         {"aval.trianalab.io/v1", "aval.trianalab.io/v2", "apiVersion"},
-		"typo":               {"fragments:", "fragmens:", "did you mean fragments?"},
+		"unknown fragment":    {"use: [web, db]", "use: [web, db, cache]", `tests[1] (shard-{index}-of-{total}): use: unknown fragment "cache"`},
+		"unused fragment":     {"use: [web, db]", "use: [db]", "fragments.web: not used by any test"},
+		"fragment uses":       {"web:\n    scope:", "web:\n    use: [db]\n    scope:", "fragments.web: use is not allowed here: a fragment cannot use another fragment"},
+		"fragment exclude":    {`scope: {source: ["db/**"]}`, `scope: {source: ["db/**"], exclude: [x]}`, "fragments.db: scope.exclude is not allowed here"},
+		"fragment runner":     {"web:\n", "web:\n    runner: {command: [x]}\n", "fragments.web: runner is not allowed here"},
+		"fragment metadata":   {"web:\n", "web:\n    metadata: {name: x}\n", "fragments.web: metadata is not allowed here"},
+		"fragment cache":      {"web:\n", "web:\n    cacheability: hermetic\n", "fragments.web: cacheability is not allowed here"},
+		"fragment outputs":    {"web:\n", "web:\n    outputs: [x]\n", "fragments.web: outputs is not allowed here"},
+		"fragment matrix":     {"web:\n", "web:\n    matrix: {a: [b]}\n", "fragments.web: matrix is not allowed here"},
+		"fragment name":       {"web:", "Web:", "fragments.Web: the name must be"},
+		"defaults runner":     {"  cacheability: hermetic\nfragments", "  runner: {command: [x]}\n  cacheability: hermetic\nfragments", "defaults: runner is not allowed here"},
+		"defaults use":        {"  cacheability: hermetic\nfragments", "  use: [db]\n  cacheability: hermetic\nfragments", "defaults: use is not allowed here: it belongs to a test only"},
+		"toolchain conflict":  {`toolchain: {postgres: "16"}`, `toolchain: {postgres: "16", go: "1.24"}`, `environment.toolchain.go: "1.25" from defaults conflicts with "1.24" from fragment db`},
+		"probe conflict":      {"[web, db]\n", "[web, db]\n    environment: {probe: {postgres: [pg, -V]}}\n", `environment.probe.postgres: ["postgres" "--version"] from fragment db conflicts with ["pg" "-V"] from the test`},
+		"unknown var":         {`"{literal x}"`, `"{totl}"`, `unknown matrix variable {totl} in "{totl}" (the matrix has index, total)`},
+		"duplicate expanded":  {`index: ["1", "2"]`, `index: ["1", "1"]`, `metadata.name "shard-1-of-2" is also the name of tests[1]`},
+		"duplicate name":      {"name: unit}", "name: shard-1-of-2}", `metadata.name "shard-1-of-2" is also the name of tests[0]`},
+		"empty matrix":        {`matrix: {index: ["1", "2"], total: ["2"]}`, `matrix: {}`, "matrix: at least one variable is required"},
+		"empty values":        {`total: ["2"]`, `total: []`, "matrix.total: at least one value is required"},
+		"bad var":             {`total: ["2"]}`, `total: ["2"], 1x: [a]}`, `matrix: invalid variable name "1x"`},
+		"toolchain var":       {"    cacheability: controlled", "    environment: {toolchain: {os: \"{oss}\"}}\n    cacheability: controlled", `tests[1] (shard-{index}-of-{total}): unknown matrix variable {oss} in environment.toolchain.os "{oss}" (the matrix has index, total)`},
+		"no-matrix var":       {"scope: {source: [\"**/*.go\"]}", "scope: {source: [\"**/*.go\"]}\n    environment: {toolchain: {os: \"x-{os}\"}}", "tests[0] (unit): environment.toolchain.os: {os} is a matrix reference but the test has no matrix"},
+		"inherited no-matrix": {`toolchain: {go: "1.25"}`, `toolchain: {go: "{go}"}`, "tests[0] (unit): environment.toolchain.go: {go} is a matrix reference but the test has no matrix"},
+		"invalid test":        {"name: unit}", "name: Unit}", `tests[0] (Unit): metadata.name: "Unit"`},
+		"apiVersion":          {"aval.trianalab.io/v1", "aval.trianalab.io/v2", "apiVersion"},
+		"typo":                {"fragments:", "fragmens:", "did you mean fragments?"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

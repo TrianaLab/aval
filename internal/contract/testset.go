@@ -252,11 +252,16 @@ func union[T any](a, b []T) []T {
 }
 
 // matrix expands c into one test per combination of the values of m, by
-// sorted variable name, substituting {var} into metadata.name and
-// runner.command only. Without a matrix, c is the only test and nothing is
-// substituted. More than limit tests is an error.
+// sorted variable name, substituting {var} into metadata.name,
+// runner.command and environment.toolchain values only. Without a matrix,
+// c is the only test, nothing is substituted, and a {var} in a toolchain
+// value is an error: it would be hashed as literal text. More than limit
+// tests is an error.
 func matrix(c *Contract, m map[string][]string, limit int) ([]*Contract, error) {
 	if m == nil {
+		if err := noMatrixRefs(c); err != nil {
+			return nil, err
+		}
 		return []*Contract{c}, nil
 	}
 	if len(m) == 0 {
@@ -286,13 +291,32 @@ func matrix(c *Contract, m map[string][]string, limit int) ([]*Contract, error) 
 		for j, a := range c.Runner.Command {
 			x.Runner.Command[j] = subst(a, vals)
 		}
+		x.Environment.Toolchain = maps.Clone(c.Environment.Toolchain) // nil stays nil
+		for k, v := range c.Environment.Toolchain {
+			x.Environment.Toolchain[k] = subst(v, vals)
+		}
 		out[i] = &x
 	}
 	return out, nil
 }
 
+// noMatrixRefs rejects a {var} in a toolchain value of c, a TestSet test
+// without a matrix. A plain kind: Test is not checked: it is also what
+// 'aval explain --expand' prints for a matrix leg, whose substituted value
+// may hold "{x}".
+func noMatrixRefs(c *Contract) error {
+	var errs []error
+	for _, k := range slices.Sorted(maps.Keys(c.Environment.Toolchain)) {
+		if r := refRe.FindStringSubmatch(c.Environment.Toolchain[k]); r != nil {
+			errs = append(errs, fmt.Errorf("environment.toolchain.%s: {%s} is a matrix reference but the test has no matrix", k, r[1]))
+		}
+	}
+	return errors.Join(errs...)
+}
+
 // checkMatrix checks the variables and values of m, its size against
-// limit, and that every {var} in c's name and command is a variable of m.
+// limit, and that every {var} in c's name, command and toolchain values is
+// a variable of m.
 func checkMatrix(c *Contract, m map[string][]string, vars []string, limit int) error {
 	var errs []error
 	n := 1
@@ -308,12 +332,18 @@ func checkMatrix(c *Contract, m map[string][]string, vars []string, limit int) e
 			return fmt.Errorf("matrix: expands to more than %d tests in the set", maxTests)
 		}
 	}
-	for _, s := range append([]string{c.Metadata.Name}, c.Runner.Command...) {
+	unknown := func(where, s string) {
 		for _, r := range refRe.FindAllStringSubmatch(s, -1) {
 			if _, ok := m[r[1]]; !ok {
-				errs = append(errs, fmt.Errorf("unknown matrix variable {%s} in %q (the matrix has %s)", r[1], s, strings.Join(vars, ", ")))
+				errs = append(errs, fmt.Errorf("unknown matrix variable {%s} in %s%q (the matrix has %s)", r[1], where, s, strings.Join(vars, ", ")))
 			}
 		}
+	}
+	for _, s := range append([]string{c.Metadata.Name}, c.Runner.Command...) {
+		unknown("", s)
+	}
+	for _, k := range slices.Sorted(maps.Keys(c.Environment.Toolchain)) {
+		unknown("environment.toolchain."+k+" ", c.Environment.Toolchain[k])
 	}
 	return errors.Join(errs...)
 }
