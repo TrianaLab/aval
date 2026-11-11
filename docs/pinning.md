@@ -27,7 +27,7 @@ mutable: compose.yaml:3 (container) postgres:16: a tag can be repushed: pin the 
 | Ecosystem | Commit and add to `scope.dependencies` | In files and commands, pin |
 |---|---|---|
 | Go | `go.sum` | `go install x@v0.30.0`, not `@latest` or `@main` |
-| JavaScript | a lockfile (`package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock` or `bun.lockb`); without one every range is reported | `npm ci`, `npx --yes prettier@3.3.3` |
+| JavaScript | a lockfile (`package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock` or `bun.lockb`); without one every range is reported | `npm ci`, `npx --yes prettier@3.3.3`; to run the lockfile's binary, `npx --no vite`, `npm exec --no -- vite`, `pnpm exec vite` or `yarn exec vite` |
 | Python | requirements with `==` (better with hashes), or `poetry.lock`, `Pipfile.lock`, `uv.lock`, `pdm.lock` | git requirements `@<40-hex>`; files named by `-r`/`-c` must be in scope |
 | Rust | `Cargo.lock` (workspace root) | `cargo install tool --version 1.2.3` |
 | Maven, Gradle | | no `SNAPSHOT`, `LATEST`, `RELEASE`, `1.+`, `latest.release` or ranges in `pom.xml`, `build.gradle(.kts)`, `*.versions.toml` |

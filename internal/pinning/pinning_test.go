@@ -372,6 +372,9 @@ var commandCases = []struct {
 	{name: "npm install", cmd: "npm i -g typescript @scope/x @scope/y@1.0.0 z@^1 ./local --prefix dir && npm ci", want: []string{"typescript", "@scope/x", "z@^1"}},
 	{name: "yarn and pnpm", cmd: "yarn global add a; pnpm add b@2.0.0-rc.1; bun add c; yarn install; pnpm dlx d; bun x e@1.0.0", want: []string{"a", "c", "d"}},
 	{name: "npx", cmd: "npx --yes prettier && npx -p cowsay@1.6.0 cowsay hi && npx --package=lint lint && npm exec -- tsc@5.4.5 -v", want: []string{"prettier", "lint"}},
+	{name: "npx local only", cmd: "npx --no vite build; npx --no-install a; npx --yes=false b; npm exec --no -- c; npx \"--no\" d; npx '--no' e; pnpm exec f; yarn exec g --yes; npx -y --no h", want: nil},
+	{name: "npx local only false hits", cmd: "npx i; npx --yes j; npm exec -- k; pnpm dlx --no l; yarn dlx m; bunx --no n; bun x o; npx --no --yes p; npx q --no; npm exec -- r --no; npx --no -p s@latest t; npx --package=u --no v; npx --no --package=w x; npx -p y@^1 --no z", want: []string{"i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s@latest", "u", "w", "y@^1"}},
+	{name: "npx local only pinned package", cmd: "npx --no -p cowsay@1.6.0 cowsay hi", want: nil},
 	{name: "npx url", cmd: "npx https://x.io/a.tgz; npm i git+ssh://git@github.com/a/b#" + sha + " github:a/b#main", want: []string{"https://x.io/a.tgz", "github:a/b#main"}},
 	{name: "pip", cmd: "pip freeze; pip install -r requirements.txt -e . requests flask==3.0.0 'django>=4' && python3 -m pip install --upgrade pip && uv pip install x==1.0 && pipx install black", scope: []string{"requirements.txt"}, want: []string{"requests", "django>=4", "pip", "black"}},
 	{name: "pip requirements file out of scope", cmd: "pip install -r ci/reqs.txt -c ./c.txt --requirement=in.txt --constraint=", scope: []string{"c.txt", "in.txt"}, want: []string{"ci/reqs.txt", "pip install -r ci/reqs.txt -c ./c.txt --requirement=in.txt --constraint="}},
@@ -572,4 +575,13 @@ func FuzzDetect(f *testing.F) {
 			}
 		}
 	})
+}
+
+// The npx fix names the local-only form, so a lockfile user is not pushed to
+// scope.allowMutable.
+func TestDlxFixMentionsLocalOnly(t *testing.T) {
+	f := scanShell("x.sh", "npx vite", func(string) bool { return false })
+	if len(f) != 1 || !strings.Contains(f[0].Fix, "npx --no <bin>") {
+		t.Fatalf("findings = %+v", f)
+	}
 }
