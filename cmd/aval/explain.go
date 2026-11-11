@@ -130,7 +130,7 @@ func explainAll(ctx context.Context, w io.Writer, file, output string) error {
 	list := make([]explained, len(cs))
 	var errs []error
 	for i, c := range cs {
-		_, _, fp, err := rootAndFingerprint(ctx, file, c, filepath.Join(fingerprint.OutputDir, c.Metadata.Name, "result.json"))
+		_, _, fp, err := rootAndFingerprint(ctx, file, c, "", filepath.Join(fingerprint.OutputDir, c.Metadata.Name, "result.json"))
 		list[i] = explained{Name: c.Metadata.Name, Fingerprint: fp.Digest}
 		if err != nil {
 			list[i].Error = reason(err)
