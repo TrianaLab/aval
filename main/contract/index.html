@@ -2917,21 +2917,37 @@ as that file would be: the set above fingerprints <code>shard-1</code> like a
   another fragment.</li>
 </ul>
 <p><code>matrix</code> maps variables to lists of strings and creates one test per
-combination. It substitutes <code>{var}</code> into <code>metadata.name</code> and
-<code>runner.command</code> only, so each value is part of the fingerprinted argv. In a
-test with a matrix, every <code>{name}</code> in those two fields must be a matrix
-variable: write a shell variable as <code>$VAR</code>, not <code>${VAR}</code>. A set expands to
-at most 1024 tests.</p>
+combination. It substitutes <code>{var}</code> into <code>metadata.name</code>, <code>runner.command</code>
+and the values of <code>environment.toolchain</code> (inherited ones too), in one pass,
+so a value that holds <code>{x}</code> is not substituted again. Each value is part of
+the fingerprinted argv or toolchain lines. In a test with a matrix, every
+<code>{name}</code> in those fields must be a matrix variable: write a shell variable as
+<code>$VAR</code>, not <code>${VAR}</code>. In a test without a matrix, a <code>{name}</code> in a toolchain
+value is an error. Probe argv, <code>env</code>, <code>scope</code> and <code>outputs</code> are not
+substituted. A set expands to at most 1024 tests.</p>
+<p>One test per platform, each with its own <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, so a result recorded
+on darwin is never reused on linux:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">"unit-{os}"</span><span class="p p-Indicator">}</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">go</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">./...</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">matrix</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">os</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">linux</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">darwin</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="nt">toolchain</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">platform</span><span class="p">:</span><span class="w"> </span><span class="s">"{os}"</span><span class="p p-Indicator">}</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">      </span><span class="nt">probe</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">platform</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">go</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">env</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">GOOS</span><span class="p p-Indicator">]}</span>
+</span></code></pre></div>
+<p><code>aval run --test unit-darwin</code> records a result only where the probe prints
+<code>darwin</code>. To reuse a result across platforms, do not declare <code>platform</code>.</p>
 <p>Each of these exits 2 and names the problem: an unknown fragment, a fragment
 no test uses, a fragment with <code>use</code>, <code>exclude</code>, <code>runner</code>, <code>metadata</code>,
 <code>outputs</code>, <code>matrix</code> or <code>cacheability</code>, a conflicting key, an unknown
-<code>{var}</code>, two tests with the same expanded name, and a <code>scope.contracts</code>
-entry that points at a TestSet (share <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> with fragments instead).</p>
+<code>{var}</code>, a <code>{var}</code> in a toolchain value of a test without a matrix, two
+tests with the same expanded name, and a <code>scope.contracts</code> entry that points
+at a TestSet (share <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> with fragments instead).</p>
 <h3 id="select-a-test">Select a test<a class="headerlink" href="#select-a-test" title="Anchor link">&para;</a></h3>
 <p><code>aval run</code>, <code>explain</code>, <code>verify</code> and <code>push</code> take <code>-t/--test &lt;name&gt;</code>, the
 expanded <code>metadata.name</code> of one test:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--test<span class="w"> </span>shard-1
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>aval<span class="w"> </span>push<span class="w"> </span>--test<span class="w"> </span>shard-1
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>aval<span class="w"> </span>run<span class="w"> </span>--test<span class="w"> </span>shard-1
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>aval<span class="w"> </span>push<span class="w"> </span>--test<span class="w"> </span>shard-1
 </span></code></pre></div>
 <ul>
 <li>On a TestSet of more than one test, a missing <code>--test</code> exits 2 and lists
@@ -2962,7 +2978,7 @@ absolute, symlink-resolved paths of the contracts of the enclosing runs plus
 its own, joined by the OS path list separator (<code>:</code> or <code>;</code>). A run whose
 <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> is already in the stack exits 2 before it probes, looks up or runs
 anything:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>aval: aval.yaml is already running in an outer aval run (/repo/aval.yaml): runner.command must not start the same contract again
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>aval: aval.yaml is already running in an outer aval run (/repo/aval.yaml): runner.command must not start the same contract again
 </span></code></pre></div>
 <p>The outer run then records a failed test (exit 3). This catches a make target
 that calls <code>aval run</code> and a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> whose <code>runner.command</code> calls that target,
@@ -3023,9 +3039,9 @@ finds its inputs by pattern (it walks the tree for every
 <code>*testdata*.yaml</code>) reads files that may not exist yet. Leaving the pattern
 out of the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> means the first such file is not hashed, and a stale result
 is reused. Declare it in <code>optionalSource</code>:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">scope</span><span class="p">:</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"src/**"</span><span class="p p-Indicator">]</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">optionalSource</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"**/*testdata*.yaml"</span><span class="p p-Indicator">]</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"src/**"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">optionalSource</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"**/*testdata*.yaml"</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
 <ul>
 <li>Files it matches are hashed as <code>source</code> lines, with the same <code>exclude</code>,
@@ -3084,14 +3100,14 @@ does not accept is a miss, and its result is not published
 <p>The <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr> is <code>sha256:&lt;hex&gt;</code> of a line-oriented manifest (format
 <code>aval-fingerprint/v2</code>). <code>aval explain</code> prints the exact text that was
 hashed, in this order:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>aval-fingerprint/v2
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>source &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>dependency &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>toolchain &lt;key&gt;=&lt;value&gt;
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>env &lt;NAME&gt; &lt;sha256 of value | unset&gt;
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>aval-fingerprint/v2
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>contract &lt;sha256 of canonical contract JSON&gt;
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>source &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>dependency &lt;sha256&gt; &lt;mode&gt; &lt;path&gt;
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>toolchain &lt;key&gt;=&lt;value&gt;
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>env &lt;NAME&gt; &lt;sha256 of value | unset&gt;
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>resolve &lt;kind&gt; &lt;reference&gt; &lt;version&gt; &lt;immutable id&gt;
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>contract &lt;path&gt; &lt;name&gt; &lt;fingerprint&gt;
 </span></code></pre></div>
 <table>
 <thead>
@@ -3255,11 +3271,11 @@ value must appear in the output (stdout and stderr) as a version token: not
 preceded by a digit or a dot, not followed by a digit. <code>3.13</code> matches
 <code>Python 3.13.1</code>; it does not match <code>Python 3.130</code>, and <code>3.1</code> does not match
 <code>Python 3.13</code>.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">environment</span><span class="p">:</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">toolchain</span><span class="p">:</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="s">"3.13"</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">probe</span><span class="p">:</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--version</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
 <p>On a mismatch, a probe that cannot start, a non-zero exit, a timeout or
 output over 4 KiB (it is signed into the predicate),
