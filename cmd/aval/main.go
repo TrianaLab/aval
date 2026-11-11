@@ -314,7 +314,7 @@ func rootAndFingerprint(ctx context.Context, file string, c *contract.Contract, 
 	}
 	var fp fingerprint.Fingerprint
 	if envFile == "" {
-		fp, err = fingerprint.Compute(ctx, filepath.Dir(file), c, os.LookupEnv, outputs...)
+		fp, err = fingerprint.Compute(ctx, filepath.Dir(file), c, fingerprint.ProcessEnv(), outputs...)
 	} else {
 		raw, rerr := os.ReadFile(envFile)
 		var recorded []string

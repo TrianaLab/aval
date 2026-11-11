@@ -296,7 +296,7 @@ func (d *Demo) fingerprint(errw io.Writer) (*contract.Contract, fingerprint.Fing
 	for name, body := range d.files {
 		fsys[name] = &fstest.MapFile{Data: body, Mode: 0o644}
 	}
-	fp, err := fingerprint.ComputeFS(fsys, c, func(string) (string, bool) { return "", false })
+	fp, err := fingerprint.ComputeFS(fsys, c, fingerprint.Env{})
 	if err != nil {
 		fmt.Fprintf(errw, "aval: fingerprint: %s\n", cliout.OneLine(err.Error()))
 		return nil, fingerprint.Fingerprint{}, exitError

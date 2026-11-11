@@ -39,7 +39,7 @@ environment:
     go: "1.25"
   probe:                        # optional, checks a toolchain entry before the run
     go: [go, version]
-  env:                          # optional, names only; values are hashed
+  env:                          # optional, names or PREFIX_* patterns; values are hashed
     - CGO_ENABLED
     - GOFLAGS
 
@@ -88,7 +88,7 @@ above it ([Contracts in a subdirectory](#contracts-in-a-subdirectory)). A
 | `scope.root` | string | no | The path from this contract's directory up to the root of its tree: `..` segments only (`..`, `../..`). Globs, `outputs`, `allowMutable[].file` and `files`, `runner.command` and `environment.probe` resolve from it; `scope.contracts` does not. The root must lie inside the git working tree of this contract, as for `scope.contracts`; otherwise `aval run`, `explain`, `verify` and `push` exit 2. See [Contracts in a subdirectory](#contracts-in-a-subdirectory). |
 | `environment.toolchain` | map string to string | no | Keys match `^[a-z0-9][a-z0-9._-]*$`. Values are not validated. |
 | `environment.probe` | map string to list of strings | no | Each key must be an `environment.toolchain` key with a non-empty value; each value a non-empty argv, first element not blank. See [Probe the toolchain](#probe-the-toolchain). |
-| `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`, except `AVAL_RUN_STACK` in any case (set by `aval run`, not an input). |
+| `environment.env` | list of strings | no | Variable names matching `^[A-Za-z_][A-Za-z0-9_]*$`, or prefix patterns: a name followed by `*` (`APP_*`), see [Environment variable patterns](#environment-variable-patterns). `AVAL_RUN_STACK` is rejected in any case (set by `aval run`, not an input), and so is a pattern that would match it (`AVAL_*`, `AVAL_RUN_*`). |
 | `cacheability` | string | yes | One of `hermetic`, `controlled-environment`, `external-dependencies`, `non-deterministic`. |
 | `outputs` | list of globs | no | Files the test writes that a reused result restores, such as `coverage.xml` ([Restore coverage and reports on reuse](guides/write-a-contract.md#restore-coverage-and-reports-on-reuse)). Same glob rules as `scope`. When publishing, each glob must match a regular file (no symlink) that is not the contract file, outside the scope, `.git` and `.aval`; at most 256 files, 16 MiB each, 64 MiB in total. Otherwise nothing is published (exit 1). To push from another job, `aval run --outputs-dir` copies them and `aval push --outputs-dir` publishes them from that copy ([the artifact](guides/github-actions.md#split-credentials)). Omitted from the fingerprint when empty, so existing contracts keep theirs; adding it changes the fingerprint, so a result without outputs is never reused for it. |
 
@@ -347,13 +347,43 @@ contract <path> <name> <fingerprint>
 | `contract` | sha256 of the parsed contract as JSON | comments, formatting, key order, the order and duplicates of set-like lists (argv order counts; an empty list equals an omitted one) |
 | `source`, `dependency` | sha256 of the content, `x` (any exec bit) or `-`, path. A file in both sets appears twice | owner, timestamps, other permission bits |
 | `toolchain` | `key=value` as written; checked against the installed tools only by `environment.probe` | |
-| `env` | sha256 of the value, or `unset` (empty is not unset); values never appear in clear, but the hash of a short or guessable value (a low-entropy secret) can be found by trying values, so declare secrets only if `aval explain` output and the [env file](artifact-format.md#env-file) may be seen | |
+| `env` | sha256 of the value, or `unset` (empty is not unset); values never appear in clear, but the hash of a short or guessable value (a low-entropy secret) can be found by trying values, so declare secrets only if `aval explain` output and the [env file](artifact-format.md#env-file) may be seen. A prefix pattern gives one line per set variable it matches and none when nothing matches | |
 | `resolve` | kind, reference, version or `floating`, immutable id; only with `scope.resolve`, and needs the network ([Resolve references](resolve/index.md)) | the registry address |
 | `contract <path>` | one line per `scope.contracts` entry: the path as written, the referenced contract's `metadata.name` and its fingerprint, computed from its own directory and inputs (so references are transitive). `aval explain` also prints the tree, one `depends on <path> (<name>) <fingerprint>` line per reference | |
 
 Lines are sorted within each section, so checkout path and walk order do not
 matter. Paths are hashed byte for byte. Windows has no exec bit, so an
 executable file fingerprints differently there than on Unix.
+
+### Environment variable patterns
+
+A tool configured by prefix (viper `SetEnvPrefix` with `AutomaticEnv`, Go
+envconfig, pydantic-settings `env_prefix`, Spring relaxed binding) reads any
+`PREFIX_<KEY>`. List the prefix instead of every name:
+
+```yaml
+environment:
+  env: ["APP_*", GOFLAGS]
+```
+
+`*` may only end the entry, after at least one name character: `*`,
+`*_TOKEN`, `APP*X` and `APP_?` are rejected. The pattern hashes every
+variable set when the fingerprint is computed whose name starts with the
+prefix, one `env NAME <sha256>` line each, so setting, unsetting or changing
+one changes the fingerprint. A pattern that matches nothing adds no line; the
+pattern itself is in the `contract` line. An exact name a pattern also
+matches yields one line.
+
+Names compare as the platform does: case-sensitively on Linux and macOS
+(`APP_*` matches neither `APPX` nor `app_a`), case-insensitively on
+Windows, where a matched name is written upper-cased in the manifest.
+
+A pattern also hashes credentials that share the prefix, such as
+`APP_REGISTRY_TOKEN`, as it would a listed name. Their sha256 digests are
+in the manifest that `aval explain` and `--explain` print (CI logs), and the
+published fingerprint is a hash over that manifest, so anyone who knows the
+other inputs can test guesses of a short or guessable secret against it.
+When the prefix covers secrets, list the exact names instead.
 
 ### What does not go in
 
