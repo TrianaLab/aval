@@ -20,7 +20,7 @@ jobs:
         with:
           go-version-file: go.mod
       # --8<-- [start:run]
-      - uses: TrianaLab/aval/integrations/github/run@21f9727eb7f030f13111fee223212bd407212d3c # main, 2026-11-10
+      - uses: TrianaLab/aval/integrations/github/run@28628760e7b7291d900a77bab5c907cbf9b8ba58 # v0.8.2
         with:
           test: unit
       # --8<-- [end:run]
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
-      - uses: TrianaLab/aval/integrations/github/run@21f9727eb7f030f13111fee223212bd407212d3c # main, 2026-11-10
+      - uses: TrianaLab/aval/integrations/github/run@28628760e7b7291d900a77bab5c907cbf9b8ba58 # v0.8.2
         with:
           test: ui
   e2e:
@@ -49,7 +49,7 @@ jobs:
         with:
           go-version-file: go.mod
       # --8<-- [start:matrix]
-      - uses: TrianaLab/aval/integrations/github/run@21f9727eb7f030f13111fee223212bd407212d3c # main, 2026-11-10
+      - uses: TrianaLab/aval/integrations/github/run@28628760e7b7291d900a77bab5c907cbf9b8ba58 # v0.8.2
         with:
           test: e2e-${{ matrix.shard }}
       # --8<-- [end:matrix]
@@ -73,5 +73,5 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: TrianaLab/aval/integrations/github/publish@21f9727eb7f030f13111fee223212bd407212d3c # main, 2026-11-10
+      - uses: TrianaLab/aval/integrations/github/publish@28628760e7b7291d900a77bab5c907cbf9b8ba58 # v0.8.2
   # --8<-- [end:publish]

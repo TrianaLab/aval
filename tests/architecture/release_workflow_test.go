@@ -48,6 +48,14 @@ const pinPRDispatch = `for _ in 1 2 3; do
 done
 exit 1`
 
+// pinExamplesDispatch is the one step of pin-examples-ci: it dispatches
+// ci.yaml on the examples' pin PR branch (#261), like versionPRDispatch.
+const pinExamplesDispatch = `for _ in 1 2 3; do
+  gh workflow run ci.yaml --ref release-pins/examples && exit 0
+  sleep 15
+done
+exit 1`
+
 // releaseWorkflowProblems: release.yaml's auto-tag job tags and dispatches
 // only after ci passed on a push to main, holds only contents and actions
 // write, and runs no code from its checkout; version-pr and release keep
@@ -56,6 +64,8 @@ exit 1`
 // version-pr and runs only versionPRDispatch, with no action. pin-actions
 // runs after release only, holds only pinPRPermissions, and pin-actions-ci
 // is to it what version-pr-ci is to version-pr, with pinPRDispatch.
+// pin-examples runs on push to main only, holds only pinPRPermissions, and
+// pin-examples-ci dispatches pinExamplesDispatch after it.
 func releaseWorkflowProblems(data []byte) ([]string, error) {
 	var wf struct {
 		Jobs map[string]permJob `yaml:"jobs"`
@@ -99,6 +109,8 @@ func releaseWorkflowProblems(data []byte) ([]string, error) {
 	}
 	problems = append(problems, pinActionsProblems(wf.Jobs["pin-actions"], needs.Jobs["pin-actions"].Needs)...)
 	problems = append(problems, dispatchJobProblems("pin-actions-ci", wf.Jobs["pin-actions-ci"], needs.Jobs["pin-actions-ci"].Needs, "pin-actions", pinPRDispatch)...)
+	problems = append(problems, pinExamplesProblems(wf.Jobs["pin-examples"])...)
+	problems = append(problems, dispatchJobProblems("pin-examples-ci", wf.Jobs["pin-examples-ci"], needs.Jobs["pin-examples-ci"].Needs, "pin-examples", pinExamplesDispatch)...)
 	return problems, nil
 }
 
@@ -114,6 +126,19 @@ func pinActionsProblems(job permJob, needs []string) []string {
 	}
 	if !maps.Equal(job.Permissions, pinPRPermissions) {
 		problems = append(problems, "pin-actions: permissions must be exactly contents and pull-requests write")
+	}
+	return problems
+}
+
+// pinExamplesProblems: pin-examples runs on push to main only and holds
+// only pinPRPermissions.
+func pinExamplesProblems(job permJob) []string {
+	var problems []string
+	if job.If != "github.event_name == 'push' && github.ref == 'refs/heads/main'" {
+		problems = append(problems, "pin-examples runs on "+job.If)
+	}
+	if !maps.Equal(job.Permissions, pinPRPermissions) {
+		problems = append(problems, "pin-examples: permissions must be exactly contents and pull-requests write")
 	}
 	return problems
 }
@@ -159,6 +184,10 @@ func TestReleaseWorkflowCheckCatchesLooseAutoTag(t *testing.T) {
 		"    permissions: {contents: write, pull-requests: write}\n" +
 		"  pin-actions-ci:\n    needs: pin-actions\n    permissions: {actions: write}\n" +
 		"    steps:\n      - run: " + strconv.Quote(pinPRDispatch) + "\n" +
+		"  pin-examples:\n    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n" +
+		"    permissions: {contents: write, pull-requests: write}\n" +
+		"  pin-examples-ci:\n    needs: pin-examples\n    permissions: {actions: write}\n" +
+		"    steps:\n      - run: " + strconv.Quote(pinExamplesDispatch) + "\n" +
 		"  auto-tag:\n    if: >-\n      " + strings.Join(autoTagGuards, " &&\n      ") + "\n" +
 		"    permissions: {contents: write, actions: write}\n" +
 		"    steps:\n" +
@@ -186,6 +215,10 @@ func TestReleaseWorkflowCheckCatchesLooseAutoTag(t *testing.T) {
 		"pin signs":          {"contents: write, pull-requests: write}\n  pin", "contents: write, pull-requests: write, id-token: write}\n  pin"},
 		"pin ci other ref":   {"--ref release-pins/main", "--ref main"},
 		"pin ci contents":    {"needs: pin-actions\n    permissions: {actions: write}", "needs: pin-actions\n    permissions: {actions: write, contents: write}"},
+		"examples on tag":    {"if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n    permissions: {contents: write, pull-requests: write}\n  pin-examples-ci", "if: startsWith(github.ref, 'refs/tags/v')\n    permissions: {contents: write, pull-requests: write}\n  pin-examples-ci"},
+		"examples signs":     {"pull-requests: write}\n  pin-examples-ci", "pull-requests: write, id-token: write}\n  pin-examples-ci"},
+		"examples ci ref":    {"--ref release-pins/examples", "--ref main"},
+		"examples ci needs":  {"needs: pin-examples\n", "needs: pin-actions\n"},
 	}
 	for name, c := range cases {
 		wf := strings.Replace(ok, c[0], c[1], 1)

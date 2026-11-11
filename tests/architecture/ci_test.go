@@ -369,9 +369,9 @@ jobs:
 }
 
 // dispatchGuard is the first step of `changes` in a ci.yaml that runs on
-// workflow_dispatch: only the version PR and pin PR (#213) branches may be
-// dispatched.
-const dispatchGuard = "github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/changeset-release/main' && github.ref != 'refs/heads/release-pins/main'"
+// workflow_dispatch: only the version PR and pin PR (#213, #261) branches may
+// be dispatched.
+const dispatchGuard = "github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/changeset-release/main' && github.ref != 'refs/heads/release-pins/main' && github.ref != 'refs/heads/release-pins/examples'"
 
 // dispatchProblems: the concurrency group separates events, so a dispatch on
 // main cannot cancel main's push run, and a workflow_dispatch trigger comes
@@ -426,6 +426,7 @@ func TestDispatchCheckCatchesLooseGuards(t *testing.T) {
 		"guard removed":       strings.Replace(good, guard, "", 1),
 		"other ref":           strings.Replace(good, "changeset-release/main", "evil", 1),
 		"other pin ref":       strings.Replace(good, "release-pins/main", "evil", 1),
+		"other examples ref":  strings.Replace(good, "release-pins/examples", "evil", 1),
 		"guard does not fail": strings.Replace(good, "exit 1", "exit 0", 1),
 	}
 	for name, wf := range cases {
