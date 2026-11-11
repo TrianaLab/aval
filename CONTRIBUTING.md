@@ -560,6 +560,18 @@ ci.yaml --ref release-pins/main`. Review and merge the PR like any other.
 pinned release's `checksums.txt` and fails when a pin does not match it, so
 a pin moved to a version with no `checksums.txt` fails `ci-release`.
 
+Once the pin PR merges, the `pin-examples` job (on every push to `main`)
+opens a `chore: pin the examples to aval <tag>` PR from the branch
+`release-pins/examples`: `scripts/pin-examples.sh` moves every use of
+`integrations/github/{run,publish}` in `examples/*/.github/workflows` to the
+merge commit, with a `# <tag>` comment, so the guides that embed the
+examples show the current release. `pin-examples-ci` dispatches `ci` on it.
+`TestExampleActionPins` in `tests/architecture` fails when an example pins a
+commit that installs an older release than `main` (one pin behind is
+allowed while that PR is open) or whose comment names another version.
+Dependabot does not watch the examples: it would move them to the tag's
+commit, which still pins the previous release.
+
 The actions also pin the cosign that verifies the aval release
 (`COSIGN_VERSION` and `COSIGN_SHA256` of their `cosign` step), installed off
 the job's `PATH` by `integrations/github/get-cosign.sh`. No job moves it: to

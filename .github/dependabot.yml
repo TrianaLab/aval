@@ -8,7 +8,9 @@ updates:
       interval: weekly
     rebase-strategy: auto
   # Keeps the commit SHA pins in .github/workflows current (with their
-  # version comments).
+  # version comments). Not examples/*: their pins of Aval's own actions move
+  # with release.yaml's pin-examples job (#261); Dependabot would move them to
+  # a tag's commit, which still pins the previous release.
   - package-ecosystem: github-actions
     directory: /
     schedule:

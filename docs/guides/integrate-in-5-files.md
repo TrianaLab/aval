@@ -71,9 +71,8 @@ Add one publish job:
 Add `.aval/` to `.gitignore`: each test writes its result there. Optionally,
 say in `CONTRIBUTING.md` that CI reuses results.
 
-!!! note "Milestone 14"
-    The actions install aval 0.7.0 until their pin moves to a release with
-    `--test`.
+Each action installs the aval release its commit pins. The example pins
+the commit that pins the latest release.
 
 The run action's artifact carries `coverage.out`, the output of `unit`, and
 the publish job pushes it from there, not from its own checkout
