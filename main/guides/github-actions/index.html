@@ -2451,13 +2451,13 @@ default <code>false</code>). In order, it:</p>
 <li>Refuses a ref other than the default branch unless <code>allow-unprotected:
    true</code>, always refuses <code>pull_request_target</code> and <code>workflow_run</code>, and fails
    without <code>id-token: write</code>.</li>
+<li>Downloads this run's <code>aval-*</code> artifacts (so name no other artifact <code>aval-*</code>) into <code>$RUNNER_TEMP</code>. With none, for example when path filters skipped every test job,
+   it prints a notice and exits 0: no install, no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> fetch, no OIDC token, so a publish job on <code>!cancelled()</code> costs seconds and passes before the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> is merged.</li>
 <li>Installs the same pinned, verified aval release as the run action.</li>
 <li>Fetches the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> from the default branch and logs in to the host of its
    <code>registry</code>, where results go. No <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or no <code>registry</code> fails the step.</li>
-<li>Downloads this run's <code>aval-*</code> artifacts (so name no other artifact
-   <code>aval-*</code>) into <code>$RUNNER_TEMP</code>. For each <code>aval-&lt;name&gt;</code>, fetches a fresh OIDC
-   token (audience <code>sigstore</code>) and runs <code>aval push --test &lt;name&gt;</code>. It tries
-   them all, then exits with the worst code; 5 is <code>aval SECURITY</code>, never downgraded.</li>
+<li>For each <code>aval-&lt;name&gt;</code>, fetches a fresh OIDC token (audience <code>sigstore</code>) and runs <code>aval push --test &lt;name&gt;</code>.
+   It tries them all, then exits with the worst code; 5 is <code>aval SECURITY</code>, never downgraded.</li>
 <li>With <code>stats: true</code>, publishes each pushed test's run record; a failure
    is a warning.</li>
 </ol>
