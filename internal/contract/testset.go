@@ -254,6 +254,7 @@ func merge(layers []layer) (*Contract, error) {
 		c.Scope.Resolve = union(c.Scope.Resolve, s.Resolve)
 		c.Scope.Contracts = union(c.Scope.Contracts, s.Contracts)
 		c.Environment.Env = union(c.Environment.Env, e.Env)
+		c.Environment.Paths = union(c.Environment.Paths, e.Paths)
 		if s.Root != "" {
 			if rootFrom != "" && c.Scope.Root != s.Root {
 				errs = append(errs, fmt.Errorf("scope.root: %q from %s conflicts with %q from %s", c.Scope.Root, rootFrom, s.Root, l.name))

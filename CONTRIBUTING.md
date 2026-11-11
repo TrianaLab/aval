@@ -79,6 +79,14 @@ does not, and an unresolvable reference fails closed; `internal/resolve`
 has the per-ecosystem tables. `TestResolveManifestGolden` pins the
 `resolve` lines in `testdata/golden/resolve-aval-fingerprint-vN.manifest`.
 
+`TestPathsFalseHits` covers `environment.paths`: an edited, added,
+removed or renamed file, a flipped exec bit, an entry going from absent to
+present (also empty) or from file to directory, and a variable going from
+unset to set change the fingerprint; another `$HOME` with the same content,
+entry order and creation order do not; a symlink, a FIFO or an unreadable
+file fails closed, never as `absent`. `TestPathsManifestGolden` pins the
+`path` lines in `testdata/golden/paths-aval-fingerprint-vN.manifest`.
+
 `TestContractsFalseHits` and `TestContractsFailClosed` cover
 `scope.contracts`: a change inside a referenced contract's scope (also two
 levels down) changes the dependent's fingerprint, a change outside it does

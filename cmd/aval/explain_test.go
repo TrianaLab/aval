@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -271,5 +272,44 @@ tests:
 		if code != ExitOK || !strings.Contains(out, "toolchain platform="+goos+"\n") {
 			t.Errorf("unit-%s: exit %d, stderr %q:\n%s", goos, code, stderr, out)
 		}
+	}
+}
+
+// explain lists one path line per environment.paths entry, as declared,
+// and a change under the home directory changes the digest (#254).
+func TestExplainPaths(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("AVAL_TEST_CFG", "") // restored after the test
+	if err := os.Unsetenv("AVAL_TEST_CFG"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".config", "app"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	c := writeContract(t, "hermetic")
+	data, err := os.ReadFile(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = []byte(strings.Replace(string(data), "cacheability:", "environment:\n  paths: [\"~/.config/app\", \"~/.npmrc\", \"$AVAL_TEST_CFG/app\"]\ncacheability:", 1))
+	if err := os.WriteFile(c, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, before, stderr := runCLI("explain", "-f", c)
+	for _, want := range []string{
+		"\npath $AVAL_TEST_CFG/app unset\n",
+		"\npath ~/.config/app " + fmt.Sprintf("%x", sha256.Sum256(nil)) + "\n",
+		"\npath ~/.npmrc absent\n",
+	} {
+		if code != ExitOK || !strings.Contains(before, want) {
+			t.Fatalf("explain: exit %d, stderr %q, stdout %q; want a line %q", code, stderr, before, want)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(home, ".config", "app", "config.yaml"), []byte("x: 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, digest, stderr := runCLI("explain", "-f", c, "--digest"); code != ExitOK || strings.HasSuffix(before, "fingerprint "+digest) {
+		t.Fatalf("explain --digest: exit %d, stderr %q; a file added under ~/.config/app kept the digest %s", code, stderr, digest)
 	}
 }

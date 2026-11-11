@@ -23,6 +23,7 @@ defaults:
     dependencies: ["go.sum"]
   environment:
     toolchain: {go: "1.25"}
+    paths: ["~/.netrc"]
   cacheability: hermetic
 fragments:
   db:
@@ -31,6 +32,7 @@ fragments:
       toolchain: {postgres: "16"}
       probe: {postgres: [postgres, --version]}
       env: [DB_URL]
+      paths: ["~/.pgpass", "~/.netrc"]
   web:
     scope: {source: ["web/**", "go.mod"]}
 tests:
@@ -60,7 +62,7 @@ func TestParseAllTestSet(t *testing.T) {
 		APIVersion: APIVersion, Kind: Kind, Metadata: Metadata{Name: "unit"},
 		Runner:       Runner{Command: []string{"go", "test", "./..."}},
 		Scope:        Scope{Source: []string{"go.mod", "**/*.go"}, Exclude: []string{"**/testdata/**"}, Dependencies: []string{"go.sum"}},
-		Environment:  Environment{Toolchain: map[string]string{"go": "1.25"}},
+		Environment:  Environment{Toolchain: map[string]string{"go": "1.25"}, Paths: []string{"~/.netrc"}},
 		Cacheability: Hermetic,
 	}
 	if !reflect.DeepEqual(*cs[0], unit) {
@@ -73,6 +75,9 @@ func TestParseAllTestSet(t *testing.T) {
 	// Fragments in sorted order (db, web) after defaults; go.mod once.
 	if want := []string{"go.mod", "db/**", "web/**"}; !reflect.DeepEqual(s.Scope.Source, want) {
 		t.Errorf("source %q, want %q", s.Scope.Source, want)
+	}
+	if want := []string{"~/.netrc", "~/.pgpass"}; !reflect.DeepEqual(s.Environment.Paths, want) {
+		t.Errorf("paths %q, want %q", s.Environment.Paths, want)
 	}
 	if s.Cacheability != ControlledEnvironment || s.Environment.Toolchain["postgres"] != "16" || s.Environment.Env[0] != "DB_URL" || len(s.Environment.Probe["postgres"]) != 2 {
 		t.Errorf("merged %+v", s)
