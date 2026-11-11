@@ -2355,8 +2355,8 @@ takes <code>test</code> (required), <code>file</code> (default <code>aval.yaml</
    (<a href="../trust-policy/">Write a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></a>); the job's <code>AVAL_REGISTRY</code> and
    <code>AVAL_POLICY</code> are ignored. With no <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> nothing is reused, the test
    runs and a warning is logged.</li>
-<li>Runs <code>aval run -f &lt;file&gt; --test &lt;test&gt;</code> with the CI run URL and the
-   repository for the run record.</li>
+<li>Runs <code>aval run -f &lt;file&gt; --test &lt;test&gt;</code> with the CI run URL, the
+   repository and, on a push to the default branch, <code>--outputs-dir</code>.</li>
 <li>Writes the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> to the step summary and the <code>outcome</code> output. Exit 5
    sets the <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> to <code>verification-failed</code>, becomes an <code>aval SECURITY</code>
    error annotation and fails the step; a miss is routine.</li>
@@ -2366,15 +2366,13 @@ takes <code>test</code> (required), <code>file</code> (default <code>aval.yaml</
    <code>minTrustLevel</code>.</li>
 </ol>
 <p>The <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> is a separate file on the default branch, so <code>publicKey</code> paths in
-it are not fetched; use keyless identities.</p>
-<p>The action runs on Linux and macOS runners that ship <code>/usr/bin/jq</code>
+it are not fetched; use keyless identities. The action needs <code>/usr/bin/jq</code>
 (GitHub's Ubuntu images, macOS 15 and later).</p>
 <div class="admonition note">
 <p class="admonition-title">Pinned release</p>
-<p>Pinning an action by commit SHA pins its aval release too (version and
-sha256, moved by a PR after each release). The actions need <code>--test</code> and
-the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code>, which ship after 0.7.0; until that pin merges
-(milestone 14), <code>aval run</code> and <code>aval push</code> exit 2 and the step fails.</p>
+<p>Pinning an action by commit SHA pins its aval release too, moved by a PR
+after each release. Until a pin with <code>--outputs-dir</code> (after 0.8.1,
+milestone 14), a test with <code>outputs</code> fails with exit 1; others work.</p>
 </div>
 <h2 id="split-credentials">Split credentials<a class="headerlink" href="#split-credentials" title="Anchor link">&para;</a></h2>
 <p>One job signs what the suite jobs uploaded, with the workflow's identity:</p>
@@ -2420,16 +2418,18 @@ default <code>false</code>). In order, it:</p>
 <li>A <code>miss</code> or an <code>error</code> publishes the result, failures included: on a tie
   in <abbr title="How much the policy trusts a signer: developer, runner or isolated.">trust level</abbr> a failure outranks a later flaky pass.</li>
 <li>A report that records a security event signs nothing and exits 5.</li>
+<li>The artifact holds <code>result.json</code>, <code>report.json</code>, <code>record.json</code> and
+  <code>outputs/&lt;path&gt;</code>, the files the <code>outputs</code> globs matched; push publishes
+  those, never the checkout's. No <code>outputs/</code> for a test with outputs, or a
+  symlink, extra file, input, <code>.git</code> or <code>.aval</code> in it, exits 1, publishing nothing.</li>
 <li>Trust only this workflow on <code>main</code>: <a href="../trust-policy/#the-example">Write a trust <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr></a>.</li>
 </ul>
 <h3 id="why-a-composite-action">Why a composite action<a class="headerlink" href="#why-a-composite-action" title="Anchor link">&para;</a></h3>
-<p>The publish action is a composite action, not a reusable workflow
-(<code>workflow_call</code>). The steps of a composite action run inside the caller's
-job, so the Fulcio certificate names the calling workflow, for example
-<code>https://github.com/acme/app/.github/workflows/ci.yaml@refs/heads/main</code>.
-A reusable workflow would put Aval's workflow in the certificate of every
-repository that calls it, and a <code>subjectRegexp</code> for it would trust them all.
-Aval's CI checks the certificates its <code>main</code> signs this way.</p>
+<p>The publish action is a composite action, not a reusable workflow: its steps
+run in the caller's job, so the Fulcio certificate names the calling workflow
+(<code>https://github.com/acme/app/.github/workflows/ci.yaml@refs/heads/main</code>). A
+reusable workflow would put Aval's workflow in every caller's certificate, and
+one <code>subjectRegexp</code> would trust them all. Aval's CI checks this.</p>
 <h2 id="pull-requests">Pull requests<a class="headerlink" href="#pull-requests" title="Anchor link">&para;</a></h2>
 <p>A pull request runs the same suite job and reuses what <code>main</code> published. Its
 own <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> edits change nothing, because the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> comes from the default

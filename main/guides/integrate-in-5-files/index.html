@@ -2491,10 +2491,11 @@ say in <code>CONTRIBUTING.md</code> that CI reuses results.</p>
 <div class="admonition note">
 <p class="admonition-title">Milestone 14</p>
 <p>The actions install aval 0.7.0 until their pin moves to a release with
-<code>--test</code>. The run action uploads <code>.aval/&lt;test&gt;/</code> only, so the publish
-job cannot push a test with <code>outputs</code> (exit 1 for that test) until the
-artifact carries them. TODO(milestone-14): carry <code>outputs</code> in the artifact (#236).</p>
+<code>--test</code>.</p>
 </div>
+<p>The run action's artifact carries <code>coverage.out</code>, the output of <code>unit</code>, and
+the publish job pushes it from there, not from its own checkout
+(<a href="../github-actions/#split-credentials">the artifact</a>).</p>
 <h2 id="before-you-start">Before you start<a class="headerlink" href="#before-you-start" title="Anchor link">&para;</a></h2>
 <p>Pinning is project work, not part of these files: base images by digest,
 lockfiles in <code>scope.dependencies</code>, tools at fixed versions. Until then
