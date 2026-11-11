@@ -2344,7 +2344,9 @@ PRs reuse them. On <code>main</code>, raise the minimum for that run only:</p>
 <p><code>AVAL_MIN_TRUST_LEVEL=runner</code> does the same (the flag wins). Both work on
 <code>aval run</code> and <code>aval verify</code> and can only raise the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s minimum: a lower
 or unknown level exits 2. A developer result is then a miss (exit 4), never
-exit 5. A <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> that trusts only main's CI identity does not need this.</p>
+exit 5. A <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> that trusts only main's CI identity does not need this.
+The <a href="../github-actions/">GitHub run action</a> does it by default
+on the default branch; <code>min-trust-level: developer</code> opts out.</p>
 <h2 id="the-fields">The fields<a class="headerlink" href="#the-fields" title="Anchor link">&para;</a></h2>
 <table>
 <thead>
