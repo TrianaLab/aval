@@ -11,9 +11,9 @@ result: `aval run`, `verify` and `push` never call it, and the scope stays
 declared in `aval.yaml`.
 
 !!! note "Languages"
-    JavaScript and TypeScript ([below](#javascript-and-typescript)) and Rust
-    ([below](#rust)) ship. The other adapters (Go, Python, Java, .NET) are the
-    next stories of
+    JavaScript and TypeScript ([below](#javascript-and-typescript)), Python
+    ([below](#python)) and Rust ([below](#rust)) ship. The other adapters (Go,
+    Java, .NET) are the next stories of
     [Epic 16](https://github.com/TrianaLab/aval/issues/291). `aval gen --help`
     lists the languages your build has.
 
@@ -191,6 +191,68 @@ package; and an unreadable tsconfig or a missing, absolute or out-of-root
 `extends`. A package
 without a `test` script still gets a test; its command fails until you add
 the script.
+
+## Python
+
+`aval gen python` makes one unit per `pyproject.toml` with a project name
+(`[project]` or `[tool.poetry]`): uv workspace members, poetry and pip
+projects. The unit is the project name, PEP 503 normalized. It needs
+Python 3.11 or later on `PATH` (`python3`, else `python`), which parses the
+manifests with `tomllib` and the sources with `ast`.
+
+```text
+pyproject.toml          # acme, a uv workspace root and a project
+uv.lock
+src/acme/               # import acme_api
+packages/core/          # acme-core
+packages/api/           # acme-api, dependencies = ["acme-core"]
+packages/cli/           # acme-cli, import acme_api, not declared
+```
+
+```yaml
+tests:
+  - metadata: {name: python.acme-cli}
+    runner: {command: [uv, run, --package, acme-cli, pytest, packages/cli]}
+    use:
+      - python.acme-api
+      - python.acme-cli
+      - python.acme-core
+fragments:
+  python.acme-cli:
+    scope:
+      source:
+        - packages/cli/**
+```
+
+- Edges: a local project named in `dependencies`, `optional-dependencies`,
+  `dependency-groups`, `tool.uv.dev-dependencies` or the poetry dependency
+  tables, or imported by a `.py` file of the project. External packages are
+  not edges; put the lockfiles in `defaults`.
+- Files: a project without nested projects owns `<dir>/**`, so a new file
+  in it is in scope at once. The root project and any project with nested
+  projects list their top-level files and directories instead, leaving out
+  nested projects, hidden directories, `__pycache__`, `node_modules` and
+  virtual environments (a directory with `pyvenv.cfg`): a new top-level file
+  there needs `aval gen python` again, which `--check` catches. The root
+  project also owns the files at the contract root, `aval.yaml` and lockfiles
+  included, so an edit to them re-runs its test. Add
+  `exclude: ["**/__pycache__/**", "**/.venv/**"]` to `defaults` so bytecode
+  and virtual environments never change a fingerprint.
+- Command: `uv run --package <name> pytest <dir>` when `uv.lock` sits at the
+  contract root, otherwise `python -m pytest <dir>` in the active
+  environment (poetry projects too). Nested projects are passed as
+  `--ignore`.
+- Imports map to the packages (a directory with `__init__.py`) and modules
+  at the top of a project and of its `src/`. Relative imports stay in the
+  project. Not seen: namespace packages, custom `package-dir` layouts, and
+  modules loaded by path (`runpy`, `exec`, `spec_from_file_location`).
+- `import_module("x")` and `__import__("x")` with a string count as
+  imports. With `--strict-imports`, a call whose module is not a string
+  literal is an error that names the file and line; without it, it is
+  ignored.
+
+No Python 3.11+, an unreadable or invalid `pyproject.toml` or a `.py` syntax
+error: nothing is written, exit 1.
 
 ## Rust
 
