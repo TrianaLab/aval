@@ -10,7 +10,7 @@ require (
 	github.com/sigstore/sigstore v1.11.3
 	github.com/sigstore/sigstore-go v1.4.0
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	golang.org/x/mod v0.42.0
 	golang.org/x/term v0.47.0
 	google.golang.org/protobuf v1.36.12
