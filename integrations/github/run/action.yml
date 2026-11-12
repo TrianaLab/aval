@@ -1,4 +1,4 @@
-# Runs one test through Aval in a GitHub Actions job (#211). The trust
+# Runs one or several tests (#327) through Aval in a GitHub Actions job (#211). The trust
 # policy, and the registry inside it, come from the default branch, never
 # from the checkout; a job that could sign (id-token: write) is refused.
 # GitHub specifics live here, outside core (AGENTS.md invariant 8).
@@ -8,7 +8,10 @@ name: aval run
 description: Reuse a verified test result or run the test, with the trust policy from the default branch.
 inputs:
   test:
-    description: The test to run, by metadata.name (aval run --test).
+    description: >-
+      The test to run, by metadata.name (aval run --test), or several: names and
+      glob patterns (go.*) separated by spaces, commas or newlines. They run one
+      after the other; the step fails if any fails, after running them all.
     required: true
   file:
     description: The contract file.
@@ -41,8 +44,13 @@ inputs:
     default: ""
 outputs:
   outcome:
-    description: verified, miss, verification-failed or error, from the report.
+    description: >-
+      verified, miss, verification-failed or error, from the report. With several
+      tests, the worst of them: verified only when every test is.
     value: ${{ steps.run.outputs.outcome }}
+  outcomes:
+    description: A JSON object of each test's outcome, by test name.
+    value: ${{ steps.run.outputs.outcomes }}
 runs:
   using: composite
   steps:
@@ -118,8 +126,9 @@ runs:
     - if: ${{ !cancelled() && steps.run.outputs.upload == 'true' }}
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: aval-${{ inputs.test }}
-        path: .aval/${{ inputs.test }}/
+        # aval-<test> for one test; aval-.<id> holding <test>/ for several.
+        name: ${{ steps.run.outputs.artifact }}
+        path: ${{ steps.run.outputs.artifact-path }}
         include-hidden-files: true
         if-no-files-found: ignore
         # A re-run replaces the earlier attempt's artifact (#249).

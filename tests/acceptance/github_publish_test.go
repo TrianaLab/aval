@@ -605,3 +605,37 @@ func TestGitHubActionsCarryEnv(t *testing.T) {
 		t.Fatalf("verify a with GOTOOLCHAIN=local: exit %d, want 0", code)
 	}
 }
+
+// The run action with several tests on main (#327) uploads one artifact
+// aval-.<id> holding a directory per test; publish pushes each of them, as
+// it does a single-test aval-<name> beside it, and checks every name.
+func TestGitHubActionsSeveralTestsOneArtifact(t *testing.T) {
+	s := newPublishStory(t)
+	r := action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", "INPUT_TEST=a c")
+	if r.code != 0 || r.outputs["upload"] != "true" || !strings.HasPrefix(r.outputs["artifact"], "aval-.") {
+		t.Fatalf("run action: exit %d, upload %q, artifact %q\n%s", r.code, r.outputs["upload"], r.outputs["artifact"], r.out)
+	}
+	for _, test := range []string{"a", "c"} {
+		if err := os.CopyFS(filepath.Join(s.artifacts, r.outputs["artifact"], test), os.DirFS(filepath.Join(s.dir, ".aval", test))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.artifact(t, "b", s.suite(t, "b"), nil)
+	p := s.publish(t)
+	if p.code != 0 || len(pushes(p.calls)) != 3 {
+		t.Fatalf("publish: exit %d, %d pushes, want 0 and 3\n%s", p.code, len(pushes(p.calls)), p.out)
+	}
+	for _, test := range []string{"a", "b", "c"} {
+		if got := s.verify(t, test); got != 0 {
+			t.Errorf("verify %s: exit %d, want 0", test, got)
+		}
+	}
+
+	s.reset(t)
+	if err := os.MkdirAll(filepath.Join(s.artifacts, "aval-.1", "B_d"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if p := s.publish(t); p.code != 2 || len(pushes(p.calls)) != 0 || !strings.Contains(p.out, `::error title=aval publish::artifact aval-.1/B_d: "B_d" is not a valid metadata.name`) {
+		t.Fatalf("bad name in the artifact: exit %d\n%s", p.code, p.out)
+	}
+}

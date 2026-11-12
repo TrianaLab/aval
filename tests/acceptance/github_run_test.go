@@ -641,3 +641,90 @@ func TestGitHubRunActionLookupOnly(t *testing.T) {
 		}
 	}
 }
+
+// severalSet is three tests for one run action step (#327). A test fails
+// when ../fail-<name> exists; each run appends its name to ../runs.log.
+const severalSet = `apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults: {scope: {source: ["src/**"]}, cacheability: hermetic}
+tests:
+  - metadata: {name: "go.{n}"}
+    runner: {command: [sh, -c, "echo go.{n} >> ../runs.log; test ! -f ../fail-go.{n}"]}
+    matrix: {n: [a, b]}
+  - metadata: {name: py.c}
+    runner: {command: [sh, -c, "echo py.c >> ../runs.log; test ! -f ../fail-py.c"]}
+`
+
+// ranLog returns and clears the names severalSet's tests logged.
+func (s *actionStory) ranLog() string {
+	p := filepath.Join(s.root, "runs.log")
+	b, _ := os.ReadFile(p)
+	_ = os.Remove(p)
+	return string(b)
+}
+
+// wantSeveral fails unless r exited code, the tests in runs ran, and the
+// outputs and the log or summary match.
+func (s *actionStory) wantSeveral(t *testing.T, name string, r actionRun, code int, runs, outcome, outcomes string, out ...string) {
+	t.Helper()
+	got := s.ranLog()
+	ok := r.code == code && got == runs && r.outputs["outcome"] == outcome && r.outputs["outcomes"] == outcomes
+	for _, o := range out {
+		ok = ok && strings.Contains(r.out+r.summary, o)
+	}
+	if !ok {
+		t.Fatalf("%s: exit %d, runs %q, outcome %q, outcomes %s; want %d, %q, %q, %s and %q\n%s\n%s",
+			name, r.code, got, r.outputs["outcome"], r.outputs["outcomes"], code, runs, outcome, outcomes, out, r.out, r.summary)
+	}
+}
+
+// One step runs a list and a pattern of tests (#327): a hit and two misses,
+// one failing test that does not stop the next one, a verification failure
+// that keeps exit 5 over a later failure, lookup-only, one artifact for
+// them all on main, and selections refused before anything runs. A single
+// test keeps its own artifact name.
+func TestGitHubRunActionSeveralTests(t *testing.T) {
+	s := newActionStory(t)
+	if err := os.WriteFile(filepath.Join(s.dir, "aval.yaml"), []byte(severalSet), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, errOut, code := avalIn(t, s.dir, "run", "--test", "go.a", "--registry", s.repo, "--push", "--key", s.ciKey, "--no-reuse"); code != 0 {
+		t.Fatalf("publish go.a: exit %d\n%s\n%s", code, out, errOut)
+	}
+	s.ranLog()
+	sel := "INPUT_TEST=go.* py.c,\ngo.a"
+	misses := `{"go.a":"verified","go.b":"miss","py.c":"miss"}`
+	s.wantSeveral(t, "hit and misses", s.pr(t, sel), 0, "go.b\npy.c\n", "miss", misses,
+		"### aval go.a: `verified` passed (exit 0)", "### aval go.b: `miss`  (exit 0)", "3 tests: 2 miss, 1 verified (exit 0)")
+	s.wantSeveral(t, "lookup-only", s.pr(t, sel, "INPUT_LOOKUP_ONLY=true"), 0, "", "miss", misses, "### aval lookup py.c: `miss`")
+	s.wantSeveral(t, "one test", s.pr(t, "INPUT_TEST=go.a"), 0, "", "verified", `{"go.a":"verified"}`)
+
+	r := action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", sel)
+	s.wantSeveral(t, "push to main", r, 0, "go.b\npy.c\n", "miss", misses)
+	if a := r.outputs["artifact"]; r.outputs["upload"] != "true" || !strings.HasPrefix(a, "aval-.") || len(a) < 7 {
+		t.Fatalf("push to main: upload %q, artifact %q", r.outputs["upload"], a)
+	}
+	r = action(t, s.dir, s.api.URL, s.repo, "push", "refs/heads/main", "INPUT_TEST=go.b")
+	if r.outputs["artifact"] != "aval-go.b" || r.outputs["artifact-path"] != ".aval/go.b/" {
+		t.Fatalf("one test on main: artifact %q, path %q", r.outputs["artifact"], r.outputs["artifact-path"])
+	}
+	s.ranLog()
+
+	if err := os.WriteFile(filepath.Join(s.root, "fail-go.b"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s.wantSeveral(t, "one failing test", s.pr(t, sel), 3, "go.b\npy.c\n", "miss", misses, "### aval go.b: `miss`  (exit 3)")
+
+	tamper(t, s.repo, s.dir, func() {}, "--test", "go.a")
+	s.wantSeveral(t, "verification failure", s.pr(t, sel), 5, "go.a\ngo.b\npy.c\n", "verification-failed",
+		`{"go.a":"verification-failed","go.b":"miss","py.c":"miss"}`, "::error title=aval SECURITY::go.a: ", "(exit 5)")
+
+	for name, tc := range map[string]struct{ test, err string }{
+		"no match":    {"rb.*", `test: "rb.*" matches no test in aval.yaml`},
+		"bad pattern": {"Go.*", `test: "Go.*" is not a valid pattern`},
+		"bad name":    {"go.a ../x", `test: "../x" is not a valid metadata.name`},
+		"empty list":  {" , ", "test: name at least one test"},
+	} {
+		s.wantSeveral(t, name, s.pr(t, "INPUT_TEST="+tc.test), 2, "", "", "", tc.err)
+	}
+}
