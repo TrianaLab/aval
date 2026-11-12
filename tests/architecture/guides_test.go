@@ -118,7 +118,8 @@ func commandProblems(body string, sections map[string]string) []string {
 			continue
 		}
 		for _, fl := range flagRe.FindAllStringSubmatch(c[2], -1) {
-			if !strings.Contains(sec, fl[1]+" ") {
+			// pflag prints a boolean flag as --name[=true|false].
+			if !strings.Contains(sec, fl[1]+" ") && !strings.Contains(sec, fl[1]+"[=") {
 				probs = append(probs, fmt.Sprintf("aval %s %s: no such flag in docs/cli-reference.md", c[1], fl[1]))
 			}
 		}

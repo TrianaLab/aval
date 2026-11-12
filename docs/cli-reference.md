@@ -57,9 +57,9 @@ Additional Commands:
   version     Print the aval version, Go version and platform
 
 Flags:
-  -h, --help      help for aval
-      --plain     plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
-  -v, --version   version for aval
+  -h, --help[=true|false]      help for aval
+      --plain[=true|false]     plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+  -v, --version[=true|false]   version for aval
 
 Use "aval [command] --help" for more information about a command.
 ```
@@ -83,10 +83,10 @@ Available Commands:
   zsh         Generate the autocompletion script for zsh
 
 Flags:
-  -h, --help   help for completion
+  -h, --help[=true|false]   help for completion
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 
 Use "aval completion [command] --help" for more information about a command.
 ```
@@ -123,16 +123,16 @@ Examples:
   aval explain --digest
 
 Flags:
-      --all               check and fingerprint every test of the file, one line per test
-  -f, --contract string   path to the test contract (default "aval.yaml")
-      --digest            print only the fingerprint (sha256:...)
-      --expand            print the test as the standalone kind: Test it expands to
-  -h, --help              help for explain
-  -o, --output string     output format of --all: text or json (default "text")
-  -t, --test string       the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
+      --all[=true|false]      check and fingerprint every test of the file, one line per test
+  -f, --contract string       path to the test contract (default "aval.yaml")
+      --digest[=true|false]   print only the fingerprint (sha256:...)
+      --expand[=true|false]   print the test as the standalone kind: Test it expands to
+  -h, --help[=true|false]     help for explain
+  -o, --output string         output format of --all: text or json (default "text")
+  -t, --test string           the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval init
@@ -174,17 +174,17 @@ Examples:
   aval init --set --name unit --source 'src/**' --cacheability hermetic -- go test ./...
 
 Flags:
-      --cacheability string   hermetic, controlled-environment, external-dependencies or non-deterministic
-      --force                 replace existing aval.yaml, policy.yaml and key files (.github/aval/policy.yaml with --set)
-  -h, --help                  help for init
-      --key string            signing key pair NAME.key and NAME.pub to create and trust in policy.yaml; a trailing .key is dropped
-      --keyless               sign keyless with Sigstore: no key and no policy are written
-      --name string           test name (metadata.name): what the test checks
-      --set                   write aval.yaml as a kind: TestSet and .github/aval/policy.yaml with a placeholder identity, no key
-      --source stringArray    source glob relative to the current directory (scope.source); repeat it for more
+      --cacheability string    hermetic, controlled-environment, external-dependencies or non-deterministic
+      --force[=true|false]     replace existing aval.yaml, policy.yaml and key files (.github/aval/policy.yaml with --set)
+  -h, --help[=true|false]      help for init
+      --key string             signing key pair NAME.key and NAME.pub to create and trust in policy.yaml; a trailing .key is dropped
+      --keyless[=true|false]   sign keyless with Sigstore: no key and no policy are written
+      --name string            test name (metadata.name): what the test checks
+      --set[=true|false]       write aval.yaml as a kind: TestSet and .github/aval/policy.yaml with a placeholder identity, no key
+      --source stringArray     source glob relative to the current directory (scope.source); repeat it for more
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval keygen
@@ -207,11 +207,11 @@ Examples:
   aval keygen ci     # ci.key and ci.pub
 
 Flags:
-      --force   replace name.key and name.pub if they exist
-  -h, --help    help for keygen
+      --force[=true|false]   replace name.key and name.pub if they exist
+  -h, --help[=true|false]    help for keygen
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval push
@@ -249,9 +249,9 @@ Examples:
 Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
       --env-file string             take the env section of the fingerprint from this file ('aval run --env-file') instead of this process's environment
-  -h, --help                        help for push
+  -h, --help[=true|false]           help for push
       --key string                  signing key path (default: keyless OIDC)
-      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
+      --login[=true|false]          sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
       --outputs-dir string          read the contract's outputs from this directory ('aval run --outputs-dir') instead of the contract root; anything in it that is not a declared output publishes nothing
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
@@ -260,7 +260,7 @@ Flags:
   -t, --test string                 the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 Deprecated flags, hidden from help:
@@ -281,14 +281,14 @@ Examples:
   aval stats publish --registry ghcr.io/acme/orders-aval record.json
 
 Flags:
-  -h, --help                        help for record
+  -h, --help[=true|false]           help for record
       --record-file string          run record written by 'aval run --stats-file' (required)
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --source-repo string          source repository (e.g. acme/orders); default: the one in the record
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 Deprecated flags, hidden from help:
@@ -329,31 +329,31 @@ Examples:
   aval run --registry ghcr.io/acme/orders-aval --push
 
 Flags:
-      --ci-run-url string           link to the CI run, stored in the run record
-  -f, --contract string             path to the test contract (default "aval.yaml")
-      --env-file string             where to record the env section of the fingerprint (hashes, no values) with the result, for 'aval push --env-file' in another job (default ".aval/env.txt")
-      --explain                     print the fingerprint manifest (what was hashed) before the run; 'aval explain' prints it alone
-      --fingerprint-only            print the execution fingerprint and exit (same as 'aval explain --digest')
-  -h, --help                        help for run
-      --key string                  signing key path for --push (default: keyless, from $SIGSTORE_ID_TOKEN or the interactive login; no token is stored and runner.command never sees it)
-      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
-      --min-trust-level string      raise the trust policy's minTrustLevel to developer, runner or isolated; a value below it exits 2 (default: $AVAL_MIN_TRUST_LEVEL)
-      --no-reuse                    always run, never reuse (excludes --shadow)
-      --outputs-dir string          also copy the contract's outputs to this empty directory when the result is recorded, for 'aval push --outputs-dir' in another job (keep it outside the scope, e.g. under .aval/)
-      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
-      --push                        sign and publish the result after running (needs --registry)
-      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)
-      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-      --report-file string          also write the lookup decision as a verify report (JSON) to this file
-      --result-file string          where to record the result for 'aval push' (default ".aval/result.json")
-      --shadow                      verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)
-      --source-repo string          source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
-      --stats                       publish a run record for statistics after the run (needs --registry; best-effort)
-      --stats-file string           also write the run record to this file, for 'aval stats publish'
-  -t, --test string                 the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
+      --ci-run-url string               link to the CI run, stored in the run record
+  -f, --contract string                 path to the test contract (default "aval.yaml")
+      --env-file string                 where to record the env section of the fingerprint (hashes, no values) with the result, for 'aval push --env-file' in another job (default ".aval/env.txt")
+      --explain[=true|false]            print the fingerprint manifest (what was hashed) before the run; 'aval explain' prints it alone
+      --fingerprint-only[=true|false]   print the execution fingerprint and exit (same as 'aval explain --digest')
+  -h, --help[=true|false]               help for run
+      --key string                      signing key path for --push (default: keyless, from $SIGSTORE_ID_TOKEN or the interactive login; no token is stored and runner.command never sees it)
+      --login[=true|false]              sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
+      --min-trust-level string          raise the trust policy's minTrustLevel to developer, runner or isolated; a value below it exits 2 (default: $AVAL_MIN_TRUST_LEVEL)
+      --no-reuse[=true|false]           always run, never reuse (excludes --shadow)
+      --outputs-dir string              also copy the contract's outputs to this empty directory when the result is recorded, for 'aval push --outputs-dir' in another job (keep it outside the scope, e.g. under .aval/)
+      --policy string                   trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
+      --push[=true|false]               sign and publish the result after running (needs --registry)
+      --registry string                 OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)
+      --registry-timeout duration       deadline for this command's registry calls (default 1m0s)
+      --report-file string              also write the lookup decision as a verify report (JSON) to this file
+      --result-file string              where to record the result for 'aval push' (default ".aval/result.json")
+      --shadow[=true|false]             verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)
+      --source-repo string              source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
+      --stats[=true|false]              publish a run record for statistics after the run (needs --registry; best-effort)
+      --stats-file string               also write the run record to this file, for 'aval stats publish'
+  -t, --test string                     the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 Deprecated flags, hidden from help:
@@ -396,7 +396,7 @@ Available Commands:
 
 Flags:
       --by string                   group by test or repository (the run record's source repository) (default "test")
-  -h, --help                        help for stats
+  -h, --help[=true|false]           help for stats
   -o, --output string               output format: text or json (default "text")
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
@@ -404,7 +404,7 @@ Flags:
       --test string                 only this test id (metadata.name); default: every test with run records
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 
 Use "aval stats [command] --help" for more information about a command.
 ```
@@ -425,13 +425,13 @@ Examples:
   aval stats publish --registry ghcr.io/acme/orders-aval record.json
 
 Flags:
-  -h, --help                        help for publish
+  -h, --help[=true|false]           help for publish
       --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
       --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
       --source-repo string          source repository (e.g. acme/orders); default: the one in the record
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval upgrade
@@ -453,12 +453,12 @@ Examples:
   aval upgrade --check
 
 Flags:
-      --check            print the current and target versions without installing
-  -h, --help             help for upgrade
-      --version string   release to install, e.g. v0.4.0 (default: latest)
+      --check[=true|false]   print the current and target versions without installing
+  -h, --help[=true|false]    help for upgrade
+      --version string       release to install, e.g. v0.4.0 (default: latest)
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval verify
@@ -481,7 +481,7 @@ Examples:
 
 Flags:
   -f, --contract string             path to the test contract (default "aval.yaml")
-  -h, --help                        help for verify
+  -h, --help[=true|false]           help for verify
       --min-trust-level string      raise the trust policy's minTrustLevel to developer, runner or isolated; a value below it exits 2 (default: $AVAL_MIN_TRUST_LEVEL)
   -o, --output string               output format: text or json (default "text")
       --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
@@ -490,7 +490,7 @@ Flags:
   -t, --test string                 the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
 
 ## aval version
@@ -505,8 +505,8 @@ Examples:
   aval version
 
 Flags:
-  -h, --help   help for version
+  -h, --help[=true|false]   help for version
 
 Global Flags:
-      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 ```
