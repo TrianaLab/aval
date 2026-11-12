@@ -2734,7 +2734,7 @@ every other line, comments included, is kept as it is. Shared inputs
 (lockfiles, root build files, toolchain, <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr>) belong in the
 hand-written defaults. aval run, verify and push never run gen: commit its
 output and check it in CI with --check.</p>
-<p>Languages: dotnet, js, python, rust.</p>
+<p>Languages: dotnet, go, js, python, rust.</p>
 <p>Exit codes: 0 written or up to date, 1 error (the language tool failed, the
 dependency graph is invalid, the file cannot be written) or with --check out
 of date (the diff is printed), 2 usage (an unknown language, no TestSet at
@@ -2752,11 +2752,12 @@ of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 </span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>Flags:
 </span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>      --check[=true|false]            write nothing; exit 1 with a diff when the generated entries are out of date
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>  -f, --file string                   the kind: TestSet to write (default "aval.yaml")
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>  -h, --help[=true|false]             help for gen
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>      --strict-imports[=true|false]   python: fail on an import_module or __import__ call whose module is not a string literal
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>Global Flags:
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>      --go-cover[=true|false]         go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>  -h, --help[=true|false]             help for gen
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>      --strict-imports[=true|false]   python: fail on an import_module or __import__ call whose module is not a string literal
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>Global Flags:
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-init">aval init<a class="headerlink" href="#aval-init" title="Anchor link">&para;</a></h2>
 <p>init writes aval.yaml for one test, validated before it is written. With
