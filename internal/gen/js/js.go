@@ -93,7 +93,11 @@ func (Adapter) Units(root string) ([]gen.Unit, error) {
 			return nil, err
 		}
 		deps = slices.Compact(slices.Sorted(slices.Values(append(deps, more...))))
-		units[i] = gen.Unit{ID: p.Name, Source: append([]string{dir + "/**"}, files...), Deps: deps, Command: command(pm, p.Name)}
+		source, err := gen.Under(dir, "**")
+		if err != nil {
+			return nil, fmt.Errorf("package %s: %w", p.Name, err)
+		}
+		units[i] = gen.Unit{ID: p.Name, Source: append([]string{source}, files...), Deps: deps, Command: command(pm, p.Name)}
 	}
 	return units, nil
 }
