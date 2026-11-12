@@ -114,7 +114,7 @@ func TestGenErrors(t *testing.T) {
 		want string
 	}{
 		{[]string{"gen"}, ExitUsage, "accepts 1 arg"},
-		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake)`},
+		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake, js)`},
 		{[]string{"gen", "fake", "-f", filepath.Join(dir, "none.yaml")}, ExitUsage, "aval init --set"},
 		{[]string{"gen", "fake", "-f", test}, ExitUsage, "kind: TestSet"},
 		{[]string{"gen", "broken", "-f", set}, ExitError, "gen broken: tool not found"},
@@ -137,7 +137,26 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenLanguages(t *testing.T) {
-	if got := languages(); got != "none yet" {
-		t.Errorf("languages() = %q with no adapters", got)
+	if got := languages(); got != "js" {
+		t.Errorf("languages() = %q, want js", got)
+	}
+}
+
+// aval gen js on the adapter's fixture is up to date; an unreadable
+// manifest exits 1 and writes nothing.
+func TestGenJS(t *testing.T) {
+	file := filepath.Join("..", "..", "internal", "gen", "js", "testdata", "monorepo", "aval.yaml")
+	if code, out, errOut := runCLI("gen", "js", "-f", file, "--check"); code != ExitOK || !strings.Contains(out, "up to date") {
+		t.Fatalf("fixture: exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	dir := t.TempDir()
+	set := filepath.Join(dir, "aval.yaml")
+	plain := strings.Replace(genSet, "  scope: {root: ..}\n", "", 1)
+	_ = os.WriteFile(set, []byte(plain), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte("{}"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "package.json"), []byte("{"), 0o644)
+	code, _, errOut := runCLI("gen", "js", "-f", set)
+	if data, _ := os.ReadFile(set); code != ExitError || !strings.Contains(errOut, "package.json: unexpected end of JSON input") || string(data) != plain {
+		t.Errorf("broken package.json: exit %d, stderr %q, file %q", code, errOut, data)
 	}
 }
