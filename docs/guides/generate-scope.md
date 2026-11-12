@@ -104,6 +104,13 @@ tests:
 A hand-written test can `use` generated fragments. When the unit behind one
 disappears, `aval gen` fails (exit 2) and writes nothing.
 
+`--no-test <pattern>` (repeatable, a contract glob over unit IDs such as
+`cmd/gen*` or `tests/**`) writes no test for the matching units, for code
+generators or harness packages you keep out of the test gate: their fragment
+stays while another test uses it, so their files stay in that test's scope. A
+pattern that matches no unit fails (exit 2), and `--check` needs the same
+flags.
+
 ## Go
 
 `aval gen go` reads the graph with `go list -deps -test -json ./...` in the
@@ -498,5 +505,5 @@ fragment to a hand-written test's `use`, or its globs to `defaults`.
 A missing language tool, a parse error, a dependency on an unknown unit or a
 unit without files is an error, and nothing is written. Exit codes: 0 written
 or up to date, 1 error or `--check` out of date, 2 usage (an unknown
-language, no `kind: TestSet` at `-f`, or a result that is not a valid
-TestSet).
+language, no `kind: TestSet` at `-f`, a `--no-test` pattern that matches no
+unit, or a result that is not a valid TestSet).

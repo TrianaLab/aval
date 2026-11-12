@@ -1,8 +1,12 @@
 package gen
 
 import (
+	"errors"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/TrianaLab/aval/internal/contract"
 )
 
 // handWritten is a TestSet with comments, blank lines and mixed styles,
@@ -217,5 +221,81 @@ func TestDiff(t *testing.T) {
 	want := "--- a\n+++ b\n@@ -2,1 +2,1 @@\n-y\n+Y\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestRewriteNoTest(t *testing.T) {
+	units := []Unit{unit("a", "cmd/gen"), unit("cmd/gen"), unit("cmd/genx"), unit("tests/e2e")}
+	out, err := Rewrite([]byte(base), "go", units, "cmd/gen*", "tests/**")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := contract.ParseAll(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, c := range cs {
+		names = append(names, c.Metadata.Name)
+	}
+	if !slices.Equal(names, []string{"go.a"}) {
+		t.Errorf("tests %v, want only go.a", names)
+	}
+	// go.a uses go.cmd.gen; no test uses the other two, so they go.
+	for f, want := range map[string]bool{"go.cmd.gen:": true, "go.cmd.genx:": false, "go.tests.e2e:": false} {
+		if strings.Contains(string(out), "  "+f+"\n") != want {
+			t.Errorf("fragment %s kept: %v, want %v:\n%s", f, !want, want, out)
+		}
+	}
+	if !strings.Contains(string(out), "use:\n      - go.a\n      - go.cmd.gen\n") {
+		t.Errorf("go.a no longer uses go.cmd.gen:\n%s", out)
+	}
+	// A hand-written test that uses an excluded unit keeps its fragment.
+	hand := base + "tests:\n  - metadata: {name: e2e}\n    use: [go.tests.e2e]\n    runner: {command: [x]}\n"
+	if kept := string(must(Rewrite([]byte(hand), "go", units, "cmd/gen*", "tests/**"))); !strings.Contains(kept, "  go.tests.e2e:\n") || strings.Contains(kept, "{name: go.tests.e2e}") {
+		t.Errorf("hand-written use:\n%s", kept)
+	}
+	// Without patterns every unit gets its test back.
+	if all := rewrite(t, string(out), "go", units...); strings.Count(all, "- metadata:") != 4 {
+		t.Errorf("without --no-test:\n%s", all)
+	}
+}
+
+// Every unit under --no-test: only the hand-written entries are left.
+func TestRewriteNoTestAll(t *testing.T) {
+	hand := base + "tests:\n  - metadata: {name: e2e}\n    runner: {command: [x]}\n    scope: {source: [x]}\n"
+	if out := string(must(Rewrite([]byte(hand), "go", []Unit{unit("a")}, "a"))); out != hand {
+		t.Errorf("got:\n%s", out)
+	}
+	if out := string(must(Rewrite([]byte(hand+"fragments:\n"), "go", []Unit{unit("a")}, "a"))); out != hand+"fragments:\n" {
+		t.Errorf("empty fragments:\n%s", out)
+	}
+	gend := rewrite(t, hand, "go", unit("a"))
+	if out := string(must(Rewrite([]byte(gend), "go", []Unit{unit("a")}, "*"))); !strings.HasSuffix(out, "fragments:\n") || strings.Contains(out, "go.a") {
+		t.Errorf("got:\n%s", out)
+	}
+	if _, err := Rewrite([]byte(base), "go", []Unit{unit("a")}, "a"); err == nil || !strings.Contains(err.Error(), "at least one test") {
+		t.Errorf("no test left: %v", err)
+	}
+}
+
+func must(out []byte, err error) []byte {
+	if err != nil {
+		panic(err)
+	}
+	return out
+}
+
+func TestRewriteNoTestErrors(t *testing.T) {
+	units := []Unit{unit("a"), unit("b")}
+	for pattern, want := range map[string]string{
+		"c":     "--no-test c: matches no unit",
+		"a/**x": "'**' must be a whole path segment",
+		"/a":    "relative",
+	} {
+		_, err := Rewrite([]byte(base), "go", units, "a", pattern)
+		if err == nil || !strings.Contains(err.Error(), want) || errors.Is(err, ErrUnits) {
+			t.Errorf("%q: got %v, want %q (not ErrUnits)", pattern, err, want)
+		}
 	}
 }

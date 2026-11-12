@@ -19,9 +19,16 @@ import (
 // generated entries take the place of the first owned one, or go at the end
 // of fragments and tests. The result must be a valid TestSet, so a
 // hand-written test that uses the fragment of a unit that no longer exists
-// is an error. On any error nothing is returned to write (invariant 3).
-func Rewrite(data []byte, lang string, units []Unit) ([]byte, error) {
+// is an error. A unit whose ID matches one of the contract globs in noTest
+// gets no test; its fragment stays while another test uses it, so its files
+// stay in that test's scope. On any error nothing is returned to write
+// (invariant 3).
+func Rewrite(data []byte, lang string, units []Unit, noTest ...string) ([]byte, error) {
 	p, err := plan(lang, units)
+	if err != nil {
+		return nil, err
+	}
+	skip, err := skipped(lang, units, noTest)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +47,7 @@ func Rewrite(data []byte, lang string, units []Unit) ([]byte, error) {
 		}
 	}
 	e := edit{lines: lines, drop: make([]bool, len(lines)), ins: map[int]string{}, root: root, lang: lang, eol: eol}
-	frags, tests := generated(p)
+	frags, tests := generated(p, skip, used(lang, root, p, skip))
 	if err := errors.Join(e.splice("fragments", frags), e.splice("tests", tests)); err != nil {
 		return nil, err
 	}
@@ -145,12 +152,41 @@ func mapping(style yaml.Style, kv ...*yaml.Node) *yaml.Node {
 	return &yaml.Node{Kind: yaml.MappingNode, Style: style, Content: kv}
 }
 
+// used returns the fragment names that the tests of p not in skip, and the
+// tests in root that lang does not own, use.
+func used(lang string, root *yaml.Node, p []planned, skip map[string]bool) map[string]bool {
+	use := map[string]bool{}
+	for _, u := range p {
+		for _, n := range u.use {
+			if !skip[u.name] {
+				use[n] = true
+			}
+		}
+	}
+	if ts := value(root, "tests"); ts != nil {
+		for _, t := range ts.Content {
+			if u := value(t, "use"); u != nil && !owned(lang, testName(t)) {
+				for _, n := range u.Content {
+					use[n.Value] = true
+				}
+			}
+		}
+	}
+	return use
+}
+
 // generated returns the fragments (a mapping) and the tests (a sequence)
-// for p, in name order.
-func generated(p []planned) (frags, tests *yaml.Node) {
+// for p, in name order: no test for the names in skip, and only the
+// fragments in use (a fragment no test uses is invalid).
+func generated(p []planned, skip, use map[string]bool) (frags, tests *yaml.Node) {
 	frags, tests = mapping(0), &yaml.Node{Kind: yaml.SequenceNode}
 	for _, u := range p {
-		frags.Content = append(frags.Content, str(u.name), mapping(0, str("scope"), mapping(0, str("source"), seq(0, u.source...))))
+		if use[u.name] {
+			frags.Content = append(frags.Content, str(u.name), mapping(0, str("scope"), mapping(0, str("source"), seq(0, u.source...))))
+		}
+		if skip[u.name] {
+			continue
+		}
 		tests.Content = append(tests.Content, mapping(0,
 			str("metadata"), mapping(yaml.FlowStyle, str("name"), str(u.name)),
 			str("runner"), mapping(yaml.FlowStyle, str("command"), seq(yaml.FlowStyle, u.command...)),
@@ -171,8 +207,12 @@ type edit struct {
 	eol   string // the file's line ending: "\n", "\r\n" or "\r"
 }
 
-// encode renders n like encode, with the file's line endings.
+// encode renders n like encode, with the file's line endings; an empty
+// collection (every unit under --no-test) renders as nothing.
 func (e *edit) encode(n *yaml.Node, prefix string) string {
+	if len(n.Content) == 0 {
+		return ""
+	}
 	return strings.ReplaceAll(encode(n, prefix), "\n", e.eol)
 }
 
@@ -188,7 +228,7 @@ func (e *edit) splice(key string, gen *yaml.Node) error {
 	indent := strings.Repeat(" ", e.root.Content[0].Column-1)
 	j := e.find(key)
 	if j < 0 {
-		e.tail += indent + key + ":" + e.eol + e.encode(gen, indent+"  ")
+		e.add(key, indent, gen)
 		return nil
 	}
 	k, v := e.root.Content[j], e.root.Content[j+1]
@@ -232,6 +272,13 @@ func (e *edit) splice(key string, gen *yaml.Node) error {
 	prefix := e.lines[starts[0]][:strings.IndexFunc(e.lines[starts[0]], func(r rune) bool { return r != ' ' })]
 	e.ins[at] += e.encode(gen, prefix)
 	return nil
+}
+
+// add appends the new top-level key with gen, unless gen is empty.
+func (e *edit) add(key, indent string, gen *yaml.Node) {
+	if len(gen.Content) > 0 {
+		e.tail += indent + key + ":" + e.eol + e.encode(gen, indent+"  ")
+	}
 }
 
 // find returns the index of the top-level key in root.Content, or -1.
@@ -292,11 +339,16 @@ func encode(n *yaml.Node, prefix string) string {
 // replace does on the nodes what splice does on the lines.
 func replace(root *yaml.Node, lang, key string, gen *yaml.Node) {
 	v := value(root, key)
-	if v == nil {
+	empty := len(gen.Content) == 0 // splice writes no line for it
+	switch {
+	case v == nil && empty:
+		return
+	case v == nil:
 		root.Content = append(root.Content, str(key), gen)
 		return
-	}
-	if v.Kind != gen.Kind {
+	case v.Kind != gen.Kind && empty:
+		return
+	case v.Kind != gen.Kind:
 		*v = *gen
 		return
 	}
@@ -323,6 +375,9 @@ func replace(root *yaml.Node, lang, key string, gen *yaml.Node) {
 		at = len(kept)
 	}
 	v.Content = append(kept[:at:at], append(gen.Content, kept[at:]...)...)
+	if len(v.Content) == 0 { // every entry dropped: the key is left empty
+		*v = yaml.Node{Kind: yaml.ScalarNode, Tag: "!!null"}
+	}
 }
 
 // canon renders n without comments or styles, to compare two trees by

@@ -220,6 +220,31 @@ func check(lang string, units []Unit) ([]planned, map[string]int, error) {
 	return out, byID, nil
 }
 
+// skipped returns the names of the units whose ID matches one of patterns,
+// contract globs. units are valid (see plan). A pattern that matches no unit
+// is an error, so a typo or a renamed unit cannot silently change what runs.
+func skipped(lang string, units []Unit, patterns []string) (map[string]bool, error) {
+	skip := map[string]bool{}
+	var errs []error
+	for _, p := range patterns {
+		if err := contract.ValidateGlob(p); err != nil {
+			errs = append(errs, fmt.Errorf("--no-test: %w", err))
+			continue
+		}
+		matched := false
+		for _, u := range units {
+			if contract.Match(p, u.ID) {
+				name, _ := Name(lang, u.ID) // plan checked every name
+				skip[name], matched = true, true
+			}
+		}
+		if !matched {
+			errs = append(errs, fmt.Errorf("--no-test %s: matches no unit", p))
+		}
+	}
+	return skip, errors.Join(errs...)
+}
+
 // Root returns the contract root of the TestSet data in dir: dir, or the
 // directory defaults.scope.root names above it. Adapters list units there.
 func Root(data []byte, dir string) (string, error) {

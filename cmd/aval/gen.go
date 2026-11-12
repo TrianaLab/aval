@@ -42,6 +42,7 @@ type flagger interface{ Flags(*pflag.FlagSet) }
 func newGenCmd() *cobra.Command {
 	var file string
 	var check bool
+	var noTest []string
 	cmd := &cobra.Command{
 		Use:   "gen <language>",
 		Short: "Generate one test per unit from a dependency graph into a TestSet",
@@ -55,7 +56,10 @@ tests of the units that depend on it.
 gen owns only the fragments and tests whose names start with "LANGUAGE.";
 every other line, comments included, is kept as it is. Shared inputs
 (lockfiles, root build files, toolchain, cacheability) belong in the
-hand-written defaults. aval run, verify and push never run gen: commit its
+hand-written defaults. --no-test PATTERN (repeatable, a contract glob such as
+cmd/gen* or tests/**) writes no test for the units whose ID matches; they keep
+their fragment, so their files stay in the scope of the tests that use them.
+aval run, verify and push never run gen: commit its
 output and check it in CI with --check.
 
 Languages: ` + languages() + `.
@@ -63,7 +67,8 @@ Languages: ` + languages() + `.
 Exit codes: 0 written or up to date, 1 error (the language tool failed, the
 dependency graph is invalid, the file cannot be written) or with --check out
 of date (the diff is printed), 2 usage (an unknown language, no TestSet at
--f, or a result that is not a valid TestSet).`,
+-f, a --no-test pattern that matches no unit, or a result that is not a valid
+TestSet).`,
 		Args: func(c *cobra.Command, args []string) error {
 			if err := cobra.ExactArgs(1)(c, args); err != nil {
 				return usageError{err}
@@ -84,11 +89,12 @@ of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 			if err != nil {
 				return err
 			}
-			return runGen(cmd, a, args[0], file, check)
+			return runGen(cmd, a, args[0], file, check, noTest)
 		},
 	}
 	cmd.Flags().StringVarP(&file, "file", "f", "aval.yaml", "the kind: TestSet to write")
 	cmd.Flags().BoolVar(&check, "check", false, "write nothing; exit 1 with a diff when the generated entries are out of date")
+	cmd.Flags().StringArrayVar(&noTest, "no-test", nil, "write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)")
 	for _, lang := range slices.Sorted(maps.Keys(adapters)) {
 		if a, ok := adapters[lang].(flagger); ok {
 			fs := pflag.NewFlagSet(lang, pflag.ContinueOnError)
@@ -105,7 +111,7 @@ of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 // languages lists the adapters for help and errors.
 func languages() string { return strings.Join(slices.Sorted(maps.Keys(adapters)), ", ") }
 
-func runGen(cmd *cobra.Command, a gen.Adapter, lang, file string, check bool) error {
+func runGen(cmd *cobra.Command, a gen.Adapter, lang, file string, check bool, noTest []string) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return usageError{fmt.Errorf("gen: %w (start a TestSet with aval init --set)", err)}
@@ -118,7 +124,7 @@ func runGen(cmd *cobra.Command, a gen.Adapter, lang, file string, check bool) er
 	if err != nil {
 		return fmt.Errorf("gen %s: %w", lang, err)
 	}
-	out, err := gen.Rewrite(data, lang, units)
+	out, err := gen.Rewrite(data, lang, units, noTest...)
 	switch {
 	case errors.Is(err, gen.ErrUnits):
 		return fmt.Errorf("gen %s: %w", lang, err)
