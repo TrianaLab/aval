@@ -148,7 +148,7 @@ func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string)
 	// A //go:embed pattern can name a directory, so a file added under it
 	// later changes what is embedded: the whole package directory is in
 	// scope whenever the package embeds anything (embeds cannot leave it).
-	if len(p.EmbedFiles)+len(p.TestEmbedFiles)+len(p.XTestEmbedFiles) > 0 || embeds(dir, p.IgnoredGoFiles) {
+	if p.embeds(dir) {
 		u.Source = append(u.Source, glob("**"))
 	}
 	// Tests read testdata/ by convention. A glob must match a file, so it is
@@ -181,6 +181,12 @@ func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string)
 		u.Command = []string{"sh", "-c", coverScript, u.Command[2]}
 	}
 	return u, nil
+}
+
+// embeds reports whether the package embeds files, in a file for this
+// platform or for another one.
+func (p pkg) embeds(dir string) bool {
+	return len(p.EmbedFiles)+len(p.TestEmbedFiles)+len(p.XTestEmbedFiles) > 0 || embeds(dir, p.IgnoredGoFiles)
 }
 
 // embeds reports whether a file in dir mentions //go:embed.
