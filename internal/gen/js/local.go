@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/TrianaLab/aval/internal/gen"
 )
 
 // workspace locates paths in the workspace packages of a repository.
@@ -160,7 +162,11 @@ func (w workspace) tsconfig(r *reached, file string, refs bool, seen map[string]
 			continue // an external package: the lockfile in defaults covers it
 		}
 		if !w.add(r, target) {
-			r.files = append(r.files, target)
+			g, err := gen.Literal(target)
+			if err != nil {
+				return fmt.Errorf("%s: extends: %w", file, err)
+			}
+			r.files = append(r.files, g)
 		}
 		if err := w.tsconfig(r, target, false, seen); err != nil {
 			return err
@@ -200,9 +206,6 @@ func (w workspace) extended(dir, e string) (target string, ok bool, err error) {
 		target = path.Join(target, "tsconfig.json")
 	} else if errors.Is(err, fs.ErrNotExist) && !strings.HasSuffix(target, ".json") {
 		target += ".json"
-	}
-	if strings.ContainsAny(target, `*?[\`) {
-		return "", false, fmt.Errorf("%s: a glob character in the name", target)
 	}
 	return target, true, nil
 }

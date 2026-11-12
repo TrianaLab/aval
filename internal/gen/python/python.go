@@ -99,7 +99,11 @@ func (a *Adapter) Units(root string) ([]gen.Unit, error) {
 	uv := exists(filepath.Join(root, "uv.lock"))
 	units := make([]gen.Unit, 0, len(projects))
 	for _, p := range projects {
-		u := gen.Unit{ID: p.name, Source: p.globs(dirs), Command: p.command(uv, dirs)}
+		globs, err := p.globs(dirs)
+		if err != nil {
+			return nil, fmt.Errorf("project %s: %w", p.name, err)
+		}
+		u := gen.Unit{ID: p.name, Source: globs, Command: p.command(uv, dirs)}
 		for d := range p.deps {
 			u.Deps = append(u.Deps, d)
 		}
@@ -228,27 +232,31 @@ func (p *project) rel(file string) string {
 // a new file in it is in scope before gen runs again. Otherwise: dir/** for
 // each top-level directory of p, and one glob per file, descending only
 // toward the directories of nested projects (dirs), which own their own files.
-func (p *project) globs(dirs map[string]bool) []string {
+func (p *project) globs(dirs map[string]bool) ([]string, error) {
 	if p.dir != "." && !nests(p.dir, dirs) {
-		return []string{p.dir + "/**"}
+		g, err := gen.Under(p.dir, "**")
+		return []string{g}, err
 	}
 	var globs []string
 	for _, file := range p.files {
 		dir := p.dir
-		glob := file
+		glob, err := gen.Literal(file)
 		for seg := range strings.SplitSeq(path.Dir(p.rel(file)), "/") {
 			if seg == "." {
 				break
 			}
 			dir = path.Join(dir, seg)
 			if !nests(dir, dirs) {
-				glob = dir + "/**"
+				glob, err = gen.Under(dir, "**")
 				break
 			}
 		}
+		if err != nil {
+			return nil, err
+		}
 		globs = append(globs, glob)
 	}
-	return slices.Compact(globs)
+	return slices.Compact(globs), nil
 }
 
 // nests reports whether a project lives below dir.

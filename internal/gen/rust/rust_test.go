@@ -141,6 +141,7 @@ func TestErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	outside := write("outside.json", strings.Replace(string(recorded), `"manifest_path": "@ROOT@/apps/cli/Cargo.toml"`, `"manifest_path": "@ROOT@/../cli/Cargo.toml"`, 1))
+	backslash := write("backslash.json", strings.Replace(string(recorded), `"manifest_path": "@ROOT@/apps/cli/Cargo.toml"`, `"manifest_path": "@ROOT@/apps/c\\li/Cargo.toml"`, 1))
 	nonMember := write("nonmember.json", strings.Replace(string(recorded), `"path": "@ROOT@/crates/domain"`, `"path": "@ROOT@/vendor/domain"`, 1))
 	for _, tc := range []struct {
 		name, metadata, root, want string
@@ -151,6 +152,7 @@ func TestErrors(t *testing.T) {
 		{"no root", "", filepath.Join(dir, "none"), "no such file"},
 		{"member outside root", outside, fixture, "member cli: "},
 		{"path dependency not a member", nonMember, fixture, "path dependency domain at "},
+		{"inexpressible member path", backslash, fixture, `member cli: "apps/c\\li": a contract glob cannot express`},
 		{"no workspace root", write("nows.json", `{"packages": []}`), fixture, "no workspace_root"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -337,5 +339,27 @@ func TestFalseHitPathOverrideInsideMember(t *testing.T) {
 		if !slices.Contains(u.Deps, "domain") || !slices.Contains(u.Deps, "cli") {
 			t.Errorf("unit %s deps %v: want domain and cli", u.ID, u.Deps)
 		}
+	}
+}
+
+// A member directory named with glob metacharacters gets an escaped glob.
+func TestMetacharacterMember(t *testing.T) {
+	recorded, err := os.ReadFile("testdata/metadata.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(t.TempDir(), "metadata.json")
+	data := strings.Replace(string(recorded), `"manifest_path": "@ROOT@/apps/cli/Cargo.toml"`, `"manifest_path": "@ROOT@/apps/c[*?]li/Cargo.toml"`, 1)
+	if err := os.WriteFile(p, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fake(t, p)
+	units, err := Adapter{}.Units(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(units, func(u gen.Unit) bool { return u.ID == "cli" })
+	if i < 0 || !slices.Equal(units[i].Source, []string{"apps/c[[][*][?]]li/**"}) {
+		t.Errorf("units %+v: want cli with source apps/c[[][*][?]]li/**", units)
 	}
 }
