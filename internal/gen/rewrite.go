@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 
@@ -28,13 +29,17 @@ func Rewrite(data []byte, lang string, units []Unit) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	text := string(data)
-	if !strings.HasSuffix(text, "\n") {
-		text += "\n"
+	lines := splitLines(string(data))
+	eol := "\n"
+	if len(lines) > 0 {
+		if t := lines[0][len(strings.TrimRight(lines[0], "\r\n")):]; t == "\r\n" || t == "\r" {
+			eol = t // generated lines follow the file's line endings
+		}
+		if last := lines[len(lines)-1]; !strings.ContainsAny(last, breaks) {
+			lines[len(lines)-1] += eol
+		}
 	}
-	lines := strings.SplitAfter(text, "\n")
-	lines = lines[:len(lines)-1] // the empty string after the final newline
-	e := edit{lines: lines, drop: make([]bool, len(lines)), ins: map[int]string{}, root: root, lang: lang}
+	e := edit{lines: lines, drop: make([]bool, len(lines)), ins: map[int]string{}, root: root, lang: lang, eol: eol}
 	frags, tests := generated(p)
 	if err := errors.Join(e.splice("fragments", frags), e.splice("tests", tests)); err != nil {
 		return nil, err
@@ -61,6 +66,27 @@ func Rewrite(data []byte, lang string, units []Unit) ([]byte, error) {
 		return nil, errors.New("cannot rewrite the generated entries without changing other lines; check the layout of fragments and tests")
 	}
 	return out, nil
+}
+
+// breaks are the characters yaml.v3 counts as a line break; "\r\n" is one.
+const breaks = "\r\n\u0085\u2028\u2029"
+
+// splitLines splits s after every line break, the way yaml.v3 numbers
+// lines, so that line n of a node is lines[n-1].
+func splitLines(s string) []string {
+	var lines []string
+	for s != "" {
+		i := strings.IndexAny(s, breaks)
+		if i < 0 {
+			return append(lines, s)
+		}
+		_, w := utf8.DecodeRuneInString(s[i:])
+		if strings.HasPrefix(s[i:], "\r\n") {
+			w = 2
+		}
+		lines, s = append(lines, s[:i+w]), s[i+w:]
+	}
+	return lines
 }
 
 // parseSet decodes data: one YAML document whose root is a block mapping
@@ -142,6 +168,12 @@ type edit struct {
 	tail  string // new top-level keys, after everything else
 	root  *yaml.Node
 	lang  string
+	eol   string // the file's line ending: "\n", "\r\n" or "\r"
+}
+
+// encode renders n like encode, with the file's line endings.
+func (e *edit) encode(n *yaml.Node, prefix string) string {
+	return strings.ReplaceAll(encode(n, prefix), "\n", e.eol)
 }
 
 // isGap: a blank or comment-only line, which belongs to the entry after it.
@@ -156,7 +188,7 @@ func (e *edit) splice(key string, gen *yaml.Node) error {
 	indent := strings.Repeat(" ", e.root.Content[0].Column-1)
 	j := e.find(key)
 	if j < 0 {
-		e.tail += indent + key + ":\n" + encode(gen, indent+"  ")
+		e.tail += indent + key + ":" + e.eol + e.encode(gen, indent+"  ")
 		return nil
 	}
 	k, v := e.root.Content[j], e.root.Content[j+1]
@@ -166,7 +198,7 @@ func (e *edit) splice(key string, gen *yaml.Node) error {
 		end = e.root.Content[j+2].Line - 1
 	}
 	if v.Tag == "!!null" && v.Value == "" {
-		e.ins[keyLine+1] += encode(gen, indent+"  ")
+		e.ins[keyLine+1] += e.encode(gen, indent+"  ")
 		return nil
 	}
 	if v.Kind != gen.Kind || v.Style&yaml.FlowStyle != 0 || len(v.Content) == 0 {
@@ -198,7 +230,7 @@ func (e *edit) splice(key string, gen *yaml.Node) error {
 		}
 	}
 	prefix := e.lines[starts[0]][:strings.IndexFunc(e.lines[starts[0]], func(r rune) bool { return r != ' ' })]
-	e.ins[at] += encode(gen, prefix)
+	e.ins[at] += e.encode(gen, prefix)
 	return nil
 }
 
