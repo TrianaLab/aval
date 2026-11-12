@@ -22,7 +22,7 @@ var (
 	pathArgRe  = regexp.MustCompile(`^path\s*[:=]\s*`)
 	// projects.core, projects.feature.ui: type-safe project accessors.
 	accessorRe     = regexp.MustCompile(`\bprojects((?:\s*\.\s*[A-Za-z_]\w*)+)`)
-	includeBuildRe = regexp.MustCompile(`\bincludeBuild\s*\(`)
+	includeBuildRe = regexp.MustCompile(`\bincludeBuild\b`)
 	// apply(from = "...") or apply from: '...' pulls in a script no unit covers.
 	applyFromRe = regexp.MustCompile(`\bapply\s*\(?\s*from\b`)
 	// Names that reach the files of another project from a subproject.
@@ -150,9 +150,22 @@ func projects(root, settings string) (text string, paths []string, known map[str
 func includedBuilds(text, masked string) ([]string, string, error) {
 	var builds []string
 	for _, loc := range includeBuildRe.FindAllStringIndex(masked, -1) {
-		v, j, err := literal(text, skip(text, loc[1], true))
-		if err == nil && (skip(text, j, true) >= len(text) || text[skip(text, j, true)] != ')') {
-			err = fmt.Errorf("an argument other than a string literal: %w", errUnsupported)
+		// Kotlin includeBuild("x"), Groovy includeBuild 'x' or includeBuild('x').
+		i := skip(text, loc[1], false)
+		paren := i < len(text) && text[i] == '('
+		if paren {
+			i++
+		}
+		v, j, err := literal(text, skip(text, i, paren))
+		if err == nil {
+			k := skip(text, j, paren)
+			ok := k == len(text) || strings.ContainsRune("\n;}", rune(text[k]))
+			if paren {
+				ok = k < len(text) && text[k] == ')'
+			}
+			if !ok {
+				err = fmt.Errorf("an argument other than a string literal: %w", errUnsupported)
+			}
 		}
 		if err != nil {
 			return nil, "", fmt.Errorf("includeBuild: %w", err)

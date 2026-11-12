@@ -3,5 +3,14 @@ kind: TestSet
 # aval gen java lists the root context (root files, .mvn/) in every unit.
 defaults:
   scope:
-    exclude: ["**/target/**"]
+    # Build output, one entry per module: **/target/** would also hide
+    # source packages named target.
+    exclude:
+      - target/**
+      - common/target/**
+      - inventory/target/**
+      - services/target/**
+      - services/api/target/**
+      - services/web/target/**
+      - tools/target/**
   cacheability: hermetic

@@ -205,6 +205,23 @@ var conventions = map[string]string{
 	"buildSrc/README.md":                         "project(name) is not code here",
 }
 
+// Output directories are excluded one by one in the fixtures' defaults: a
+// source package named build or target stays in scope, so a change to it
+// changes the fingerprint (**/build/** would hide it and reuse the result).
+func TestFalseHitOutputNamedPackage(t *testing.T) {
+	for build, file := range map[string]string{
+		"gradle": "buildSrc/src/main/java/com/acme/build/Conventions.java",
+		"maven":  "common/src/main/java/com/acme/target/Ids.java",
+	} {
+		fsys := fixture(t, build)
+		changed := maps.Clone(fsys)
+		changed[file] = &fstest.MapFile{Data: append(read(t, filepath.Join("testdata", build, file)), "// changed\n"...)}
+		if digest(t, changed, "java.common") == digest(t, fsys, "java.common") {
+			t.Errorf("%s: java.common has the same fingerprint after changing %s", build, file)
+		}
+	}
+}
+
 // nested is a Gradle build whose project app hands a file of its own to
 // its subproject app:sub.
 var nested = map[string]string{
@@ -612,30 +629,40 @@ func TestUnitsFailClosed(t *testing.T) {
 			"app/build.gradle.kts":      "plugins {\n    alias(libs.plugins.android.application)\n}\nandroid {\n    namespace = \"com.example.myapplication\"\n    compileSdk = 35\n    buildTypes {\n        release {\n            isMinifyEnabled = false\n            proguardFiles(getDefaultProguardFile(\"proguard-android-optimize.txt\"), \"proguard-rules.pro\")\n        }\n    }\n    packaging {\n        resources {\n            excludes += \"/META-INF/{AL2.0,LGPL2.1}\"\n        }\n    }\n}\ntasks.withType<Jar> { exclude(\"/META-INF/*\") }\ndependencies {\n    implementation(libs.androidx.core.ktx)\n}\n",
 			"gradle/libs.versions.toml": "",
 		}, ""},
-		"root rootDir receiver":       {kts(`include(":a", ":common")`, "a/build.gradle.kts", `val f = file("${project.rootProject.rootDir}/common/x")`), `"${project.rootProject.rootDir}/common/x" refers to files of another project`},
-		"plugin rootDir receiver":     {kts(`include(":a", ":common")`, "buildSrc/src/main/kotlin/P.kt", `class P { fun apply(target: Project) { val f = target.file("${target.rootDir}/common/x") } }`), "refers to files of another project"},
-		"rootDir receiver in text":    {kts(`include(":a")`, "a/build.gradle.kts", `tasks.test { jvmArgs("-Dfx=${target.rootDir}/y") }`), "holds a path inside larger text"},
-		"backslash dot-dot in text":   {kts(`include(":a")`, "a/build.gradle.kts", `tasks.test { jvmArgs("-Dfx=..\\common") }`), "holds a path inside larger text"},
-		"resolve sibling":             {kts(`include(":a")`, "a/build.gradle.kts", `val f = projectDir.resolveSibling("b")`), "a/build.gradle.kts: resolveSibling"},
-		"root resolve chain":          {kts(`include(":a", ":services:api")`, "a/build.gradle.kts", `val f = rootDir.resolve("services").resolve("api")`), `a/build.gradle.kts: rootDir.resolve(...: refers to files of another project`},
-		"computed root resolve":       {kts(`include(":a")`, "a/build.gradle.kts", `val f = rootDir.resolve(name)`), "rootDir.resolve(...: an argument other than a string literal"},
-		"root resolve outside":        {kts(`include(":a")`, "a/build.gradle.kts", `val f = rootProject.projectDir.resolve("..").resolve("x")`), "refers to files outside the root"},
-		"settings directory chain":    {kts(`include(":a")`, "a/build.gradle.kts", `val f = layout.settingsDirectory.dir("config").file("x.xml"); val g = rootDir.resolve("config"`), ""},
-		"maven filter":                {sub(`<project><build><filters><filter>../shared/f.properties</filter></filters></build></project>`), "<filter>../shared/f.properties</filter>"},
-		"maven suiteXmlFile":          {sub(`<project><build><plugins><plugin><configuration><suiteXmlFiles><suiteXmlFile>../testng.xml</suiteXmlFile></suiteXmlFiles></configuration></plugin></plugins></build></project>`), "<suiteXmlFile>"},
-		"maven activation file":       {sub(`<project><profiles><profile><activation><file><exists>${basedir}/../x</exists></file></activation></profile></profiles></project>`), "<exists>"},
-		"maven property path":         {sub(`<project><properties><d>../shared</d></properties></project>`), "<d>../shared</d>"},
-		"maven.config property":       {map[string]string{".mvn/maven.config": "-B -D a=1 --define=b=2 -Dlib=x --define", "pom.xml": pomHead + `<properties><lib>a</lib></properties><modules><module>a</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${lib}</artifactId></dependency></dependencies></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, "a/pom.xml: property lib set by .mvn/maven.config"},
-		"maven.config other property": {map[string]string{".mvn/maven.config": "-Dother=x", "pom.xml": pomHead + `<properties><lib>a</lib></properties><modules><module>a</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${lib}</artifactId></dependency></dependencies></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, ""},
-		"unreadable maven.config":     {map[string]string{".mvn/maven.config/x": "", "pom.xml": pomHead + `</project>`}, "maven.config"},
-		"apply from in settings":      {kts(`include(":a")` + "\n" + `apply(from = "more.settings.gradle.kts")`), "settings.gradle.kts: apply from"},
-		"empty project segment":       {kts(`include(":a")`, "a/build.gradle.kts", `evaluationDependsOn("::")`), `a/build.gradle.kts: project path "::"`},
-		"computed evaluation":         {kts(`include(":a")`, "a/build.gradle.kts", `evaluationDependsOn(other)`), "a/build.gradle.kts: evaluationDependsOn(...): an argument other than a string literal"},
-		"buildSrc computed ref":       {kts(`include(":a")`, "buildSrc/src/main/kotlin/c.gradle.kts", `dependencies { "implementation"(project(name)) }`), "buildSrc/src/main/kotlin/c.gradle.kts: project(...)"},
-		"ancestor two builds":         {kts(`include(":s:a")`, "s/build.gradle", "", "s/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
-		"ancestor computed ref":       {kts(`include(":s:a")`, "s/build.gradle.kts", "subprojects { dependencies { implementation(project(name)) } }"), "s/build.gradle.kts: project(...)"},
-		"comment hides rest":          {kts("include(\":a\") /* unterminated\ninclude(name)"), ""},
-		"comment at the end":          {kts(`include(":a") // no line break after it`), ""},
+		"root rootDir receiver":     {kts(`include(":a", ":common")`, "a/build.gradle.kts", `val f = file("${project.rootProject.rootDir}/common/x")`), `"${project.rootProject.rootDir}/common/x" refers to files of another project`},
+		"plugin rootDir receiver":   {kts(`include(":a", ":common")`, "buildSrc/src/main/kotlin/P.kt", `class P { fun apply(target: Project) { val f = target.file("${target.rootDir}/common/x") } }`), "refers to files of another project"},
+		"rootDir receiver in text":  {kts(`include(":a")`, "a/build.gradle.kts", `tasks.test { jvmArgs("-Dfx=${target.rootDir}/y") }`), "holds a path inside larger text"},
+		"backslash dot-dot in text": {kts(`include(":a")`, "a/build.gradle.kts", `tasks.test { jvmArgs("-Dfx=..\\common") }`), "holds a path inside larger text"},
+		"resolve sibling":           {kts(`include(":a")`, "a/build.gradle.kts", `val f = projectDir.resolveSibling("b")`), "a/build.gradle.kts: resolveSibling"},
+		"root resolve chain":        {kts(`include(":a", ":services:api")`, "a/build.gradle.kts", `val f = rootDir.resolve("services").resolve("api")`), `a/build.gradle.kts: rootDir.resolve(...: refers to files of another project`},
+		"computed root resolve":     {kts(`include(":a")`, "a/build.gradle.kts", `val f = rootDir.resolve(name)`), "rootDir.resolve(...: an argument other than a string literal"},
+		"root resolve outside":      {kts(`include(":a")`, "a/build.gradle.kts", `val f = rootProject.projectDir.resolve("..").resolve("x")`), "refers to files outside the root"},
+		"settings directory chain":  {kts(`include(":a")`, "a/build.gradle.kts", `val f = layout.settingsDirectory.dir("config").file("x.xml"); val g = rootDir.resolve("config"`), ""},
+		"maven string names a POM outside the reactor": {map[string]string{
+			"pom.xml":   pomHead + `<modules><module>a</module></modules></project>`,
+			"a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId><build><plugins><plugin><configuration><resourceBundles><resourceBundle>g:x:1.0</resourceBundle></resourceBundles></configuration></plugin></plugins></build></project>`,
+			"x/pom.xml": `<project><groupId>g</groupId><artifactId>x</artifactId></project>`,
+		}, "a/pom.xml: g:x refers to x/pom.xml, a local POM outside the build"},
+		"maven string with a profile property":        {two(`<profiles><profile><properties><b>common</b></properties></profile></profiles><build><plugins><plugin><configuration><resourceBundles><resourceBundle>g:${b}:1.0</resourceBundle></resourceBundles></configuration></plugin></plugins></build>`), "a/pom.xml: property b set by a profile"},
+		"maven string with a maven.config property":   {map[string]string{".mvn/maven.config": "-Db=common", "pom.xml": pomHead + `<modules><module>a</module></modules></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId><properties><d>${project.groupId}:${b}</d></properties></project>`}, "property b set by .mvn/maven.config"},
+		"maven profile property outside a coordinate": {two(`<profiles><profile><properties><jacoco.args>-javaagent:x.jar</jacoco.args></properties></profile></profiles><build><plugins><plugin><configuration><argLine>${jacoco.args}</argLine></configuration></plugin></plugins></build>`), ""},
+		"groovy include build":                        {map[string]string{"settings.gradle": "includeBuild 'build-logic'\ninclude ':a'\n", "build-logic/settings.gradle": "", "a/build.gradle": ""}, ""},
+		"groovy include build concat":                 {map[string]string{"settings.gradle": "includeBuild 'build-logic' + suffix\n", "build-logic/settings.gradle": ""}, "settings.gradle: includeBuild: an argument other than a string literal"},
+		"maven filter":                                {sub(`<project><build><filters><filter>../shared/f.properties</filter></filters></build></project>`), "<filter>../shared/f.properties</filter>"},
+		"maven suiteXmlFile":                          {sub(`<project><build><plugins><plugin><configuration><suiteXmlFiles><suiteXmlFile>../testng.xml</suiteXmlFile></suiteXmlFiles></configuration></plugin></plugins></build></project>`), "<suiteXmlFile>"},
+		"maven activation file":                       {sub(`<project><profiles><profile><activation><file><exists>${basedir}/../x</exists></file></activation></profile></profiles></project>`), "<exists>"},
+		"maven property path":                         {sub(`<project><properties><d>../shared</d></properties></project>`), "<d>../shared</d>"},
+		"maven.config property":                       {map[string]string{".mvn/maven.config": "-B -D a=1 --define=b=2 -Dlib=x --define", "pom.xml": pomHead + `<properties><lib>a</lib></properties><modules><module>a</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${lib}</artifactId></dependency></dependencies></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, "a/pom.xml: property lib set by .mvn/maven.config"},
+		"maven.config other property":                 {map[string]string{".mvn/maven.config": "-Dother=x", "pom.xml": pomHead + `<properties><lib>a</lib></properties><modules><module>a</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${lib}</artifactId></dependency></dependencies></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, ""},
+		"unreadable maven.config":                     {map[string]string{".mvn/maven.config/x": "", "pom.xml": pomHead + `</project>`}, "maven.config"},
+		"apply from in settings":                      {kts(`include(":a")` + "\n" + `apply(from = "more.settings.gradle.kts")`), "settings.gradle.kts: apply from"},
+		"empty project segment":                       {kts(`include(":a")`, "a/build.gradle.kts", `evaluationDependsOn("::")`), `a/build.gradle.kts: project path "::"`},
+		"computed evaluation":                         {kts(`include(":a")`, "a/build.gradle.kts", `evaluationDependsOn(other)`), "a/build.gradle.kts: evaluationDependsOn(...): an argument other than a string literal"},
+		"buildSrc computed ref":                       {kts(`include(":a")`, "buildSrc/src/main/kotlin/c.gradle.kts", `dependencies { "implementation"(project(name)) }`), "buildSrc/src/main/kotlin/c.gradle.kts: project(...)"},
+		"ancestor two builds":                         {kts(`include(":s:a")`, "s/build.gradle", "", "s/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
+		"ancestor computed ref":                       {kts(`include(":s:a")`, "s/build.gradle.kts", "subprojects { dependencies { implementation(project(name)) } }"), "s/build.gradle.kts: project(...)"},
+		"comment hides rest":                          {kts("include(\":a\") /* unterminated\ninclude(name)"), ""},
+		"comment at the end":                          {kts(`include(":a") // no line break after it`), ""},
 	} {
 		_, err := Adapter{}.Units(tree(t, tc.files))
 		switch {

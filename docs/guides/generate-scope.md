@@ -411,9 +411,12 @@ tool. A unit's files are its whole directory (`<module>/**`) plus the root
 context: each top-level file and directory of the root that is not a module
 directory or build output (`.git`, `.gradle`, `build`, `out`, `target`),
 since build files read root files such as `config/checkstyle.xml`. A
-directory that holds modules is included whole. Exclude build output in
-`defaults`: `**/target/**` for Maven, `**/build/**` and `**/.gradle/**` for
-Gradle.
+directory that holds modules is included whole. Exclude each build output
+directory in `defaults` by hand: the root `target/**`, `build/**` and
+`.gradle/**`, plus `<module>/target/**` or `<module>/build/**` per module,
+such as `app/build/**`. Do not write `**/build/**` or `**/target/**`: they
+also hide source packages named `build` or `target`, and a change there
+would be reused.
 
 - Maven: one unit per module in `<modules>` (Maven 4 `<subprojects>`), in
   the root POM, nested aggregators and every profile. A module depends on
@@ -441,7 +444,7 @@ time: declare those by hand in a fragment.
 ```yaml
 defaults:
   scope:
-    exclude: ["**/build/**", "**/.gradle/**"]
+    exclude: [.gradle/**, build/**, common/build/**, inventory/build/**]
   cacheability: hermetic
 fragments:
   java.common:

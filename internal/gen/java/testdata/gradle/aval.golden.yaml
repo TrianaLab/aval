@@ -3,7 +3,17 @@ kind: TestSet
 # aval gen java lists the root context (root files and gradle/) in every unit.
 defaults:
   scope:
-    exclude: ["**/build/**", "**/.gradle/**"]
+    # Build output, one entry per project: **/build/** would also hide
+    # source packages named build, such as buildSrc's below.
+    exclude:
+      - .gradle/**
+      - build/**
+      - buildSrc/.gradle/**
+      - buildSrc/build/**
+      - common/build/**
+      - inventory/build/**
+      - services/api/build/**
+      - services/web/build/**
   cacheability: hermetic
 fragments:
   java.common:
@@ -12,6 +22,7 @@ fragments:
         - aval.golden.yaml
         - aval.yaml
         - build.gradle.kts
+        - buildSrc/**
         - common/**
         - gradle/**
         - gradlew
@@ -23,6 +34,7 @@ fragments:
         - aval.golden.yaml
         - aval.yaml
         - build.gradle.kts
+        - buildSrc/**
         - gradle/**
         - gradlew
         - inventory/**
@@ -34,6 +46,7 @@ fragments:
         - aval.golden.yaml
         - aval.yaml
         - build.gradle.kts
+        - buildSrc/**
         - gradle/**
         - gradlew
         - services/**
@@ -46,6 +59,7 @@ fragments:
         - aval.golden.yaml
         - aval.yaml
         - build.gradle.kts
+        - buildSrc/**
         - gradle/**
         - gradlew
         - services/**

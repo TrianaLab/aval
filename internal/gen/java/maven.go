@@ -545,34 +545,64 @@ func (r reactor) deps(p *pom, dir string, index, strays map[string]string) ([]st
 				return nil, fmt.Errorf("%s refers to %s, a local POM outside the build: %w, list its directory in <modules>", key, f, errUnsupported)
 			}
 		}
-		deps = append(deps, r.textRefs(p, q, dir, index)...)
+		more, err := r.textRefs(p, q, dir, index, strays)
+		if err != nil {
+			return nil, err
+		}
+		deps = append(deps, more...)
 	}
 	return slices.Compact(slices.Sorted(slices.Values(deps))), nil
 }
 
+// coordTokenRe matches a groupId:artifactId[:...] token, properties
+// included.
+var coordTokenRe = regexp.MustCompile(`[\w.${}-]+(:[\w.${}-]+)+`)
+
 // textRefs returns the modules q's element texts name as one
 // groupId:artifactId[:...] string (a resourceBundle, dependenciesToScan,
-// an <artifact>), properties resolved in p's context where they can be.
-func (r reactor) textRefs(p, q *pom, dir string, index map[string]string) []string {
+// an <artifact>), properties resolved in p's context. Like a coordinate
+// reference, such a string naming a local POM outside the reactor, or
+// holding a property a profile or .mvn/maven.config sets, is an error.
+func (r reactor) textRefs(p, q *pom, dir string, index, strays map[string]string) ([]string, error) {
 	var deps []string
 	for _, e := range q.texts {
+		for _, tok := range coordTokenRe.FindAllString(e.text, -1) {
+			for _, m := range propRe.FindAllStringSubmatch(tok, -1) {
+				if _, _, err := r.prop(p, m[1]); err != nil {
+					return nil, err
+				}
+			}
+		}
 		t := propRe.ReplaceAllStringFunc(e.text, func(m string) string {
-			if v, ok, err := r.prop(p, m[2:len(m)-1]); ok && err == nil {
+			if v, ok, _ := r.prop(p, m[2:len(m)-1]); ok {
 				return v
 			}
 			return m
 		})
 		for key, d := range index {
-			for i := strings.Index(t, key); i >= 0 && d != dir; i = indexFrom(t, key, i+1) {
-				end := i + len(key)
-				if (i == 0 || !coordByte(t[i-1])) && (end == len(t) || t[end] == ':') {
-					deps = append(deps, d)
-					break
-				}
+			if d != dir && names(t, key) {
+				deps = append(deps, d)
+			}
+		}
+		for key, f := range strays {
+			if names(t, key) {
+				return nil, fmt.Errorf("%s refers to %s, a local POM outside the build: %w, list its directory in <modules>", key, f, errUnsupported)
 			}
 		}
 	}
-	return deps
+	return deps, nil
+}
+
+// names reports whether t holds key (groupId:artifactId) as a whole
+// coordinate: not inside a longer id, followed by the end or ":".
+func names(t, key string) bool {
+	for i := strings.Index(t, key); i >= 0; i = indexFrom(t, key, i+1) {
+		end := i + len(key)
+		if (i == 0 || !coordByte(t[i-1])) && (end == len(t) || t[end] == ':') {
+			return true
+		}
+	}
+	return false
 }
 
 // indexFrom is strings.Index from position i, or -1.
