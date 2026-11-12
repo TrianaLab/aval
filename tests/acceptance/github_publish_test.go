@@ -219,7 +219,8 @@ func pushes(calls []string) []string {
 
 // Every artifact is pushed with a fresh token, a forged artifact is refused
 // without stopping the others, the job's AVAL_REGISTRY, AVAL_POLICY and
-// SIGSTORE_ID_TOKEN are ignored, and run records follow successful pushes.
+// SIGSTORE_ID_TOKEN are ignored, and every artifact's run record is
+// published, whatever its push did (#290).
 func TestGitHubPublishActionStory(t *testing.T) {
 	s := newPublishStory(t)
 	a, c := s.suite(t, "a"), s.suite(t, "c")
@@ -247,8 +248,8 @@ func TestGitHubPublishActionStory(t *testing.T) {
 			t.Errorf("verify %s: exit %d, want %d", test, got, want)
 		}
 	}
-	if stats := strings.Count(strings.Join(r.calls, "\n"), " stats publish --registry "+s.repo+" --source-repo acme/app "); stats != 2 {
-		t.Errorf("%d run records published, want 2 (a and c)", stats)
+	if stats := strings.Count(strings.Join(r.calls, "\n"), " stats publish --registry "+s.repo+" --source-repo acme/app "); stats != 3 {
+		t.Errorf("%d run records published, want 3 (one per artifact)", stats)
 	}
 	if !strings.Contains(r.summary, "| a | exit 0 |") || !strings.Contains(r.summary, "| b | exit 1 |") {
 		t.Errorf("summary %q", r.summary)
@@ -278,6 +279,40 @@ func TestGitHubPublishActionSecurityEvent(t *testing.T) {
 	if s.verify(t, "a") != 4 || s.verify(t, "b") != 0 {
 		t.Fatal("a must not be published and b must be")
 	}
+	if stats := strings.Count(strings.Join(r.calls, "\n"), " stats publish "); stats != 3 {
+		t.Errorf("%d run records published, want 3: a security event still records its run", stats)
+	}
+}
+
+// With stats-registry, the run records of misses and of verified hits go
+// there, not to the policy's registry, and aval stats --by repository counts
+// them (#290). A record that cannot be published only warns.
+func TestGitHubPublishActionStatsRegistry(t *testing.T) {
+	s := newPublishStory(t)
+	stats := strings.SplitN(s.repo, "/", 2)[0] + "/trianalab/aval-stats"
+	env := "INPUT_STATS_REGISTRY=" + stats
+	s.artifact(t, "a", s.suite(t, "a"), nil) // miss
+	if r := s.publish(t, env); r.code != 0 || s.verify(t, "a") != 0 {
+		t.Fatalf("miss: exit %d\n%s", r.code, r.out)
+	}
+	s.reset(t)
+	s.artifact(t, "a", s.suite(t, "a", "--registry", s.repo, "--policy", ".github/aval/policy.yaml"), nil) // hit
+	s.artifact(t, "b", s.suite(t, "b"), nil)                                                               // miss
+	if r := s.publish(t, env); r.code != 0 || strings.Count(strings.Join(r.calls, "\n"), " stats publish --registry "+stats+" ") != 2 {
+		t.Fatalf("hit and miss: exit %d\n%s\n%s", r.code, r.out, strings.Join(r.calls, "\n"))
+	}
+	stdout, stderr, code := avalIn(t, s.dir, "stats", "--registry", stats, "--by", "repository")
+	if code != 0 || !strings.Contains(stdout, "\nacme/app: 3 runs, 1 reused") {
+		t.Fatalf("stats: exit %d\n%s\n%s", code, stdout, stderr)
+	}
+	if stdout, _, _ := avalIn(t, s.dir, "stats", "--registry", s.repo); !strings.Contains(stdout, "no run records") {
+		t.Errorf("policy registry holds run records:\n%s", stdout)
+	}
+
+	// An unreachable stats registry warns and leaves the exit code alone.
+	if r := s.publish(t, "INPUT_STATS_REGISTRY=127.0.0.1:1/x"); r.code != 0 || !strings.Contains(r.out, "::warning title=aval publish::a: could not publish the run record") {
+		t.Fatalf("unreachable stats registry: exit %d\n%s", r.code, r.out)
+	}
 }
 
 // Refs and events that must not sign, a job without id-token and a missing
@@ -300,6 +335,8 @@ func TestGitHubPublishActionRefuses(t *testing.T) {
 		"bad allow value":     {s.policy, []string{"ALLOW_UNPROTECTED=yes"}, 2, "must be true or false"},
 		"no policy":           {"", nil, 1, "no trust policy at .github/aval/policy.yaml in the default branch (main, HTTP 404)"},
 		"no registry":         {noRegistry, nil, 1, "has no valid registry field"},
+		"stats credentials":   {s.policy, []string{"INPUT_STATS_REGISTRY=u:p@ghcr.io/x"}, 2, `stats-registry: "u:p@ghcr.io/x" must be host[:port]/path`},
+		"stats scheme":        {s.policy, []string{"INPUT_STATS_REGISTRY=https://ghcr.io/x"}, 2, "must be host[:port]/path"},
 	} {
 		s.contents.set(tc.policy)
 		if r := s.publish(t, tc.env...); r.code != tc.code || len(r.calls) != 0 || !strings.Contains(r.out, tc.out) {

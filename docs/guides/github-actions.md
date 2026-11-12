@@ -65,7 +65,7 @@ One job signs what the suite jobs uploaded, with the workflow's identity:
 The action [`integrations/github/publish`](https://github.com/TrianaLab/aval/blob/main/integrations/github/publish/action.yml)
 takes `file`, `policy`, `registry-username`, `registry-password` (default
 `github.actor` and `github.token`), `stats` and `allow-unprotected` (both
-default `false`). In order, it:
+default `false`) and `stats-registry` (default empty). In order, it:
 
 1. Refuses a ref other than the default branch unless `allow-unprotected:
    true`, always refuses `pull_request_target` and `workflow_run`, and fails
@@ -77,8 +77,8 @@ default `false`). In order, it:
    `registry`, where results go. No policy or no `registry` fails the step.
 5. For each `aval-<name>`, fetches a fresh OIDC token (audience `sigstore`) and runs `aval push --test <name>`.
    It tries them all, then exits with the worst code; 5 is `aval SECURITY`, never downgraded.
-6. With `stats: true`, publishes each pushed test's run record; a failure
-   is a warning.
+6. With `stats: true`, publishes every artifact's run record (hit, miss or verification failure) to `stats-registry`,
+   or the policy's `registry` when empty ([shared stats](../stats.md#publish-from-github-actions)); a failure is a warning.
 
 What `aval push` does with each artifact:
 

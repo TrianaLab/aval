@@ -1,7 +1,7 @@
 #!/bin/bash
 # Steps 3, 4, 6 and 7 of the aval publish action (#212); it runs only
 # when there is an aval-* artifact (#260). Reads INPUT_FILE,
-# INPUT_POLICY, INPUT_STATS, AVAL (absolute path of the installed binary),
+# INPUT_POLICY, INPUT_STATS, INPUT_STATS_REGISTRY, AVAL (absolute path of the installed binary),
 # ARTIFACTS (the directory the aval-* artifacts were downloaded into),
 # REGISTRY_USERNAME, REGISTRY_PASSWORD, DEFAULT_BRANCH, GH_TOKEN and the
 # runner's GITHUB_*, RUNNER_TEMP and ACTIONS_ID_TOKEN_REQUEST_* variables.
@@ -23,6 +23,13 @@ if ! [[ "$INPUT_POLICY" =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$ ]] || [[ "/$INPU
   echo "::error title=aval publish::policy: \"$INPUT_POLICY\" must be a relative path in the repository"
   exit 2
 fi
+# Where run records go (#290): empty means the policy's registry. The same
+# host/path check as policy-registry.sh: no scheme, no credentials, no @.
+stats_registry=${INPUT_STATS_REGISTRY:-}
+if [ -n "$stats_registry" ] && ! [[ "$stats_registry" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+$ ]]; then
+  echo "::error title=aval publish::stats-registry: \"$stats_registry\" must be host[:port]/path"
+  exit 2
+fi
 
 # Step 3: the policy from the default branch. Without it there is no
 # registry to publish to.
@@ -42,9 +49,10 @@ if ! registry=$(/bin/bash "${BASH_SOURCE[0]%/*}/../policy-registry.sh" "$policy"
   exit 1
 fi
 echo "trust policy: $INPUT_POLICY from the default branch ($DEFAULT_BRANCH), registry $registry"
+stats_registry=${stats_registry:-$registry}
 
 # Step 4: credentials for the registry host only, in a credential store of
-# this step, never the job's.
+# this step, never the job's. A stats registry on another host gets none.
 export DOCKER_CONFIG="$RUNNER_TEMP/aval-publish-docker"
 trap '/bin/rm -rf "$DOCKER_CONFIG"' EXIT
 /bin/mkdir -p "$DOCKER_CONFIG"
@@ -110,9 +118,11 @@ for dir in "$ARTIFACTS"/aval-*/; do
     worst=$code
   fi
 
-  # Step 7: best effort, never fails the step.
-  if [ "${INPUT_STATS:-false}" = true ] && [ "$code" -eq 0 ] && [ -f "${dir}record.json" ]; then
-    "$AVAL" stats publish --registry "$registry" --source-repo "$GITHUB_REPOSITORY" "${dir}record.json" ||
+  # Step 7: every artifact's record, hit, miss or verification failure,
+  # whatever push did (#290). Unsigned statistics that run and verify never
+  # read; best effort, never fails the step.
+  if [ "${INPUT_STATS:-false}" = true ] && [ -f "${dir}record.json" ]; then
+    "$AVAL" stats publish --registry "$stats_registry" --source-repo "$GITHUB_REPOSITORY" "${dir}record.json" ||
       echo "::warning title=aval publish::$name: could not publish the run record"
   fi
 done
