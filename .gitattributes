@@ -3,6 +3,7 @@ internal/fingerprint/testdata/golden/** -text
 # TestVendoredMermaid hashes these bytes: no EOL conversion on checkout.
 docs/javascripts/vendor/** -text linguist-vendored
 # TestGolden compares these bytes: no EOL conversion on checkout.
+internal/gen/dotnet/testdata/** -text
 internal/gen/js/testdata/** -text
 # The aval gen java golden tests compare these bytes: no EOL conversion.
 internal/gen/java/testdata/** -text
