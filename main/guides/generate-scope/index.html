@@ -2510,7 +2510,28 @@ test command:</p>
 dependency becomes an edge when it names another workspace package (any
 range, or <code>workspace:</code>), or when a <code>file:</code>, <code>link:</code> or <code>portal:</code> path points
 to one. External packages are not edges: the lockfile in <code>defaults</code> covers
-them. Exclude <code>node_modules</code> there too:</p>
+them. Exclude <code>node_modules</code> there too.</p>
+<p>Two local dependencies that <code>package.json</code> does not name are edges as well:</p>
+<ul>
+<li>TypeScript configs. Every <code>tsconfig*.json</code> in a package (JSON with comments
+  and trailing commas) adds an edge for each <code>references</code> path that lands in
+  another workspace package. Its <code>extends</code> chain is followed the way
+  TypeScript does (a relative path, a directory meaning its <code>tsconfig.json</code>,
+  <code>.json</code> added when missing, or <code>&lt;workspace package&gt;/&lt;path&gt;</code>): a file in
+  another workspace package is an edge, and a file outside every package,
+  such as a root <code>tsconfig.base.json</code>, joins the unit's own files. <code>extends</code>
+  of an external package is not followed.</li>
+<li>Relative imports. Every <code>.js</code>, <code>.jsx</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.ts</code>, <code>.tsx</code>,
+  <code>.mts</code>, <code>.cts</code>, <code>.vue</code>, <code>.svelte</code> and <code>.astro</code> file in a package is
+  scanned for relative specifiers (<code>./</code>, <code>../</code>) of <code>import ... from</code>,
+  <code>export ... from</code>, <code>import "..."</code>, <code>import(...)</code> and <code>require(...)</code>. One
+  that lands in another workspace package is an edge. Comments are not
+  stripped, so a commented-out import still counts.</li>
+</ul>
+<p>The scan skips <code>node_modules</code>, <code>.git</code> and nested workspace packages;
+hidden directories such as <code>.storybook</code> are scanned. It reads only those
+references: <code>paths</code> aliases and <code>include</code> globs that reach outside the package are not edges, so declare
+those by hand.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TestSet</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">defaults</span><span class="p">:</span>
@@ -2541,7 +2562,12 @@ them. Exclude <code>node_modules</code> there too:</p>
 <p>No lockfile or lockfiles of two package managers, an unreadable
 <code>package.json</code> or <code>pnpm-workspace.yaml</code>, no workspaces, a workspace package
 without a <code>name</code>, and a <code>workspace:</code> or <code>file:</code> reference to something that
-is not a workspace package are errors: nothing is written, exit 1. A package
+is not a workspace package are errors: nothing is written, exit 1. So are a
+relative import that lands outside every workspace package or outside the
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, or that is computed (a template literal with <code>${...}</code>),
+named by file and line; a <code>references</code> path outside every workspace
+package; and an unreadable tsconfig or a missing, absolute or out-of-root
+<code>extends</code>. A package
 without a <code>test</code> script still gets a test; its command fails until you add
 the script.</p>
 <h2 id="rust">Rust<a class="headerlink" href="#rust" title="Anchor link">&para;</a></h2>
