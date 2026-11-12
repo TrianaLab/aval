@@ -430,6 +430,9 @@ A repository appears on the [Stats](https://aval.run/main/stats/) page once it p
 
     Without `--source-repo` here or on `aval run`, the repository shows as
     `unknown`. Aval's own `dogfood-record` job in `ci.yaml` does this.
+    With the publish action, set `stats: "true"` and
+    `stats-registry: ghcr.io/trianalab/aval-stats` instead: it publishes
+    every artifact's record with the repository.
 
 A maintainer can refresh the site's `stats.json` at any time from the Actions
 tab: open the `docs` workflow and choose "Run workflow" on `main`.

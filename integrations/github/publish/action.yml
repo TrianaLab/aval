@@ -23,8 +23,13 @@ inputs:
     description: Registry password or token.
     default: ${{ github.token }}
   stats:
-    description: Also publish each pushed test's run record (aval stats publish), best effort.
+    description: Also publish every artifact's run record (aval stats publish), hit or miss, best effort.
     default: "false"
+  stats-registry:
+    description: >-
+      Registry (host/path) for the run records; empty means the policy's registry.
+      Gets the registry credentials only when on the policy registry's host.
+    default: ""
   allow-unprotected:
     description: Publish from a ref other than the default branch.
     default: "false"
@@ -109,6 +114,7 @@ runs:
         INPUT_FILE: ${{ inputs.file }}
         INPUT_POLICY: ${{ inputs.policy }}
         INPUT_STATS: ${{ inputs.stats }}
+        INPUT_STATS_REGISTRY: ${{ inputs.stats-registry }}
         REGISTRY_USERNAME: ${{ inputs.registry-username }}
         REGISTRY_PASSWORD: ${{ inputs.registry-password }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
