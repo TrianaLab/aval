@@ -154,7 +154,9 @@ fi
 echo "upload=$upload" >> "$GITHUB_OUTPUT"
 
 # Step 3: the policy from the default branch.
-policy=$(/usr/bin/mktemp "$RUNNER_TEMP/aval-policy.XXXXXX")
+# Named after the first test: one test keeps the path it always had.
+policy="$RUNNER_TEMP/aval-policy-${tests[0]}.yaml"
+/bin/rm -f "$policy"
 status=000
 if [ -n "${DEFAULT_BRANCH:-}" ]; then
   ref=$(/usr/bin/jq -rn --arg v "$DEFAULT_BRANCH" '$v | @uri')
