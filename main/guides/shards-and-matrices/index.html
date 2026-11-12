@@ -993,6 +993,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#several-tests-in-one-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several tests in one job
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#read-next" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2276,6 +2287,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#several-tests-in-one-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several tests in one job
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#read-next" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2540,6 +2562,20 @@ the workflow:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>aval<span class="w"> </span>run<span class="w"> </span>-f<span class="w"> </span>aval.shard-2.yaml<span class="w"> </span>--result-file<span class="w"> </span>.aval/shard-2.json
 </span></code></pre></div>
 <p>To publish, add the push step from <a href="../github-actions/">Use GitHub Actions</a>.</p>
+<h2 id="several-tests-in-one-job">Several tests in one job<a class="headerlink" href="#several-tests-in-one-job" title="Anchor link">&para;</a></h2>
+<p>One job per test pays checkout, setup and the aval install each time. The run action takes several tests in one step instead:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="w">  </span><span class="nt">go</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">          </span><span class="nt">persist-credentials</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TrianaLab/aval/integrations/github/run@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">          </span><span class="nt">test</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">go.* lint</span>
+</span></code></pre></div>
+<p><code>test</code> takes names and glob patterns (<code>*</code>, <code>?</code>, <code>[...]</code>) separated by spaces, commas or newlines; a pattern adds the tests it matches, in <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> order, and exits 2 when it matches none. Each test gets its own lookup, verification, run and report, one after the other. After them all the step exits with the worst code: a failing test (exit 3) does not skip the rest, and 5 (<code>aval SECURITY</code>) is never downgraded. The <code>outcome</code> output is the worst <abbr title="The decision on a lookup: verified, miss, verification-failed or error.">outcome</abbr> (<code>verified</code> only when every test is, so <code>lookup-only</code> skips setup only then); <code>outcomes</code> maps each test to its own, and the step summary has a line per test. On a push to the default branch the tests share one artifact <code>aval-.&lt;id&gt;</code>, which the publish action pushes test by test.</p>
+<p>The tests share the job and its user: code one test runs can change what the next one reads, as with separate steps of one job. Keep tests that must not touch each other in separate jobs.</p>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Anchor link">&para;</a></h2>
 <ul>
 <li><a href="../depend-on-a-contract/">Depend on another part of the repo</a></li>
