@@ -1032,6 +1032,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#net" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .NET
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-language-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2309,6 +2320,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#net" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .NET
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-language-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2415,8 +2437,8 @@ declared in <code>aval.yaml</code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Languages</p>
 <p>JavaScript and TypeScript (<a href="#javascript-and-typescript">below</a>), Python
-(<a href="#python">below</a>) and Rust (<a href="#rust">below</a>) ship. The other adapters (Go,
-Java, .NET) are the next stories of
+(<a href="#python">below</a>), Rust (<a href="#rust">below</a>) and .NET (<a href="#net">below</a>) ship.
+The other adapters (Go, Java) are the next stories of
 <a href="https://github.com/TrianaLab/aval/issues/291">Epic 16</a>. <code>aval gen --help</code>
 lists the languages your build has.</p>
 </div>
@@ -2697,6 +2719,48 @@ inheritance) and <code>Cargo.lock</code> in <code>defaults</code>.</p>
   is an error naming the file. <code>.cargo/config.toml</code> files in parent
   directories or in <code>CARGO_HOME</code> are not read: keep overrides at the
   workspace root.</li>
+</ul>
+<h2 id="net">.NET<a class="headerlink" href="#net" title="Anchor link">&para;</a></h2>
+<p><code>aval gen dotnet</code> reads the solution and project files themselves, so it
+needs no .NET SDK. Its units are the projects of the <code>.sln</code> or <code>.slnx</code> at the
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, or every <code>.csproj</code>, <code>.fsproj</code> and <code>.vbproj</code> under it when
+there is no solution (skipping hidden, <code>bin</code>, <code>obj</code> and <code>node_modules</code>
+directories), plus every project they reference. A unit's ID is its project
+name, and its test is <code>dotnet test &lt;project&gt;</code>. An excerpt; the full output is
+in <code>internal/gen/dotnet/testdata/golden.yaml</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">dotnet.shop.api</span><span class="p">:</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Directory.Build.props</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shared/Version.cs</span><span class="w">     </span><span class="c1"># &lt;Compile Include="..\..\shared\Version.cs" /&gt;</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/Shop.Api/**</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">dotnet.shop.api</span><span class="p p-Indicator">}</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">dotnet</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">src/Shop.Api/Shop.Api.csproj</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dotnet.shop.api</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dotnet.shop.core</span><span class="w">        </span><span class="c1"># through Shop.Data</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dotnet.shop.data</span><span class="w">        </span><span class="c1"># &lt;ProjectReference Include="..\Shop.Data\Shop.Data.csproj" /&gt;</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dotnet.shop.legacy</span><span class="w">      </span><span class="c1"># referenced, not in the .sln</span>
+</span></code></pre></div>
+<ul>
+<li>A unit's files are its project directory, the <code>Directory.Build.props</code>,
+  <code>Directory.Build.targets</code> and <code>Directory.Packages.props</code> files from there
+  up to the root, the files its <code>Import</code>s name, and the items it includes
+  from outside its directory, such as a shared <code>Compile</code> or <code>Protobuf</code> glob.
+  Imported files are read too, so a <code>ProjectReference</code> in a
+  <code>Directory.Build.props</code> counts.</li>
+<li>Only <code>ProjectReference</code>s become dependencies. Keep <code>global.json</code>,
+  <code>NuGet.config</code> and <code>packages.lock.json</code> files in <code>defaults</code>.</li>
+<li>Fails closed: a malformed file, a missing referenced project, a path
+  outside the repository or built from an MSBuild property other than
+  <code>$(MSBuildThisFileDirectory)</code> or <code>$(MSBuildProjectDirectory)</code>, a wildcard
+  <code>Import</code>, a <code>GetPathOfFileAbove</code> of a file other than the <code>Directory.*</code>
+  files or from outside the project's directory and those above it, several
+  solutions at the root, or two projects with the same name is an error.</li>
+<li>Files that only a property names (such as a <code>KeyOriginatorFile</code>) are not
+  followed: add them to <code>defaults</code>.</li>
 </ul>
 <h2 id="cross-language-dependencies">Cross-language dependencies<a class="headerlink" href="#cross-language-dependencies" title="Anchor link">&para;</a></h2>
 <p>A generator sees one ecosystem. Declare a dependency across languages by
