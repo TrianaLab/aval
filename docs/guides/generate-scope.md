@@ -420,22 +420,29 @@ Gradle.
   every local module its POM names with a `groupId` and `artifactId`:
   `<parent>`, dependencies, plugins and `pluginManagement`, extensions,
   imported BOMs or plugin configuration such as
-  `annotationProcessorPaths`, and on what its local parents and the root
-  POM name, resolved with its own properties. Managed dependencies and
+  `annotationProcessorPaths`, or a `groupId:artifactId` string (a
+  `resourceBundle`, `dependenciesToScan`), and on what its local parents
+  and the root POM name, resolved with its own properties. Managed dependencies and
   `exclusions` are not edges. The test is `mvn -B -pl <module> test`
   (`./mvnw` when the root has it), which takes the other modules from the
   local repository: run `mvn -B install -DskipTests` before `aval run`.
 - Gradle: one unit per `include` in `settings.gradle.kts` or
   `settings.gradle`. A subproject depends on its parent projects and on the
-  projects named in `project(...)`, `evaluationDependsOn(...)` or a task
-  path such as `":common:jar"` by its build script, the settings script,
-  the root build script, `buildSrc` and its parent projects' build scripts.
-  The test is `./gradlew :<path>:test` (`gradle` without a wrapper).
+  projects named in `project(...)`, a type-safe accessor
+  (`projects.feature.ui`), `evaluationDependsOn(...)` or a task path such
+  as `":common:jar"` by its build script, the settings script, the root
+  build script, `buildSrc`, an `includeBuild` of a top-level directory
+  (`build-logic`) and its parent projects' build scripts. The test is
+  `./gradlew :<path>:test` (`gradle` without a wrapper).
 
 Neither adapter sees test code that reads another module's files at run
 time: declare those by hand in a fragment.
 
 ```yaml
+defaults:
+  scope:
+    exclude: ["**/build/**", "**/.gradle/**"]
+  cacheability: hermetic
 fragments:
   java.common:
     scope:
@@ -451,7 +458,8 @@ fragments:
 What it cannot read for certain is an error (exit 1), not a guess:
 
 - a computed `include`, `project(...)` or `evaluationDependsOn(...)` path,
-  type-safe accessors (`projects.common`), `includeBuild`, `projectDir`,
+  an accessor that names no included project, an `includeBuild` of
+  anything but a top-level directory that is not a project, `projectDir`,
   `buildFileName`, `apply from` or a triple-quoted string;
 - in Gradle, `parent`, `getParent`, `parentFile`, or
   `rootProject.subprojects` and `project(":").subprojects` (and kin) in a

@@ -20,7 +20,9 @@ var (
 	settingsRe = regexp.MustCompile(`\b(includeBuild|includeFlat|projectDir|buildFileName)\b`)
 	projectRe  = regexp.MustCompile(`\b(project|findProject|evaluationDependsOn)\s*\(`)
 	pathArgRe  = regexp.MustCompile(`^path\s*[:=]\s*`)
-	accessorRe = regexp.MustCompile(`\bprojects\.`)
+	// projects.core, projects.feature.ui: type-safe project accessors.
+	accessorRe     = regexp.MustCompile(`\bprojects((?:\s*\.\s*[A-Za-z_]\w*)+)`)
+	includeBuildRe = regexp.MustCompile(`\bincludeBuild\s*\(`)
 	// apply(from = "...") or apply from: '...' pulls in a script no unit covers.
 	applyFromRe = regexp.MustCompile(`\bapply\s*\(?\s*from\b`)
 	// Names that reach the files of another project from a subproject.
@@ -47,11 +49,11 @@ var (
 // reads only string literals and fails on anything else: a computed include
 // or project path could hide a unit or an edge.
 func gradle(root, settings string) ([]gen.Unit, error) {
-	text, paths, known, err := projects(root, settings)
+	text, paths, known, builds, err := projects(root, settings)
 	if err != nil {
 		return nil, err
 	}
-	shared, common, err := buildLogic(root, settings, known)
+	shared, common, err := buildLogic(root, append([]string{"buildSrc"}, builds...), known)
 	if err != nil {
 		return nil, err
 	}
@@ -106,37 +108,69 @@ func gradle(root, settings string) ([]gen.Unit, error) {
 }
 
 // projects returns the settings script without comments, the project
-// paths it includes and their unit IDs.
-func projects(root, settings string) (string, []string, map[string]bool, error) {
-	text, err := script(root, settings)
-	if err != nil {
-		return "", nil, nil, err
+// paths it includes, their unit IDs and the builds it includes (see
+// includedBuilds).
+func projects(root, settings string) (text string, paths []string, known map[string]bool, builds []string, err error) {
+	if text, err = script(root, settings); err != nil {
+		return "", nil, nil, nil, err
 	}
 	masked, _ := literals(text)
+	builds, masked, err = includedBuilds(text, masked)
+	if err != nil {
+		return "", nil, nil, nil, fmt.Errorf("%s: %w", settings, err)
+	}
 	if m := settingsRe.FindString(masked); m != "" {
-		return "", nil, nil, fmt.Errorf("%s: %s: %w", settings, m, errUnsupported)
+		return "", nil, nil, nil, fmt.Errorf("%s: %s: %w", settings, m, errUnsupported)
 	}
 	if applyFromRe.MatchString(masked) {
-		return "", nil, nil, fmt.Errorf("%s: apply from: %w, put the settings in %s", settings, errUnsupported, settings)
+		return "", nil, nil, nil, fmt.Errorf("%s: apply from: %w, put the settings in %s", settings, errUnsupported, settings)
 	}
-	paths, err := includes(text)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("%s: %w", settings, err)
+	if paths, err = includes(text); err != nil {
+		return "", nil, nil, nil, fmt.Errorf("%s: %w", settings, err)
 	}
-	known := map[string]bool{}
+	known = map[string]bool{}
 	for i, p := range paths {
 		if !strings.HasPrefix(p, ":") {
 			paths[i] = ":" + p
 		}
 		known[projectID(paths[i])] = true
 	}
-	return text, paths, known, nil
+	for _, b := range builds {
+		if info, err := os.Stat(filepath.Join(root, b)); known[b] || err != nil || !info.IsDir() {
+			return "", nil, nil, nil, fmt.Errorf("%s: includeBuild(%q): %w, only a top-level directory that is not a project", settings, b, errUnsupported)
+		}
+	}
+	return text, paths, known, builds, nil
+}
+
+// includedBuilds returns the targets of includeBuild("dir") (such as a
+// build-logic build in pluginManagement), each a top-level directory
+// whose files the root context covers, and masked without those calls.
+// Any other target is an error.
+func includedBuilds(text, masked string) ([]string, string, error) {
+	var builds []string
+	for _, loc := range includeBuildRe.FindAllStringIndex(masked, -1) {
+		v, j, err := literal(text, skip(text, loc[1], true))
+		if err == nil && (skip(text, j, true) >= len(text) || text[skip(text, j, true)] != ')') {
+			err = fmt.Errorf("an argument other than a string literal: %w", errUnsupported)
+		}
+		if err != nil {
+			return nil, "", fmt.Errorf("includeBuild: %w", err)
+		}
+		b := path.Clean(v)
+		if strings.Contains(b, "/") || b == "." || b == ".." || notContext[b] {
+			return nil, "", fmt.Errorf("includeBuild(%q): %w, only a top-level directory that is not a project", v, errUnsupported)
+		}
+		builds = append(builds, b)
+		masked = masked[:loc[0]] + strings.Repeat(" ", loc[1]-loc[0]) + masked[loc[1]:]
+	}
+	return builds, masked, nil
 }
 
 // buildLogic returns the root context (see rootContext), the files of
 // every unit, and the units the root build script and buildSrc refer to
 // (subprojects { ... }, convention plugins), edges of every unit.
-func buildLogic(root, settings string, known map[string]bool) (shared, common []string, err error) {
+func buildLogic(root string, logic []string, known map[string]bool) (shared, common []string, err error) {
 	if shared, err = rootContext(root, known); err != nil {
 		return nil, nil, err
 	}
@@ -149,8 +183,11 @@ func buildLogic(root, settings string, known map[string]bool) (shared, common []
 			return nil, nil, err
 		}
 	}
-	if info, err := os.Stat(filepath.Join(root, "buildSrc")); err == nil && info.IsDir() {
-		more, err := buildSrc(root, known)
+	for _, b := range logic {
+		if info, err := os.Stat(filepath.Join(root, b)); err != nil || !info.IsDir() {
+			continue // no buildSrc
+		}
+		more, err := logicBuild(root, b, known)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -159,12 +196,15 @@ func buildLogic(root, settings string, known map[string]bool) (shared, common []
 	return shared, common, nil
 }
 
-// buildSrc returns the units the build logic under buildSrc refers to
-// with project(...) or a task path. Its files are in every unit's scope,
-// so only the references are read.
-func buildSrc(root string, known map[string]bool) ([]string, error) {
+// logicBuild returns the units the build logic in dir (buildSrc or an
+// included build-logic build) refers to with project(...), an accessor or
+// a task path. Its files are in every unit's scope, so only the
+// references and paths are read: its own settings and build scripts
+// resolve paths against dir (from(files("../gradle/libs.versions.toml"))),
+// the convention plugins under it against the project that applies them.
+func logicBuild(root, dir string, known map[string]bool) ([]string, error) {
 	var ids []string
-	err := filepath.WalkDir(filepath.Join(root, "buildSrc"), func(p string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(filepath.Join(root, dir), func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -183,7 +223,11 @@ func buildSrc(root string, known map[string]bool) ([]string, error) {
 			return err
 		}
 		name := filepath.ToSlash(rel)
-		if err := checkLiterals(text, name, "", known); err != nil {
+		self, base := "", path.Base(name)
+		if path.Dir(name) == dir && (strings.HasPrefix(base, "settings.gradle") || strings.HasPrefix(base, "build.gradle")) {
+			self = dir
+		}
+		if err := checkLiterals(text, name, self, known); err != nil {
 			return err
 		}
 		more, err := projectRefs(text, name, ":", known)
@@ -297,9 +341,6 @@ func refs(root, name, self string, known map[string]bool) ([]string, error) {
 
 func scriptRefs(text, name, self string, known map[string]bool) ([]string, error) {
 	masked, _ := literals(text)
-	if accessorRe.MatchString(masked) {
-		return nil, fmt.Errorf("%s: type-safe project accessors (projects.*): %w, use project(\":path\")", name, errUnsupported)
-	}
 	if applyFromRe.MatchString(masked) {
 		return nil, fmt.Errorf("%s: apply from: %w, put the script in defaults or a fragment", name, errUnsupported)
 	}
@@ -498,6 +539,11 @@ func projectRefs(text, name, self string, known map[string]bool) ([]string, erro
 		}
 		ids = append(ids, id)
 	}
+	more, err := accessorRefs(masked, name, known)
+	if err != nil {
+		return nil, err
+	}
+	ids = append(ids, more...)
 	for _, l := range lits {
 		if !strings.HasPrefix(l, ":") {
 			continue
@@ -510,6 +556,50 @@ func projectRefs(text, name, self string, known map[string]bool) ([]string, erro
 		}
 	}
 	return ids, nil
+}
+
+// accessorRefs returns the units the type-safe project accessors in masked
+// name: the longest prefix of projects.a.b.c that is an accessor. One that
+// names no included project is an error.
+func accessorRefs(masked, name string, known map[string]bool) ([]string, error) {
+	acc := accessors(known)
+	var ids []string
+	for _, m := range accessorRe.FindAllStringSubmatch(masked, -1) {
+		chain := strings.Join(strings.Fields(m[1]), "")
+		segs := strings.Split(chain, ".")[1:]
+		id := ""
+		for i := len(segs); i > 0 && id == ""; i-- {
+			id = acc[strings.Join(segs[:i], ".")]
+		}
+		if id == "" {
+			return nil, fmt.Errorf("%s: projects%s: no included project has this accessor: %w", name, chain, errUnsupported)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// accessors maps each type-safe project accessor (projects.feature.ui,
+// projects.myLib) to its unit: each path segment in lower camel case, with
+// "-" and "_" removed, as Gradle names them.
+func accessors(known map[string]bool) map[string]string {
+	acc := map[string]string{}
+	for id := range known {
+		segs := strings.Split(id, "/")
+		for i, seg := range segs {
+			words := strings.FieldsFunc(seg, func(r rune) bool { return r == '-' || r == '_' })
+			for j, w := range words {
+				if j == 0 {
+					words[j] = strings.ToLower(w[:1]) + w[1:]
+				} else {
+					words[j] = strings.ToUpper(w[:1]) + w[1:]
+				}
+			}
+			segs[i] = strings.Join(words, "")
+		}
+		acc[strings.Join(segs, ".")] = id
+	}
+	return acc
 }
 
 // literals returns text with the contents of its string literals blanked,

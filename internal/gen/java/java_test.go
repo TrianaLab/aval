@@ -215,6 +215,15 @@ var nested = map[string]string{
 	"app/sub/src/S.kt":          "",
 }
 
+// bundled is a Maven build whose module a names res only in a
+// groupId:artifactId string.
+var bundled = map[string]string{
+	"pom.xml":                                pomHead + `<modules><module>a</module><module>res</module></modules></project>`,
+	"a/pom.xml":                              `<project><groupId>g</groupId><artifactId>a</artifactId><build><plugins><plugin><artifactId>maven-surefire-plugin</artifactId><configuration><dependenciesToScan><dependency>g:res</dependency></dependenciesToScan></configuration></plugin></plugins></build></project>`,
+	"res/pom.xml":                            `<project><groupId>g</groupId><artifactId>res</artifactId></project>`,
+	"res/src/main/resources/META-INF/NOTICE": "",
+}
+
 // rooted is a Maven build whose module a reads a root file by a path
 // relative to the root (the working directory under mvn -pl).
 var rooted = map[string]string{
@@ -246,9 +255,10 @@ func TestFalseHitInheritedAndImported(t *testing.T) {
 			"java.b": "config/detekt.yml",     // read by a buildSrc convention plugin
 			"java.e": "config/checkstyle.xml", // read by the root build script
 		}},
-		{conventions, map[string]string{"java.a": "e/src/E.kt"}},                 // named in the settings script
-		{nested, map[string]string{"java.app.sub": "app/gradle.properties"}},     // inherited by subprojects
-		{nested, map[string]string{"java.app.sub": "app/config/checkstyle.xml"}}, // handed down by app's script
+		{conventions, map[string]string{"java.a": "e/src/E.kt"}},                         // named in the settings script
+		{nested, map[string]string{"java.app.sub": "app/gradle.properties"}},             // inherited by subprojects
+		{nested, map[string]string{"java.app.sub": "app/config/checkstyle.xml"}},         // handed down by app's script
+		{bundled, map[string]string{"java.a": "res/src/main/resources/META-INF/NOTICE"}}, // a resourceBundle string
 		{rooted, map[string]string{
 			"java.a": "config/checkstyle.xml", // <configLocation> resolved against the root
 			"java.b": ".mvn/jvm.config",
@@ -374,6 +384,50 @@ func TestUnits(t *testing.T) {
 				{ID: "a-fixtures", Source: []string{"pom.xml", "a-fixtures/**"}, Command: []string{"mvn", "-B", "-pl", "a-fixtures", "test"}},
 			},
 		},
+		"gradle init layout, buildSrc catalog": {
+			files: map[string]string{
+				"settings.gradle.kts":          "rootProject.name = \"demo\"\ninclude(\"app\", \"list\", \"utilities\")\n",
+				"gradle/libs.versions.toml":    "[versions]\n",
+				"buildSrc/settings.gradle.kts": "dependencyResolutionManagement {\n    versionCatalogs {\n        create(\"libs\", { from(files(\"../gradle/libs.versions.toml\")) })\n    }\n}\n",
+				"buildSrc/build.gradle.kts":    "plugins {\n    `kotlin-dsl`\n}\nrepositories {\n    gradlePluginPortal()\n}\n",
+				"buildSrc/src/main/kotlin/buildlogic.kotlin-common-conventions.gradle.kts": "plugins {\n    kotlin(\"jvm\")\n}\n",
+				"app/build.gradle.kts":       "plugins {\n    id(\"buildlogic.kotlin-application-conventions\")\n}\ndependencies {\n    implementation(\"org.apache.commons:commons-text\")\n    implementation(project(\":utilities\"))\n}\n",
+				"utilities/build.gradle.kts": "plugins {\n    id(\"buildlogic.kotlin-library-conventions\")\n}\ndependencies {\n    api(project(\":list\"))\n}\n",
+				"list/build.gradle.kts":      "plugins {\n    id(\"buildlogic.kotlin-library-conventions\")\n}\n",
+			},
+			want: []gen.Unit{
+				{ID: "app", Source: []string{"buildSrc/**", "gradle/**", "settings.gradle.kts", "app/**"}, Deps: []string{"utilities"}, Command: []string{"gradle", ":app:test"}},
+				{ID: "list", Source: []string{"buildSrc/**", "gradle/**", "settings.gradle.kts", "list/**"}, Command: []string{"gradle", ":list:test"}},
+				{ID: "utilities", Source: []string{"buildSrc/**", "gradle/**", "settings.gradle.kts", "utilities/**"}, Deps: []string{"list"}, Command: []string{"gradle", ":utilities:test"}},
+			},
+		},
+		"gradle accessors, included build-logic": {
+			files: map[string]string{
+				"settings.gradle.kts":                      "pluginManagement {\n    includeBuild(\"build-logic\")\n}\ninclude(\":app\", \":core\", \":feature:ui\", \":my-lib\")\n",
+				"build-logic/settings.gradle.kts":          `dependencyResolutionManagement { versionCatalogs { create("libs") { from(files("../gradle/libs.versions.toml")) } } }`,
+				"build-logic/src/main/kotlin/c.gradle.kts": `dependencies { "testImplementation"(project(":core")) }`,
+				"app/build.gradle.kts":                     "dependencies {\n    implementation(projects.feature.ui)\n    implementation(projects.myLib.dependencyProject)\n    implementation(projects . core)\n}\n",
+			},
+			want: []gen.Unit{
+				{ID: "app", Source: []string{"build-logic/**", "settings.gradle.kts", "app/**"}, Deps: []string{"core", "feature/ui", "my-lib"}, Command: []string{"gradle", ":app:test"}},
+				{ID: "core", Source: []string{"build-logic/**", "settings.gradle.kts"}, Command: []string{"gradle", ":core:test"}},
+				{ID: "feature/ui", Source: []string{"build-logic/**", "settings.gradle.kts"}, Deps: []string{"core"}, Command: []string{"gradle", ":feature:ui:test"}},
+				{ID: "my-lib", Source: []string{"build-logic/**", "settings.gradle.kts"}, Deps: []string{"core"}, Command: []string{"gradle", ":my-lib:test"}},
+			},
+		},
+		"maven groupId:artifactId strings": {
+			files: map[string]string{
+				"pom.xml":     pomHead + `<modules><module>a</module><module>b</module><module>res</module></modules></project>`,
+				"a/pom.xml":   `<project><groupId>g</groupId><artifactId>a</artifactId><build><plugins><plugin><artifactId>maven-remote-resources-plugin</artifactId><configuration><resourceBundles><resourceBundle>${project.groupId}:res:${project.version}</resourceBundle></resourceBundles><dependenciesToScan>xg:res,g:res</dependenciesToScan></configuration></plugin></plugins></build></project>`,
+				"b/pom.xml":   `<project><groupId>g</groupId><artifactId>b</artifactId><properties><x>g:res-extra:1.0</x><y>xg:res</y><z>g:resx</z></properties></project>`,
+				"res/pom.xml": `<project><groupId>g</groupId><artifactId>res</artifactId></project>`,
+			},
+			want: []gen.Unit{
+				{ID: "a", Source: []string{"pom.xml", "a/**"}, Deps: []string{"res"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
+				{ID: "b", Source: []string{"pom.xml", "b/**"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
+				{ID: "res", Source: []string{"pom.xml", "res/**"}, Command: []string{"mvn", "-B", "-pl", "res", "test"}},
+			},
+		},
 		"gradle buildSrc, task paths, include in a string": {
 			files: conventions,
 			want: []gen.Unit{
@@ -478,7 +532,13 @@ func TestUnitsFailClosed(t *testing.T) {
 			"x/pom.xml":   `<project><groupId>g</groupId><artifactId>p</artifactId></project>`,
 		}, "parent x/pom.xml is a local POM outside the build"},
 
-		"include build":                        {kts(`pluginManagement { includeBuild("build-logic") }`), "settings.gradle.kts: includeBuild: not supported by aval gen java"},
+		"include build not on disk":            {kts(`pluginManagement { includeBuild("build-logic") }`), `settings.gradle.kts: includeBuild("build-logic"): not supported by aval gen java`},
+		"include build outside":                {kts(`includeBuild("../other")`), `includeBuild("../other"): not supported`},
+		"include build of a project":           {kts(`include(":core")`+"\n"+`includeBuild("core")`, "core/build.gradle.kts", ""), `includeBuild("core"): not supported`},
+		"include build output":                 {kts(`includeBuild("build")`), `includeBuild("build"): not supported`},
+		"computed include build":               {kts(`includeBuild(name)`), "settings.gradle.kts: includeBuild: an argument other than a string literal"},
+		"include build with options":           {kts(`includeBuild("logic") { name = "x" }; includeBuild("logic", "x")`, "logic/settings.gradle.kts", ""), "includeBuild: an argument other than a string literal"},
+		"include build logic outside the root": {kts(`include(":a")`+"\n"+`pluginManagement { includeBuild("logic") }`, "logic/settings.gradle.kts", `val f = files("../../x")`), `logic/settings.gradle.kts: "../../x" refers to files outside the root`},
 		"project dir":                          {kts(`include(":a")` + "\n" + `project(":a").projectDir = file("x")`), "projectDir"},
 		"computed include":                     {kts(`listOf("a").forEach { include(it) }`), "include: an argument other than a string literal"},
 		"concatenated":                         {kts(`include(":a" + suffix)`), "include: an argument other than a string literal"},
@@ -488,7 +548,8 @@ func TestUnitsFailClosed(t *testing.T) {
 		"include outside":                      {kts(`include("..")`), `include ":..": ".."`},
 		"two root builds":                      {kts(`include(":a")`, "build.gradle", "", "build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
 		"two unit builds":                      {kts(`include(":a")`, "a/build.gradle", "", "a/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
-		"accessor in root":                     {kts(`include(":a")`, "build.gradle.kts", "dependencies { implementation(projects.a) }"), "build.gradle.kts: type-safe project accessors"},
+		"unknown accessor":                     {kts(`include(":a", ":feature:ui")`, "build.gradle.kts", "dependencies { implementation(projects.feature) }"), "build.gradle.kts: projects.feature: no included project has this accessor"},
+		"maven root POM dot-dot":               {map[string]string{"pom.xml": pomHead + `<properties><cfg>${project.basedir}/../config/x.xml</cfg></properties><modules><module>a</module></modules></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, "pom.xml: <cfg>${project.basedir}/../config/x.xml</cfg> refers to files outside the module directory: not supported by aval gen java; for a file of the root write ${maven.multiModuleProjectDirectory}/"},
 		"computed project":                     {kts(`include(":a")`, "a/build.gradle.kts", "dependencies { implementation(project(name)) }"), "a/build.gradle.kts: project(...): an argument other than a string literal"},
 		"apply from kotlin":                    {kts(`include(":a")`, "a/build.gradle.kts", `apply(from = "../gradle/shared.gradle.kts")`), "a/build.gradle.kts: apply from: not supported"},
 		"apply from groovy":                    {kts(`include(":a")`, "build.gradle", "subprojects { apply from: '../x.gradle' }"), "build.gradle: apply from"},

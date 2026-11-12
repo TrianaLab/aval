@@ -186,7 +186,11 @@ func (r *reactor) checkPaths(modules map[string]bool) error {
 	}
 	for dir, p := range r.poms {
 		for _, e := range p.texts {
-			if err := r.checkPath(e, dir, modules); err != nil {
+			err := r.checkPath(e, dir, modules)
+			if err != nil && dir == "" && strings.Contains(strings.ReplaceAll(e.text, `\`, "/"), "../") {
+				err = fmt.Errorf("%w; for a file of the root write ${maven.multiModuleProjectDirectory}/", err)
+			}
+			if err != nil {
 				return fmt.Errorf("%s: %w", pomPath(dir), err)
 			}
 		}
@@ -541,9 +545,46 @@ func (r reactor) deps(p *pom, dir string, index, strays map[string]string) ([]st
 				return nil, fmt.Errorf("%s refers to %s, a local POM outside the build: %w, list its directory in <modules>", key, f, errUnsupported)
 			}
 		}
+		deps = append(deps, r.textRefs(p, q, dir, index)...)
 	}
 	return slices.Compact(slices.Sorted(slices.Values(deps))), nil
 }
+
+// textRefs returns the modules q's element texts name as one
+// groupId:artifactId[:...] string (a resourceBundle, dependenciesToScan,
+// an <artifact>), properties resolved in p's context where they can be.
+func (r reactor) textRefs(p, q *pom, dir string, index map[string]string) []string {
+	var deps []string
+	for _, e := range q.texts {
+		t := propRe.ReplaceAllStringFunc(e.text, func(m string) string {
+			if v, ok, err := r.prop(p, m[2:len(m)-1]); ok && err == nil {
+				return v
+			}
+			return m
+		})
+		for key, d := range index {
+			for i := strings.Index(t, key); i >= 0 && d != dir; i = indexFrom(t, key, i+1) {
+				end := i + len(key)
+				if (i == 0 || !coordByte(t[i-1])) && (end == len(t) || t[end] == ':') {
+					deps = append(deps, d)
+					break
+				}
+			}
+		}
+	}
+	return deps
+}
+
+// indexFrom is strings.Index from position i, or -1.
+func indexFrom(s, sub string, i int) int {
+	if j := strings.Index(s[i:], sub); j >= 0 {
+		return i + j
+	}
+	return -1
+}
+
+// coordByte reports whether b can be part of a groupId or artifactId.
+func coordByte(b byte) bool { return isAlnum(b) || b == '.' || b == '-' || b == '_' }
 
 // chain returns p, its local parents and, when it is not one of them, the
 // root POM.
