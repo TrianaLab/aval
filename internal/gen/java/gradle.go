@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/TrianaLab/aval/internal/gen"
@@ -18,6 +19,9 @@ var (
 	projectRe  = regexp.MustCompile(`\b(project|findProject)\s*\(`)
 	pathArgRe  = regexp.MustCompile(`^path\s*[:=]\s*`)
 	accessorRe = regexp.MustCompile(`\bprojects\.`)
+	// A source set directory the src/** glob would miss: srcDir("gen"),
+	// srcDirs = ['gen'], setSrcDirs(listOf("gen")).
+	srcDirRe = regexp.MustCompile(`\b(srcDirs?|setSrcDirs)\b\s*(\+?=)?\s*[(\[]?\s*((listOf|setOf|files)\s*\()?`)
 )
 
 // gradle reads the include(...) list of the settings script and the
@@ -65,22 +69,60 @@ func gradle(root, settings string) ([]gen.Unit, error) {
 		if err != nil {
 			return nil, err
 		}
-		deps := common
+		deps := slices.Clone(common)
 		if build != "" {
 			own, err := refs(root, id+"/"+build, p)
 			if err != nil {
 				return nil, err
 			}
-			deps = append(own, common...)
+			deps = append(own, deps...)
 		}
+		inherited, more, err := ancestors(root, id)
+		if err != nil {
+			return nil, err
+		}
+		deps = append(deps, more...)
 		units = append(units, gen.Unit{
 			ID:      id,
-			Source:  source(root, id, build),
+			Source:  append(inherited, gradleSource(root, id, build)...),
 			Deps:    without(deps, id),
 			Command: []string{gradle, p + ":test"},
 		})
 	}
 	return units, nil
+}
+
+// ancestors returns the build scripts of the ancestor projects of id (a
+// and a/b for a/b/c) and the units they refer to. Gradle evaluates them,
+// included or not, and their subprojects { ... } may configure id.
+func ancestors(root, id string) (files, deps []string, err error) {
+	for i := strings.LastIndexByte(id, '/'); i > 0; i = strings.LastIndexByte(id[:i], '/') {
+		anc := id[:i]
+		b, err := oneOf(filepath.Join(root, filepath.FromSlash(anc)), "build.gradle.kts", "build.gradle")
+		if err != nil {
+			return nil, nil, err
+		}
+		if b == "" {
+			continue
+		}
+		r, err := refs(root, anc+"/"+b, ":"+strings.ReplaceAll(anc, "/", ":"))
+		if err != nil {
+			return nil, nil, err
+		}
+		deps = append(deps, r...)
+		files = append([]string{anc + "/" + b}, files...)
+	}
+	return files, deps, nil
+}
+
+// gradleSource is source plus the subproject's gradle.properties, which
+// Gradle reads as project properties.
+func gradleSource(root, id, build string) []string {
+	src := source(root, id, build)
+	if isFile(filepath.Join(root, filepath.FromSlash(id), "gradle.properties")) {
+		src = append(src, id+"/gradle.properties")
+	}
+	return src
 }
 
 // projectID turns a project path (:a:b) into a unit ID and directory (a/b).
@@ -150,6 +192,9 @@ func refs(root, name, self string) ([]string, error) {
 	if accessorRe.MatchString(text) {
 		return nil, fmt.Errorf("%s: type-safe project accessors (projects.*): %w, use project(\":path\")", name, errUnsupported)
 	}
+	if err := srcDirs(text); err != nil {
+		return nil, fmt.Errorf("%s: %w", name, err)
+	}
 	var ids []string
 	for _, loc := range projectRe.FindAllStringIndex(text, -1) {
 		i := skip(text, loc[1], true)
@@ -166,6 +211,29 @@ func refs(root, name, self string) ([]string, error) {
 		}
 	}
 	return ids, nil
+}
+
+// srcDirs checks that every source set directory a script adds is a
+// string literal under src, the only sources the generated globs cover.
+func srcDirs(text string) error {
+	for _, loc := range srcDirRe.FindAllStringIndex(text, -1) {
+		for i := loc[1]; ; i++ {
+			v, j, err := literal(text, skip(text, i, true))
+			if err != nil {
+				return fmt.Errorf("source set directory: %w", err)
+			}
+			if v == "" {
+				v = "." // the project directory
+			}
+			if err := checkSrc(v); err != nil {
+				return err
+			}
+			if i = skip(text, j, true); i >= len(text) || text[i] != ',' {
+				break
+			}
+		}
+	}
+	return nil
 }
 
 // skip returns the index of the first character at or after i that is not

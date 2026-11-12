@@ -181,12 +181,17 @@ tool:
 - Gradle: one unit per `include` in `settings.gradle.kts` or
   `settings.gradle`. A subproject depends on the `project(":path")`
   references of its build script; a reference in the root build script
-  (`subprojects { ... }`) becomes an edge of every subproject. The test is
-  `./gradlew :<path>:test` (`gradle` without a wrapper).
+  (`subprojects { ... }`) becomes an edge of every subproject. The build
+  script of an intermediate project (`services` for `:services:web`) is an
+  input of the subprojects under it, and its references are their edges.
+  The test is `./gradlew :<path>:test` (`gradle` without a wrapper).
 
-A unit's files are its `pom.xml` or `build.gradle(.kts)` and `src/**`. The
-root project is not a unit; its build files, the wrapper and version
-catalogs go in `defaults`:
+A unit's files are its `pom.xml` or `build.gradle(.kts)`, a Gradle
+subproject's `gradle.properties` and `src/**`. Other files in the module
+directory, such as `lombok.config`, go in a hand-written fragment. The root
+project is not a unit; its build files and whatever else configures every
+module (`buildSrc/**`, `gradle.properties`, `gradle/wrapper/**`, version
+catalogs, `.mvn/**`) go in `defaults`:
 
 ```yaml
 apiVersion: aval.trianalab.io/v1
@@ -221,7 +226,9 @@ tests:
 What it cannot read for certain is an error (exit 1), not a guess: a
 computed `include` or `project(...)` path, type-safe accessors
 (`projects.common`), `includeBuild`, `projectDir`, `buildFileName`, a
-source or resource directory outside `src`, a property it cannot resolve in
+source or resource directory outside `src` (a Gradle `srcDir` that is not a
+string literal under `src`), a local `<parent>` POM that is neither the root
+POM nor a module, a property it cannot resolve in
 a local module's coordinates, or a root with both a POM and a Gradle
 settings script.
 

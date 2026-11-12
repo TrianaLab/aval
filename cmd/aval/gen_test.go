@@ -180,4 +180,7 @@ func TestGenJava(t *testing.T) {
 	if code, _, errOut := runCLI("gen", "java", "-f", file); code != ExitError || !strings.Contains(errOut, "gen java: ") {
 		t.Errorf("no build: exit %d, stderr %q", code, errOut)
 	}
+	if after, _ := os.ReadFile(file); string(after) != string(got) {
+		t.Errorf("no build: the file changed:\n%s", after)
+	}
 }

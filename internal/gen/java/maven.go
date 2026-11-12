@@ -18,6 +18,13 @@ type coord struct {
 	ArtifactID string `xml:"artifactId"`
 }
 
+// parentRef is <parent>. RelativePath is nil when the element is absent
+// (Maven reads ../pom.xml) and "" for <relativePath/> (the repository).
+type parentRef struct {
+	coord
+	RelativePath *string `xml:"relativePath"`
+}
+
 type plugin struct {
 	coord
 	Dependencies []coord `xml:"dependencies>dependency"`
@@ -45,8 +52,8 @@ type model struct {
 type pom struct {
 	XMLName xml.Name
 	coord
-	Parent     coord `xml:"parent"`
-	Properties props `xml:"properties"`
+	Parent     parentRef `xml:"parent"`
+	Properties props     `xml:"properties"`
 	model
 	Profiles []model `xml:"profiles>profile"`
 }
@@ -88,6 +95,7 @@ func (p *pom) group() string {
 // reactor is a Maven multi-module build: every POM by directory ("" is the
 // root), and each local POM by its literal coordinates for parent lookup.
 type reactor struct {
+	root    string
 	poms    map[string]*pom
 	byCoord map[coord]*pom
 }
@@ -95,7 +103,7 @@ type reactor struct {
 // maven walks <modules> (and Maven 4 <subprojects>) from the root POM, in
 // the root project and every profile, and returns one unit per module.
 func maven(root string) ([]gen.Unit, error) {
-	r := reactor{poms: map[string]*pom{}, byCoord: map[coord]*pom{}}
+	r := reactor{root: root, poms: map[string]*pom{}, byCoord: map[coord]*pom{}}
 	var dirs []string
 	seen := map[string]bool{"": true}
 	for queue := []string{""}; len(queue) > 0; queue = queue[1:] {
@@ -200,7 +208,10 @@ func checkSrc(d string) error {
 // its build plugins and their dependencies, in the project and in every
 // profile.
 func (r reactor) deps(p *pom, dir string, index map[string]string) ([]string, error) {
-	refs := []coord{p.Parent}
+	if err := r.checkParent(p, dir); err != nil {
+		return nil, err
+	}
+	refs := []coord{p.Parent.coord}
 	for _, m := range p.models() {
 		refs = append(refs, m.Dependencies...)
 		for _, pl := range m.Build.Plugins {
@@ -225,6 +236,30 @@ func (r reactor) deps(p *pom, dir string, index map[string]string) ([]string, er
 		}
 	}
 	return deps, nil
+}
+
+// checkParent rejects a parent POM read from disk inside the root that is
+// neither the root POM nor a module: no unit covers its file, so a change to
+// it would not change the fingerprint.
+func (r reactor) checkParent(p *pom, dir string) error {
+	rel := ".."
+	if p.Parent.RelativePath != nil {
+		rel = strings.TrimSpace(*p.Parent.RelativePath)
+	}
+	if p.Parent.ArtifactID == "" || rel == "" {
+		return nil
+	}
+	f := path.Join(dir, filepath.ToSlash(rel))
+	if info, err := os.Stat(filepath.Join(r.root, filepath.FromSlash(f))); err == nil && info.IsDir() {
+		f = path.Join(f, "pom.xml")
+	}
+	if f == ".." || strings.HasPrefix(f, "../") || !isFile(filepath.Join(r.root, filepath.FromSlash(f))) {
+		return nil // outside the root or not on disk: resolved from a repository
+	}
+	if d := strings.TrimSuffix(path.Dir(f), "."); path.Base(f) == "pom.xml" && r.poms[d] != nil {
+		return nil
+	}
+	return fmt.Errorf("parent %s is a local POM outside the build: %w, list its directory in <modules>", f, errUnsupported)
 }
 
 var propRe = regexp.MustCompile(`\$\{([^}]*)\}`)
@@ -256,7 +291,7 @@ func (r reactor) prop(p *pom, name string) (string, bool) {
 		return p.Parent.GroupID, true
 	}
 	// ponytail: depth cap instead of cycle tracking; a deeper local parent chain is not real.
-	for q, depth := p, 0; q != nil && depth < 32; q, depth = r.byCoord[q.Parent], depth+1 {
+	for q, depth := p, 0; q != nil && depth < 32; q, depth = r.byCoord[q.Parent.coord], depth+1 {
 		if v, ok := q.Properties[name]; ok {
 			return v, true
 		}

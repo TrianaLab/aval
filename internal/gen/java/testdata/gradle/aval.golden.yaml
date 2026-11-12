@@ -21,9 +21,11 @@ fragments:
       source:
         - services/api/build.gradle
         - services/api/src/**
+        - services/build.gradle.kts
   java.services.web:
     scope:
       source:
+        - services/build.gradle.kts
         - services/web/build.gradle.kts
         - services/web/src/**
 tests:

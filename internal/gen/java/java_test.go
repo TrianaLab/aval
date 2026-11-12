@@ -109,16 +109,16 @@ func digest(t *testing.T, fsys fstest.MapFS, name string) string {
 
 func TestFalseHitTransitiveDependency(t *testing.T) {
 	for _, tc := range []struct {
-		build, test, transitive, unrelated, shared string
+		build, test, transitive, unrelated, shared, parent string
 	}{
 		// web -> api -> inventory -> common; tools stands alone.
-		{"maven", "java.services.web", "common/src/main/java/com/acme/common/Money.java", "tools/src/main/java/com/acme/tools/Gen.java", "pom.xml"},
-		// web -> api -> inventory -> common.
-		{"gradle", "java.services.web", "common/src/main/kotlin/com/acme/common/Money.kt", "gradlew", "gradle/libs.versions.toml"},
+		{"maven", "java.services.web", "common/src/main/java/com/acme/common/Money.java", "tools/src/main/java/com/acme/tools/Gen.java", "pom.xml", "services/pom.xml"},
+		// web -> api -> inventory -> common; services/build.gradle.kts configures web.
+		{"gradle", "java.services.web", "common/src/main/kotlin/com/acme/common/Money.kt", "gradlew", "gradle/libs.versions.toml", "services/build.gradle.kts"},
 	} {
 		fsys := fixture(t, tc.build)
 		before := digest(t, fsys, tc.test)
-		for file, reuse := range map[string]bool{tc.transitive: false, tc.unrelated: true, tc.shared: false} {
+		for file, reuse := range map[string]bool{tc.transitive: false, tc.unrelated: true, tc.shared: false, tc.parent: false} {
 			changed := fstest.MapFS{}
 			for k, v := range fsys {
 				changed[k] = v
@@ -190,7 +190,36 @@ func TestUnits(t *testing.T) {
 			want: []gen.Unit{
 				{ID: "a", Source: []string{"a/build.gradle"}, Deps: []string{"a/c", "b", "b"}, Command: []string{"gradle", ":a:test"}},
 				{ID: "b", Source: []string{"b/src/**"}, Command: []string{"gradle", ":b:test"}},
-				{ID: "a/c", Source: []string{"a/c/build.gradle.kts"}, Deps: []string{"b"}, Command: []string{"gradle", ":a:c:test"}},
+				{ID: "a/c", Source: []string{"a/build.gradle", "a/c/build.gradle.kts"}, Deps: []string{"b", "b"}, Command: []string{"gradle", ":a:c:test"}},
+			},
+		},
+		"gradle intermediate project not included, source sets under src, gradle.properties": {
+			files: map[string]string{
+				"settings.gradle.kts":                `include(":common", ":services:web:app")`,
+				"services/build.gradle.kts":          "subprojects { dependencies { \"implementation\"(project(\":common\")) } }\n",
+				"services/web/app/build.gradle":      "sourceSets { main { java.srcDirs = ['src/gen', \"src/more\"]; resources.srcDir 'src/res' } }\n",
+				"services/web/app/gradle.properties": "",
+				"common/build.gradle.kts":            `sourceSets.main { kotlin.setSrcDirs(listOf("src/kt")) }`,
+			},
+			want: []gen.Unit{
+				{ID: "common", Source: []string{"common/build.gradle.kts"}, Command: []string{"gradle", ":common:test"}},
+				{ID: "services/web/app", Source: []string{"services/build.gradle.kts", "services/web/app/build.gradle", "services/web/app/gradle.properties"}, Deps: []string{"common"}, Command: []string{"gradle", ":services:web:app:test"}},
+			},
+		},
+		"maven parent by relative path, a module or from a repository": {
+			files: map[string]string{
+				"pom.xml":         pomHead + `<modules><module>parent</module><module>a</module><module>b</module><module>c</module></modules></project>`,
+				"parent/pom.xml":  `<project><groupId>g</groupId><artifactId>parent</artifactId></project>`,
+				"a/pom.xml":       `<project><parent><groupId>g</groupId><artifactId>parent</artifactId><relativePath>../parent</relativePath></parent><artifactId>a</artifactId></project>`,
+				"b/pom.xml":       `<project><parent><groupId>x</groupId><artifactId>ext</artifactId><relativePath>../../outside</relativePath></parent><groupId>g</groupId><artifactId>b</artifactId></project>`,
+				"c/pom.xml":       `<project><parent><groupId>x</groupId><artifactId>ext</artifactId><relativePath/></parent><groupId>g</groupId><artifactId>c</artifactId></project>`,
+				"b/other/pom.xml": "not read",
+			},
+			want: []gen.Unit{
+				{ID: "parent", Source: []string{"parent/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "parent", "test"}},
+				{ID: "a", Source: []string{"a/pom.xml"}, Deps: []string{"parent"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
+				{ID: "b", Source: []string{"b/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
+				{ID: "c", Source: []string{"c/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "c", "test"}},
 			},
 		},
 	} {
@@ -238,21 +267,36 @@ func TestUnitsFailClosed(t *testing.T) {
 		"unresolved dependency property": {sub(`<project><groupId>g</groupId><artifactId>a</artifactId><dependencies><dependency><groupId>g</groupId><artifactId>${x}</artifactId></dependency></dependencies></project>`), "cannot resolve the properties in g:${x}"},
 		"bad property element":           {sub(`<project><properties><a>x</b></properties></project>`), "a/pom.xml: XML syntax error"},
 		"unclosed properties":            {sub(`<project><properties>`), "a/pom.xml: XML syntax error"},
+		"parent outside the build": {map[string]string{
+			"pom.xml":        pomHead + `<modules><module>a</module></modules></project>`,
+			"a/pom.xml":      `<project><parent><groupId>g</groupId><artifactId>p</artifactId><relativePath>../parent/pom.xml</relativePath></parent><artifactId>a</artifactId></project>`,
+			"parent/pom.xml": `<project><groupId>g</groupId><artifactId>p</artifactId></project>`,
+		}, "a/pom.xml: parent parent/pom.xml is a local POM outside the build"},
+		"default parent path outside the build": {map[string]string{
+			"pom.xml":     pomHead + `<modules><module>x/a</module></modules></project>`,
+			"x/a/pom.xml": `<project><parent><groupId>g</groupId><artifactId>p</artifactId></parent><artifactId>a</artifactId></project>`,
+			"x/pom.xml":   `<project><groupId>g</groupId><artifactId>p</artifactId></project>`,
+		}, "parent x/pom.xml is a local POM outside the build"},
 
-		"include build":       {kts(`pluginManagement { includeBuild("build-logic") }`), "settings.gradle.kts: includeBuild: not supported by aval gen java"},
-		"project dir":         {kts(`include(":a")` + "\n" + `project(":a").projectDir = file("x")`), "projectDir"},
-		"computed include":    {kts(`listOf("a").forEach { include(it) }`), "include: an argument other than a string literal"},
-		"concatenated":        {kts(`include(":a" + suffix)`), "include: an argument other than a string literal"},
-		"groovy concatenated": {map[string]string{"settings.gradle": "include ':a' + suffix\n"}, "include: an argument other than a string literal"},
-		"interpolated":        {kts(`include(":${name}")`), "a string with interpolation or escapes"},
-		"unterminated":        {kts(`include(":a`), "a string with interpolation or escapes"},
-		"include outside":     {kts(`include("..")`), `include ":..": ".."`},
-		"two root builds":     {kts(`include(":a")`, "build.gradle", "", "build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
-		"two unit builds":     {kts(`include(":a")`, "a/build.gradle", "", "a/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
-		"accessor in root":    {kts(`include(":a")`, "build.gradle.kts", "dependencies { implementation(projects.a) }"), "build.gradle.kts: type-safe project accessors"},
-		"computed project":    {kts(`include(":a")`, "a/build.gradle.kts", "dependencies { implementation(project(name)) }"), "a/build.gradle.kts: project(...): an argument other than a string literal"},
-		"comment hides rest":  {kts("include(\":a\") /* unterminated\ninclude(name)"), ""},
-		"comment at the end":  {kts(`include(":a") // no line break after it`), ""},
+		"include build":          {kts(`pluginManagement { includeBuild("build-logic") }`), "settings.gradle.kts: includeBuild: not supported by aval gen java"},
+		"project dir":            {kts(`include(":a")` + "\n" + `project(":a").projectDir = file("x")`), "projectDir"},
+		"computed include":       {kts(`listOf("a").forEach { include(it) }`), "include: an argument other than a string literal"},
+		"concatenated":           {kts(`include(":a" + suffix)`), "include: an argument other than a string literal"},
+		"groovy concatenated":    {map[string]string{"settings.gradle": "include ':a' + suffix\n"}, "include: an argument other than a string literal"},
+		"interpolated":           {kts(`include(":${name}")`), "a string with interpolation or escapes"},
+		"unterminated":           {kts(`include(":a`), "a string with interpolation or escapes"},
+		"include outside":        {kts(`include("..")`), `include ":..": ".."`},
+		"two root builds":        {kts(`include(":a")`, "build.gradle", "", "build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
+		"two unit builds":        {kts(`include(":a")`, "a/build.gradle", "", "a/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
+		"accessor in root":       {kts(`include(":a")`, "build.gradle.kts", "dependencies { implementation(projects.a) }"), "build.gradle.kts: type-safe project accessors"},
+		"computed project":       {kts(`include(":a")`, "a/build.gradle.kts", "dependencies { implementation(project(name)) }"), "a/build.gradle.kts: project(...): an argument other than a string literal"},
+		"source set outside src": {kts(`include(":a")`, "a/build.gradle.kts", `sourceSets { main { java.srcDir("gen") } }`), `a/build.gradle.kts: source or resource directory "gen" outside src`},
+		"source set in root":     {kts(`include(":a")`, "build.gradle.kts", `subprojects { sourceSets.main { java.srcDirs("src/a", "") } }`), `"." outside src`},
+		"computed source set":    {kts(`include(":a")`, "a/build.gradle.kts", `java.srcDir(layout.buildDirectory.dir("gen"))`), "source set directory: an argument other than a string literal"},
+		"ancestor two builds":    {kts(`include(":s:a")`, "s/build.gradle", "", "s/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
+		"ancestor computed ref":  {kts(`include(":s:a")`, "s/build.gradle.kts", "subprojects { dependencies { implementation(project(name)) } }"), "s/build.gradle.kts: project(...)"},
+		"comment hides rest":     {kts("include(\":a\") /* unterminated\ninclude(name)"), ""},
+		"comment at the end":     {kts(`include(":a") // no line break after it`), ""},
 	} {
 		_, err := Adapter{}.Units(tree(t, tc.files))
 		switch {
