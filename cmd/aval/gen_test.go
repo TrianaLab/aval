@@ -187,3 +187,22 @@ func TestGenRustFailClosed(t *testing.T) {
 	}
 }
 
+// A [patch] path outside every member, invisible to cargo metadata
+// --no-deps, exits 1, names the file and writes nothing.
+func TestGenRustPatchOutsideMembers(t *testing.T) {
+	if _, err := exec.LookPath("cargo"); err != nil {
+		t.Skip("cargo not installed")
+	}
+	dir := t.TempDir()
+	file := filepath.Join(dir, "aval.yaml")
+	set := "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"
+	_ = os.MkdirAll(filepath.Join(dir, "a", "src"), 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "a", "src", "lib.rs"), nil, 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "a", "Cargo.toml"), []byte("[package]\nname = \"a\"\nversion = \"0.1.0\"\nedition = \"2021\"\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte("[workspace]\nmembers = [\"a\"]\nresolver = \"2\"\n[patch.crates-io]\nserde = { path = \"vendor/serde\" }\n"), 0o644)
+	_ = os.WriteFile(file, []byte(set), 0o644)
+	code, _, errOut := runCLI("gen", "rust", "-f", file)
+	if after, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, "Cargo.toml: path override vendor/serde is not inside a workspace member") || string(after) != set {
+		t.Errorf("exit %d, stderr %q, file %q", code, errOut, after)
+	}
+}

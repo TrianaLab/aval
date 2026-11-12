@@ -209,8 +209,14 @@ tests:
   dependents use its dev-dependencies too: more re-runs, never a stale reuse.
 - A package at the workspace root gets `**`: add `target/**` to
   `defaults.scope.exclude`.
-- `cargo metadata` does not show `[patch]` or `.cargo/config.toml` path
-  overrides. Put those directories in `defaults` by hand.
+- `cargo metadata` does not show path overrides, so `aval gen` reads them
+  from the workspace root: `path` entries of `[patch]` tables in
+  `Cargo.toml` and `.cargo/config.toml`, and `paths` in
+  `.cargo/config.toml`. An override inside a member makes every member
+  depend on that member. One outside every member, or one it cannot read,
+  is an error naming the file. `.cargo/config.toml` files in parent
+  directories or in `CARGO_HOME` are not read: keep overrides at the
+  workspace root.
 
 ## Cross-language dependencies
 

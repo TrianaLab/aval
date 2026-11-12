@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -118,6 +119,7 @@ func TestErrors(t *testing.T) {
 		{"no root", "", filepath.Join(dir, "none"), "no such file"},
 		{"member outside root", outside, fixture, "member cli: "},
 		{"path dependency not a member", nonMember, fixture, "path dependency domain at "},
+		{"no workspace root", write("nows.json", `{"packages": []}`), fixture, "no workspace_root"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.metadata == "" {
@@ -207,7 +209,8 @@ func TestFalseHitNewPathDependencyIsDrift(t *testing.T) {
 	}
 	// domain now depends on testkit.
 	var m struct {
-		Packages []map[string]any `json:"packages"`
+		WorkspaceRoot string           `json:"workspace_root"`
+		Packages      []map[string]any `json:"packages"`
 	}
 	if err := json.Unmarshal(recorded, &m); err != nil {
 		t.Fatal(err)
@@ -229,5 +232,78 @@ func TestFalseHitNewPathDependencyIsDrift(t *testing.T) {
 	}
 	if digest(t, now, "rust.domain", nil) == digest(t, now, "rust.domain", map[string]string{"crates/testkit/src/lib.rs": "// changed\n"}) {
 		t.Error("rust.domain reused after its new dependency testkit changed")
+	}
+}
+
+// overrides runs Units on a scratch workspace with the recorded metadata
+// and files, a map from a path under the root to its content.
+func overrides(t *testing.T, files map[string]string) ([]gen.Unit, error) {
+	t.Helper()
+	fake(t, "testdata/metadata.json")
+	root := t.TempDir()
+	for name, data := range files {
+		p := filepath.Join(root, filepath.FromSlash(name))
+		if strings.HasSuffix(name, "/") { // a directory where a file should be
+			if err := os.MkdirAll(p, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(data), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return Adapter{}.Units(root)
+}
+
+// cargo metadata --no-deps does not show path overrides: one outside every
+// member fails closed, naming its file; one it cannot read fails closed.
+func TestFalseHitPathOverrideOutsideMembers(t *testing.T) {
+	for _, tc := range []struct {
+		name, file, data, want string
+	}{
+		{"patch in Cargo.toml", "Cargo.toml", "[workspace]\n[patch.crates-io]\nserde = { path = \"vendor/serde\" }\n", "Cargo.toml: path override vendor/serde is not inside a workspace member"},
+		{"quoted patch table", "Cargo.toml", "[ patch . \"https://github.com/a/b\" ]\nb.path = '../b'\n", "path override ../b"},
+		{"dotted patch key", "Cargo.toml", "patch.crates-io.serde = { git = \"x\", path = \"/opt/serde\" }\n", "path override /opt/serde"},
+		{"patch subtable", "Cargo.toml", "[patch.crates-io.serde]\n\"path\" = \"vendor/serde\"\n", "path override vendor/serde"},
+		{"patch in config", ".cargo/config.toml", "[patch.crates-io]\nserde = { path = \"vendor/serde\" }\n", "config.toml: path override vendor/serde"},
+		{"legacy config", ".cargo/config", "paths = [\"vendor/serde\"]\n", ".cargo/config: path override vendor/serde"},
+		{"multi-line paths", ".cargo/config.toml", "paths = [\n  \"crates/domain\", # a member\n  'vendor/x',\n]\n", "path override vendor/x"},
+		{"a sibling is not inside", "Cargo.toml", "[patch.crates-io]\nd = { path = \"crates/domain-fork\" }\n", "path override crates/domain-fork"},
+		{"non-string path", "Cargo.toml", "[patch.crates-io]\nserde = { path = 7 }\n", "Cargo.toml:2: cannot read the path override"},
+		{"multi-line string", "Cargo.toml", "[patch.crates-io]\nserde = { path = \"\"\"\nvendor\"\"\" }\n", "is not inside a workspace member"},
+		{"bad escape", "Cargo.toml", "[patch.crates-io]\nserde = { path = \"\\q\" }\n", "cannot read the path override"},
+		{"paths not an array", ".cargo/config.toml", "paths = \"vendor\"\n", "config.toml:1: cannot read"},
+		{"bad escape in paths", ".cargo/config.toml", "paths = [\"\\q\"]\n", "cannot read"},
+		{"unreadable", ".cargo/config.toml/", "", "config.toml: is a directory"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			units, err := overrides(t, map[string]string{tc.file: tc.data})
+			if err == nil || !strings.Contains(err.Error(), tc.want) || units != nil {
+				t.Errorf("Units: %v, %v; want an error with %q", units, err, tc.want)
+			}
+		})
+	}
+}
+
+// An override inside a member makes every member depend on it, so a change
+// there re-runs every test. Comments, strings with # and tables other than
+// [patch] are not overrides.
+func TestFalseHitPathOverrideInsideMember(t *testing.T) {
+	units, err := overrides(t, map[string]string{
+		"Cargo.toml": "[workspace] # [patch.crates-io]\n# serde = { path = \"vendor\" }\n[dependencies]\nx = { path = \"vendor/x\" }\n" +
+			"[patch.crates-io]\nserde = { path = \"crates/domain/vendor/a#\\\"b\" } # path = 1\n",
+		".cargo/config.toml": "paths = ['apps/cli']\n[build]\njobs = 1\n",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range units {
+		if !slices.Contains(u.Deps, "domain") || !slices.Contains(u.Deps, "cli") {
+			t.Errorf("unit %s deps %v: want domain and cli", u.ID, u.Deps)
+		}
 	}
 }
