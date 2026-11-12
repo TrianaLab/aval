@@ -10,6 +10,8 @@
 # through the contents API, as in the run action. Each artifact aval-<name>
 # is pushed with --test <name>, so it can only publish the test it is named
 # after, with a fresh OIDC token: the signer is the calling workflow's job.
+# An artifact aval-.<id> (the run action with several tests, #327) holds one
+# <name>/ directory per test, each pushed the same way.
 # Every artifact is tried; the step exits with the worst code, and 5 (a
 # security event) is never downgraded. Tools are called by absolute path, so
 # an earlier step that writes GITHUB_PATH cannot shim them.
@@ -77,17 +79,22 @@ if [[ "$help" == *--env-file* ]]; then env_file=true; fi
 worst=0
 echo "| test | aval push |" >> "$GITHUB_STEP_SUMMARY"
 echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-for dir in "$ARTIFACTS"/aval-*/; do
+for dir in "$ARTIFACTS"/aval-*/ "$ARTIFACTS"/aval-.*/*/; do
   [ -d "$dir" ] || continue
-  name=${dir%/}
-  name=${name##*/aval-}
+  artifact=${dir%/}
+  artifact=${artifact#"$ARTIFACTS"/}
+  case "$artifact" in
+    aval-.*/*) name=${artifact#*/} ;;
+    aval-.*) continue ;; # its <name>/ directories come from the second glob
+    *) name=${artifact#aval-} ;;
+  esac
   code=0
   # metadata.name's syntax (internal/contract).
   if ! [[ "$name" =~ ^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$ ]]; then
-    echo "::error title=aval publish::artifact aval-$name: \"$name\" is not a valid metadata.name"
+    echo "::error title=aval publish::artifact $artifact: \"$name\" is not a valid metadata.name"
     code=2
   elif extra=$(/usr/bin/find "$dir" -mindepth 1 -maxdepth 1 ! -name result.json ! -name report.json ! -name record.json ! -name env.txt ! -name outputs -print -quit) && [ -n "$extra" ]; then
-    echo "::error title=aval publish::artifact aval-$name holds ${extra##*/}, which is not part of the artifact layout"
+    echo "::error title=aval publish::artifact $artifact holds ${extra##*/}, which is not part of the artifact layout"
     code=1
   elif [ "$outputs_dir" = false ] && ! expanded=$("$AVAL" explain -f "$INPUT_FILE" --test "$name" --expand); then
     echo "::error title=aval publish::$name: aval explain could not read the test, so the action cannot tell whether it declares outputs"

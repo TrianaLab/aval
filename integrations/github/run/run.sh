@@ -1,5 +1,6 @@
 #!/bin/bash
-# Steps 3 to 7 of the aval run action (#211). Reads INPUT_TEST, INPUT_FILE,
+# Steps 3 to 7 of the aval run action (#211). Reads INPUT_TEST (one test, or
+# several names and glob patterns, #327), INPUT_FILE,
 # INPUT_POLICY, INPUT_SHADOW, INPUT_LOOKUP_ONLY, INPUT_MIN_TRUST_LEVEL, AVAL (absolute path of
 # the installed binary), DEFAULT_BRANCH, GH_TOKEN, REGISTRY_USERNAME,
 # REGISTRY_PASSWORD and the runner's GITHUB_* variables.
@@ -16,16 +17,36 @@
 # that writes GITHUB_PATH cannot shim them. A hostile pull request still
 # controls its own workflow file: required code-owner review is what protects
 # the default branch (docs/trust-model.md).
+#
+# Several tests (#327) run one after the other in this step, each with its
+# own lookup, verify, run and report; after them all, the step exits with the
+# worst code, and 5 (a security event) is never downgraded.
 set -euo pipefail
 : "${INPUT_TEST:?}" "${INPUT_FILE:?}" "${INPUT_POLICY:?}" "${AVAL:?}" "${GH_TOKEN:?}"
 : "${GITHUB_API_URL:?}" "${GITHUB_REPOSITORY:?}" "${GITHUB_EVENT_NAME:?}" "${RUNNER_TEMP:?}" "${GITHUB_OUTPUT:?}" "${GITHUB_STEP_SUMMARY:?}"
 unset AVAL_REGISTRY AVAL_POLICY
 
-# metadata.name's syntax (internal/contract): it names the artifact and a path.
-if ! [[ "$INPUT_TEST" =~ ^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$ ]]; then
-  echo "::error title=aval run::test: \"$INPUT_TEST\" is not a valid metadata.name"
+# test: names and glob patterns, split on whitespace and commas. A name
+# follows metadata.name's syntax (internal/contract): it names the artifact
+# and a path. A pattern (* ? [) must match at least one test of the contract.
+name_re='^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$'
+pattern_re='^[][a-z0-9._*?!-]+$'
+read -ra entries <<< "${INPUT_TEST//[$',\n\r']/ }"
+if [ "${#entries[@]}" -eq 0 ]; then
+  echo "::error title=aval run::test: name at least one test"
   exit 2
 fi
+for e in "${entries[@]}"; do
+  if [[ "$e" == *[]*?[]* ]]; then
+    re=$pattern_re kind="a valid pattern (lowercase names with * ? [...])"
+  else
+    re=$name_re kind="a valid metadata.name"
+  fi
+  if ! [[ "$e" =~ $re ]]; then
+    echo "::error title=aval run::test: \"$e\" is not $kind"
+    exit 2
+  fi
+done
 if ! [[ "$INPUT_POLICY" =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$ ]] || [[ "/$INPUT_POLICY/" == */../* ]]; then
   echo "::error title=aval run::policy: \"$INPUT_POLICY\" must be a relative path in the repository"
   exit 2
@@ -65,6 +86,32 @@ if [ -n "${AVAL_MIN_TRUST_LEVEL:-}" ] && [ "$(rank "$AVAL_MIN_TRUST_LEVEL")" = 9
   exit 2
 fi
 
+# The tests, in the order named; a pattern adds the contract's tests it
+# matches, in contract order. aval explain --all lists the names (it exits 1
+# when a test cannot be fingerprinted, but still lists it).
+tests=() seen=" " known=""
+for e in "${entries[@]}"; do
+  if [[ "$e" != *[]*?[]* ]]; then
+    if [[ "$seen" != *" $e "* ]]; then tests+=("$e") seen+="$e "; fi
+    continue
+  fi
+  if [ -z "$known" ]; then
+    known=$("$AVAL" explain -f "$INPUT_FILE" --all -o json 2> /dev/null | /usr/bin/jq -r '.tests[].name' 2> /dev/null || true)
+  fi
+  matched=false
+  while IFS= read -r n; do
+    # shellcheck disable=SC2053 # $e is the glob
+    if [ -n "$n" ] && [[ "$n" == $e ]]; then
+      matched=true
+      if [[ "$seen" != *" $n "* ]]; then tests+=("$n") seen+="$n "; fi
+    fi
+  done <<< "$known"
+  if [ "$matched" = false ]; then
+    echo "::error title=aval run::test: \"$e\" matches no test in $INPUT_FILE"
+    exit 2
+  fi
+done
+
 # A literal string comparison: no glob, no prefix match, and an empty
 # default branch never matches.
 on_default=false
@@ -90,11 +137,24 @@ upload=false
 if [ "$lookup" = false ] && [ "$GITHUB_EVENT_NAME" = push ] && [ "$on_default" = true ]; then
   upload=true
 fi
+# One test uploads aval-<test>, as before. Several share one artifact,
+# aval-.<id> (an id no metadata.name can be), holding a <test>/ directory
+# each, which the publish action pushes test by test. The id tells the jobs
+# of one workflow run apart.
+# ponytail: CRC32 of the test list; two jobs with different lists colliding
+# is negligible, a longer hash if it ever happens.
+if [ "${#tests[@]}" -eq 1 ]; then
+  echo "artifact=aval-${tests[0]}" >> "$GITHUB_OUTPUT"
+  echo "artifact-path=.aval/${tests[0]}/" >> "$GITHUB_OUTPUT"
+else
+  id=$(printf '%s\n' "${tests[@]}" | /usr/bin/cksum)
+  echo "artifact=aval-.${id%% *}" >> "$GITHUB_OUTPUT"
+  { echo "artifact-path<<AVAL_EOF"; printf '.aval/%s/\n' "${tests[@]}"; echo AVAL_EOF; } >> "$GITHUB_OUTPUT"
+fi
 echo "upload=$upload" >> "$GITHUB_OUTPUT"
 
 # Step 3: the policy from the default branch.
-policy="$RUNNER_TEMP/aval-policy-$INPUT_TEST.yaml"
-/bin/rm -f "$policy"
+policy=$(/usr/bin/mktemp "$RUNNER_TEMP/aval-policy.XXXXXX")
 status=000
 if [ -n "${DEFAULT_BRANCH:-}" ]; then
   ref=$(/usr/bin/jq -rn --arg v "$DEFAULT_BRANCH" '$v | @uri')
@@ -106,28 +166,8 @@ if [ -n "${DEFAULT_BRANCH:-}" ]; then
 fi
 # The test runs pull request code: it never sees the job token (#250).
 unset GH_TOKEN
-args=(run -f "$INPUT_FILE" --test "$INPUT_TEST" --source-repo "$GITHUB_REPOSITORY")
-if [ "$lookup" = true ]; then
-  args=(verify -f "$INPUT_FILE" --test "$INPUT_TEST" -o json)
-fi
-# The files the outputs globs matched travel in the artifact, for the
-# publish job's aval push --outputs-dir (#236); aval resolves them. A
-# release without the flag (v0.8.1 and older) still runs a test without
-# outputs; for one with outputs, which aval explain --expand lists, the
-# action refuses rather than upload a result whose outputs the publish job
-# would take from its own checkout.
-if [ "$upload" = true ]; then
-  help=$("$AVAL" run --help) || help=""
-  if [[ "$help" == *--outputs-dir* ]]; then
-    args+=(--outputs-dir ".aval/$INPUT_TEST/outputs")
-  elif ! expanded=$("$AVAL" explain -f "$INPUT_FILE" --test "$INPUT_TEST" --expand); then
-    echo "::error title=aval run::$INPUT_TEST: aval explain could not read the test, so the action cannot tell whether it declares outputs"
-    exit 1
-  elif [[ $'\n'"$expanded" == *$'\n'outputs:* ]]; then
-    echo "::error title=aval run::$INPUT_TEST declares outputs and the installed aval has no run --outputs-dir: carrying outputs to the publish job needs aval v0.8.2 or later (#236)"
-    exit 1
-  fi
-fi
+# The flags every test gets; step 4 adds the command and --test.
+args=()
 # Shadow mode verifies a published result and runs the test anyway (#216).
 if [ "${INPUT_SHADOW:-false}" = true ]; then
   args+=(--shadow)
@@ -226,44 +266,93 @@ else
 fi
 echo "trust minimum: $effective"
 
-# Step 4. A report left by an earlier run in this workspace must not be read
-# as this run's outcome. Lookup-only keeps its report in RUNNER_TEMP; with no
-# policy there is no registry to ask, and nothing is reused: a miss.
-code=0
-if [ "$lookup" = true ]; then
-  report="$RUNNER_TEMP/aval-lookup-$INPUT_TEST.json"
-  /bin/rm -f "$report"
-  if [ -f "$policy" ]; then
-    "$AVAL" "${args[@]}" > "$report" || code=$?
-  else
-    code=4
+# The files the outputs globs matched travel in the artifact, for the
+# publish job's aval push --outputs-dir (#236); aval resolves them. A
+# release without the flag (v0.8.1 and older) still runs a test without
+# outputs; for one with outputs, which aval explain --expand lists, the
+# action refuses rather than upload a result whose outputs the publish job
+# would take from its own checkout.
+help=""
+if [ "$upload" = true ]; then
+  help=$("$AVAL" run --help) || help=""
+fi
+# outputs_dir test prints the --outputs-dir flag for test, or returns 1 when
+# the test needs one the installed aval lacks.
+outputs_dir() {
+  if [ "$upload" = false ]; then
+    return 0
+  elif [[ "$help" == *--outputs-dir* ]]; then
+    echo "--outputs-dir .aval/$1/outputs"
+  elif ! expanded=$("$AVAL" explain -f "$INPUT_FILE" --test "$1" --expand); then
+    echo "::error title=aval run::$1: aval explain could not read the test, so the action cannot tell whether it declares outputs" >&2
+    return 1
+  elif [[ $'\n'"$expanded" == *$'\n'outputs:* ]]; then
+    echo "::error title=aval run::$1 declares outputs and the installed aval has no run --outputs-dir: carrying outputs to the publish job needs aval v0.8.2 or later (#236)" >&2
+    return 1
   fi
-else
-  report=".aval/$INPUT_TEST/report.json"
-  /bin/rm -f "$report"
-  "$AVAL" "${args[@]}" || code=$?
-fi
+}
 
-# Step 5: the summary prints only known values; the reason can carry text
-# from an untrusted attestation, so it stays in the report.
-outcome=unknown result=""
-if [ -f "$report" ]; then
-  outcome=$(/usr/bin/jq -r '.outcome // ""' "$report" 2> /dev/null) || outcome=unknown
-  result=$(/usr/bin/jq -r '.result // ""' "$report" 2> /dev/null) || result=""
-fi
-case "$outcome" in verified | miss | verification-failed | error) ;; *) outcome=unknown ;; esac
-case "$result" in passed | failed | "") ;; *) result=unknown ;; esac
-# Exit 5 is a security event whatever the report's lookup outcome says (#195).
-if [ "$code" -eq 5 ]; then outcome=verification-failed; fi
-if [ "$lookup" = true ] && [ "$code" -eq 4 ]; then outcome=miss; fi
-echo "outcome=$outcome" >> "$GITHUB_OUTPUT"
+orank() { case "$1" in verified) echo 0 ;; miss) echo 1 ;; error) echo 2 ;; unknown) echo 3 ;; *) echo 4 ;; esac; }
+worst=0 all=verified outcomes='{}'
+count=() # one "<outcome>" per test, for the summary line
 mode=""
 if [ "$lookup" = true ]; then mode="lookup "; fi
-echo "### aval $mode$INPUT_TEST: \`$outcome\` $result (exit $code)" >> "$GITHUB_STEP_SUMMARY"
-echo "Trust minimum: $effective" >> "$GITHUB_STEP_SUMMARY"
-if [ "$code" -eq 5 ]; then
-  echo "::error title=aval SECURITY::$INPUT_TEST: an attestation for this fingerprint failed signature or policy verification; see the SECURITY line in the log and the uploaded report"
+for test in "${tests[@]}"; do
+  # Step 4. A report left by an earlier run in this workspace must not be
+  # read as this run's outcome. Lookup-only keeps its report in RUNNER_TEMP;
+  # with no policy there is no registry to ask, and nothing is reused: a miss.
+  code=0
+  if [ "$lookup" = true ]; then
+    report="$RUNNER_TEMP/aval-lookup-$test.json"
+    /bin/rm -f "$report"
+    if [ -f "$policy" ]; then
+      "$AVAL" verify -f "$INPUT_FILE" --test "$test" -o json ${args[@]+"${args[@]}"} > "$report" || code=$?
+    else
+      code=4
+    fi
+  else
+    report=".aval/$test/report.json"
+    /bin/rm -f "$report"
+    if flag=$(outputs_dir "$test"); then
+      # shellcheck disable=SC2086 # $flag is empty or two words without spaces
+      "$AVAL" run -f "$INPUT_FILE" --test "$test" --source-repo "$GITHUB_REPOSITORY" $flag ${args[@]+"${args[@]}"} || code=$?
+    else
+      code=1
+    fi
+  fi
+
+  # Step 5: the summary prints only known values; the reason can carry text
+  # from an untrusted attestation, so it stays in the report.
+  outcome=unknown result=""
+  if [ -f "$report" ]; then
+    outcome=$(/usr/bin/jq -r '.outcome // ""' "$report" 2> /dev/null) || outcome=unknown
+    result=$(/usr/bin/jq -r '.result // ""' "$report" 2> /dev/null) || result=""
+  fi
+  case "$outcome" in verified | miss | verification-failed | error) ;; *) outcome=unknown ;; esac
+  case "$result" in passed | failed | "") ;; *) result=unknown ;; esac
+  # Exit 5 is a security event whatever the report's lookup outcome says (#195).
+  if [ "$code" -eq 5 ]; then outcome=verification-failed; fi
+  # A miss is routine, so the lookup step succeeds; exit 5 never becomes one.
+  if [ "$lookup" = true ] && [ "$code" -eq 4 ]; then outcome=miss; fi
+  echo "### aval $mode$test: \`$outcome\` $result (exit $code)" >> "$GITHUB_STEP_SUMMARY"
+  if [ "$code" -eq 5 ]; then
+    echo "::error title=aval SECURITY::$test: an attestation for this fingerprint failed signature or policy verification; see the SECURITY line in the log and the uploaded report"
+  fi
+  if [ "$lookup" = true ] && [ "$code" -eq 4 ]; then code=0; fi
+  if [ "$code" -eq 5 ] || { [ "$worst" -ne 5 ] && [ "$code" -gt "$worst" ]; }; then
+    worst=$code
+  fi
+  if [ "$(orank "$outcome")" -gt "$(orank "$all")" ]; then all=$outcome; fi
+  outcomes=$(/usr/bin/jq -cn --argjson m "$outcomes" --arg t "$test" --arg o "$outcome" '$m + {($t): $o}')
+  count+=("$outcome")
+done
+
+# outcome is the worst of the tests: verified only when every test is.
+echo "outcome=$all" >> "$GITHUB_OUTPUT"
+echo "outcomes=$outcomes" >> "$GITHUB_OUTPUT"
+if [ "${#tests[@]}" -gt 1 ]; then
+  tally=$(printf '%s\n' "${count[@]}" | /usr/bin/sort | /usr/bin/uniq -c | /usr/bin/awk '{printf "%s%s %s", sep, $1, $2; sep=", "}')
+  echo "${#tests[@]} tests: $tally (exit $worst)" >> "$GITHUB_STEP_SUMMARY"
 fi
-# A miss is routine, so the lookup step succeeds; exit 5 never becomes one.
-if [ "$lookup" = true ] && [ "$code" -eq 4 ]; then exit 0; fi
-exit "$code"
+echo "Trust minimum: $effective" >> "$GITHUB_STEP_SUMMARY"
+exit "$worst"
