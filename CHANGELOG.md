@@ -1,5 +1,12 @@
 # aval
 
+## 0.9.1
+
+### Patch Changes
+
+- d4a98a6: Dependencies: github.com/sigstore/sigstore 1.11.3, and actions/setup-node 7.1.0 in the release workflow (with its automatic package-manager cache off).
+- be64eb3: Docs: a `lookup-only` step must not skip setup that `environment.probe` checks, since the run step probes before its lookup; the example now gates `npm ci` and the browsers instead of `setup-node`.
+
 ## 0.9.0
 
 ### Minor Changes
