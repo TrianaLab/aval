@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -21,10 +23,11 @@ import (
 // hand-written test that uses the fragment of a unit that no longer exists
 // is an error. A unit whose ID matches one of the contract globs in noTest
 // gets no test; its fragment stays while another test uses it, so its files
-// stay in that test's scope. On any error nothing is returned to write
-// (invariant 3).
-func Rewrite(data []byte, lang string, units []Unit, noTest ...string) ([]byte, error) {
-	p, err := plan(lang, units)
+// stay in that test's scope. A non-nil shared becomes the fragment
+// "<lang>.module", which every generated test uses. On any error nothing is
+// returned to write (invariant 3).
+func Rewrite(data []byte, lang string, units []Unit, shared *Shared, noTest ...string) ([]byte, error) {
+	p, err := withShared(lang, units, shared)
 	if err != nil {
 		return nil, err
 	}
@@ -176,15 +179,20 @@ func used(lang string, root *yaml.Node, p []planned, skip map[string]bool) map[s
 }
 
 // generated returns the fragments (a mapping) and the tests (a sequence)
-// for p, in name order: no test for the names in skip, and only the
-// fragments in use (a fragment no test uses is invalid).
+// for p, in name order: no test for the names in skip or for a shared
+// fragment, and only the fragments in use (a fragment no test uses is
+// invalid).
 func generated(p []planned, skip, use map[string]bool) (frags, tests *yaml.Node) {
 	frags, tests = mapping(0), &yaml.Node{Kind: yaml.SequenceNode}
 	for _, u := range p {
-		if use[u.name] {
-			frags.Content = append(frags.Content, str(u.name), mapping(0, str("scope"), mapping(0, str("source"), seq(0, u.source...))))
+		body := u.body
+		if body == nil {
+			body = mapping(0, str("scope"), mapping(0, str("source"), seq(0, u.source...)))
 		}
-		if skip[u.name] {
+		if use[u.name] {
+			frags.Content = append(frags.Content, str(u.name), body)
+		}
+		if skip[u.name] || u.body != nil {
 			continue
 		}
 		tests.Content = append(tests.Content, mapping(0,
@@ -193,6 +201,45 @@ func generated(p []planned, skip, use map[string]bool) (frags, tests *yaml.Node)
 			str("use"), seq(0, u.use...)))
 	}
 	return frags, tests
+}
+
+// withShared plans units and adds shared, when not nil, as "<lang>.module",
+// and its name to the use of every unit.
+func withShared(lang string, units []Unit, shared *Shared) ([]planned, error) {
+	p, err := plan(lang, units)
+	if err != nil || shared == nil {
+		return p, err
+	}
+	name := lang + "." + SharedName
+	for i := range p {
+		if p[i].name == name {
+			return nil, fmt.Errorf("%w: a unit gets the name %s, which the shared fragment owns", ErrUnits, name)
+		}
+		p[i].use = append(p[i].use, name)
+		slices.Sort(p[i].use)
+	}
+	p = append(p, planned{name: name, body: shared.node()})
+	slices.SortFunc(p, func(a, b planned) int { return strings.Compare(a.name, b.name) })
+	return p, nil
+}
+
+// node returns the body of the shared fragment.
+// ponytail: every key is written; Go fills them all. Skip empty ones when an
+// adapter has none.
+func (s *Shared) node() *yaml.Node {
+	tool, probe := mapping(yaml.FlowStyle), mapping(0)
+	for _, k := range slices.Sorted(maps.Keys(s.Toolchain)) {
+		tool.Content = append(tool.Content, str(k), str(s.Toolchain[k]))
+	}
+	for _, k := range slices.Sorted(maps.Keys(s.Probe)) {
+		probe.Content = append(probe.Content, str(k), seq(yaml.FlowStyle, s.Probe[k]...))
+	}
+	return mapping(0,
+		str("scope"), mapping(0, str("dependencies"), seq(0, slices.Sorted(slices.Values(s.Dependencies))...)),
+		str("environment"), mapping(0,
+			str("toolchain"), tool,
+			str("probe"), probe,
+			str("env"), seq(0, slices.Sorted(slices.Values(s.Env))...)))
 }
 
 // edit collects line edits to the file: lines to drop, text to insert

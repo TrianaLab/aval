@@ -58,7 +58,7 @@ func generate(t *testing.T, a *Adapter, root string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := gen.Rewrite(data, "python", units)
+	out, err := gen.Rewrite(data, "python", units, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

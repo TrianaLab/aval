@@ -98,7 +98,7 @@ tests:
 
 func rewrite(t *testing.T, data, lang string, units ...Unit) string {
 	t.Helper()
-	out, err := Rewrite([]byte(data), lang, units)
+	out, err := Rewrite([]byte(data), lang, units, nil)
 	if err != nil {
 		t.Fatalf("Rewrite: %v", err)
 	}
@@ -209,7 +209,7 @@ func TestRewriteErrors(t *testing.T) {
 		// for a comment: the node check refuses to write.
 		"block scalar": {set + "tests:\n  - metadata: {name: go.a}\n    runner: {command: [x]}\n    scope: {source: [x]}\n  - metadata: {name: h}\n    scope: {source: [x]}\n    runner:\n      command:\n        - sh\n        - |\n          echo\n          # kept\n  - metadata: {name: go.b}\n    runner: {command: [x]}\n    scope: {source: [x]}\n", []Unit{unit("a")}, "without changing other lines"},
 	} {
-		_, err := Rewrite([]byte(tc.in), "go", tc.units)
+		_, err := Rewrite([]byte(tc.in), "go", tc.units, nil)
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: got %v, want %q", name, err, tc.want)
 		}
@@ -226,7 +226,7 @@ func TestDiff(t *testing.T) {
 
 func TestRewriteNoTest(t *testing.T) {
 	units := []Unit{unit("a", "cmd/gen"), unit("cmd/gen"), unit("cmd/genx"), unit("tests/e2e")}
-	out, err := Rewrite([]byte(base), "go", units, "cmd/gen*", "tests/**")
+	out, err := Rewrite([]byte(base), "go", units, nil, "cmd/gen*", "tests/**")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestRewriteNoTest(t *testing.T) {
 	}
 	// A hand-written test that uses an excluded unit keeps its fragment.
 	hand := base + "tests:\n  - metadata: {name: e2e}\n    use: [go.tests.e2e]\n    runner: {command: [x]}\n"
-	if kept := string(must(Rewrite([]byte(hand), "go", units, "cmd/gen*", "tests/**"))); !strings.Contains(kept, "  go.tests.e2e:\n") || strings.Contains(kept, "{name: go.tests.e2e}") {
+	if kept := string(must(Rewrite([]byte(hand), "go", units, nil, "cmd/gen*", "tests/**"))); !strings.Contains(kept, "  go.tests.e2e:\n") || strings.Contains(kept, "{name: go.tests.e2e}") {
 		t.Errorf("hand-written use:\n%s", kept)
 	}
 	// Without patterns every unit gets its test back.
@@ -264,17 +264,17 @@ func TestRewriteNoTest(t *testing.T) {
 // Every unit under --no-test: only the hand-written entries are left.
 func TestRewriteNoTestAll(t *testing.T) {
 	hand := base + "tests:\n  - metadata: {name: e2e}\n    runner: {command: [x]}\n    scope: {source: [x]}\n"
-	if out := string(must(Rewrite([]byte(hand), "go", []Unit{unit("a")}, "a"))); out != hand {
+	if out := string(must(Rewrite([]byte(hand), "go", []Unit{unit("a")}, nil, "a"))); out != hand {
 		t.Errorf("got:\n%s", out)
 	}
-	if out := string(must(Rewrite([]byte(hand+"fragments:\n"), "go", []Unit{unit("a")}, "a"))); out != hand+"fragments:\n" {
+	if out := string(must(Rewrite([]byte(hand+"fragments:\n"), "go", []Unit{unit("a")}, nil, "a"))); out != hand+"fragments:\n" {
 		t.Errorf("empty fragments:\n%s", out)
 	}
 	gend := rewrite(t, hand, "go", unit("a"))
-	if out := string(must(Rewrite([]byte(gend), "go", []Unit{unit("a")}, "*"))); !strings.HasSuffix(out, "fragments:\n") || strings.Contains(out, "go.a") {
+	if out := string(must(Rewrite([]byte(gend), "go", []Unit{unit("a")}, nil, "*"))); !strings.HasSuffix(out, "fragments:\n") || strings.Contains(out, "go.a") {
 		t.Errorf("got:\n%s", out)
 	}
-	if _, err := Rewrite([]byte(base), "go", []Unit{unit("a")}, "a"); err == nil || !strings.Contains(err.Error(), "at least one test") {
+	if _, err := Rewrite([]byte(base), "go", []Unit{unit("a")}, nil, "a"); err == nil || !strings.Contains(err.Error(), "at least one test") {
 		t.Errorf("no test left: %v", err)
 	}
 }
@@ -293,9 +293,56 @@ func TestRewriteNoTestErrors(t *testing.T) {
 		"a/**x": "'**' must be a whole path segment",
 		"/a":    "relative",
 	} {
-		_, err := Rewrite([]byte(base), "go", units, "a", pattern)
+		_, err := Rewrite([]byte(base), "go", units, nil, "a", pattern)
 		if err == nil || !strings.Contains(err.Error(), want) || errors.Is(err, ErrUnits) {
 			t.Errorf("%q: got %v, want %q (not ErrUnits)", pattern, err, want)
 		}
+	}
+}
+
+var testShared = &Shared{
+	Toolchain:    map[string]string{"go": "1.22"},
+	Probe:        map[string][]string{"go": {"go", "env", "GOVERSION"}},
+	Dependencies: []string{"go.sum", "go.mod"},
+	Env:          []string{"GOOS", "CGO_ENABLED"},
+}
+
+// The shared fragment is written once, in name order, and every generated
+// test uses it; hand-written tests are left alone.
+func TestRewriteShared(t *testing.T) {
+	hand := base + "tests:\n  - metadata: {name: e2e}\n    runner: {command: [x]}\n    scope: {source: [x]}\n"
+	out := string(must(Rewrite([]byte(hand), "go", []Unit{unit("a", "b"), unit("b")}, testShared)))
+	frag := "  go.module:\n    scope:\n      dependencies:\n        - go.mod\n        - go.sum\n    environment:\n" +
+		"      toolchain: {go: \"1.22\"}\n      probe:\n        go: [go, env, GOVERSION]\n      env:\n        - CGO_ENABLED\n        - GOOS\n"
+	if !strings.Contains(out, frag) {
+		t.Fatalf("no go.module fragment:\n%s", out)
+	}
+	cs, err := contract.ParseAll([]byte(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cs {
+		gen := strings.HasPrefix(c.Metadata.Name, "go.")
+		if got := c.Environment.Toolchain["go"] == "1.22" && slices.Contains(c.Environment.Env, "GOOS"); got != gen {
+			t.Errorf("%s: has go.module = %v, want %v", c.Metadata.Name, got, gen)
+		}
+	}
+	// Idempotent, and dropped when no test uses it.
+	if again := string(must(Rewrite([]byte(out), "go", []Unit{unit("a", "b"), unit("b")}, testShared))); again != out {
+		t.Errorf("second run differs:\n%s", Diff("first", "second", []byte(out), []byte(again)))
+	}
+	if none := string(must(Rewrite([]byte(out), "go", []Unit{unit("a")}, testShared, "a"))); strings.Contains(none, "go.module") {
+		t.Errorf("go.module kept without a test that uses it:\n%s", none)
+	}
+}
+
+func TestRewriteSharedErrors(t *testing.T) {
+	if _, err := Rewrite([]byte(base), "go", []Unit{unit("module")}, testShared); !errors.Is(err, ErrUnits) || !strings.Contains(err.Error(), "go.module") {
+		t.Errorf("a unit named module: %v", err)
+	}
+	// A hand-written toolchain that disagrees is a conflict, not an override.
+	clash := strings.Replace(base, "  cacheability:", "  environment: {toolchain: {go: \"1.21\"}}\n  cacheability:", 1)
+	if _, err := Rewrite([]byte(clash), "go", []Unit{unit("a")}, testShared); err == nil || !strings.Contains(err.Error(), "conflicts") {
+		t.Errorf("conflicting toolchain: %v", err)
 	}
 }

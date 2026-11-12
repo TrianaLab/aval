@@ -31,7 +31,7 @@ func generate(t *testing.T, root string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := gen.Rewrite(in, "dotnet", units)
+	out, err := gen.Rewrite(in, "dotnet", units, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

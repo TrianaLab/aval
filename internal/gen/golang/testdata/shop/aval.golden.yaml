@@ -13,27 +13,32 @@ tests:
     runner: {command: [go, test, ./internal/money]}
     use:
       - go.internal.money
+      - go.module
   - metadata: {name: go.internal.orders}
     runner: {command: [go, test, ./internal/orders]}
     use:
       - go.internal.money
       - go.internal.orders
       - go.internal.testutil
+      - go.module
   - metadata: {name: go.internal.testutil}
     runner: {command: [go, test, ./internal/testutil]}
     use:
       - go.internal.testutil
+      - go.module
   - metadata: {name: go.shop}
     runner: {command: [go, test, .]}
     use:
       - go.internal.money
       - go.internal.orders
       - go.internal.testutil
+      - go.module
       - go.shop
   - metadata: {name: go.web}
     runner: {command: [go, test, ./web]}
     use:
       - go.internal.money
+      - go.module
       - go.web
 fragments:
   go.internal.money:
@@ -49,6 +54,23 @@ fragments:
     scope:
       source:
         - internal/testutil/*.go
+  go.module:
+    scope:
+      dependencies:
+        - go.mod
+    environment:
+      toolchain: {go: "1.22"}
+      probe:
+        go: [go, env, GOVERSION]
+      env:
+        - CGO_ENABLED
+        - GOARCH
+        - GODEBUG
+        - GOEXPERIMENT
+        - GOFLAGS
+        - GOOS
+        - GOTOOLCHAIN
+        - GOWORK
   go.shop:
     scope:
       source:

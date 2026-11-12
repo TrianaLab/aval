@@ -184,14 +184,14 @@ func FuzzRewrite(f *testing.F) {
 	f.Add([]byte(strings.ReplaceAll(base, "\n", "\r") + "tests:\r- metadata: {name: \"go.x\u2028\"}\n"))
 	f.Add([]byte(base + "tests:\n  -\n    metadata: {name: go.x}\n"))
 	f.Fuzz(func(t *testing.T, data []byte) {
-		out, err := Rewrite(data, "go", []Unit{unit("a", "b"), unit("b")})
+		out, err := Rewrite(data, "go", []Unit{unit("a", "b"), unit("b")}, nil)
 		if err != nil {
 			return
 		}
 		if _, err := contract.ParseAll(out); err != nil {
 			t.Fatalf("invalid output: %v", err)
 		}
-		again, err := Rewrite(out, "go", []Unit{unit("b"), unit("a", "b")})
+		again, err := Rewrite(out, "go", []Unit{unit("b"), unit("a", "b")}, nil)
 		if err != nil || string(again) != string(out) {
 			t.Fatalf("second run: %v\n%s", err, Diff("first", "second", out, again))
 		}
@@ -253,7 +253,7 @@ func TestFalseHitInexpressiblePath(t *testing.T) {
 // A unit without a test keeps its fragment: a change to its files still
 // re-runs the tests of the units that depend on it.
 func TestFalseHitNoTestKeepsScope(t *testing.T) {
-	out, err := Rewrite([]byte(base), "go", graph, "b")
+	out, err := Rewrite([]byte(base), "go", graph, nil, "b")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,5 +270,21 @@ func TestFalseHitNoTestKeepsScope(t *testing.T) {
 	files["b/b.go"], files["c/c.go"] = "b", "c2"
 	if digest(t, set, files, "go.a") == before {
 		t.Error("go.a reused after c, reached through go.b, changed")
+	}
+}
+
+// A change to a file of the shared fragment re-runs every generated test.
+func TestFalseHitShared(t *testing.T) {
+	set := string(must(Rewrite([]byte(base), "go", graph, testShared)))
+	files := map[string]string{"go.mod": "module x", "go.sum": "x v1 h1:a=", "a/a.go": "a", "b/b.go": "b", "c/c.go": "c", "d/d.go": "d"}
+	for _, f := range []string{"go.mod", "go.sum"} {
+		for _, name := range []string{"go.a", "go.b", "go.c", "go.d"} {
+			before := digest(t, set, files, name)
+			changed := maps.Clone(files)
+			changed[f] += "\n"
+			if digest(t, set, changed, name) == before {
+				t.Errorf("%s reused after %s changed", name, f)
+			}
+		}
 	}
 }

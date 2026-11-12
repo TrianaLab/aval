@@ -30,7 +30,7 @@ func generate(t *testing.T, dir string) (before, after string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := gen.Rewrite(data, "js", units)
+	out, err := gen.Rewrite(data, "js", units, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

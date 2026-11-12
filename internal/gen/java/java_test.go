@@ -43,7 +43,7 @@ func generate(t *testing.T, root string, set []byte) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := gen.Rewrite(set, "java", units)
+	out, err := gen.Rewrite(set, "java", units, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
