@@ -763,6 +763,8 @@
       
         
       
+        
+      
     
     
     
@@ -879,6 +881,34 @@
     
   
     Shards and matrices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/generate-scope/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate scope from the dependency graph
   
 
     
@@ -2966,6 +2996,9 @@ as that file would be: the set above fingerprints <code>shard-1</code> like a
 <li>The order of <code>use</code> does not change the result. A fragment cannot <code>use</code>
   another fragment.</li>
 </ul>
+<p><code>aval gen &lt;language&gt;</code> writes one fragment and one test per unit from the
+repository's dependency graph into a TestSet, and leaves hand-written entries
+alone (<a href="../guides/generate-scope/">Generate <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr></a>).</p>
 <p><code>matrix</code> maps variables to lists of strings and creates one test per
 combination. It substitutes <code>{var}</code> into <code>metadata.name</code>, <code>runner.command</code>
 and the values of <code>environment.toolchain</code> (inherited ones too), in one pass,
