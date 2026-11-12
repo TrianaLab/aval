@@ -1,0 +1,11 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [uv.lock]
+    exclude: ["**/__pycache__/**", "**/.venv/**"]
+  cacheability: hermetic
+tests:
+  - metadata: {name: e2e}   # hand-written, kept as is
+    use: [python.acme]
+    runner: {command: [make, e2e]}

@@ -99,8 +99,8 @@ func digests(t *testing.T, dir string) map[string]string {
 func TestFalseHitTransitiveDependency(t *testing.T) {
 	dir := copyFixture(t)
 	before := digests(t, dir)
-	if len(before) != 5 {
-		t.Fatalf("tests %v, want 5", slices.Sorted(maps.Keys(before)))
+	if len(before) != 7 {
+		t.Fatalf("tests %v, want 7", slices.Sorted(maps.Keys(before)))
 	}
 	write(t, dir, map[string]string{
 		"apps/api/src/server.ts":           "changed",

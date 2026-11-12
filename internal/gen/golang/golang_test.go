@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/pflag"
+
 	"github.com/TrianaLab/aval/internal/contract"
 	"github.com/TrianaLab/aval/internal/fingerprint"
 	"github.com/TrianaLab/aval/internal/gen"
@@ -73,7 +75,13 @@ func TestGolden(t *testing.T) {
 }
 
 func TestCover(t *testing.T) {
-	units, err := (&Adapter{Cover: true}).Units(fixture)
+	a := &Adapter{}
+	fs := pflag.NewFlagSet("go", pflag.ContinueOnError)
+	a.Flags(fs)
+	if err := fs.Parse([]string{"--go-cover"}); err != nil || !a.Cover {
+		t.Fatalf("--go-cover: err %v, Cover %v", err, a.Cover)
+	}
+	units, err := a.Units(fixture)
 	if err != nil {
 		t.Fatal(err)
 	}

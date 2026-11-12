@@ -12,23 +12,28 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/TrianaLab/aval/internal/gen"
 	"github.com/TrianaLab/aval/internal/gen/golang"
 	"github.com/TrianaLab/aval/internal/gen/js"
+	"github.com/TrianaLab/aval/internal/gen/python"
 	"github.com/TrianaLab/aval/internal/gen/rust"
 )
 
-// goAdapter is the go adapter, whose options are flags of aval gen.
-var goAdapter = &golang.Adapter{}
-
-// adapters are the languages aval gen knows, by name. An adapter's own
-// flags are named "<language>-<option>".
+// adapters are the languages aval gen knows, by name.
+// ponytail: adapters hold flag values; newGenCmd re-registers (and resets)
+// them on every call.
 var adapters = map[string]gen.Adapter{
-	"go":   goAdapter,
-	"js":   js.Adapter{},
-	"rust": rust.Adapter{},
+	"go":     &golang.Adapter{},
+	"js":     js.Adapter{},
+	"python": &python.Adapter{},
+	"rust":   rust.Adapter{},
 }
+
+// flagger is an adapter with flags of its own. gen registers them, and
+// rejects them for another language.
+type flagger interface{ Flags(*pflag.FlagSet) }
 
 func newGenCmd() *cobra.Command {
 	var file string
@@ -66,19 +71,35 @@ of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 			if !ok {
 				return usageError{fmt.Errorf("gen: unknown language %q (available: %s)", args[0], languages())}
 			}
+			var err error
+			cmd.Flags().Visit(func(f *pflag.Flag) {
+				if l := f.Annotations["language"]; l != nil && l[0] != args[0] {
+					err = usageError{fmt.Errorf("gen %s: --%s is a %s flag", args[0], f.Name, l[0])}
+				}
+			})
+			if err != nil {
+				return err
+			}
 			return runGen(cmd, a, args[0], file, check)
 		},
 	}
 	cmd.Flags().StringVarP(&file, "file", "f", "aval.yaml", "the kind: TestSet to write")
-	cmd.Flags().BoolVar(&goAdapter.Cover, "go-cover", false, "go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)")
 	cmd.Flags().BoolVar(&check, "check", false, "write nothing; exit 1 with a diff when the generated entries are out of date")
+	for _, lang := range slices.Sorted(maps.Keys(adapters)) {
+		if a, ok := adapters[lang].(flagger); ok {
+			fs := pflag.NewFlagSet(lang, pflag.ContinueOnError)
+			a.Flags(fs)
+			fs.VisitAll(func(f *pflag.Flag) {
+				f.Annotations = map[string][]string{"language": {lang}}
+				cmd.Flags().AddFlag(f)
+			})
+		}
+	}
 	return cmd
 }
 
 // languages lists the adapters for help and errors.
-func languages() string {
-	return strings.Join(slices.Sorted(maps.Keys(adapters)), ", ")
-}
+func languages() string { return strings.Join(slices.Sorted(maps.Keys(adapters)), ", ") }
 
 func runGen(cmd *cobra.Command, a gen.Adapter, lang, file string, check bool) error {
 	data, err := os.ReadFile(file)

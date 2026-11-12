@@ -19,6 +19,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/spf13/pflag"
+
 	"github.com/TrianaLab/aval/internal/gen"
 )
 
@@ -27,6 +29,11 @@ type Adapter struct {
 	// Cover makes each unit's test fail below 100% statement coverage of
 	// its own package. The command then needs a POSIX sh, mktemp and awk.
 	Cover bool
+}
+
+// Flags registers the adapter's options as aval gen flags.
+func (a *Adapter) Flags(fs *pflag.FlagSet) {
+	fs.BoolVar(&a.Cover, "go-cover", false, "go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)")
 }
 
 // pkg is the part of a go list -json record the adapter reads.
