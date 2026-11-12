@@ -207,9 +207,14 @@ func TestFalseHitUnresolvedRead(t *testing.T) {
 		"wd, _ := os.Getwd()\n\tt.Chdir(filepath.Dir(wd))\n\t_, _ = os.ReadFile(\"fixtures/order.json\")",
 		"readFile := os.ReadFile\n\t_, _ = readFile(\"../fixtures/order.json\")",
 		"_, _ = (os.ReadFile)(\"x\")\n\tvar open func(string) (*os.File, error) = (os.Open)\n\t_, _ = open(\"../fixtures/order.json\")",
+		"_, _ = os.ReadFile(fmt.Sprintf(\"../fixtures/%s.json\", \"order\"))",
+		"_, _ = os.ReadFile(fmt.Sprintf(\"../%s/order.json\", \"fixtures\"))",
+		"_, _ = os.ReadFile(strings.ReplaceAll(\"../fixtures/NAME.json\", \"NAME\", \"order\"))",
+		"_ = syscall.Chdir(os.Getenv(\"D\"))\n\t_, _ = os.ReadFile(\"fixtures/order.json\")",
+		"f, _ := os.Open(\"static\")\n\t_ = f.Chdir()\n\t_, _ = os.ReadFile(\"../../fixtures/order.json\")",
 	} {
 		root := shop(t)
-		write(t, filepath.Join(root, "web/unresolved_test.go"), "package web\n\nimport (\n\t\"os\"\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"example.com/shop/internal/testutil\"\n)\n\nvar _ = filepath.Join\nvar _ = testutil.Equal\n\nfunc TestUnresolved(t *testing.T) {\n\t"+body+"\n}\n")
+		write(t, filepath.Join(root, "web/unresolved_test.go"), "package web\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\t\"path/filepath\"\n\t\"strings\"\n\t\"syscall\"\n\t\"testing\"\n\n\t\"example.com/shop/internal/testutil\"\n)\n\nvar _ = filepath.Join\nvar _ = fmt.Sprint\nvar _ = strings.Cut\nvar _ = syscall.Chdir\nvar _ = testutil.Equal\n\nfunc TestUnresolved(t *testing.T) {\n\t"+body+"\n}\n")
 		if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "web/unresolved_test.go:") || !strings.Contains(err.Error(), "cannot resolve") {
 			t.Errorf("%s: %v, want an error naming web/unresolved_test.go", body, err)
 		}

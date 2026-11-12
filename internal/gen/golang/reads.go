@@ -448,7 +448,15 @@ func (r *resolver) reads(files []*ast.File) []read {
 		dot := dotImports(f)
 		ast.Inspect(f, func(n ast.Node) bool {
 			c, ok := n.(*ast.CallExpr)
-			if !ok || len(c.Args) == 0 {
+			if !ok {
+				return true
+			}
+			if sel, ok := ast.Unparen(c.Fun).(*ast.SelectorExpr); ok && sel.Sel.Name == "Chdir" && len(c.Args) == 0 {
+				// (*os.File).Chdir: a directory it cannot resolve
+				out = append(out, read{pos: r.fset.Position(c.Pos()), call: "Chdir", val: val{cwd: true}})
+				return true
+			}
+			if len(c.Args) == 0 {
 				return true
 			}
 			call, ok := r.readCall(c.Fun, dot)
@@ -548,8 +556,9 @@ func (r *resolver) from(o types.Object, ip, name string) bool {
 }
 
 // readCall returns the name of the read call fun is, such as os.ReadFile:
-// a function of readCalls, through a dot import too, or os.Chdir or a
-// Chdir method (testing.T.Chdir), which make later relative reads land
+// a function of readCalls, through a dot import too, or os.Chdir,
+// syscall.Chdir, unix.Chdir or a Chdir method (testing.T.Chdir), which make
+// later relative reads land
 // under their directory.
 func (r *resolver) readCall(fun ast.Expr, dot []string) (string, bool) {
 	ip, name := r.callee(fun)
@@ -561,7 +570,7 @@ func (r *resolver) readCall(fun ast.Expr, dot []string) (string, bool) {
 			}
 		}
 	case *ast.SelectorExpr:
-		if readCalls[ip][name] || ip == "os" && name == "Chdir" {
+		if readCalls[ip][name] || (ip == "os" || ip == "syscall" || ip == "golang.org/x/sys/unix") && name == "Chdir" {
 			return path.Base(ip) + "." + name, true
 		}
 		if ip == "" && fun.Sel.Name == "Chdir" {
@@ -1120,14 +1129,30 @@ func (p pkg) escapes(root string, dirs []string, v val) bool {
 			return false // outside the root: test data, or a file no scope can hold
 		}
 		return slices.ContainsFunc(dirs, func(d string) bool {
-			rel := path.Join(p.Dir, d, s)
-			if climbs(rel) {
-				return false
-			}
-			_, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
-			return err == nil
+			return slices.ContainsFunc(cuts(s), func(c string) bool {
+				rel := path.Join(p.Dir, d, c)
+				if climbs(rel) {
+					return false
+				}
+				_, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
+				return err == nil
+			})
 		})
 	})
+}
+
+// cuts returns s, s before its first format verb, and each ancestor of s
+// that ends in a named segment: a template ("../../fixtures/%s.json",
+// "../../fixtures/NAME.json") names the directory fmt or strings fill in.
+func cuts(s string) []string {
+	out := []string{s}
+	if i := strings.IndexByte(s, '%'); i >= 0 {
+		out = append(out, s[:i])
+	}
+	for d := path.Dir(s); d != "." && d != "/" && path.Base(d) != ".."; d = path.Dir(d) {
+		out = append(out, d)
+	}
+	return out
 }
 
 // readGlob returns the scope glob of the path s that rd reads, "" when it

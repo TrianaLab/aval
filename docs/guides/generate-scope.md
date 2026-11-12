@@ -192,7 +192,8 @@ tests of the packages that import it, and no other test.
   `Readlink`, `DirFS`, `OpenRoot` and `OpenInRoot`; `ioutil.ReadFile` and
   `ReadDir`; `filepath.Walk`, `WalkDir` and `Glob`; the `html/template`
   and `text/template` functions `ParseFiles` (every argument) and
-  `ParseGlob`; `http.Dir`; and `os.Chdir` and `t.Chdir`, since later
+  `ParseGlob`; `http.Dir`; and `os.Chdir`, `syscall.Chdir`,
+  `unix.Chdir`, `t.Chdir` and an open file's `Chdir`, since later
   relative reads land under that directory (going back to the directory
   `os.Getwd` returned is not a read). Dot imports count.
 - After a `Chdir`, a relative read of the package resolves against the
@@ -216,15 +217,17 @@ It fails closed, naming the file and line (exit 1, nothing written):
   variable (`os.Getenv`, `LookupEnv`, `ExpandEnv`) or `runtime.Caller`
   with another depth, or from a literal with a `..`
   segment that names a file or directory of the contract root outside the
-  package (`filepath.Join(root, name)` with `root` from `"../.."`). Paths
+  package (`filepath.Join(root, name)` with `root` from `"../.."`), also
+  through the directory a template names
+  (`fmt.Sprintf("../fixtures/%s.json", name)`). Paths
   it cannot follow count as built from anywhere: a parameter of a method
   or closure, or of a function that no call in the package passes or that
   is also used as a value; a read function itself used as a value
-  (`var readFile = os.ReadFile`, other than assigned to `_`); a variable written through a pointer; a call
-  to another package (other than `strings`, `fmt`, `strconv`, `path` and
+  (`var readFile = os.ReadFile`, other than assigned to `_`); a variable
+  written through a pointer; a call to another package (other than `strings`, `fmt`, `strconv`, `path` and
   `filepath`, which keep what their arguments may climb to), to a method
   or to a function value; a variable of another package; and a `Chdir` to
-  a directory it cannot resolve. A path built on `t.TempDir()`,
+  a directory it cannot resolve, such as an open file's. A path built on `t.TempDir()`,
   `t.Name()`, `os.TempDir()`, `os.MkdirTemp` or the `Name()` of an
   `os.CreateTemp` file is fine;
 - a path outside the contract root, absolute ones included
@@ -248,8 +251,9 @@ caller's package.
 
 It does not see, so declare by hand: a slice or map literal that a
 function it is passed to changes; a path that climbs without a `..` in
-any literal (`"." + "./x"`); a `Chdir` the tests run more than once
-in a row (`os.Chdir("..")` in a loop); and files read through other APIs, such as
+any literal (`"." + "./x"`, `strings.TrimPrefix("x../../y", "x")`); a
+`Chdir` the tests run more than once in a row (`os.Chdir("..")` in a
+loop); and files read through other APIs, such as
 `exec.Command`, the `ParseFiles` method of a template, or a function of
 another package that opens a path of its own.
 
