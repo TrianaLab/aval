@@ -2728,9 +2728,12 @@ kind: TestSet in -f. For each unit (a package, module or project) it writes
 a fragment with the unit's own files and a test that uses the fragments of
 the unit and of every unit it depends on, both named LANGUAGE.UNIT (such as
 go.internal.<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>). A change to a unit then re-runs its test and the
-tests of the units that depend on it.</p>
+tests of the units that depend on it. gen go also writes the fragment
+go.module, which every go.* test uses: the toolchain version from go.mod or
+go.work with a probe, go.mod, go.sum, go.work and go.work.sum, and the Go
+build environment.</p>
 <p>gen owns only the fragments and tests whose names start with "LANGUAGE.";
-every other line, comments included, is kept as it is. Shared inputs
+every other line, comments included, is kept as it is. Other shared inputs
 (lockfiles, root build files, toolchain, <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr>) belong in the
 hand-written defaults. --no-test PATTERN (repeatable, a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> glob such as
 cmd/gen* or tests/**) writes no test for the units whose ID matches; they keep
