@@ -40,9 +40,20 @@ jobs:
         with:
           test: ui
   # --8<-- [end:lookup]
+  # --8<-- [start:several]
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@<sha> # pin by commit SHA
+        with:
+          persist-credentials: false
+      - uses: TrianaLab/aval/integrations/github/run@<sha> # pin by commit SHA
+        with:
+          test: go.* lint
+  # --8<-- [end:several]
   # --8<-- [start:publish]
   publish:
-    needs: [unit, ui]
+    needs: [unit, ui, go]
     if: ${{ !cancelled() && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     runs-on: ubuntu-latest
     permissions:

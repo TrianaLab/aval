@@ -99,6 +99,18 @@ aval run -f aval.shard-2.yaml --result-file .aval/shard-2.json
 
 To publish, add the push step from [Use GitHub Actions](github-actions.md).
 
+## Several tests in one job
+
+One job per test pays checkout, setup and the aval install each time. The run action takes several tests in one step instead:
+
+```yaml
+--8<-- "docs/includes/github-actions.yml:several"
+```
+
+`test` takes names and glob patterns (`*`, `?`, `[...]`) separated by spaces, commas or newlines; a pattern adds the tests it matches, in contract order, and exits 2 when it matches none. Each test gets its own lookup, verification, run and report, one after the other. After them all the step exits with the worst code: a failing test (exit 3) does not skip the rest, and 5 (`aval SECURITY`) is never downgraded. The `outcome` output is the worst outcome (`verified` only when every test is, so `lookup-only` skips setup only then); `outcomes` maps each test to its own, and the step summary has a line per test. On a push to the default branch the tests share one artifact `aval-.<id>`, which the publish action pushes test by test.
+
+The tests share the job and its user: code one test runs can change what the next one reads, as with separate steps of one job. Keep tests that must not touch each other in separate jobs.
+
 ## Read next
 
 - [Depend on another part of the repo](depend-on-a-contract.md)
