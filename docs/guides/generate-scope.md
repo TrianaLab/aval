@@ -164,7 +164,10 @@ fragments:
 
 - `toolchain.go` is the `toolchain` directive without its `go` prefix, else
   the `go` directive, of `go.work` in a workspace or of `go.mod`. The probe
-  makes `aval run` check it against `go env GOVERSION` before the lookup.
+  makes `aval run` check it against `go env GOVERSION` before the lookup, so
+  the installed Go must match it exactly: with only `go 1.25.0`, a machine
+  on go1.25.3 records and reuses nothing. Pin the patch version (a
+  `toolchain` line, or `go` with the patch you install).
 - `dependencies` are `go.work`, `go.work.sum`, and the `go.mod` and
   `go.sum` of every main module, when they exist, relative to the contract
   root.
