@@ -114,7 +114,7 @@ func TestGenErrors(t *testing.T) {
 		want string
 	}{
 		{[]string{"gen"}, ExitUsage, "accepts 1 arg"},
-		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake)`},
+		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake, go)`},
 		{[]string{"gen", "fake", "-f", filepath.Join(dir, "none.yaml")}, ExitUsage, "aval init --set"},
 		{[]string{"gen", "fake", "-f", test}, ExitUsage, "kind: TestSet"},
 		{[]string{"gen", "broken", "-f", set}, ExitError, "gen broken: tool not found"},
@@ -137,7 +137,49 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenLanguages(t *testing.T) {
+	if got := languages(); got != "go" {
+		t.Errorf("languages() = %q", got)
+	}
+	saved := adapters
+	adapters = map[string]gen.Adapter{}
+	t.Cleanup(func() { adapters = saved })
 	if got := languages(); got != "none yet" {
 		t.Errorf("languages() = %q with no adapters", got)
+	}
+}
+
+// aval gen go writes the golden file of the Go fixture; without go on PATH
+// it exits 1 and writes nothing.
+func TestGenGo(t *testing.T) {
+	const fixture = "../../internal/gen/golang/testdata/shop"
+	dir := filepath.Join(t.TempDir(), "shop")
+	if err := os.CopyFS(dir, os.DirFS(fixture)); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "aval.yaml")
+	before, _ := os.ReadFile(file)
+	t.Setenv("PATH", t.TempDir())
+	if code, _, errOut := runCLI("gen", "go", "-f", file); code != ExitError || !strings.Contains(errOut, "gen go: go list:") {
+		t.Errorf("no go: exit %d, stderr %q", code, errOut)
+	}
+	if data, _ := os.ReadFile(file); string(data) != string(before) {
+		t.Error("written without go")
+	}
+}
+
+func TestGenGoWrites(t *testing.T) {
+	const fixture = "../../internal/gen/golang/testdata/shop"
+	dir := filepath.Join(t.TempDir(), "shop")
+	if err := os.CopyFS(dir, os.DirFS(fixture)); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "aval.yaml")
+	if code, out, errOut := runCLI("gen", "go", "-f", file); code != ExitOK || !strings.Contains(out, "wrote the go entries for 5 units") {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	got, _ := os.ReadFile(file)
+	want, _ := os.ReadFile(filepath.Join(dir, "aval.golden.yaml"))
+	if string(got) != string(want) {
+		t.Errorf("written file differs from the golden:\n%s", gen.Diff("golden", "got", want, got))
 	}
 }

@@ -11,8 +11,8 @@ result: `aval run`, `verify` and `push` never call it, and the scope stays
 declared in `aval.yaml`.
 
 !!! note "Languages"
-    The core is in place; no language ships yet. The adapters (Go,
-    JavaScript, Python, Java, Rust, .NET) are the next stories of
+    Go ships today ([below](#go)). The other adapters (JavaScript, Python,
+    Java, Rust, .NET) are the next stories of
     [Epic 16](https://github.com/TrianaLab/aval/issues/291). `aval gen --help`
     lists the languages your build has.
 
@@ -96,6 +96,45 @@ tests:
 
 A hand-written test can `use` generated fragments. When the unit behind one
 disappears, `aval gen` fails (exit 2) and writes nothing.
+
+## Go
+
+`aval gen go` reads the graph with `go list -deps -test -json ./...` in the
+contract root, so it needs `go` on `PATH`. A module or a `go.work` workspace
+works. Each package is one unit:
+
+- Its id is the package directory (`internal/orders`); the root package
+  takes the last element of its import path (`shop`).
+- Its files are `<dir>/*.go`, the files it embeds with `go:embed` (test
+  embeds included), its non-Go sources (C, assembly, `.syso`) and
+  `<dir>/testdata/**` when `testdata` holds a file.
+- Its dependencies are the packages of the main modules it imports, from
+  any `.go` file, test files and files under any build tag included. The
+  standard library and external modules are not units: keep `go.mod` and
+  `go.sum` in `defaults`.
+- Its test is `go test ./<dir>`.
+
+```sh
+aval gen go             # writes go.* into aval.yaml
+aval gen go --go-cover  # each test also fails below 100% coverage of its package
+```
+
+`--go-cover` runs the tests through `sh -c` with `go test -coverprofile`
+and fails when any statement of the package did not run, so a
+repository-wide 100% gate becomes one gate per package. It needs `sh`,
+`mktemp` and `awk`.
+
+The package set and the embedded files are read as for `linux/amd64` with
+cgo, so the output is the same on every machine. `aval gen go` fails and
+writes nothing (exit 1) when `go` is missing, `go list` fails (no `go.mod`,
+a broken import), a file does not parse, a package of a main module lies
+outside the contract root, a `.go` file imports a package of a main module
+that `go list` did not list, or a dependency is replaced by a local
+directory (its files are not in `go.sum`: add it to a `go.work` instead).
+
+A test's scope follows the imports of the package's tests too, so a helper
+package that only tests import is in the scope of every package that
+depends on it. That re-runs more than needed, never less.
 
 ## Keep it up to date in CI
 

@@ -1,0 +1,60 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [go.mod]
+  cacheability: hermetic
+tests:
+  # hand-written, kept as is
+  - metadata: {name: e2e}
+    use: [go.web]
+    runner: {command: [go, run, .]}
+  - metadata: {name: go.internal.money}
+    runner: {command: [go, test, ./internal/money]}
+    use:
+      - go.internal.money
+  - metadata: {name: go.internal.orders}
+    runner: {command: [go, test, ./internal/orders]}
+    use:
+      - go.internal.money
+      - go.internal.orders
+      - go.internal.testutil
+  - metadata: {name: go.internal.testutil}
+    runner: {command: [go, test, ./internal/testutil]}
+    use:
+      - go.internal.testutil
+  - metadata: {name: go.shop}
+    runner: {command: [go, test, .]}
+    use:
+      - go.internal.money
+      - go.internal.orders
+      - go.internal.testutil
+      - go.shop
+  - metadata: {name: go.web}
+    runner: {command: [go, test, ./web]}
+    use:
+      - go.internal.money
+      - go.web
+fragments:
+  go.internal.money:
+    scope:
+      source:
+        - internal/money/*.go
+  go.internal.orders:
+    scope:
+      source:
+        - internal/orders/*.go
+        - internal/orders/testdata/**
+  go.internal.testutil:
+    scope:
+      source:
+        - internal/testutil/*.go
+  go.shop:
+    scope:
+      source:
+        - '*.go'
+  go.web:
+    scope:
+      source:
+        - web/*.go
+        - web/static/index.html

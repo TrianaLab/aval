@@ -14,11 +14,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/TrianaLab/aval/internal/gen"
+	"github.com/TrianaLab/aval/internal/gen/golang"
 )
 
-// adapters are the languages aval gen knows, by name.
-// ponytail: empty until the language stories of Epic 16 (#293-#298) add theirs.
-var adapters = map[string]gen.Adapter{}
+// goAdapter is the go adapter, whose options are flags of aval gen.
+var goAdapter = &golang.Adapter{}
+
+// adapters are the languages aval gen knows, by name. An adapter's own
+// flags are named "<language>-<option>".
+var adapters = map[string]gen.Adapter{"go": goAdapter}
 
 func newGenCmd() *cobra.Command {
 	var file string
@@ -60,6 +64,7 @@ of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 		},
 	}
 	cmd.Flags().StringVarP(&file, "file", "f", "aval.yaml", "the kind: TestSet to write")
+	cmd.Flags().BoolVar(&goAdapter.Cover, "go-cover", false, "go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)")
 	cmd.Flags().BoolVar(&check, "check", false, "write nothing; exit 1 with a diff when the generated entries are out of date")
 	return cmd
 }
