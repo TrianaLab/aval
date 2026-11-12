@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -114,7 +115,7 @@ func TestGenErrors(t *testing.T) {
 		want string
 	}{
 		{[]string{"gen"}, ExitUsage, "accepts 1 arg"},
-		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake)`},
+		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake, rust)`},
 		{[]string{"gen", "fake", "-f", filepath.Join(dir, "none.yaml")}, ExitUsage, "aval init --set"},
 		{[]string{"gen", "fake", "-f", test}, ExitUsage, "kind: TestSet"},
 		{[]string{"gen", "broken", "-f", set}, ExitError, "gen broken: tool not found"},
@@ -137,7 +138,32 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenLanguages(t *testing.T) {
-	if got := languages(); got != "none yet" {
-		t.Errorf("languages() = %q with no adapters", got)
+	if got := languages(); got != "rust" {
+		t.Errorf("languages() = %q, want rust", got)
+	}
+}
+
+// aval gen rust fails closed: no cargo, or a manifest cargo cannot read,
+// exits 1 and leaves the TestSet as it was.
+func TestGenRustFailClosed(t *testing.T) {
+	cases := map[string]string{"missing tool": "cargo metadata: exec:"}
+	if _, err := exec.LookPath("cargo"); err == nil {
+		cases["unreadable manifest"] = "cargo metadata: exit status"
+	}
+	for name, want := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(dir, "aval.yaml")
+			_ = os.WriteFile(file, []byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"), 0o644)
+			_ = os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte("[package\n"), 0o644)
+			if name == "missing tool" {
+				t.Setenv("PATH", "")
+			}
+			before, _ := os.ReadFile(file)
+			code, _, errOut := runCLI("gen", "rust", "-f", file)
+			if after, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, want) || string(after) != string(before) {
+				t.Errorf("exit %d, stderr %q, file changed %v; want exit 1 and %q", code, errOut, string(after) != string(before), want)
+			}
+		})
 	}
 }

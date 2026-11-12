@@ -11,8 +11,8 @@ result: `aval run`, `verify` and `push` never call it, and the scope stays
 declared in `aval.yaml`.
 
 !!! note "Languages"
-    The core is in place; no language ships yet. The adapters (Go,
-    JavaScript, Python, Java, Rust, .NET) are the next stories of
+    Rust ships ([below](#rust)). The other adapters (Go, JavaScript, Python,
+    Java, .NET) are the next stories of
     [Epic 16](https://github.com/TrianaLab/aval/issues/291). `aval gen --help`
     lists the languages your build has.
 
@@ -106,6 +106,53 @@ aval gen go --check
 `--check` writes nothing. It exits 0 when the generated entries match the
 graph, and 1 with a diff when they do not, such as a new import or a dropped
 one. Run it in the same job as your linters.
+
+## Rust
+
+`aval gen rust` reads the Cargo workspace found from the contract root with
+`cargo metadata --no-deps` (no network, no build scripts). Each workspace
+member is a unit named after its package: its scope is the member's
+directory, its test is `cargo test -p <member>`, and its path dependencies
+on other members (normal, dev and build) are its edges. Registry and git
+dependencies are not units: put the root `Cargo.toml` (workspace
+inheritance) and `Cargo.lock` in `defaults`.
+
+```yaml
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [Cargo.toml, Cargo.lock]
+  cacheability: hermetic
+fragments:
+  rust.domain:
+    scope:
+      source:
+        - crates/domain/**
+  rust.store:
+    scope:
+      source:
+        - crates/store/**
+tests:
+  - metadata: {name: rust.domain}
+    runner: {command: [cargo, test, -p, domain]}
+    use:
+      - rust.domain
+  - metadata: {name: rust.store}
+    runner: {command: [cargo, test, -p, store]}
+    use:
+      - rust.domain
+      - rust.store
+```
+
+- A path dependency on a crate that is not a workspace member, or a member
+  outside the contract root, is an error: its files would be in no scope.
+- A dev-dependency is an edge like any other, so the tests of a member's
+  dependents use its dev-dependencies too: more re-runs, never a stale reuse.
+- A package at the workspace root gets `**`: add `target/**` to
+  `defaults.scope.exclude`.
+- `cargo metadata` does not show `[patch]` or `.cargo/config.toml` path
+  overrides. Put those directories in `defaults` by hand.
 
 ## Cross-language dependencies
 
