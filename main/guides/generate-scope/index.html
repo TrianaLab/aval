@@ -2509,7 +2509,8 @@ lists the languages your build has.</p>
 <li>It replaces those entries in place (the first one's position, or the end
   of <code>fragments</code> and <code>tests</code>) and keeps every other line byte for byte,
   comments and blank lines included. Comment lines right above a later
-  generated entry go with it, and a missing final newline is added.</li>
+  generated entry go with it, and a missing final newline is added.
+  Generated lines use the file's line endings (<code>\n</code>, <code>\r\n</code> or <code>\r</code>).</li>
 <li>The prefix is reserved: a hand-written <code>go.*</code> entry is replaced.</li>
 <li>Two generators share a file: <code>aval gen js</code> owns <code>js.*</code> and leaves <code>go.*</code>
   alone.</li>
