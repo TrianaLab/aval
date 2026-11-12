@@ -2732,13 +2732,17 @@ tests of the units that depend on it.</p>
 <p>gen owns only the fragments and tests whose names start with "LANGUAGE.";
 every other line, comments included, is kept as it is. Shared inputs
 (lockfiles, root build files, toolchain, <abbr title="How safe a test is to reuse: hermetic, controlled-environment, external-dependencies or non-deterministic.">cacheability</abbr>) belong in the
-hand-written defaults. aval run, verify and push never run gen: commit its
+hand-written defaults. --no-test PATTERN (repeatable, a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> glob such as
+cmd/gen* or tests/**) writes no test for the units whose ID matches; they keep
+their fragment, so their files stay in the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> of the tests that use them.
+aval run, verify and push never run gen: commit its
 output and check it in CI with --check.</p>
 <p>Languages: dotnet, go, java, js, python, rust.</p>
 <p>Exit codes: 0 written or up to date, 1 error (the language tool failed, the
 dependency graph is invalid, the file cannot be written) or with --check out
 of date (the diff is printed), 2 usage (an unknown language, no TestSet at
--f, or a result that is not a valid TestSet).</p>
+-f, a --no-test pattern that matches no unit, or a result that is not a valid
+TestSet).</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Usage:
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  aval gen &lt;language&gt; [flags]
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
@@ -2754,10 +2758,11 @@ of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>  -f, --file string                   the kind: TestSet to write (default "aval.yaml")
 </span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>      --go-cover[=true|false]         go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)
 </span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>  -h, --help[=true|false]             help for gen
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>      --strict-imports[=true|false]   python: fail on an import_module or __import__ call whose module is not a string literal
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>Global Flags:
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>      --no-test stringArray           write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>      --strict-imports[=true|false]   python: fail on an import_module or __import__ call whose module is not a string literal
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>Global Flags:
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-init">aval init<a class="headerlink" href="#aval-init" title="Anchor link">&para;</a></h2>
 <p>init writes aval.yaml for one test, validated before it is written. With

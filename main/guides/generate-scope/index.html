@@ -2565,6 +2565,12 @@ fragments; every generated test inherits <code>defaults</code>.</p>
 </span></code></pre></div>
 <p>A hand-written test can <code>use</code> generated fragments. When the unit behind one
 disappears, <code>aval gen</code> fails (exit 2) and writes nothing.</p>
+<p><code>--no-test &lt;pattern&gt;</code> (repeatable, a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> glob over unit IDs such as
+<code>cmd/gen*</code> or <code>tests/**</code>) writes no test for the matching units, for code
+generators or harness packages you keep out of the test gate: their fragment
+stays while another test uses it, so their files stay in that test's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. A
+pattern that matches no unit fails (exit 2), and <code>--check</code> needs the same
+flags.</p>
 <h2 id="go">Go<a class="headerlink" href="#go" title="Anchor link">&para;</a></h2>
 <p><code>aval gen go</code> reads the graph with <code>go list -deps -test -json ./...</code> in the
 <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, so it needs <code>go</code> on <code>PATH</code>. A module or a <code>go.work</code> workspace
@@ -2939,8 +2945,8 @@ fragment to a hand-written test's <code>use</code>, or its globs to <code>defaul
 <p>A missing language tool, a parse error, a dependency on an unknown unit or a
 unit without files is an error, and nothing is written. Exit codes: 0 written
 or up to date, 1 error or <code>--check</code> out of date, 2 usage (an unknown
-language, no <code>kind: TestSet</code> at <code>-f</code>, or a result that is not a valid
-TestSet).</p>
+language, no <code>kind: TestSet</code> at <code>-f</code>, a <code>--no-test</code> pattern that matches no
+unit, or a result that is not a valid TestSet).</p>
 
 
 
