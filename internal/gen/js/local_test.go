@@ -62,15 +62,17 @@ func TestLocalEdges(t *testing.T) {
 		"libs/a/nested/package.json": `{"name": "n"}`,
 		"libs/a/nested/x.ts":         `import "../../d/x"`, // n's edge, not a's
 		"libs/a/node_modules/m/i.js": `import "../../../../outside"`,
-		"libs/a/.cache/i.js":         `import "../../../outside"`,
+		"libs/a/.git/i.js":           `import "../../../outside"`,
+		"libs/a/.storybook/p.ts":     `import "../../d/x"`,
 		"libs/a/src/i.ts":            `import { x } from "./own"; import y from '..';`,
 		"libs/a/tsconfig.json": `{
   "extends": ["@s/b/conf/base", "c", "./tsconfig.json", "external/base.json"], // "x" /* y */
   "references": [{"path": "./"}],
 }`,
-		"libs/b/conf/base.json": `{"extends": "../../../shared/ts", "references": [{"path": "../../../nowhere"}]}`,
-		"shared/ts.json":        `{"extends": "../libs/a/tsconfig.json", "compilerOptions": {"a\"b": "\\/*"}}`,
-		"libs/c/tsconfig.json":  `{}`,
+		"libs/b/conf/base.json":     `{"extends": "../../../shared/ts", "references": [{"path": "../../../nowhere"}]}`,
+		"shared/ts.json":            `{"extends": "../libs/a/tsconfig.json", "compilerOptions": {"a\"b": "\\/*"}}`,
+		"libs/c/tsconfig.json":      `{"extends": "./tsconfig.refs.json"}`,
+		"libs/c/tsconfig.refs.json": `{"references": [{"path": "../d"}]}`,
 	}
 	dir := t.TempDir()
 	write(t, dir, files)
@@ -82,8 +84,11 @@ func TestLocalEdges(t *testing.T) {
 	for _, u := range units {
 		got[u.ID] = u
 	}
-	if a := got["a"]; !slices.Equal(a.Deps, []string{"@s/b", "c"}) || !slices.Equal(a.Source, []string{"libs/a/**", "shared/ts.json"}) {
+	if a := got["a"]; !slices.Equal(a.Deps, []string{"@s/b", "c", "d"}) || !slices.Equal(a.Source, []string{"libs/a/**", "shared/ts.json"}) {
 		t.Errorf("a: %+v", a)
+	}
+	if c := got["c"]; !slices.Equal(c.Deps, []string{"d"}) {
+		t.Errorf("c: %+v", c)
 	}
 	if n := got["n"]; !slices.Equal(n.Deps, []string{"d"}) {
 		t.Errorf("n: %+v", n)

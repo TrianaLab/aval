@@ -145,9 +145,9 @@ Two local dependencies that `package.json` does not name are edges as well:
   that lands in another workspace package is an edge. Comments are not
   stripped, so a commented-out import still counts.
 
-The scan skips `node_modules`, hidden directories and nested workspace
-packages, and it reads only those references: `paths` aliases and
-`include` globs that reach outside the package are not edges, so declare
+The scan skips `node_modules`, `.git` and nested workspace packages;
+hidden directories such as `.storybook` are scanned. It reads only those
+references: `paths` aliases and `include` globs that reach outside the package are not edges, so declare
 those by hand.
 
 ```yaml

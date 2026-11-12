@@ -57,10 +57,10 @@ var sourceExt = []string{".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", "
 // from, a side-effect or dynamic import and require. Comments are not
 // stripped: a commented-out import still counts, which errs towards
 // re-running.
-var specifierRe = regexp.MustCompile(`(?:\bfrom|\bimport|\brequire)\s*\(?\s*['"` + "`" + `](\.\.?(?:/[^'"` + "`" + `\n]*)?)['"` + "`" + `]`)
+var specifierRe = regexp.MustCompile(`(?:\bfrom\s*|\b(?:import|require)\s*\(?\s*)['"` + "`" + `](\.\.?(?:/[^'"` + "`" + `\n]*)?)['"` + "`" + `]`)
 
 // scan walks the package in dir (its source files and tsconfig*.json, not
-// node_modules, hidden directories or nested workspace packages) and
+// node_modules, .git or nested workspace packages) and
 // returns the workspace packages it reaches through relative imports and
 // TypeScript references and extends, and the files outside every package
 // its tsconfig extends. A relative import outside every package, or one it
@@ -76,7 +76,7 @@ func (w workspace) scan(dir string) (deps, files []string, err error) {
 		rel = filepath.ToSlash(rel)
 		name := d.Name()
 		if d.IsDir() {
-			if rel != dir && (name == "node_modules" || strings.HasPrefix(name, ".") || w.byDir[rel] != "") {
+			if rel != dir && (name == "node_modules" || name == ".git" || w.byDir[rel] != "") {
 				return filepath.SkipDir
 			}
 			return nil
@@ -122,10 +122,14 @@ func (w workspace) imports(r *reached, file string) error {
 // every file its extends chain reads. extends does not inherit references,
 // so the chain is followed without them.
 func (w workspace) tsconfig(r *reached, file string, refs bool, seen map[string]bool) error {
-	if seen[file] {
+	key := file // a file seen through extends has not had its references read
+	if refs {
+		key += "\x00refs"
+	}
+	if seen[key] {
 		return nil
 	}
-	seen[file] = true
+	seen[key] = true
 	data, err := os.ReadFile(filepath.Join(w.root, filepath.FromSlash(file)))
 	if err != nil {
 		return err
