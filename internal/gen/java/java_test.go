@@ -205,6 +205,26 @@ var conventions = map[string]string{
 	"buildSrc/README.md":                         "project(name) is not code here",
 }
 
+// nested is a Gradle build whose project app hands a file of its own to
+// its subproject app:sub.
+var nested = map[string]string{
+	"settings.gradle.kts":       `include(":app", ":app:sub")`,
+	"app/build.gradle.kts":      `subprojects { checkstyle { configFile = file("config/checkstyle.xml") } }`,
+	"app/gradle.properties":     "",
+	"app/config/checkstyle.xml": "",
+	"app/sub/src/S.kt":          "",
+}
+
+// rooted is a Maven build whose module a reads a root file by a path
+// relative to the root (the working directory under mvn -pl).
+var rooted = map[string]string{
+	"pom.xml":               pomHead + `<modules><module>a</module><module>b</module></modules></project>`,
+	"a/pom.xml":             `<project><groupId>g</groupId><artifactId>a</artifactId><build><plugins><plugin><configuration><configLocation>config/checkstyle.xml</configLocation></configuration></plugin></plugins></build></project>`,
+	"b/pom.xml":             `<project><groupId>g</groupId><artifactId>b</artifactId></project>`,
+	"config/checkstyle.xml": "",
+	".mvn/jvm.config":       "-Xmx1g",
+}
+
 // The files and edges a unit gets from inheritance, build logic and its own
 // directory: a change to any of them must change its fingerprint.
 func TestFalseHitInheritedAndImported(t *testing.T) {
@@ -226,7 +246,13 @@ func TestFalseHitInheritedAndImported(t *testing.T) {
 			"java.b": "config/detekt.yml",     // read by a buildSrc convention plugin
 			"java.e": "config/checkstyle.xml", // read by the root build script
 		}},
-		{conventions, map[string]string{"java.a": "e/src/E.kt"}}, // named in the settings script
+		{conventions, map[string]string{"java.a": "e/src/E.kt"}},                 // named in the settings script
+		{nested, map[string]string{"java.app.sub": "app/gradle.properties"}},     // inherited by subprojects
+		{nested, map[string]string{"java.app.sub": "app/config/checkstyle.xml"}}, // handed down by app's script
+		{rooted, map[string]string{
+			"java.a": "config/checkstyle.xml", // <configLocation> resolved against the root
+			"java.b": ".mvn/jvm.config",
+		}},
 	} {
 		set := generate(t, tree(t, tc.files), []byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"))
 		fsys := fstest.MapFS{"aval.golden.yaml": {Data: set}}
@@ -260,8 +286,8 @@ func TestUnits(t *testing.T) {
 				"plugin/pom.xml": "not listed as a module",
 			},
 			want: []gen.Unit{
-				{ID: "a", Source: []string{"a/**"}, Deps: []string{"b"}, Command: []string{"./mvnw", "-B", "-pl", "a", "test"}},
-				{ID: "b", Source: []string{"b/**"}, Command: []string{"./mvnw", "-B", "-pl", "b", "test"}},
+				{ID: "a", Source: []string{"mvnw", "plugin/**", "pom.xml", "a/**"}, Deps: []string{"b"}, Command: []string{"./mvnw", "-B", "-pl", "a", "test"}},
+				{ID: "b", Source: []string{"mvnw", "plugin/**", "pom.xml", "b/**"}, Command: []string{"./mvnw", "-B", "-pl", "b", "test"}},
 			},
 		},
 		"gradle groovy, root references, relative and root project paths": {
@@ -275,7 +301,7 @@ func TestUnits(t *testing.T) {
 			want: []gen.Unit{
 				{ID: "a", Source: []string{"build.gradle", "settings.gradle", "a/**"}, Deps: []string{"a/c", "b"}, Command: []string{"gradle", ":a:test"}},
 				{ID: "b", Source: []string{"build.gradle", "settings.gradle", "b/**"}, Command: []string{"gradle", ":b:test"}},
-				{ID: "a/c", Source: []string{"build.gradle", "settings.gradle", "a/build.gradle", "a/c/**"}, Deps: []string{"b"}, Command: []string{"gradle", ":a:c:test"}},
+				{ID: "a/c", Source: []string{"build.gradle", "settings.gradle", "a/build.gradle", "a/c/**"}, Deps: []string{"a", "b"}, Command: []string{"gradle", ":a:c:test"}},
 			},
 		},
 		"gradle intermediate project not included, source sets in the project": {
@@ -301,10 +327,10 @@ func TestUnits(t *testing.T) {
 				"b/other/pom.xml": "not read",
 			},
 			want: []gen.Unit{
-				{ID: "parent", Source: []string{"parent/**"}, Command: []string{"mvn", "-B", "-pl", "parent", "test"}},
-				{ID: "a", Source: []string{"a/**"}, Deps: []string{"parent"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
-				{ID: "b", Source: []string{"b/**"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
-				{ID: "c", Source: []string{"c/**"}, Command: []string{"mvn", "-B", "-pl", "c", "test"}},
+				{ID: "parent", Source: []string{"pom.xml", "parent/**"}, Command: []string{"mvn", "-B", "-pl", "parent", "test"}},
+				{ID: "a", Source: []string{"pom.xml", "a/**"}, Deps: []string{"parent"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
+				{ID: "b", Source: []string{"pom.xml", "b/**"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
+				{ID: "c", Source: []string{"pom.xml", "c/**"}, Command: []string{"mvn", "-B", "-pl", "c", "test"}},
 			},
 		},
 		"maven references outside dependencies and plugins": {
@@ -318,21 +344,21 @@ func TestUnits(t *testing.T) {
 				"ext/pom.xml":  `<project><groupId>g</groupId><artifactId>ext</artifactId></project>`,
 			},
 			want: []gen.Unit{
-				{ID: "a", Source: []string{"a/**"}, Deps: []string{"proc"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
-				{ID: "b", Source: []string{"b/**"}, Deps: []string{"ext"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
-				{ID: "proc", Source: []string{"proc/**"}, Deps: []string{"ext"}, Command: []string{"mvn", "-B", "-pl", "proc", "test"}},
-				{ID: "ext", Source: []string{"ext/**"}, Command: []string{"mvn", "-B", "-pl", "ext", "test"}},
+				{ID: "a", Source: []string{"pom.xml", "a/**"}, Deps: []string{"proc"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
+				{ID: "b", Source: []string{"pom.xml", "b/**"}, Deps: []string{"ext"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
+				{ID: "proc", Source: []string{"pom.xml", "proc/**"}, Deps: []string{"ext"}, Command: []string{"mvn", "-B", "-pl", "proc", "test"}},
+				{ID: "ext", Source: []string{"pom.xml", "ext/**"}, Command: []string{"mvn", "-B", "-pl", "ext", "test"}},
 			},
 		},
 		"root references are inherited by every module, resolved in its context": {
 			files: inherited,
 			want: []gen.Unit{
-				{ID: "common", Source: []string{"common/**"}, Deps: []string{"lint"}, Command: []string{"mvn", "-B", "-pl", "common", "test"}},
-				{ID: "util", Source: []string{"util/**"}, Deps: []string{"common", "lint"}, Command: []string{"mvn", "-B", "-pl", "util", "test"}},
-				{ID: "lint", Source: []string{"lint/**"}, Deps: []string{"common"}, Command: []string{"mvn", "-B", "-pl", "lint", "test"}},
-				{ID: "tools", Source: []string{"tools/**"}, Deps: []string{"common", "lint"}, Command: []string{"mvn", "-B", "-pl", "tools", "test"}},
-				{ID: "bom", Source: []string{"bom/**"}, Deps: []string{"common", "lint"}, Command: []string{"mvn", "-B", "-pl", "bom", "test"}},
-				{ID: "app", Source: []string{"app/**"}, Deps: []string{"bom", "common", "lint", "util"}, Command: []string{"mvn", "-B", "-pl", "app", "test"}},
+				{ID: "common", Source: []string{"pom.xml", "common/**"}, Deps: []string{"lint"}, Command: []string{"mvn", "-B", "-pl", "common", "test"}},
+				{ID: "util", Source: []string{"pom.xml", "util/**"}, Deps: []string{"common", "lint"}, Command: []string{"mvn", "-B", "-pl", "util", "test"}},
+				{ID: "lint", Source: []string{"pom.xml", "lint/**"}, Deps: []string{"common"}, Command: []string{"mvn", "-B", "-pl", "lint", "test"}},
+				{ID: "tools", Source: []string{"pom.xml", "tools/**"}, Deps: []string{"common", "lint"}, Command: []string{"mvn", "-B", "-pl", "tools", "test"}},
+				{ID: "bom", Source: []string{"pom.xml", "bom/**"}, Deps: []string{"common", "lint"}, Command: []string{"mvn", "-B", "-pl", "bom", "test"}},
+				{ID: "app", Source: []string{"pom.xml", "app/**"}, Deps: []string{"bom", "common", "lint", "util"}, Command: []string{"mvn", "-B", "-pl", "app", "test"}},
 			},
 		},
 		"root ${project.artifactId} reference, stray POMs in build output or unparsable": {
@@ -344,8 +370,8 @@ func TestUnits(t *testing.T) {
 				"a/src/it/bad/pom.xml": `<project>`,
 			},
 			want: []gen.Unit{
-				{ID: "a", Source: []string{"a/**"}, Deps: []string{"a-fixtures"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
-				{ID: "a-fixtures", Source: []string{"a-fixtures/**"}, Command: []string{"mvn", "-B", "-pl", "a-fixtures", "test"}},
+				{ID: "a", Source: []string{"pom.xml", "a/**"}, Deps: []string{"a-fixtures"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
+				{ID: "a-fixtures", Source: []string{"pom.xml", "a-fixtures/**"}, Command: []string{"mvn", "-B", "-pl", "a-fixtures", "test"}},
 			},
 		},
 		"gradle buildSrc, task paths, include in a string": {
@@ -369,9 +395,9 @@ func TestUnits(t *testing.T) {
 					<build><pluginManagement><plugins><plugin><groupId>g</groupId><artifactId>lib</artifactId><scope>import</scope></plugin></plugins></pluginManagement></build></project>`,
 			},
 			want: []gen.Unit{
-				{ID: "bom", Source: []string{"bom/**"}, Command: []string{"mvn", "-B", "-pl", "bom", "test"}},
-				{ID: "lib", Source: []string{"lib/**"}, Command: []string{"mvn", "-B", "-pl", "lib", "test"}},
-				{ID: "app", Source: []string{"app/**"}, Deps: []string{"bom", "lib"}, Command: []string{"mvn", "-B", "-pl", "app", "test"}},
+				{ID: "bom", Source: []string{"pom.xml", "bom/**"}, Command: []string{"mvn", "-B", "-pl", "bom", "test"}},
+				{ID: "lib", Source: []string{"pom.xml", "lib/**"}, Command: []string{"mvn", "-B", "-pl", "lib", "test"}},
+				{ID: "app", Source: []string{"pom.xml", "app/**"}, Deps: []string{"bom", "lib"}, Command: []string{"mvn", "-B", "-pl", "app", "test"}},
 			},
 		},
 	} {
@@ -497,6 +523,13 @@ func TestUnitsFailClosed(t *testing.T) {
 		"bare project dir in buildSrc":         {kts(`include(":a", ":common")`, "buildSrc/src/main/kotlin/c.gradle.kts", `val t = fileTree("common")`), `buildSrc/src/main/kotlin/c.gradle.kts: "common" refers to files`},
 		"bare project dir second argument":     {kts(`include(":a", ":common")`, "a/build.gradle.kts", `tasks.register<Copy>("c") { from("src", "common"); into(layout.buildDirectory.dir("x")) }`), `"common" refers to files of another project`},
 		"bare project names elsewhere":         {kts(`include(":a", ":common")`+"\n"+`include("common")`, "a/build.gradle.kts", `val c = "common"; group = "common"; dependencies { implementation(project(":common")) }; val own = file("a"); val f = file(name)`), ""},
+		"jvm.config property":                  {map[string]string{".mvn/jvm.config": "-Xmx1g -Dlib=x", "pom.xml": pomHead + `<properties><lib>a</lib></properties><modules><module>a</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${lib}</artifactId></dependency></dependencies></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, "a/pom.xml: property lib set by .mvn/jvm.config"},
+		"unreadable jvm.config":                {map[string]string{".mvn/jvm.config/x": "", "pom.xml": pomHead + `</project>`}, "jvm.config"},
+		"maven 4 rootDirectory":                {sub(`<project><properties><d>${rootDirectory}/x</d></properties></project>`), "${rootDirectory}"},
+		"File with a project dir":              {kts(`include(":a", ":common")`, "a/build.gradle.kts", `val f = File(rootDir, "common")`), `a/build.gradle.kts: "common" refers to files of another project`},
+		"new File with a project dir":          {kts(`include(":a", ":common")`, "build.gradle", `def f = new File("common")`), `build.gradle: "common" refers to files of another project`},
+		"unterminated path call":               {kts(`include(":a", ":common")`, "a/build.gradle.kts", `val f = file("common"`), `"common" refers to files of another project`},
+		"File with a root dir":                 {kts(`include(":a", ":common")`, "a/build.gradle.kts", `val f = File(rootDir, "config"); val g = file(listOf("x", "y").joinToString("/"))`), ""},
 		"maven filter":                         {sub(`<project><build><filters><filter>../shared/f.properties</filter></filters></build></project>`), "<filter>../shared/f.properties</filter>"},
 		"maven suiteXmlFile":                   {sub(`<project><build><plugins><plugin><configuration><suiteXmlFiles><suiteXmlFile>../testng.xml</suiteXmlFile></suiteXmlFiles></configuration></plugin></plugins></build></project>`), "<suiteXmlFile>"},
 		"maven activation file":                {sub(`<project><profiles><profile><activation><file><exists>${basedir}/../x</exists></file></activation></profile></profiles></project>`), "<exists>"},
@@ -543,13 +576,15 @@ func TestUnreadableScript(t *testing.T) {
 			t.Errorf("%s unreadable: %v", file, err)
 		}
 	}
-	root := tree(t, gradle) // the settings script is readable, the root not listable
-	if err := os.Chmod(root, 0o311); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
-	if _, err := (Adapter{}).Units(root); !errors.Is(err, fs.ErrPermission) {
-		t.Errorf("root not listable: %v", err)
+	for _, files := range []map[string]string{gradle, maven} { // the build files are readable, the root not listable
+		root := tree(t, files)
+		if err := os.Chmod(root, 0o311); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
+		if _, err := (Adapter{}).Units(root); !errors.Is(err, fs.ErrPermission) {
+			t.Errorf("root not listable: %v", err)
+		}
 	}
 }
 

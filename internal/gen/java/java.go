@@ -82,6 +82,39 @@ func under(dir, pattern string) string {
 	return g
 }
 
+// notContext are the top-level directories the root context leaves out:
+// VCS and build tool state and build output.
+var notContext = map[string]bool{".git": true, ".gradle": true, "build": true, "out": true, "target": true}
+
+// rootContext returns the globs of every top-level entry of root that is
+// not a unit directory (units) nor in notContext: entry/** for a
+// directory, its name for a file. Build files there read root files
+// (config/checkstyle.xml, ${main.basedir}, version catalogs) through too
+// many APIs to follow one by one, so every unit gets them. A directory that
+// holds units is included whole: more re-runs, never a false hit.
+func rootContext(root string, units map[string]bool) ([]string, error) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	var globs []string
+	for _, e := range entries {
+		n := e.Name()
+		if units[n] || notContext[n] {
+			continue
+		}
+		g, err := gen.Literal(n)
+		if e.IsDir() {
+			g, err = gen.Under(n, "**")
+		}
+		if err != nil {
+			return nil, err
+		}
+		globs = append(globs, g)
+	}
+	return globs, nil
+}
+
 // tool returns the wrapper script at root (./mvnw, ./gradlew) when there is
 // one, otherwise the tool on PATH.
 func tool(root, wrapper, name string) string {

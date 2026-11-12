@@ -30,10 +30,8 @@ var (
 	rootDirRe      = regexp.MustCompile(`^\$(rootDir|\{(rootDir|rootProject\.rootDir|project\.rootDir|rootProject\.projectDir)\})/`)
 	// A root variable anywhere in a literal.
 	// Calls whose arguments are paths: file, files, layout.*.dir, resolve, ...
-	pathCallRe   = regexp.MustCompile(`\b(file|files|dir|resolve|fileTree|from|into)\s*\(`)
+	pathCallRe   = regexp.MustCompile(`\b(file|files|dir|resolve|fileTree|from|into|File)\s*\(`)
 	rootVarAnyRe = regexp.MustCompile(`\$(rootDir\b|\{(rootDir|rootProject\.(rootDir|projectDir|layout|file)|project\.rootDir|settingsDir)\b)`)
-	// Build output and VCS directories the root context leaves out.
-	notContext = map[string]bool{".git": true, ".gradle": true, "build": true, "out": true, "target": true}
 	// Build logic every project applies.
 	logicExt = map[string]bool{".kts": true, ".gradle": true, ".kt": true, ".groovy": true, ".java": true}
 )
@@ -129,32 +127,12 @@ func projects(root, settings string) (string, []string, map[string]bool, error) 
 	return text, paths, known, nil
 }
 
-// buildLogic returns the root context, the files of every unit, and the
-// units the root build script and buildSrc refer to (subprojects { ... },
-// convention plugins), edges of every unit. The root context is every
-// top-level entry of the root that is not a project directory nor build
-// output: root and buildSrc scripts read files relative to the root
-// (config/checkstyle.xml, gradle/*.gradle.kts, version catalogs) through
-// too many APIs to follow one by one. A directory that holds projects is
-// included whole: more re-runs, never a false hit.
+// buildLogic returns the root context (see rootContext), the files of
+// every unit, and the units the root build script and buildSrc refer to
+// (subprojects { ... }, convention plugins), edges of every unit.
 func buildLogic(root, settings string, known map[string]bool) (shared, common []string, err error) {
-	entries, err := os.ReadDir(root)
-	if err != nil {
+	if shared, err = rootContext(root, known); err != nil {
 		return nil, nil, err
-	}
-	for _, e := range entries {
-		n := e.Name()
-		if known[n] || notContext[n] {
-			continue
-		}
-		g, err := gen.Literal(n)
-		if e.IsDir() {
-			g, err = gen.Under(n, "**")
-		}
-		if err != nil {
-			return nil, nil, err
-		}
-		shared = append(shared, g)
 	}
 	build, err := oneOf(root, "build.gradle.kts", "build.gradle")
 	if err != nil {
@@ -211,10 +189,16 @@ func buildSrc(root string, known map[string]bool) ([]string, error) {
 
 // ancestors returns the build scripts of the ancestor projects of id (a
 // and a/b for a/b/c) and the units they refer to. Gradle evaluates them,
-// included or not, and their subprojects { ... } may configure id.
+// included or not, and their subprojects { ... } may configure id. An
+// ancestor that is a unit is an edge too: its gradle.properties and the
+// files its script hands to id (file("config/x") in subprojects { ... })
+// are in its directory, which its unit covers.
 func ancestors(root, id string, known map[string]bool) (files, deps []string, err error) {
 	for i := strings.LastIndexByte(id, '/'); i > 0; i = strings.LastIndexByte(id[:i], '/') {
 		anc := id[:i]
+		if known[anc] {
+			deps = append(deps, anc)
+		}
 		b, err := oneOf(filepath.Join(root, filepath.FromSlash(anc)), "build.gradle.kts", "build.gradle")
 		if err != nil {
 			return nil, nil, err
@@ -338,20 +322,40 @@ func checkLiterals(text, name, dir string, known map[string]bool) error {
 	// A bare project directory ("common") is a path only as the argument of
 	// a call that takes one; elsewhere (include("common")) it is a name.
 	for _, loc := range pathCallRe.FindAllStringIndex(masked, -1) {
-		for i := loc[1]; ; i++ {
-			l, j, err := literal(text, skip(text, i, true))
-			if err != nil {
-				break // not a plain literal: checked above, or no path
-			}
-			if known[l] && l != dir && (dir == "" || !strings.HasPrefix(l, dir+"/")) {
+		for _, r := range callArgs(masked, loc[1]) {
+			a := strings.TrimSpace(text[r[0]:r[1]])
+			l, j, err := literal(a, 0)
+			if err == nil && j == len(a) && known[l] && l != dir && (dir == "" || !strings.HasPrefix(l, dir+"/")) {
 				return fmt.Errorf("%s: %q refers to files of another project: %w", name, l, errUnsupported)
-			}
-			if i = skip(text, j, true); i >= len(text) || text[i] != ',' {
-				break
 			}
 		}
 	}
 	return nil
+}
+
+// callArgs returns the index ranges of the arguments of the call whose
+// "(" ends at i in masked (string contents blanked), split at top-level
+// commas: File(rootDir, "common") has two.
+func callArgs(masked string, i int) [][2]int {
+	var out [][2]int
+	depth, start := 0, i
+	for j := i; j < len(masked); j++ {
+		switch masked[j] {
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			if depth == 0 {
+				return append(out, [2]int{start, j})
+			}
+			depth--
+		case ',':
+			if depth == 0 {
+				out = append(out, [2]int{start, j})
+				start = j + 1
+			}
+		}
+	}
+	return append(out, [2]int{start, len(masked)})
 }
 
 // checkLiteral rejects a string literal of the script of the project in

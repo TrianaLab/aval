@@ -407,32 +407,33 @@ tests:
 ## Java and Kotlin
 
 `aval gen java` reads the build files at the contract root and runs no JVM
-tool. A unit's files are its whole directory (`<module>/**`), so exclude
-build output in `defaults`: `**/target/**` for Maven, `**/build/**` and
-`**/.gradle/**` for Gradle.
+tool. A unit's files are its whole directory (`<module>/**`) plus the root
+context: each top-level file and directory of the root that is not a module
+directory or build output (`.git`, `.gradle`, `build`, `out`, `target`),
+since build files read root files such as `config/checkstyle.xml`. A
+directory that holds modules is included whole. Exclude build output in
+`defaults`: `**/target/**` for Maven, `**/build/**` and `**/.gradle/**` for
+Gradle.
 
 - Maven: one unit per module in `<modules>` (Maven 4 `<subprojects>`), in
   the root POM, nested aggregators and every profile. A module depends on
   every local module its POM names with a `groupId` and `artifactId`:
   `<parent>`, dependencies, plugins and `pluginManagement`, extensions,
   imported BOMs or plugin configuration such as
-  `annotationProcessorPaths`. The references of its local parents and of
-  the root POM are its edges too, resolved with its own properties.
-  Managed dependencies and `exclusions` are not edges. The test is
-  `mvn -B -pl <module> test` (`./mvnw` when the root has it), which takes
-  the other modules from the local repository: run
-  `mvn -B install -DskipTests` before `aval run`. The root POM and
-  `.mvn/**` go in `defaults`.
+  `annotationProcessorPaths`, and on what its local parents and the root
+  POM name, resolved with its own properties. Managed dependencies and
+  `exclusions` are not edges. The test is `mvn -B -pl <module> test`
+  (`./mvnw` when the root has it), which takes the other modules from the
+  local repository: run `mvn -B install -DskipTests` before `aval run`.
 - Gradle: one unit per `include` in `settings.gradle.kts` or
-  `settings.gradle`. A subproject depends on the projects its build script
-  names in `project(...)`, `evaluationDependsOn(...)` or a task path such
-  as `":common:jar"`, and on those the settings script, the root build
-  script, `buildSrc` and its parent projects' build scripts name. Every
-  unit also gets the root context: each top-level file and directory of the
-  root that is not a project directory or build output (`.git`, `.gradle`,
-  `build`, `out`, `target`), so root scripts can read `config/` or
-  `gradle/` files. The test is `./gradlew :<path>:test` (`gradle` without
-  a wrapper).
+  `settings.gradle`. A subproject depends on its parent projects and on the
+  projects named in `project(...)`, `evaluationDependsOn(...)` or a task
+  path such as `":common:jar"` by its build script, the settings script,
+  the root build script, `buildSrc` and its parent projects' build scripts.
+  The test is `./gradlew :<path>:test` (`gradle` without a wrapper).
+
+Neither adapter sees test code that reads another module's files at run
+time: declare those by hand in a fragment.
 
 ```yaml
 fragments:

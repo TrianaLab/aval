@@ -1,8 +1,7 @@
 apiVersion: aval.trianalab.io/v1
 kind: TestSet
-# Shared inputs: the root build files. aval gen java writes the rest.
+# aval gen java lists the root context (root files, .mvn/) in every unit.
 defaults:
   scope:
-    dependencies: [pom.xml]
     exclude: ["**/target/**"]
   cacheability: hermetic

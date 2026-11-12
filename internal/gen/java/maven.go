@@ -85,7 +85,7 @@ type reactor struct {
 	root    string
 	poms    map[string]*pom
 	byCoord map[coord]*pom
-	config  map[string]bool // user properties set in .mvn/maven.config
+	config  map[string]string // user property -> the .mvn file that sets it
 }
 
 // maven walks <modules> (and Maven 4 <subprojects>) from the root POM, in
@@ -96,11 +96,51 @@ func maven(root string) ([]gen.Unit, error) {
 		return nil, err
 	}
 	r := reactor{root: root, poms: map[string]*pom{}, byCoord: map[coord]*pom{}, config: config}
+	dirs, err := r.walk()
+	if err != nil {
+		return nil, err
+	}
+	index, err := r.index(dirs)
+	if err != nil {
+		return nil, err
+	}
+	tops := map[string]bool{}
+	for _, d := range dirs {
+		tops[d] = true
+	}
+	shared, err := rootContext(root, tops)
+	if err != nil {
+		return nil, err
+	}
+	strays, err := r.strays()
+	if err != nil {
+		return nil, err
+	}
+	mvn := tool(root, "mvnw", "mvn")
+	units := make([]gen.Unit, 0, len(dirs))
+	for _, dir := range dirs {
+		deps, err := r.deps(r.poms[dir], dir, index, strays)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", pomPath(dir), err)
+		}
+		units = append(units, gen.Unit{
+			ID:      dir,
+			Source:  append(slices.Clone(shared), under(dir, "**")),
+			Deps:    deps,
+			Command: []string{mvn, "-B", "-pl", dir, "test"},
+		})
+	}
+	return units, nil
+}
+
+// walk reads the root POM and every module it reaches, in the root project
+// and every profile, and returns the module directories.
+func (r reactor) walk() ([]string, error) {
 	var dirs []string
 	seen := map[string]bool{"": true}
 	for queue := []string{""}; len(queue) > 0; queue = queue[1:] {
 		dir := queue[0]
-		p, err := readPom(root, dir)
+		p, err := readPom(r.root, dir)
 		if err != nil {
 			return nil, err
 		}
@@ -125,29 +165,7 @@ func maven(root string) ([]gen.Unit, error) {
 			}
 		}
 	}
-	index, err := r.index(dirs)
-	if err != nil {
-		return nil, err
-	}
-	strays, err := r.strays()
-	if err != nil {
-		return nil, err
-	}
-	mvn := tool(root, "mvnw", "mvn")
-	units := make([]gen.Unit, 0, len(dirs))
-	for _, dir := range dirs {
-		deps, err := r.deps(r.poms[dir], dir, index, strays)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", pomPath(dir), err)
-		}
-		units = append(units, gen.Unit{
-			ID:      dir,
-			Source:  []string{under(dir, "**")},
-			Deps:    deps,
-			Command: []string{mvn, "-B", "-pl", dir, "test"},
-		})
-	}
-	return units, nil
+	return dirs, nil
 }
 
 // index returns the module directories by groupId:artifactId.
@@ -208,31 +226,34 @@ func (r reactor) strays() (map[string]string, error) {
 	return strays, err
 }
 
-// mavenConfig returns the user properties .mvn/maven.config sets with -D
-// or --define, which override the POM's.
-func mavenConfig(root string) (map[string]bool, error) {
-	data, err := os.ReadFile(filepath.Join(root, ".mvn", "maven.config"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	keys := map[string]bool{}
-	args := strings.Fields(string(data))
-	for i, a := range args {
-		switch {
-		case (a == "-D" || a == "--define") && i+1 < len(args):
-			a = args[i+1]
-		case strings.HasPrefix(a, "--define="):
-			a = a[len("--define="):]
-		case strings.HasPrefix(a, "-D"):
-			a = a[2:]
-		default:
+// mavenConfig returns the properties .mvn/maven.config (-D, --define) and
+// .mvn/jvm.config (-D system properties) set, which override the POM's,
+// with the file that sets each.
+func mavenConfig(root string) (map[string]string, error) {
+	keys := map[string]string{}
+	for _, f := range []string{".mvn/maven.config", ".mvn/jvm.config"} {
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(f)))
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
-		k, _, _ := strings.Cut(a, "=")
-		keys[k] = true
+		if err != nil {
+			return nil, err
+		}
+		args := strings.Fields(string(data))
+		for i, a := range args {
+			switch {
+			case (a == "-D" || a == "--define") && i+1 < len(args):
+				a = args[i+1]
+			case strings.HasPrefix(a, "--define="):
+				a = a[len("--define="):]
+			case strings.HasPrefix(a, "-D"):
+				a = a[2:]
+			default:
+				continue
+			}
+			k, _, _ := strings.Cut(a, "=")
+			keys[k] = f
+		}
 	}
 	return keys, nil
 }
@@ -262,7 +283,7 @@ func readPom(root, dir string) (*pom, error) {
 // parent project (its coordinates excepted: they are not files).
 func rootVar(name string) bool {
 	switch name {
-	case "user.dir", "maven.multiModuleProjectDirectory", "project.rootDirectory":
+	case "user.dir", "maven.multiModuleProjectDirectory", "project.rootDirectory", "rootDirectory":
 		return true
 	case "project.parent.groupId", "project.parent.artifactId", "project.parent.version":
 		return false
@@ -497,8 +518,8 @@ func (r reactor) prop(p *pom, name string) (string, bool, error) {
 	case "project.parent.groupId":
 		return p.Parent.GroupID, true, nil
 	}
-	if r.config[name] {
-		return "", false, fmt.Errorf("property %s set by .mvn/maven.config: %w", name, errUnsupported)
+	if f, ok := r.config[name]; ok {
+		return "", false, fmt.Errorf("property %s set by %s: %w", name, f, errUnsupported)
 	}
 	chain := r.chain(p)
 	for _, q := range chain {
