@@ -124,6 +124,45 @@ func TestGenNoTest(t *testing.T) {
 	}
 }
 
+// --list-tests prints what gen writes a test for under the same --no-test
+// patterns, writes nothing, and fails like gen on a pattern that matches
+// no unit.
+func TestGenListTests(t *testing.T) {
+	file, _ := genFile(t)
+	withAdapter(t, "fake", fakeAdapter{units: fakeUnits("b")})
+	for _, tc := range []struct {
+		args []string
+		out  string
+	}{
+		{nil, "a\nb\n"},
+		{[]string{"--no-test", "b"}, "a\n"},
+		{[]string{"--no-test", "*"}, ""},
+	} {
+		code, out, errOut := runCLI(append([]string{"gen", "fake", "-f", file, "--list-tests"}, tc.args...)...)
+		if code != ExitOK || out != tc.out || errOut != "" {
+			t.Errorf("%v: exit %d, stdout %q, stderr %q; want %q", tc.args, code, out, errOut, tc.out)
+		}
+	}
+	if data, _ := os.ReadFile(file); string(data) != genSet {
+		t.Fatal("--list-tests wrote the file")
+	}
+	withAdapter(t, "cyclic", fakeAdapter{units: fakeUnits("missing")})
+	for _, tc := range []struct {
+		args []string
+		code int
+		want string
+	}{
+		{[]string{"fake", "--no-test", "c"}, ExitUsage, "--no-test c: matches no unit"},
+		{[]string{"fake", "--check"}, ExitUsage, "--list-tests and --check"},
+		{[]string{"cyclic"}, ExitError, `unknown dependency "missing"`},
+	} {
+		code, _, errOut := runCLI(append([]string{"gen", tc.args[0], "-f", file, "--list-tests"}, tc.args[1:]...)...)
+		if code != tc.code || !strings.Contains(errOut, tc.want) {
+			t.Errorf("%v: exit %d, stderr %q; want %d, %q", tc.args, code, errOut, tc.code, tc.want)
+		}
+	}
+}
+
 func TestGenErrors(t *testing.T) {
 	dir := t.TempDir()
 	set := filepath.Join(dir, "aval.yaml")

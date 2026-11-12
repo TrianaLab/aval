@@ -245,6 +245,28 @@ func check(lang string, units []Unit) ([]planned, map[string]int, error) {
 	return out, byID, nil
 }
 
+// Tested returns, sorted, the IDs of the units that get a test under the
+// --no-test patterns noTest: what Rewrite would write a test for. It fails
+// like Rewrite on invalid units or a pattern that matches no unit, so a
+// project's own gate can derive its list from the same patterns.
+func Tested(lang string, units []Unit, noTest ...string) ([]string, error) {
+	if _, _, err := check(lang, units); err != nil {
+		return nil, err
+	}
+	skip, err := skipped(lang, units, noTest)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, u := range units {
+		if name, _ := Name(lang, u.ID); !skip[name] {
+			ids = append(ids, u.ID)
+		}
+	}
+	slices.Sort(ids)
+	return ids, nil
+}
+
 // skipped returns the names of the units whose ID matches one of patterns,
 // contract globs. units are valid (see plan). A pattern that matches no unit
 // is an error, so a typo or a renamed unit cannot silently change what runs.
