@@ -2602,9 +2602,9 @@ to turn reuse off). run and verify then take the registry from the trust
 </span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>  version     Print the aval version, Go version and platform
 </span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
 </span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>Flags:
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>  -h, --help      help for aval
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>      --plain     plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>  -v, --version   version for aval
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>  -h, --help[=true|false]      help for aval
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>      --plain[=true|false]     plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>  -v, --version[=true|false]   version for aval
 </span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>
 </span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>Use "aval [command] --help" for more information about a command.
 </span></code></pre></div>
@@ -2624,10 +2624,10 @@ See each sub-command's help for details on how to use the generated script.</p>
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  zsh         Generate the autocompletion script for zsh
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>Flags:
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>  -h, --help   help for completion
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>  -h, --help[=true|false]   help for completion
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>Global Flags:
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
 </span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>Use "aval completion [command] --help" for more information about a command.
 </span></code></pre></div>
@@ -2658,16 +2658,16 @@ is invalid, else 1 when any <abbr title="One sha256 hash of every input the cont
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>  aval explain --digest
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>Flags:
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>      --all               check and fingerprint every test of the file, one line per test
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>  -f, --contract string   path to the test contract (default "aval.yaml")
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>      --digest            print only the fingerprint (sha256:...)
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>      --expand            print the test as the standalone kind: Test it expands to
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>  -h, --help              help for explain
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>  -o, --output string     output format of --all: text or json (default "text")
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>  -t, --test string       the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/&lt;test&gt;/
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>      --all[=true|false]      check and fingerprint every test of the file, one line per test
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>  -f, --contract string       path to the test contract (default "aval.yaml")
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>      --digest[=true|false]   print only the fingerprint (sha256:...)
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>      --expand[=true|false]   print the test as the standalone kind: Test it expands to
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>  -h, --help[=true|false]     help for explain
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>  -o, --output string         output format of --all: text or json (default "text")
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>  -t, --test string           the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/&lt;test&gt;/
 </span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>
 </span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>Global Flags:
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-init">aval init<a class="headerlink" href="#aval-init" title="Anchor link">&para;</a></h2>
 <p>init writes aval.yaml for one test, validated before it is written. With
@@ -2701,17 +2701,17 @@ nothing, init cancelled, or with --set a file exists without --force).</p>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  aval init --set --name unit --source 'src/**' --cacheability hermetic -- go test ./...
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
 </span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>Flags:
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>      --cacheability string   hermetic, controlled-environment, external-dependencies or non-deterministic
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>      --force                 replace existing aval.yaml, policy.yaml and key files (.github/aval/policy.yaml with --set)
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>  -h, --help                  help for init
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>      --key string            signing key pair NAME.key and NAME.pub to create and trust in policy.yaml; a trailing .key is dropped
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>      --keyless               sign keyless with Sigstore: no key and no policy are written
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>      --name string           test name (metadata.name): what the test checks
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>      --set                   write aval.yaml as a kind: TestSet and .github/aval/policy.yaml with a placeholder identity, no key
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>      --source stringArray    source glob relative to the current directory (scope.source); repeat it for more
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>      --cacheability string    hermetic, controlled-environment, external-dependencies or non-deterministic
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>      --force[=true|false]     replace existing aval.yaml, policy.yaml and key files (.github/aval/policy.yaml with --set)
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>  -h, --help[=true|false]      help for init
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>      --key string             signing key pair NAME.key and NAME.pub to create and trust in policy.yaml; a trailing .key is dropped
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>      --keyless[=true|false]   sign keyless with Sigstore: no key and no policy are written
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>      --name string            test name (metadata.name): what the test checks
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>      --set[=true|false]       write aval.yaml as a kind: TestSet and .github/aval/policy.yaml with a placeholder identity, no key
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>      --source stringArray     source glob relative to the current directory (scope.source); repeat it for more
 </span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>
 </span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>Global Flags:
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-keygen">aval keygen<a class="headerlink" href="#aval-keygen" title="Anchor link">&para;</a></h2>
 <p>keygen writes a new ECDSA P-256 signing key to name.key (unencrypted PKCS#8
@@ -2729,11 +2729,11 @@ or cannot be written), 2 usage.</p>
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>  aval keygen ci     # ci.key and ci.pub
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>Flags:
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>      --force   replace name.key and name.pub if they exist
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>  -h, --help    help for keygen
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>      --force[=true|false]   replace name.key and name.pub if they exist
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>  -h, --help[=true|false]    help for keygen
 </span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>
 </span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>Global Flags:
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-push">aval push<a class="headerlink" href="#aval-push" title="Anchor link">&para;</a></h2>
 <p>push signs the result recorded by 'aval run' and publishes it. The result
@@ -2767,9 +2767,9 @@ stored.</p>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>Flags:
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>  -f, --contract string             path to the test contract (default "aval.yaml")
 </span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>      --env-file string             take the env section of the fingerprint from this file ('aval run --env-file') instead of this process's environment
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>  -h, --help                        help for push
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>  -h, --help[=true|false]           help for push
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>      --key string                  signing key path (default: keyless OIDC)
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>      --login[=true|false]          sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
 </span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>      --outputs-dir string          read the contract's outputs from this directory ('aval run --outputs-dir') instead of the contract root; anything in it that is not a declared output publishes nothing
 </span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
 </span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
@@ -2778,7 +2778,7 @@ stored.</p>
 </span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>  -t, --test string                 the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/&lt;test&gt;/
 </span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>
 </span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>Global Flags:
-</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <p>Deprecated flags, hidden from help:</p>
 <ul>
@@ -2794,14 +2794,14 @@ stored.</p>
 </span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  aval stats publish --registry ghcr.io/acme/orders-aval record.json
 </span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
 </span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>Flags:
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  -h, --help                        help for record
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  -h, --help[=true|false]           help for record
 </span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>      --record-file string          run record written by 'aval run --stats-file' (required)
 </span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
 </span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 </span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>      --source-repo string          source repository (e.g. acme/orders); default: the one in the record
 </span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
 </span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>Global Flags:
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <p>Deprecated flags, hidden from help:</p>
 <ul>
@@ -2835,31 +2835,31 @@ running the test: also a verified result beside a rejected verification-failed
 </span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>  aval run --registry ghcr.io/acme/orders-aval --push
 </span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
 </span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>Flags:
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>      --ci-run-url string           link to the CI run, stored in the run record
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>  -f, --contract string             path to the test contract (default "aval.yaml")
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>      --env-file string             where to record the env section of the fingerprint (hashes, no values) with the result, for 'aval push --env-file' in another job (default ".aval/env.txt")
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>      --explain                     print the fingerprint manifest (what was hashed) before the run; 'aval explain' prints it alone
-</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>      --fingerprint-only            print the execution fingerprint and exit (same as 'aval explain --digest')
-</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>  -h, --help                        help for run
-</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>      --key string                  signing key path for --push (default: keyless, from $SIGSTORE_ID_TOKEN or the interactive login; no token is stored and runner.command never sees it)
-</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>      --login                       sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
-</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>      --min-trust-level string      raise the trust policy's minTrustLevel to developer, runner or isolated; a value below it exits 2 (default: $AVAL_MIN_TRUST_LEVEL)
-</span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>      --no-reuse                    always run, never reuse (excludes --shadow)
-</span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>      --outputs-dir string          also copy the contract's outputs to this empty directory when the result is recorded, for 'aval push --outputs-dir' in another job (keep it outside the scope, e.g. under .aval/)
-</span><span id="__span-7-23"><a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a>      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
-</span><span id="__span-7-24"><a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>      --push                        sign and publish the result after running (needs --registry)
-</span><span id="__span-7-25"><a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a>      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)
-</span><span id="__span-7-26"><a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
-</span><span id="__span-7-27"><a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a>      --report-file string          also write the lookup decision as a verify report (JSON) to this file
-</span><span id="__span-7-28"><a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a>      --result-file string          where to record the result for 'aval push' (default ".aval/result.json")
-</span><span id="__span-7-29"><a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a>      --shadow                      verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)
-</span><span id="__span-7-30"><a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a>      --source-repo string          source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
-</span><span id="__span-7-31"><a id="__codelineno-7-31" name="__codelineno-7-31" href="#__codelineno-7-31"></a>      --stats                       publish a run record for statistics after the run (needs --registry; best-effort)
-</span><span id="__span-7-32"><a id="__codelineno-7-32" name="__codelineno-7-32" href="#__codelineno-7-32"></a>      --stats-file string           also write the run record to this file, for 'aval stats publish'
-</span><span id="__span-7-33"><a id="__codelineno-7-33" name="__codelineno-7-33" href="#__codelineno-7-33"></a>  -t, --test string                 the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/&lt;test&gt;/
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>      --ci-run-url string               link to the CI run, stored in the run record
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>  -f, --contract string                 path to the test contract (default "aval.yaml")
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>      --env-file string                 where to record the env section of the fingerprint (hashes, no values) with the result, for 'aval push --env-file' in another job (default ".aval/env.txt")
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>      --explain[=true|false]            print the fingerprint manifest (what was hashed) before the run; 'aval explain' prints it alone
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>      --fingerprint-only[=true|false]   print the execution fingerprint and exit (same as 'aval explain --digest')
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>  -h, --help[=true|false]               help for run
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>      --key string                      signing key path for --push (default: keyless, from $SIGSTORE_ID_TOKEN or the interactive login; no token is stored and runner.command never sees it)
+</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>      --login[=true|false]              sign keyless after the interactive Sigstore login, even without a terminal (overrides: $SIGSTORE_OIDC_ISSUER, $SIGSTORE_OIDC_CLIENT_ID)
+</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>      --min-trust-level string          raise the trust policy's minTrustLevel to developer, runner or isolated; a value below it exits 2 (default: $AVAL_MIN_TRUST_LEVEL)
+</span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>      --no-reuse[=true|false]           always run, never reuse (excludes --shadow)
+</span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>      --outputs-dir string              also copy the contract's outputs to this empty directory when the result is recorded, for 'aval push --outputs-dir' in another job (keep it outside the scope, e.g. under .aval/)
+</span><span id="__span-7-23"><a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a>      --policy string                   trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
+</span><span id="__span-7-24"><a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>      --push[=true|false]               sign and publish the result after running (needs --registry)
+</span><span id="__span-7-25"><a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a>      --registry string                 OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY, then registry in the trust policy)
+</span><span id="__span-7-26"><a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a>      --registry-timeout duration       deadline for this command's registry calls (default 1m0s)
+</span><span id="__span-7-27"><a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a>      --report-file string              also write the lookup decision as a verify report (JSON) to this file
+</span><span id="__span-7-28"><a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a>      --result-file string              where to record the result for 'aval push' (default ".aval/result.json")
+</span><span id="__span-7-29"><a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a>      --shadow[=true|false]             verify, but run the test anyway and exit 1 on a false hit (excludes --no-reuse)
+</span><span id="__span-7-30"><a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a>      --source-repo string              source repository (e.g. acme/orders), stored in the run record for 'aval stats --by repository'
+</span><span id="__span-7-31"><a id="__codelineno-7-31" name="__codelineno-7-31" href="#__codelineno-7-31"></a>      --stats[=true|false]              publish a run record for statistics after the run (needs --registry; best-effort)
+</span><span id="__span-7-32"><a id="__codelineno-7-32" name="__codelineno-7-32" href="#__codelineno-7-32"></a>      --stats-file string               also write the run record to this file, for 'aval stats publish'
+</span><span id="__span-7-33"><a id="__codelineno-7-33" name="__codelineno-7-33" href="#__codelineno-7-33"></a>  -t, --test string                     the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/&lt;test&gt;/
 </span><span id="__span-7-34"><a id="__codelineno-7-34" name="__codelineno-7-34" href="#__codelineno-7-34"></a>
 </span><span id="__span-7-35"><a id="__codelineno-7-35" name="__codelineno-7-35" href="#__codelineno-7-35"></a>Global Flags:
-</span><span id="__span-7-36"><a id="__codelineno-7-36" name="__codelineno-7-36" href="#__codelineno-7-36"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-7-36"><a id="__codelineno-7-36" name="__codelineno-7-36" href="#__codelineno-7-36"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <p>Deprecated flags, hidden from help:</p>
 <ul>
@@ -2895,7 +2895,7 @@ records.</p>
 </span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
 </span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>Flags:
 </span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>      --by string                   group by test or repository (the run record's source repository) (default "test")
-</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>  -h, --help                        help for stats
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>  -h, --help[=true|false]           help for stats
 </span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>  -o, --output string               output format: text or json (default "text")
 </span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
 </span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
@@ -2903,7 +2903,7 @@ records.</p>
 </span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>      --test string                 only this test id (metadata.name); default: every test with run records
 </span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>
 </span><span id="__span-8-20"><a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>Global Flags:
-</span><span id="__span-8-21"><a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-8-21"><a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span><span id="__span-8-22"><a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a>
 </span><span id="__span-8-23"><a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a>Use "aval stats [command] --help" for more information about a command.
 </span></code></pre></div>
@@ -2920,13 +2920,13 @@ Run records are unsigned statistics: run and verify never read them.
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>  aval stats publish --registry ghcr.io/acme/orders-aval record.json
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>Flags:
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>  -h, --help                        help for publish
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>  -h, --help[=true|false]           help for publish
 </span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>      --registry string             OCI repository for attestations and run records, e.g. ghcr.io/acme/orders-aval (default: $AVAL_REGISTRY)
 </span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>      --registry-timeout duration   deadline for this command's registry calls (default 1m0s)
 </span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>      --source-repo string          source repository (e.g. acme/orders); default: the one in the record
 </span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>
 </span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>Global Flags:
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-upgrade">aval upgrade<a class="headerlink" href="#aval-upgrade" title="Anchor link">&para;</a></h2>
 <p>upgrade downloads a release from GitHub Releases (the latest, or --version), checks that
@@ -2943,12 +2943,12 @@ checksum, older latest release, replacing the binary), 2 usage.</p>
 </span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>  aval upgrade --check
 </span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
 </span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>Flags:
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>      --check            print the current and target versions without installing
-</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>  -h, --help             help for upgrade
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>      --version string   release to install, e.g. v0.4.0 (default: latest)
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>      --check[=true|false]   print the current and target versions without installing
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>  -h, --help[=true|false]    help for upgrade
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>      --version string       release to install, e.g. v0.4.0 (default: latest)
 </span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>
 </span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>Global Flags:
-</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-verify">aval verify<a class="headerlink" href="#aval-verify" title="Anchor link">&para;</a></h2>
 <p>verify computes the <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>, looks up the <abbr title="A signed statement of a test result and the fingerprint of the inputs it ran with.">attestation</abbr> and verifies its
@@ -2966,7 +2966,7 @@ more attestations than the lookup cap), 1 error (registry, <abbr title="Your fil
 </span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
 </span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>Flags:
 </span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>  -f, --contract string             path to the test contract (default "aval.yaml")
-</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>  -h, --help                        help for verify
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>  -h, --help[=true|false]           help for verify
 </span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>      --min-trust-level string      raise the trust policy's minTrustLevel to developer, runner or isolated; a value below it exits 2 (default: $AVAL_MIN_TRUST_LEVEL)
 </span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>  -o, --output string               output format: text or json (default "text")
 </span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>      --policy string               trust policy file; without it nothing is reused (default: $AVAL_POLICY; an empty flag also falls back to it)
@@ -2975,7 +2975,7 @@ more attestations than the lookup cap), 1 error (registry, <abbr title="Your fil
 </span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>  -t, --test string                 the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/&lt;test&gt;/
 </span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>
 </span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>Global Flags:
-</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-version">aval version<a class="headerlink" href="#aval-version" title="Anchor link">&para;</a></h2>
 <p>Print the aval version, Go version and platform</p>
@@ -2986,10 +2986,10 @@ more attestations than the lookup cap), 1 error (registry, <abbr title="Your fil
 </span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>  aval version
 </span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
 </span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>Flags:
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>  -h, --help   help for version
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>  -h, --help[=true|false]   help for version
 </span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>
 </span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>Global Flags:
-</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>      --plain   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 
 
