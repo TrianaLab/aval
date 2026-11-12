@@ -82,12 +82,12 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
-        DESIRED_VERSION: v0.10.0
+        DESIRED_VERSION: v0.11.0
         AVAL_SHA256: >-
-          linux_amd64=379f16bb4a11a4ea0f66be106fff1ba01ba1867ef7bc34b151b8c41b2a1b08bf
-          linux_arm64=5c104f73a9b29c74f99978e58b5a705d8741d24fd7fc33950a9f8835f83a321a
-          darwin_amd64=cb1c473e28c0f284bc11d3153d7c36373e66beecef434f187d2dd14f80dc8c77
-          darwin_arm64=3ab60ffd4b74db5c5c7c7bf722e36b8b3ed3a327ed4542eed2bbd25fe469a45c
+          linux_amd64=dcf7d242c634d943f392dc00d9bc735c2c4faf6d8fd0852633046a6c574faa0f
+          linux_arm64=86925c7f80dd82359cbd9c1176d086aca7219205111e15476699286f814298ed
+          darwin_amd64=eec676c8f5d58d9288bf596539ea79e920c7d5150ee28f179a8fc30c185f1e10
+          darwin_arm64=e612d5da2372d10712a1ba8f94a530c0bbace0543a7a07894e7493b589dcbb41
         AVAL_REQUIRE_VERIFY: "1"
         AVAL_REQUIRE_PROVENANCE: "1"
         AVAL_NO_VERIFY: ""
