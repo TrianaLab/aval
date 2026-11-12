@@ -28,6 +28,7 @@ func TestMain(m *testing.M) {
 		}
 		data, _ := os.ReadFile(src)
 		wd, _ := os.Getwd()
+		wd, _ = filepath.EvalSymlinks(wd) // cargo prints canonical paths
 		root, _ := json.Marshal(wd)
 		fmt.Print(strings.ReplaceAll(string(data), "@ROOT@", string(root[1:len(root)-1])))
 		os.Exit(0)
@@ -93,6 +94,37 @@ func TestGoldenCargo(t *testing.T) {
 		t.Skip("cargo not installed")
 	}
 	golden(t, generate(t, fixture))
+}
+
+// TestSymlinkRoot reaches the fixture through a symlinked working directory,
+// as a clone under macOS /tmp does: cargo prints canonical paths, which must
+// still be inside the root. A member really outside it still fails.
+func TestSymlinkRoot(t *testing.T) {
+	recorded, err := os.ReadFile("testdata/metadata.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "outside.json")
+	if err := os.WriteFile(outside, []byte(strings.Replace(string(recorded), `"manifest_path": "@ROOT@/apps/cli/Cargo.toml"`, `"manifest_path": "@ROOT@/../cli/Cargo.toml"`, 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(pkg, link); err != nil {
+		t.Fatal(err)
+	}
+	fake(t, "testdata/metadata.json")
+	t.Chdir(link)
+	for _, root := range []string{fixture, filepath.Join(link, fixture)} {
+		golden(t, generate(t, root))
+	}
+	fake(t, outside)
+	if units, err := (Adapter{}).Units(fixture); err == nil || !strings.Contains(err.Error(), "member cli: ") {
+		t.Errorf("Units: %v, %v; want member cli outside the root", units, err)
+	}
 }
 
 func TestErrors(t *testing.T) {

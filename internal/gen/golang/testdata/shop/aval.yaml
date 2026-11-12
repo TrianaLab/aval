@@ -1,0 +1,11 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [go.mod]
+  cacheability: hermetic
+tests:
+  # hand-written, kept as is
+  - metadata: {name: e2e}
+    use: [go.web]
+    runner: {command: [go, run, .]}

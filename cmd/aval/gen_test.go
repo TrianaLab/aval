@@ -115,7 +115,7 @@ func TestGenErrors(t *testing.T) {
 		want string
 	}{
 		{[]string{"gen"}, ExitUsage, "accepts 1 arg"},
-		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, dotnet, fake, js, python, rust)`},
+		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, dotnet, fake, go, js, python, rust)`},
 		{[]string{"gen", "fake", "-f", filepath.Join(dir, "none.yaml")}, ExitUsage, "aval init --set"},
 		{[]string{"gen", "fake", "-f", test}, ExitUsage, "kind: TestSet"},
 		{[]string{"gen", "broken", "-f", set}, ExitError, "gen broken: tool not found"},
@@ -138,8 +138,8 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenLanguages(t *testing.T) {
-	if got := languages(); got != "dotnet, js, python, rust" {
-		t.Errorf("languages() = %q, want dotnet, js, python, rust", got)
+	if got := languages(); got != "dotnet, go, js, python, rust" {
+		t.Errorf("languages() = %q, want dotnet, go, js, python, rust", got)
 	}
 }
 
@@ -224,6 +224,42 @@ func TestGenRustPatchOutsideMembers(t *testing.T) {
 	code, _, errOut := runCLI("gen", "rust", "-f", file)
 	if after, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, "Cargo.toml: path override vendor/serde is not inside a workspace member") || string(after) != set {
 		t.Errorf("exit %d, stderr %q, file %q", code, errOut, after)
+	}
+}
+
+// aval gen go writes the golden file of the Go fixture; without go on PATH
+// it exits 1 and writes nothing.
+func TestGenGo(t *testing.T) {
+	const fixture = "../../internal/gen/golang/testdata/shop"
+	dir := filepath.Join(t.TempDir(), "shop")
+	if err := os.CopyFS(dir, os.DirFS(fixture)); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "aval.yaml")
+	before, _ := os.ReadFile(file)
+	t.Setenv("PATH", t.TempDir())
+	if code, _, errOut := runCLI("gen", "go", "-f", file); code != ExitError || !strings.Contains(errOut, "gen go: go list:") {
+		t.Errorf("no go: exit %d, stderr %q", code, errOut)
+	}
+	if data, _ := os.ReadFile(file); string(data) != string(before) {
+		t.Error("written without go")
+	}
+}
+
+func TestGenGoWrites(t *testing.T) {
+	const fixture = "../../internal/gen/golang/testdata/shop"
+	dir := filepath.Join(t.TempDir(), "shop")
+	if err := os.CopyFS(dir, os.DirFS(fixture)); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "aval.yaml")
+	if code, out, errOut := runCLI("gen", "go", "-f", file); code != ExitOK || !strings.Contains(out, "wrote the go entries for 5 units") {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	got, _ := os.ReadFile(file)
+	want, _ := os.ReadFile(filepath.Join(dir, "aval.golden.yaml"))
+	if string(got) != string(want) {
+		t.Errorf("written file differs from the golden:\n%s", gen.Diff("golden", "got", want, got))
 	}
 }
 
