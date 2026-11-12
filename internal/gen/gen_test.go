@@ -2,6 +2,7 @@ package gen
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -125,5 +126,28 @@ func TestRoot(t *testing.T) {
 	}
 	if _, err := Root([]byte("kind: Test\n"), "/r"); err == nil {
 		t.Error("kind: Test: want an error")
+	}
+}
+
+// TestCanonical resolves the symlinks of a relative root, the working
+// directory's included.
+func TestCanonical(t *testing.T) {
+	real, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(real, "ws"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(link)
+	if got, err := Canonical("ws"); err != nil || got != filepath.Join(real, "ws") {
+		t.Errorf("Canonical(ws) = %q, %v; want %q", got, err, filepath.Join(real, "ws"))
+	}
+	if _, err := Canonical("missing"); err == nil {
+		t.Error("Canonical(missing): want an error")
 	}
 }
