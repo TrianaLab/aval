@@ -1,5 +1,26 @@
 # aval
 
+## 0.10.0
+
+### Minor Changes
+
+- 631f20b: `aval gen <language>`: the language-agnostic core that writes one fragment and one test per unit from a dependency graph into a `kind: TestSet`, with the transitive closure computed by Aval, stable `<language>.<unit>` names, hand-written entries kept byte for byte, and `--check` for CI. No language adapter ships yet (docs: Guides, Generate scope from the dependency graph).
+- 3ef1c25: `aval gen dotnet`: the .NET adapter of `aval gen`. One unit per project (`.csproj`, `.fsproj`, `.vbproj`) from the solution at the contract root, or every project file without one, read from the solution and project files without the .NET SDK. `ProjectReference`s become dependencies; imported files, `Directory.Build.*` and `Directory.Packages.props` files above a project and items included from outside its directory join its scope; the test is `dotnet test <project>` (docs: Guides, Generate scope from the dependency graph).
+- 128a40f: `aval gen go`: the Go adapter for `aval gen`. One unit per package of the main modules under the contract root, read with `go list -deps -test -json`: the package's `.go` files, `go:embed` files, non-Go sources and `testdata`, and its imports of other local packages from every `.go` file whatever its build tags. `--go-cover` makes each test fail below 100% statement coverage of its package (docs: Guides, Generate scope from the dependency graph).
+- e2127bc: `aval gen java`: the Java and Kotlin adapter. One unit per Maven module or Gradle subproject, read from `pom.xml`, `settings.gradle(.kts)` and `build.gradle(.kts)` without running a JVM tool; only references to modules of the same build become edges, and anything it cannot read for certain (computed paths, `includeBuild`, files outside the module directory) is an error (docs: Guides, Generate scope from the dependency graph).
+- 66b5c50: `aval gen js`: the JavaScript and TypeScript adapter. One unit per npm, pnpm or yarn workspace package, an edge for every dependency on another workspace package (by name, `workspace:`, `file:`, `link:` or `portal:`), and the test command of the package manager the lockfile names (docs: Guides, Generate scope from the dependency graph).
+- f7e1b80: `aval gen python`: one test per local Python project (uv workspace members, poetry and pip projects) with edges from declared dependencies and local imports, read by Python's own `tomllib` and `ast`. `--strict-imports` fails on a dynamic import it cannot resolve (docs: Guides, Generate scope from the dependency graph).
+- 1fef1dd: `aval gen rust`: one unit per Cargo workspace member, read with `cargo metadata --no-deps`, with path dependencies between members as edges and `cargo test -p <member>` as the test. A `[patch]` or `.cargo/config.toml` `paths` override outside every member fails closed (docs: Guides, Generate scope from the dependency graph).
+- da5d695: Publish action: new `stats-registry` input (`host[:port]/path`, validated; empty keeps the policy's registry). With `stats: true` it now publishes the run record of every artifact, verified hits and verification failures included, not only those whose result was pushed, so a consumer's runs reach a shared stats registry such as `ghcr.io/trianalab/aval-stats`. A failed record publish is still a warning; exit 5 handling is unchanged.
+
+### Patch Changes
+
+- 05d392d: Dependencies: github.com/spf13/pflag 1.1.0. Its help output now shows boolean flags as `--flag[=true|false]`; the CLI reference is regenerated.
+- 3997c4c: `aval gen`: file and directory names with glob metacharacters (`*`, `?`, `[`) are escaped in the generated scope, so a unit in such a directory keeps its own files in scope instead of silently matching nothing. A name no contract glob can express (a backslash) fails closed (exit 1, nothing written).
+- 68483ba: `aval gen js`: TypeScript project `references` and `extends`, and relative imports that cross into another workspace package, are now edges, so a test is no longer reused when a package it reaches only that way changes. A root `tsconfig.base.json` a package extends joins its files. A relative import outside every workspace package, or one that cannot be resolved, fails closed with the file and line (docs: Guides, Generate scope from the dependency graph).
+- 4c2dab4: `aval gen`: a `kind: TestSet` with old Mac (`\r`) line endings, or a stray `\r`, `U+0085`, `U+2028` or `U+2029` line break, no longer makes the rewrite panic: lines are counted the way the YAML parser counts them. Generated lines follow the file's line endings, so a `\r\n` file round-trips byte for byte.
+- 142b0a2: `aval gen rust`: a contract root reached through a symlink (a clone under macOS `/tmp`, a symlinked working directory) is no longer rejected with "outside the contract root". The root is made absolute before its symlinks are resolved, so it matches the canonical paths cargo prints; a member that really is outside the root still fails.
+
 ## 0.9.1
 
 ### Patch Changes
