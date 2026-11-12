@@ -225,3 +225,35 @@ func TestErrors(t *testing.T) {
 		}
 	}
 }
+
+// A package directory named with glob metacharacters gets an escaped glob,
+// so a change to its files changes its test's fingerprint; one no contract
+// glob can express fails closed.
+func TestFalseHitMetacharacterDirectory(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, map[string]string{
+		"package-lock.json":      "{}",
+		"package.json":           `{"workspaces": ["libs/*"]}`,
+		"libs/a[1]/package.json": `{"name": "a"}`,
+		"libs/a[1]/index.js":     "a",
+		"libs/a1/package.json":   `{"name": "a1"}`,
+		"aval.yaml":              "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults:\n  scope: {dependencies: [package-lock.json]}\n  cacheability: hermetic\n",
+	})
+	_, out := generate(t, dir)
+	if !strings.Contains(out, "libs/a[[]1]/**") {
+		t.Fatalf("no escaped glob:\n%s", out)
+	}
+	write(t, dir, map[string]string{"aval.yaml": out})
+	before := digests(t, dir)
+	write(t, dir, map[string]string{"libs/a[1]/index.js": "changed"})
+	if after := digests(t, dir); after["js.a"] == before["js.a"] || after["js.a1"] != before["js.a1"] {
+		t.Errorf("before %v, after %v: want only js.a to change", before, after)
+	}
+	if runtime.GOOS == "windows" { // no backslash in a file name
+		return
+	}
+	write(t, dir, map[string]string{`libs/b\c/package.json`: `{"name": "b"}`})
+	if _, err := (Adapter{}).Units(dir); err == nil || !strings.Contains(err.Error(), `package b: "libs/b\\c": a contract glob cannot express`) {
+		t.Errorf("error %v; want one naming libs/b\\c", err)
+	}
+}

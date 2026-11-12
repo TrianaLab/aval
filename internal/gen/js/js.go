@@ -83,7 +83,11 @@ func (Adapter) Units(root string) ([]gen.Unit, error) {
 		if err != nil {
 			return nil, err
 		}
-		units[i] = gen.Unit{ID: p.Name, Source: []string{dir + "/**"}, Deps: deps, Command: command(pm, p.Name)}
+		source, err := gen.Under(dir, "**")
+		if err != nil {
+			return nil, fmt.Errorf("package %s: %w", p.Name, err)
+		}
+		units[i] = gen.Unit{ID: p.Name, Source: []string{source}, Deps: deps, Command: command(pm, p.Name)}
 	}
 	return units, nil
 }

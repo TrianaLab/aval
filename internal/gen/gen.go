@@ -35,6 +35,38 @@ type Unit struct {
 	Command []string
 }
 
+// globEscape turns the glob metacharacters path.Match knows into one-character
+// classes. Contract globs reject backslashes, so `]`, `{` and `}`, which are
+// literal outside a class, stay as they are.
+var globEscape = strings.NewReplacer("*", "[*]", "?", "[?]", "[", "[[]")
+
+// Literal returns the glob that matches exactly the slash-separated path p,
+// relative to the contract root. Adapters use it, or Under, for every real
+// file or directory name in Unit.Source, so a name with glob metacharacters
+// still selects its files. A path a contract glob cannot express (a
+// backslash, an empty, "." or ".." segment) is an error (invariant 3).
+func Literal(p string) (string, error) {
+	g := globEscape.Replace(p)
+	if contract.ValidateGlob(g) != nil { // rejects backslashes too
+		return "", fmt.Errorf("%q: a contract glob cannot express this path; rename it", p)
+	}
+	return g, nil
+}
+
+// Under returns the glob pattern below the directory dir: Literal(dir), a
+// slash, then pattern, which is a glob already. dir "." is the contract
+// root, where the result is pattern itself.
+func Under(dir, pattern string) (string, error) {
+	if dir == "." {
+		return pattern, nil
+	}
+	g, err := Literal(dir)
+	if err != nil {
+		return "", err
+	}
+	return g + "/" + pattern, nil
+}
+
 // Adapter lists the units of one ecosystem under root, the contract root.
 // A missing tool, a parse error or a unit whose files cannot be listed is
 // an error, never a partial list (invariant 3).
