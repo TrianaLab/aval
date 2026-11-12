@@ -406,8 +406,9 @@ tests:
 ## Java and Kotlin
 
 `aval gen java` reads the build files at the contract root and runs no JVM
-tool. A unit's files are its whole directory (`<module>/**`), so add
-`exclude: ["**/target/**", "**/build/**"]` to `defaults`.
+tool. A unit's files are its whole directory (`<module>/**`), so exclude
+build output in `defaults`: `**/target/**` for Maven, `**/build/**` and
+`**/.gradle/**` for Gradle.
 
 - Maven: one unit per module in `<modules>` (Maven 4 `<subprojects>`), in
   the root POM, nested aggregators and every profile. A module depends on
@@ -450,13 +451,16 @@ What it cannot read for certain is an error (exit 1), not a guess:
 - a computed `include`, `project(...)` or `evaluationDependsOn(...)` path,
   type-safe accessors (`projects.common`), `includeBuild`, `projectDir`,
   `buildFileName`, `apply from` or a triple-quoted string;
-- in Gradle, `parent`, `getParent`, `parentFile` or
-  `rootProject.subprojects` in a subproject, an absolute path, or a path
-  through `..` or `rootDir` that leaves the root or reaches another
-  project's directory;
-- in Maven, an element or property whose whole value leaves the module:
-  `..`, an absolute path or `${maven.multiModuleProjectDirectory}` (`..`
-  inside a larger value, such as an `argLine`, is not seen);
+- in Gradle, `parent`, `getParent`, `parentFile`, or
+  `rootProject.subprojects` and `project(":").subprojects` (and kin) in a
+  subproject; in any script, an absolute path, a string with `../` or
+  `rootDir` inside larger text (`"-Dfx=../common"`), or a path that leaves
+  the root or starts with another project's directory
+  (`rootProject.file("common/fixtures")`);
+- in Maven, an element or property value with `../` anywhere (an
+  `argLine` too), an absolute path, or `${user.dir}`,
+  `${maven.multiModuleProjectDirectory}`, `${env.*}`, `${session.*}` or
+  `${project.parent.*}` other than the parent's coordinates;
 - a Maven property it cannot resolve, or that a profile or
   `.mvn/maven.config` sets;
 - a reference to a local POM that is not a module, or a local `<parent>`

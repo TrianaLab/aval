@@ -168,8 +168,10 @@ func (r reactor) index(dirs []string) (map[string]string, error) {
 }
 
 // strays indexes the pom.xml files under the root that are not in the
-// reactor (outside target, build output and hidden directories), by
-// groupId:artifactId. A module that refers to one would depend on files no
+// reactor, by groupId:artifactId. It skips target, build, node_modules and
+// hidden directories at any depth: a POM there is build output, a
+// downloaded package or tool state, not a source Maven builds. A module
+// named target or build is still read, through <modules>. A module that refers to one would depend on files no
 // unit covers, so deps rejects it. A POM it cannot parse or resolve is no
 // build Maven could resolve a reference to, and is left out.
 func (r reactor) strays() (map[string]string, error) {
@@ -255,21 +257,34 @@ func readPom(root, dir string) (*pom, error) {
 	return &p, nil
 }
 
-// rootVarRe matches a property that points at the build root or a parent
-// directory instead of the module.
-var rootVarRe = regexp.MustCompile(`\$\{(maven\.multiModuleProjectDirectory|session\.(executionRootDirectory|rootDirectory)|project\.(rootDirectory|parent\.basedir))\}`)
+// rootVar reports whether a property name points outside the module: the
+// build root, the working directory, the environment, the session or a
+// parent project (its coordinates excepted: they are not files).
+func rootVar(name string) bool {
+	switch name {
+	case "user.dir", "maven.multiModuleProjectDirectory", "project.rootDirectory":
+		return true
+	case "project.parent.groupId", "project.parent.artifactId", "project.parent.version":
+		return false
+	}
+	return strings.HasPrefix(name, "env.") || strings.HasPrefix(name, "session.") || strings.HasPrefix(name, "project.parent.")
+}
 
 // checkPath rejects the text of a POM element (a property value too) that
 // refers to files outside the module directory, which its <dir>/** glob
 // would miss: filters, suiteXmlFile, profile activation files, systemPath,
-// source directories. Only a whole value is read: ".." inside larger text,
-// such as an argLine, is not seen. relativePath and modules are checked
-// elsewhere.
+// source directories, an argLine with -Dx=../y. It rejects "../" or a
+// property from rootVar anywhere in the text, and a whole value that is
+// absolute. relativePath and modules are checked elsewhere.
 func checkPath(name, text string) error {
 	if name == "relativePath" || name == "module" || name == "subproject" {
 		return nil
 	}
-	if rootVarRe.MatchString(text) || outside(text) {
+	bad := outside(text) || strings.Contains(filepath.ToSlash(text), "../")
+	for _, m := range propRe.FindAllStringSubmatch(text, -1) {
+		bad = bad || rootVar(m[1])
+	}
+	if bad {
 		return fmt.Errorf("<%s>%s</%s> refers to files outside the module directory: %w", name, text, name, errUnsupported)
 	}
 	return nil
