@@ -10,10 +10,19 @@ fragments:
     scope:
       source:
         - apps/api/**
+        - tsconfig.base.json
+  js.acme.i18n:
+    scope:
+      source:
+        - packages/i18n/**
   js.acme.tsconfig:
     scope:
       source:
         - packages/tsconfig/**
+  js.acme.types:
+    scope:
+      source:
+        - packages/types/**
   js.acme.ui:
     scope:
       source:
@@ -31,11 +40,21 @@ tests:
     runner: {command: [pnpm, --filter, '@acme/api', test]}
     use:
       - js.acme.api
+      - js.acme.tsconfig
+      - js.acme.types
       - js.acme.utils
+  - metadata: {name: js.acme.i18n}
+    runner: {command: [pnpm, --filter, '@acme/i18n', test]}
+    use:
+      - js.acme.i18n
   - metadata: {name: js.acme.tsconfig}
     runner: {command: [pnpm, --filter, '@acme/tsconfig', test]}
     use:
       - js.acme.tsconfig
+  - metadata: {name: js.acme.types}
+    runner: {command: [pnpm, --filter, '@acme/types', test]}
+    use:
+      - js.acme.types
   - metadata: {name: js.acme.ui}
     runner: {command: [pnpm, --filter, '@acme/ui', test]}
     use:
@@ -48,6 +67,7 @@ tests:
   - metadata: {name: js.acme.web}
     runner: {command: [pnpm, --filter, '@acme/web', test]}
     use:
+      - js.acme.i18n
       - js.acme.tsconfig
       - js.acme.ui
       - js.acme.utils

@@ -1,0 +1,8 @@
+[project]
+name = "Acme_API"
+version = "1.0.0"
+dependencies = ["acme.core; python_version >= '3.11'"]
+
+[dependency-groups]
+dev = ["pytest>=8", { include-group = "lint" }]
+lint = ["ruff"]

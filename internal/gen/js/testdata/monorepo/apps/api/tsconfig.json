@@ -1,0 +1,8 @@
+{
+  // Project references are edges, though package.json does not name them.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {"outDir": "dist", /* built here */ "composite": true},
+  "references": [
+    {"path": "../../packages/types"},
+  ],
+}

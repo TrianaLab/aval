@@ -1,7 +1,8 @@
 // Package js is the aval gen adapter for JavaScript and TypeScript
 // workspaces (npm, pnpm, yarn). It reads the manifests and runs no tool:
 // one unit per workspace package, with an edge for every dependency on
-// another workspace package of the repository.
+// another workspace package of the repository: in package.json, in a
+// tsconfig references or extends, or through a relative import.
 package js
 
 import (
@@ -47,7 +48,8 @@ type manifest struct {
 // manager; pnpm reads pnpm-workspace.yaml, npm and yarn the workspaces of
 // package.json. A missing or ambiguous lockfile, an unreadable manifest, a
 // workspace package without a name or a local reference that is not a
-// workspace package is an error.
+// workspace package (in package.json, a tsconfig or a relative import) is
+// an error.
 func (Adapter) Units(root string) ([]gen.Unit, error) {
 	pm, err := manager(root)
 	if err != nil {
@@ -73,9 +75,12 @@ func (Adapter) Units(root string) ([]gen.Unit, error) {
 		byDir[dir] = pkgs[i].Name
 	}
 	isUnit := map[string]bool{}
-	for _, n := range byDir {
+	byName := map[string]string{}
+	for d, n := range byDir {
 		isUnit[n] = true
+		byName[n] = d
 	}
+	w := workspace{root: root, byDir: byDir, byName: byName}
 	units := make([]gen.Unit, len(dirs))
 	for i, dir := range dirs {
 		p := pkgs[i]
@@ -83,11 +88,17 @@ func (Adapter) Units(root string) ([]gen.Unit, error) {
 		if err != nil {
 			return nil, err
 		}
+		more, files, err := w.scan(dir)
+		if err != nil {
+			return nil, err
+		}
+		deps = slices.Compact(slices.Sorted(slices.Values(append(deps, more...))))
 		source, err := gen.Under(dir, "**")
 		if err != nil {
 			return nil, fmt.Errorf("package %s: %w", p.Name, err)
 		}
-		units[i] = gen.Unit{ID: p.Name, Source: []string{source}, Deps: deps, Command: command(pm, p.Name)}
+		// files need no escaping: extended() rejects glob characters in them.
+		units[i] = gen.Unit{ID: p.Name, Source: append([]string{source}, files...), Deps: deps, Command: command(pm, p.Name)}
 	}
 	return units, nil
 }
@@ -221,8 +232,7 @@ func localDeps(dir string, p manifest, isUnit map[string]bool, byDir map[string]
 			}
 		}
 	}
-	slices.Sort(deps)
-	return slices.Compact(deps), nil
+	return deps, nil
 }
 
 // command returns the argv that runs the test script of the workspace

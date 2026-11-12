@@ -11,9 +11,9 @@ result: `aval run`, `verify` and `push` never call it, and the scope stays
 declared in `aval.yaml`.
 
 !!! note "Languages"
-    JavaScript and TypeScript ([below](#javascript-and-typescript)) and Rust
-    ([below](#rust)) ship. The other adapters (Go, Python, Java, .NET) are the
-    next stories of
+    JavaScript and TypeScript ([below](#javascript-and-typescript)), Python
+    ([below](#python)) and Rust ([below](#rust)) ship. The other adapters (Go,
+    Java, .NET) are the next stories of
     [Epic 16](https://github.com/TrianaLab/aval/issues/291). `aval gen --help`
     lists the languages your build has.
 
@@ -131,7 +131,29 @@ A unit's ID is its package name and its files are its directory, so
 dependency becomes an edge when it names another workspace package (any
 range, or `workspace:`), or when a `file:`, `link:` or `portal:` path points
 to one. External packages are not edges: the lockfile in `defaults` covers
-them. Exclude `node_modules` there too:
+them. Exclude `node_modules` there too.
+
+Two local dependencies that `package.json` does not name are edges as well:
+
+- TypeScript configs. Every `tsconfig*.json` in a package (JSON with comments
+  and trailing commas) adds an edge for each `references` path that lands in
+  another workspace package. Its `extends` chain is followed the way
+  TypeScript does (a relative path, a directory meaning its `tsconfig.json`,
+  `.json` added when missing, or `<workspace package>/<path>`): a file in
+  another workspace package is an edge, and a file outside every package,
+  such as a root `tsconfig.base.json`, joins the unit's own files. `extends`
+  of an external package is not followed.
+- Relative imports. Every `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`,
+  `.mts`, `.cts`, `.vue`, `.svelte` and `.astro` file in a package is
+  scanned for relative specifiers (`./`, `../`) of `import ... from`,
+  `export ... from`, `import "..."`, `import(...)` and `require(...)`. One
+  that lands in another workspace package is an edge. Comments are not
+  stripped, so a commented-out import still counts.
+
+The scan skips `node_modules`, `.git` and nested workspace packages;
+hidden directories such as `.storybook` are scanned. It reads only those
+references: `paths` aliases and `include` globs that reach outside the package are not edges, so declare
+those by hand.
 
 ```yaml
 apiVersion: aval.trianalab.io/v1
@@ -165,9 +187,76 @@ tests:
 No lockfile or lockfiles of two package managers, an unreadable
 `package.json` or `pnpm-workspace.yaml`, no workspaces, a workspace package
 without a `name`, and a `workspace:` or `file:` reference to something that
-is not a workspace package are errors: nothing is written, exit 1. A package
+is not a workspace package are errors: nothing is written, exit 1. So are a
+relative import that lands outside every workspace package or outside the
+contract root, or that is computed (a template literal with `${...}`),
+named by file and line; a `references` path outside every workspace
+package; and an unreadable tsconfig or a missing, absolute or out-of-root
+`extends`. A package
 without a `test` script still gets a test; its command fails until you add
 the script.
+
+## Python
+
+`aval gen python` makes one unit per `pyproject.toml` with a project name
+(`[project]` or `[tool.poetry]`): uv workspace members, poetry and pip
+projects. The unit is the project name, PEP 503 normalized. It needs
+Python 3.11 or later on `PATH` (`python3`, else `python`), which parses the
+manifests with `tomllib` and the sources with `ast`.
+
+```text
+pyproject.toml          # acme, a uv workspace root and a project
+uv.lock
+src/acme/               # import acme_api
+packages/core/          # acme-core
+packages/api/           # acme-api, dependencies = ["acme-core"]
+packages/cli/           # acme-cli, import acme_api, not declared
+```
+
+```yaml
+tests:
+  - metadata: {name: python.acme-cli}
+    runner: {command: [uv, run, --package, acme-cli, pytest, packages/cli]}
+    use:
+      - python.acme-api
+      - python.acme-cli
+      - python.acme-core
+fragments:
+  python.acme-cli:
+    scope:
+      source:
+        - packages/cli/**
+```
+
+- Edges: a local project named in `dependencies`, `optional-dependencies`,
+  `dependency-groups`, `tool.uv.dev-dependencies` or the poetry dependency
+  tables, or imported by a `.py` file of the project. External packages are
+  not edges; put the lockfiles in `defaults`.
+- Files: a project without nested projects owns `<dir>/**`, so a new file
+  in it is in scope at once. The root project and any project with nested
+  projects list their top-level files and directories instead, leaving out
+  nested projects, hidden directories, `__pycache__`, `node_modules` and
+  virtual environments (a directory with `pyvenv.cfg`): a new top-level file
+  there needs `aval gen python` again, which `--check` catches. The root
+  project also owns the files at the contract root, `aval.yaml` and lockfiles
+  included, so an edit to them re-runs its test. Add
+  `exclude: ["**/__pycache__/**", "**/.venv/**"]` to `defaults` so bytecode
+  and virtual environments never change a fingerprint.
+- Command: `uv run --package <name> pytest <dir>` when `uv.lock` sits at the
+  contract root, otherwise `python -m pytest <dir>` in the active
+  environment (poetry projects too). Nested projects are passed as
+  `--ignore`.
+- Imports map to the packages (a directory with `__init__.py`) and modules
+  at the top of a project and of its `src/`. Relative imports stay in the
+  project. Not seen: namespace packages, custom `package-dir` layouts, and
+  modules loaded by path (`runpy`, `exec`, `spec_from_file_location`).
+- `import_module("x")` and `__import__("x")` with a string count as
+  imports. With `--strict-imports`, a call whose module is not a string
+  literal is an error that names the file and line; without it, it is
+  ignored.
+
+No Python 3.11+, an unreadable or invalid `pyproject.toml` or a `.py` syntax
+error: nothing is written, exit 1.
 
 ## Rust
 
