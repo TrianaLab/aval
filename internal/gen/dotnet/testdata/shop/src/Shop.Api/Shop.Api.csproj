@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Shop.Data\Shop.Data.csproj" />
+    <ProjectReference Include="..\..\tools\Shop.Legacy\Shop.Legacy.vbproj" />
+    <PackageReference Include="Grpc.Tools" />
+    <Compile Include="..\..\shared\Version.cs" Link="Version.cs" />
+    <Protobuf Include="..\..\protos\*.proto" />
+  </ItemGroup>
+</Project>

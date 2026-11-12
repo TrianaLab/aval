@@ -151,7 +151,7 @@ every other line, comments included, is kept as it is. Shared inputs
 hand-written defaults. aval run, verify and push never run gen: commit its
 output and check it in CI with --check.
 
-Languages: js, python, rust.
+Languages: dotnet, js, python, rust.
 
 Exit codes: 0 written or up to date, 1 error (the language tool failed, the
 dependency graph is invalid, the file cannot be written) or with --check out
