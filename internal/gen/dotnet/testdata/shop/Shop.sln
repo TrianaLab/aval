@@ -1,0 +1,16 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{11111111-1111-1111-1111-111111111111}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shop.Core", "src\Shop.Core\Shop.Core.csproj", "{22222222-2222-2222-2222-222222222222}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shop.Data", "src\Shop.Data\Shop.Data.csproj", "{33333333-3333-3333-3333-333333333333}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shop.Api", "src\Shop.Api\Shop.Api.csproj", "{44444444-4444-4444-4444-444444444444}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shop.Core.Tests", "tests\Shop.Core.Tests\Shop.Core.Tests.csproj", "{55555555-5555-5555-5555-555555555555}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Shop.Api.Tests", "tests\Shop.Api.Tests\Shop.Api.Tests.fsproj", "{66666666-6666-6666-6666-666666666666}"
+EndProject
+Global
+EndGlobal

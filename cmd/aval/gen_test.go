@@ -115,7 +115,7 @@ func TestGenErrors(t *testing.T) {
 		want string
 	}{
 		{[]string{"gen"}, ExitUsage, "accepts 1 arg"},
-		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake, go, js, python, rust)`},
+		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, dotnet, fake, go, js, python, rust)`},
 		{[]string{"gen", "fake", "-f", filepath.Join(dir, "none.yaml")}, ExitUsage, "aval init --set"},
 		{[]string{"gen", "fake", "-f", test}, ExitUsage, "kind: TestSet"},
 		{[]string{"gen", "broken", "-f", set}, ExitError, "gen broken: tool not found"},
@@ -138,8 +138,8 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenLanguages(t *testing.T) {
-	if got := languages(); got != "go, js, python, rust" {
-		t.Errorf("languages() = %q, want go, js, python, rust", got)
+	if got := languages(); got != "dotnet, go, js, python, rust" {
+		t.Errorf("languages() = %q, want dotnet, go, js, python, rust", got)
 	}
 }
 
@@ -260,5 +260,28 @@ func TestGenGoWrites(t *testing.T) {
 	want, _ := os.ReadFile(filepath.Join(dir, "aval.golden.yaml"))
 	if string(got) != string(want) {
 		t.Errorf("written file differs from the golden:\n%s", gen.Diff("golden", "got", want, got))
+	}
+}
+
+// aval gen dotnet fails closed: an unreadable project file exits 1 and
+// leaves the TestSet as it was.
+func TestGenDotnet(t *testing.T) {
+	file, dir := genFile(t)
+	if err := os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(`<Project Sdk="Microsoft.NET.Sdk"/>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, errOut := runCLI("gen", "dotnet", "-f", file); code != ExitOK || !strings.Contains(out, "wrote the dotnet entries for 1 units") {
+		t.Fatalf("gen dotnet: exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	written, _ := os.ReadFile(file)
+	if !strings.Contains(string(written), "runner: {command: [dotnet, test, App.csproj]}") {
+		t.Fatalf("written:\n%s", written)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(`<Project>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errOut := runCLI("gen", "dotnet", "-f", file)
+	if after, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, "gen dotnet: App.csproj: XML syntax error") || string(after) != string(written) {
+		t.Errorf("malformed project: exit %d, stderr %q", code, errOut)
 	}
 }
