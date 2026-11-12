@@ -138,6 +138,11 @@ func maven(root string) ([]gen.Unit, error) {
 		}
 		index[key] = dir
 	}
+	// The root POM is inherited: its dependencies and plugins reach every module.
+	common, err := r.deps(r.poms[""], "", index)
+	if err != nil {
+		return nil, fmt.Errorf("pom.xml: %w", err)
+	}
 	mvn := tool(root, "mvnw", "mvn")
 	units := make([]gen.Unit, 0, len(dirs))
 	for _, dir := range dirs {
@@ -148,7 +153,7 @@ func maven(root string) ([]gen.Unit, error) {
 		units = append(units, gen.Unit{
 			ID:      dir,
 			Source:  source(root, dir, "pom.xml"),
-			Deps:    deps,
+			Deps:    without(append(deps, common...), dir),
 			Command: []string{mvn, "-B", "-pl", dir, "test"},
 		})
 	}
@@ -201,10 +206,12 @@ func checkSrc(d string) error {
 }
 
 // notRefs are subtrees whose coordinates do not make a module depend on
-// another: dependencyManagement and pluginManagement declare versions (a
-// parent that manages every module would otherwise depend on all of them),
-// exclusions remove artifacts, and properties are free-form names.
-var notRefs = map[string]bool{"dependencyManagement": true, "pluginManagement": true, "exclusions": true, "properties": true}
+// another: pluginManagement declares versions (a parent that manages every
+// module would otherwise depend on all of them), exclusions remove
+// artifacts, and properties are free-form names. dependencyManagement also
+// declares versions, but an imported BOM (<scope>import</scope>) sets the
+// versions the module resolves, so coordRefs keeps those entries.
+var notRefs = map[string]bool{"pluginManagement": true, "exclusions": true, "properties": true}
 
 // coordRefs returns every element of a POM with an <artifactId> child,
 // wherever it is: <parent>, dependencies, plugins and their dependencies,
@@ -232,7 +239,7 @@ func coordRefs(data []byte) ([]coord, error) {
 				}
 				continue
 			}
-			stack = append(stack, &frame{name: t.Name.Local})
+			stack = append(stack, open(stack, t.Name.Local))
 		case xml.CharData:
 			if len(stack) > 0 {
 				stack[len(stack)-1].text.Write(t)
@@ -250,27 +257,42 @@ func coordRefs(data []byte) ([]coord, error) {
 	}
 }
 
-// frame is an open POM element: its name, the coordinates of its children
-// and its text.
+// frame is an open POM element: its name, whether it is inside
+// dependencyManagement, the coordinates and scope of its children and its
+// text.
 type frame struct {
-	name string
-	c    coord
-	text strings.Builder
+	name  string
+	dm    bool
+	c     coord
+	scope string
+	text  strings.Builder
 }
 
-// close hands a groupId or artifactId to the enclosing element up and
-// returns f's own coordinates when it has an artifactId.
+// open returns a frame for element name, a child of the top of stack.
+func open(stack []*frame, name string) *frame {
+	dm := name == "dependencyManagement"
+	if len(stack) > 0 {
+		dm = dm || stack[len(stack)-1].dm
+	}
+	return &frame{name: name, dm: dm}
+}
+
+// close hands a groupId, artifactId or scope to the enclosing element up and
+// returns f's own coordinates when it has an artifactId and, inside
+// dependencyManagement, is an imported BOM.
 func (f *frame) close(up *frame) (coord, bool) {
 	switch f.name {
 	case "groupId":
 		up.c.GroupID = strings.TrimSpace(f.text.String())
 	case "artifactId":
 		up.c.ArtifactID = strings.TrimSpace(f.text.String())
+	case "scope":
+		up.scope = strings.TrimSpace(f.text.String())
 	}
 	if f.c.GroupID == "" && f.name == "plugin" {
 		f.c.GroupID = "org.apache.maven.plugins"
 	}
-	return f.c, f.c.ArtifactID != ""
+	return f.c, f.c.ArtifactID != "" && (!f.dm || f.scope == "import")
 }
 
 // deps returns the local modules p refers to (see coordRefs).

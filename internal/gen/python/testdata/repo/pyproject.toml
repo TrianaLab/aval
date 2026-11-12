@@ -1,0 +1,10 @@
+[project]
+name = "acme"
+version = "1.0.0"
+dependencies = ["acme-api", "requests>=2.32"]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+acme-api = { workspace = true }

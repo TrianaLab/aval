@@ -1,0 +1,61 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [Cargo.toml, Cargo.lock]
+  environment:
+    toolchain: {rust: "1.90"}
+  cacheability: hermetic
+tests:
+  - metadata: {name: e2e}   # hand-written, kept as is
+    use: [rust.cli]
+    runner: {command: [make, e2e]}
+  - metadata: {name: rust.cli}
+    runner: {command: [cargo, test, -p, cli]}
+    use:
+      - rust.cli
+      - rust.domain
+      - rust.http
+      - rust.store
+      - rust.testkit
+  - metadata: {name: rust.domain}
+    runner: {command: [cargo, test, -p, domain]}
+    use:
+      - rust.domain
+  - metadata: {name: rust.http}
+    runner: {command: [cargo, test, -p, http]}
+    use:
+      - rust.domain
+      - rust.http
+      - rust.store
+      - rust.testkit
+  - metadata: {name: rust.store}
+    runner: {command: [cargo, test, -p, store]}
+    use:
+      - rust.domain
+      - rust.store
+  - metadata: {name: rust.testkit}
+    runner: {command: [cargo, test, -p, testkit]}
+    use:
+      - rust.testkit
+fragments:
+  rust.cli:
+    scope:
+      source:
+        - apps/cli/**
+  rust.domain:
+    scope:
+      source:
+        - crates/domain/**
+  rust.http:
+    scope:
+      source:
+        - crates/http/**
+  rust.store:
+    scope:
+      source:
+        - crates/store/**
+  rust.testkit:
+    scope:
+      source:
+        - crates/testkit/**

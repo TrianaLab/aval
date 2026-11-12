@@ -3,10 +3,10 @@ package java
 import (
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -159,6 +159,37 @@ func TestFalseHitNewReferenceIsDrift(t *testing.T) {
 
 const pomHead = `<project><groupId>g</groupId><artifactId>root</artifactId>`
 
+// inherited is a reactor whose root POM names common in a plugin's
+// dependencies (a shared build-tools module), and app imports bom as a BOM.
+var inherited = map[string]string{
+	"pom.xml": pomHead + `<modules><module>common</module><module>tools</module><module>bom</module><module>app</module></modules>
+		<build><plugins><plugin><artifactId>maven-checkstyle-plugin</artifactId><dependencies><dependency><groupId>g</groupId><artifactId>common</artifactId></dependency></dependencies></plugin></plugins></build></project>`,
+	"common/pom.xml":    `<project><groupId>g</groupId><artifactId>common</artifactId></project>`,
+	"common/src/C.java": "",
+	"tools/pom.xml":     `<project><groupId>g</groupId><artifactId>tools</artifactId></project>`,
+	"bom/pom.xml":       `<project><groupId>g</groupId><artifactId>bom</artifactId></project>`,
+	"app/pom.xml": `<project><groupId>g</groupId><artifactId>app</artifactId><dependencyManagement><dependencies>
+		<dependency><groupId>g</groupId><artifactId>bom</artifactId><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement></project>`,
+}
+
+// A module inherits the root POM's references and resolves versions from an
+// imported BOM: a change to either must change its fingerprint.
+func TestFalseHitInheritedAndImported(t *testing.T) {
+	set := generate(t, tree(t, inherited), []byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"))
+	fsys := fstest.MapFS{"aval.golden.yaml": {Data: set}}
+	for k, v := range inherited {
+		fsys[k] = &fstest.MapFile{Data: []byte(v)}
+	}
+	for test, file := range map[string]string{"java.tools": "common/src/C.java", "java.app": "bom/pom.xml"} {
+		before := digest(t, fsys, test)
+		changed := maps.Clone(fsys)
+		changed[file] = &fstest.MapFile{Data: []byte("<!-- changed -->")}
+		if digest(t, changed, test) == before {
+			t.Errorf("%s: same fingerprint after changing %s", test, file)
+		}
+	}
+}
+
 func TestUnits(t *testing.T) {
 	for name, tc := range map[string]struct {
 		files map[string]string
@@ -239,6 +270,31 @@ func TestUnits(t *testing.T) {
 				{ID: "ext", Source: []string{"ext/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "ext", "test"}},
 			},
 		},
+		"root plugin dependency is inherited by every module": {
+			files: inherited,
+			want: []gen.Unit{
+				{ID: "common", Source: []string{"common/pom.xml", "common/src/**"}, Command: []string{"mvn", "-B", "-pl", "common", "test"}},
+				{ID: "tools", Source: []string{"tools/pom.xml"}, Deps: []string{"common"}, Command: []string{"mvn", "-B", "-pl", "tools", "test"}},
+				{ID: "bom", Source: []string{"bom/pom.xml"}, Deps: []string{"common"}, Command: []string{"mvn", "-B", "-pl", "bom", "test"}},
+				{ID: "app", Source: []string{"app/pom.xml"}, Deps: []string{"bom", "common"}, Command: []string{"mvn", "-B", "-pl", "app", "test"}},
+			},
+		},
+		"imported local BOM, managed entries are not edges": {
+			files: map[string]string{
+				"pom.xml":     pomHead + `<modules><module>bom</module><module>lib</module><module>app</module></modules></project>`,
+				"bom/pom.xml": `<project><groupId>g</groupId><artifactId>bom</artifactId></project>`,
+				"lib/pom.xml": `<project><groupId>g</groupId><artifactId>lib</artifactId></project>`,
+				"app/pom.xml": `<project><groupId>g</groupId><artifactId>app</artifactId><dependencyManagement><dependencies>
+					<dependency><groupId>g</groupId><artifactId>bom</artifactId><type>pom</type><scope>import</scope></dependency>
+					<dependency><groupId>g</groupId><artifactId>lib</artifactId><scope>test</scope></dependency></dependencies></dependencyManagement>
+					<build><pluginManagement><plugins><plugin><groupId>g</groupId><artifactId>lib</artifactId><scope>import</scope></plugin></plugins></pluginManagement></build></project>`,
+			},
+			want: []gen.Unit{
+				{ID: "bom", Source: []string{"bom/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "bom", "test"}},
+				{ID: "lib", Source: []string{"lib/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "lib", "test"}},
+				{ID: "app", Source: []string{"app/pom.xml"}, Deps: []string{"bom"}, Command: []string{"mvn", "-B", "-pl", "app", "test"}},
+			},
+		},
 	} {
 		got, err := Adapter{}.Units(tree(t, tc.files))
 		if err != nil || !reflect.DeepEqual(got, tc.want) {
@@ -282,6 +338,7 @@ func TestUnitsFailClosed(t *testing.T) {
 		}, "modules a and b are both g:x"},
 		"unresolved own property":        {sub(`<project><groupId>${nope}</groupId><artifactId>a</artifactId></project>`), "a/pom.xml: cannot resolve the properties in ${nope}:a"},
 		"unresolved dependency property": {sub(`<project><groupId>g</groupId><artifactId>a</artifactId><dependencies><dependency><groupId>g</groupId><artifactId>${x}</artifactId></dependency></dependencies></project>`), "cannot resolve the properties in g:${x}"},
+		"unresolved root property":       {map[string]string{"pom.xml": pomHead + `<modules><module>a</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${y}</artifactId></dependency></dependencies></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, "pom.xml: cannot resolve the properties in g:${y}"},
 		"bad property element":           {sub(`<project><properties><a>x</b></properties></project>`), "a/pom.xml: XML syntax error"},
 		"unclosed properties":            {sub(`<project><properties>`), "a/pom.xml: XML syntax error"},
 		"element after the project":      {sub(`<project/><x>`), "a/pom.xml: XML syntax error"},
@@ -330,8 +387,8 @@ func TestUnitsFailClosed(t *testing.T) {
 }
 
 func TestUnreadableScript(t *testing.T) {
-	if runtime.GOOS == "windows" || os.Getuid() == 0 {
-		t.Skip("needs file permissions")
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores permissions")
 	}
 	for _, file := range []string{"settings.gradle.kts", "a/build.gradle.kts"} {
 		root := tree(t, map[string]string{"settings.gradle.kts": `include(":a")`, "a/build.gradle.kts": ""})

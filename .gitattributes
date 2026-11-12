@@ -6,3 +6,4 @@ docs/javascripts/vendor/** -text linguist-vendored
 internal/gen/js/testdata/** -text
 # The aval gen java golden tests compare these bytes: no EOL conversion.
 internal/gen/java/testdata/** -text
+internal/gen/python/testdata/** -text

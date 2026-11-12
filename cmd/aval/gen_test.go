@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -114,7 +115,7 @@ func TestGenErrors(t *testing.T) {
 		want string
 	}{
 		{[]string{"gen"}, ExitUsage, "accepts 1 arg"},
-		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake, java, js)`},
+		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake, java, js, python, rust)`},
 		{[]string{"gen", "fake", "-f", filepath.Join(dir, "none.yaml")}, ExitUsage, "aval init --set"},
 		{[]string{"gen", "fake", "-f", test}, ExitUsage, "kind: TestSet"},
 		{[]string{"gen", "broken", "-f", set}, ExitError, "gen broken: tool not found"},
@@ -137,8 +138,8 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenLanguages(t *testing.T) {
-	if got := languages(); got != "java, js" {
-		t.Errorf("languages() = %q, want java, js", got)
+	if got := languages(); got != "java, js, python, rust" {
+		t.Errorf("languages() = %q, want java, js, python, rust", got)
 	}
 }
 
@@ -182,5 +183,70 @@ func TestGenJava(t *testing.T) {
 	}
 	if after, _ := os.ReadFile(file); string(after) != string(got) {
 		t.Errorf("no build: the file changed:\n%s", after)
+	}
+}
+
+func TestGenAdapterFlags(t *testing.T) {
+	file, _ := genFile(t)
+	withAdapter(t, "fake", fakeAdapter{units: fakeUnits()})
+	code, _, errOut := runCLI("gen", "fake", "-f", file, "--strict-imports")
+	if code != ExitUsage || !strings.Contains(errOut, "gen fake: --strict-imports is a python flag") {
+		t.Errorf("exit %d, stderr %q", code, errOut)
+	}
+}
+
+// Without Python, gen python fails (exit 1) and writes nothing.
+func TestGenPythonNoTool(t *testing.T) {
+	file, dir := genFile(t)
+	_ = os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"a\"\n"), 0o644)
+	t.Setenv("PATH", t.TempDir())
+	code, _, errOut := runCLI("gen", "python", "-f", file, "--strict-imports")
+	if data, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, "gen python: python3 not found on PATH") || string(data) != genSet {
+		t.Errorf("exit %d, stderr %q, file %q", code, errOut, data)
+	}
+}
+
+// aval gen rust fails closed: no cargo, or a manifest cargo cannot read,
+// exits 1 and leaves the TestSet as it was.
+func TestGenRustFailClosed(t *testing.T) {
+	cases := map[string]string{"missing tool": "cargo metadata: exec:"}
+	if _, err := exec.LookPath("cargo"); err == nil {
+		cases["unreadable manifest"] = "cargo metadata: exit status"
+	}
+	for name, want := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(dir, "aval.yaml")
+			_ = os.WriteFile(file, []byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"), 0o644)
+			_ = os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte("[package\n"), 0o644)
+			if name == "missing tool" {
+				t.Setenv("PATH", "")
+			}
+			before, _ := os.ReadFile(file)
+			code, _, errOut := runCLI("gen", "rust", "-f", file)
+			if after, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, want) || string(after) != string(before) {
+				t.Errorf("exit %d, stderr %q, file changed %v; want exit 1 and %q", code, errOut, string(after) != string(before), want)
+			}
+		})
+	}
+}
+
+// A [patch] path outside every member, invisible to cargo metadata
+// --no-deps, exits 1, names the file and writes nothing.
+func TestGenRustPatchOutsideMembers(t *testing.T) {
+	if _, err := exec.LookPath("cargo"); err != nil {
+		t.Skip("cargo not installed")
+	}
+	dir := t.TempDir()
+	file := filepath.Join(dir, "aval.yaml")
+	set := "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"
+	_ = os.MkdirAll(filepath.Join(dir, "a", "src"), 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "a", "src", "lib.rs"), nil, 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "a", "Cargo.toml"), []byte("[package]\nname = \"a\"\nversion = \"0.1.0\"\nedition = \"2021\"\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte("[workspace]\nmembers = [\"a\"]\nresolver = \"2\"\n[patch.crates-io]\nserde = { path = \"vendor/serde\" }\n"), 0o644)
+	_ = os.WriteFile(file, []byte(set), 0o644)
+	code, _, errOut := runCLI("gen", "rust", "-f", file)
+	if after, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, "Cargo.toml: path override vendor/serde is not inside a workspace member") || string(after) != set {
+		t.Errorf("exit %d, stderr %q, file %q", code, errOut, after)
 	}
 }
