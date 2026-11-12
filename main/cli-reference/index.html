@@ -2735,10 +2735,13 @@ every other line, comments included, is kept as it is. Shared inputs
 hand-written defaults. --no-test PATTERN (repeatable, a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> glob such as
 cmd/gen* or tests/**) writes no test for the units whose ID matches; they keep
 their fragment, so their files stay in the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> of the tests that use them.
+--list-tests writes nothing and prints the IDs of the units that get a test,
+one per line, so a project's own gate (a coverage package list) derives from
+the same --no-test patterns.
 aval run, verify and push never run gen: commit its
 output and check it in CI with --check.</p>
 <p>Languages: dotnet, go, java, js, python, rust.</p>
-<p>Exit codes: 0 written or up to date, 1 error (the language tool failed, the
+<p>Exit codes: 0 written, up to date or listed, 1 error (the language tool failed, the
 dependency graph is invalid, the file cannot be written) or with --check out
 of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 -f, a --no-test pattern that matches no unit, or a result that is not a valid
@@ -2758,11 +2761,12 @@ TestSet).</p>
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>  -f, --file string                   the kind: TestSet to write (default "aval.yaml")
 </span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>      --go-cover[=true|false]         go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)
 </span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>  -h, --help[=true|false]             help for gen
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>      --no-test stringArray           write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>      --strict-imports[=true|false]   python: fail on an import_module or __import__ call whose module is not a string literal
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>Global Flags:
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>      --list-tests[=true|false]       write nothing; print the IDs of the units that get a test, one per line
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>      --no-test stringArray           write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>      --strict-imports[=true|false]   python: fail on an import_module or __import__ call whose module is not a string literal
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>Global Flags:
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-init">aval init<a class="headerlink" href="#aval-init" title="Anchor link">&para;</a></h2>
 <p>init writes aval.yaml for one test, validated before it is written. With
