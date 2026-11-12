@@ -31,10 +31,10 @@ def imports(tree):
     return {"imports": names, "dynamic": dynamic}
 
 
-req = json.load(sys.stdin)
 out = {"manifests": {}, "files": {}}
 path = "stdin"
 try:
+    req = json.load(sys.stdin)
     for path in req["manifests"]:
         with open(path, "rb") as f:
             out["manifests"][path] = tomllib.load(f)

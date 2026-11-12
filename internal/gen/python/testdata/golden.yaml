@@ -3,7 +3,7 @@ kind: TestSet
 defaults:
   scope:
     dependencies: [uv.lock]
-    exclude: ["**/__pycache__/**"]
+    exclude: ["**/__pycache__/**", "**/.venv/**"]
   cacheability: hermetic
 tests:
   - metadata: {name: e2e}   # hand-written, kept as is
@@ -47,22 +47,16 @@ fragments:
   python.acme-api:
     scope:
       source:
-        - packages/api/pyproject.toml
-        - packages/api/src/**
+        - packages/api/**
   python.acme-cli:
     scope:
       source:
-        - packages/cli/acme_cli/**
-        - packages/cli/pyproject.toml
+        - packages/cli/**
   python.acme-core:
     scope:
       source:
-        - packages/core/pyproject.toml
-        - packages/core/src/**
-        - packages/core/tests/**
+        - packages/core/**
   python.lint-rules:
     scope:
       source:
-        - tools/lint/lint_rules.py
-        - tools/lint/poetry.lock
-        - tools/lint/pyproject.toml
+        - tools/lint/**

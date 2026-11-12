@@ -3,7 +3,7 @@ kind: TestSet
 defaults:
   scope:
     dependencies: [uv.lock]
-    exclude: ["**/__pycache__/**"]
+    exclude: ["**/__pycache__/**", "**/.venv/**"]
   cacheability: hermetic
 tests:
   - metadata: {name: e2e}   # hand-written, kept as is

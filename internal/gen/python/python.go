@@ -224,10 +224,14 @@ func (p *project) rel(file string) string {
 	return strings.TrimPrefix(file, p.dir+"/")
 }
 
-// globs covers p's files: dir/** for each top-level directory of p, and one
-// glob per file, descending only toward the directories of nested projects
-// (dirs), which own their own files.
+// globs covers p's files. A project without nested projects owns dir/**, so
+// a new file in it is in scope before gen runs again. Otherwise: dir/** for
+// each top-level directory of p, and one glob per file, descending only
+// toward the directories of nested projects (dirs), which own their own files.
 func (p *project) globs(dirs map[string]bool) []string {
+	if p.dir != "." && !nests(p.dir, dirs) {
+		return []string{p.dir + "/**"}
+	}
 	var globs []string
 	for _, file := range p.files {
 		dir := p.dir

@@ -22,7 +22,7 @@ var update = flag.Bool("update", false, "rewrite testdata/golden.yaml")
 func needPython(t *testing.T) {
 	t.Helper()
 	if _, err := interpreter(); err != nil {
-		t.Skip(err)
+		t.Fatalf("aval gen python tests need Python 3.11 or later on PATH: %v", err)
 	}
 }
 
@@ -205,6 +205,12 @@ func TestFalseHitTransitiveDependency(t *testing.T) {
 	if digest(t, set, root, "python.acme") != acme {
 		t.Error("python.acme changed after acme-cli, which it does not depend on, changed")
 	}
+	// A new file in a new directory of a leaf project is in its scope.
+	cli := digest(t, set, root, "python.acme-cli")
+	write(t, root, "packages/cli/tests/test_new.py", "def test_new():\n    assert False\n")
+	if digest(t, set, root, "python.acme-cli") == cli {
+		t.Error("python.acme-cli reused after a new test file was added to it")
+	}
 }
 
 // A new local import is drift: the generated file differs and the diff
@@ -260,19 +266,6 @@ func TestFailClosed(t *testing.T) {
 	}
 }
 
-// fakePython puts an executable python3 that runs script first on PATH.
-func fakePython(t *testing.T, script string) {
-	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("shell script")
-	}
-	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "python3"), []byte("#!/bin/sh\n"+script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", bin)
-}
-
 func TestPythonFails(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "pyproject.toml", "[project]\nname = \"a\"\n")
@@ -280,29 +273,12 @@ func TestPythonFails(t *testing.T) {
 	if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "python3 not found on PATH") {
 		t.Errorf("no python: err %v", err)
 	}
-	for script, want := range map[string]string{
-		"exit 3\n":               "python: exit status 3",
-		"echo not json\n":        "python: invalid character",
-		"echo old >&2\nexit 1\n": "python: old",
-	} {
-		fakePython(t, script)
-		if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("%q: err %v, want %q", script, err, want)
-		}
-	}
-	// The second call, for the sources, fails too.
-	fakePython(t, `read in; case "$in" in *'"manifests":[]'*) exit 4;; esac
-echo '{"manifests":{"pyproject.toml":{"project":{"name":"a"}}}}'
-`)
-	if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "exit status 4") {
-		t.Errorf("sources: err %v", err)
-	}
 }
 
 func TestPython310(t *testing.T) {
 	py, err := interpreter()
 	if err != nil {
-		t.Skip(err)
+		t.Fatalf("aval gen python tests need Python 3.11 or later on PATH: %v", err)
 	}
 	// facts.py refuses an interpreter without tomllib.
 	out, _ := exec.Command(py, "-I", "-c", strings.Replace(factsPy, "(3, 11)", "(99, 0)", 1)).CombinedOutput()

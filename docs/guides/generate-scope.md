@@ -193,19 +193,23 @@ fragments:
   python.acme-cli:
     scope:
       source:
-        - packages/cli/acme_cli/**
-        - packages/cli/pyproject.toml
+        - packages/cli/**
 ```
 
 - Edges: a local project named in `dependencies`, `optional-dependencies`,
   `dependency-groups`, `tool.uv.dev-dependencies` or the poetry dependency
   tables, or imported by a `.py` file of the project. External packages are
   not edges; put the lockfiles in `defaults`.
-- Files: everything under the project's directory except nested projects,
-  hidden directories, `__pycache__`, `node_modules` and virtual
-  environments (a directory with `pyvenv.cfg`). Add
-  `exclude: ["**/__pycache__/**"]` to `defaults` so bytecode in a package
-  never changes a fingerprint.
+- Files: a project without nested projects owns `<dir>/**`, so a new file
+  in it is in scope at once. The root project and any project with nested
+  projects list their top-level files and directories instead, leaving out
+  nested projects, hidden directories, `__pycache__`, `node_modules` and
+  virtual environments (a directory with `pyvenv.cfg`): a new top-level file
+  there needs `aval gen python` again, which `--check` catches. The root
+  project also owns the files at the contract root, `aval.yaml` and lockfiles
+  included, so an edit to them re-runs its test. Add
+  `exclude: ["**/__pycache__/**", "**/.venv/**"]` to `defaults` so bytecode
+  and virtual environments never change a fingerprint.
 - Command: `uv run --package <name> pytest <dir>` when `uv.lock` sits at the
   contract root, otherwise `python -m pytest <dir>` in the active
   environment (poetry projects too). Nested projects are passed as
@@ -218,6 +222,9 @@ fragments:
   imports. With `--strict-imports`, a call whose module is not a string
   literal is an error that names the file and line; without it, it is
   ignored.
+
+No Python 3.11+, an unreadable or invalid `pyproject.toml` or a `.py` syntax
+error: nothing is written, exit 1.
 
 ## Cross-language dependencies
 
