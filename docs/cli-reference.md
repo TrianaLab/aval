@@ -151,7 +151,7 @@ every other line, comments included, is kept as it is. Shared inputs
 hand-written defaults. aval run, verify and push never run gen: commit its
 output and check it in CI with --check.
 
-Languages: dotnet, java, js, python, rust.
+Languages: dotnet, go, java, js, python, rust.
 
 Exit codes: 0 written or up to date, 1 error (the language tool failed, the
 dependency graph is invalid, the file cannot be written) or with --check out
@@ -172,6 +172,7 @@ Examples:
 Flags:
       --check[=true|false]            write nothing; exit 1 with a diff when the generated entries are out of date
   -f, --file string                   the kind: TestSet to write (default "aval.yaml")
+      --go-cover[=true|false]         go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)
   -h, --help[=true|false]             help for gen
       --strict-imports[=true|false]   python: fail on an import_module or __import__ call whose module is not a string literal
 
