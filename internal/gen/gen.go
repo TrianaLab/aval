@@ -75,6 +75,17 @@ type Adapter interface {
 	Units(root string) ([]Unit, error)
 }
 
+// Canonical returns root as an absolute path with every symlink resolved,
+// the working directory's included, so an adapter can compare it with the
+// canonical paths a tool such as cargo or go prints.
+func Canonical(root string) (string, error) {
+	abs, err := filepath.Abs(root)
+	if err == nil {
+		abs, err = filepath.EvalSymlinks(abs)
+	}
+	return abs, err
+}
+
 // ErrUnits marks a problem in the units an adapter returned (an unknown
 // dependency, a duplicate ID, two IDs with the same name), as opposed to a
 // problem in the contract file.

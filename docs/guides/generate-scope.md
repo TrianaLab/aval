@@ -343,6 +343,8 @@ tests:
 
 - A path dependency on a crate that is not a workspace member, or a member
   outside the contract root, is an error: its files would be in no scope.
+  Paths are compared after resolving symlinks, so a root reached through one
+  (a clone under macOS `/tmp`) works.
 - A dev-dependency is an edge like any other, so the tests of a member's
   dependents use its dev-dependencies too: more re-runs, never a stale reuse.
 - A package at the workspace root gets `**`: add `target/**` to
