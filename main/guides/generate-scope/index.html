@@ -999,6 +999,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#javascript-and-typescript" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JavaScript and TypeScript
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-language-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2243,6 +2254,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#javascript-and-typescript" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JavaScript and TypeScript
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-language-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2348,8 +2370,8 @@ result: <code>aval run</code>, <code>verify</code> and <code>push</code> never c
 declared in <code>aval.yaml</code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Languages</p>
-<p>The core is in place; no language ships yet. The adapters (Go,
-JavaScript, Python, Java, Rust, .NET) are the next stories of
+<p>JavaScript and TypeScript ship (<code>aval gen js</code>, below). The other
+adapters (Go, Python, Java, Rust, .NET) are the next stories of
 <a href="https://github.com/TrianaLab/aval/issues/291">Epic 16</a>. <code>aval gen --help</code>
 lists the languages your build has.</p>
 </div>
@@ -2432,6 +2454,73 @@ disappears, <code>aval gen</code> fails (exit 2) and writes nothing.</p>
 <p><code>--check</code> writes nothing. It exits 0 when the generated entries match the
 graph, and 1 with a diff when they do not, such as a new import or a dropped
 one. Run it in the same job as your linters.</p>
+<h2 id="javascript-and-typescript">JavaScript and TypeScript<a class="headerlink" href="#javascript-and-typescript" title="Anchor link">&para;</a></h2>
+<p><code>aval gen js</code> reads the manifests and runs no tool. It makes one unit per
+workspace package: the workspaces of <code>package.json</code> for npm and yarn,
+<code>pnpm-workspace.yaml</code> for pnpm (<code>!</code> globs excluded). The root package is not
+a unit. The lockfile at the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root picks the package manager and the
+test command:</p>
+<table>
+<thead>
+<tr>
+<th>Lockfile</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>package-lock.json</code>, <code>npm-shrinkwrap.json</code></td>
+<td><code>npm test --workspace &lt;name&gt;</code></td>
+</tr>
+<tr>
+<td><code>pnpm-lock.yaml</code></td>
+<td><code>pnpm --filter &lt;name&gt; test</code></td>
+</tr>
+<tr>
+<td><code>yarn.lock</code></td>
+<td><code>yarn workspace &lt;name&gt; test</code></td>
+</tr>
+</tbody>
+</table>
+<p>A unit's ID is its package name and its files are its directory, so
+<code>@acme/ui</code> in <code>packages/ui</code> becomes <code>js.acme.ui</code> with <code>packages/ui/**</code>. A
+dependency becomes an edge when it names another workspace package (any
+range, or <code>workspace:</code>), or when a <code>file:</code>, <code>link:</code> or <code>portal:</code> path points
+to one. External packages are not edges: the lockfile in <code>defaults</code> covers
+them. Exclude <code>node_modules</code> there too:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TestSet</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">defaults</span><span class="p">:</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">package.json</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pnpm-lock.yaml</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pnpm-workspace.yaml</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"**/node_modules/**"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">js.acme.ui</span><span class="p">:</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/ui/**</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">  </span><span class="nt">js.acme.utils</span><span class="p">:</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/utils/**</span>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">js.acme.ui</span><span class="p p-Indicator">}</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">pnpm</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--filter</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">'@acme/ui'</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">js.acme.ui</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">js.acme.utils</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">js.acme.utils</span><span class="p p-Indicator">}</span>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">pnpm</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--filter</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">'@acme/utils'</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">js.acme.utils</span>
+</span></code></pre></div>
+<p>No lockfile or lockfiles of two package managers, an unreadable
+<code>package.json</code> or <code>pnpm-workspace.yaml</code>, no workspaces, a workspace package
+without a <code>name</code>, and a <code>workspace:</code> or <code>file:</code> reference to something that
+is not a workspace package are errors: nothing is written, exit 1. A package
+without a <code>test</code> script still gets a test; its command fails until you add
+the script.</p>
 <h2 id="cross-language-dependencies">Cross-language dependencies<a class="headerlink" href="#cross-language-dependencies" title="Anchor link">&para;</a></h2>
 <p>A generator sees one ecosystem. Declare a dependency across languages by
 hand only when no shared file carries it. When a Go binary embeds the
