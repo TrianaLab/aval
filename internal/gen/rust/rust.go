@@ -47,10 +47,7 @@ type metadata struct {
 // that points outside every member; one inside a member makes every member
 // depend on it.
 func (Adapter) Units(root string) ([]gen.Unit, error) {
-	root, err := filepath.EvalSymlinks(root) // cargo prints canonical, absolute paths
-	if err == nil {
-		root, err = filepath.Abs(root)
-	}
+	root, err := gen.Canonical(root) // cargo prints canonical, absolute paths
 	if err != nil {
 		return nil, err
 	}
