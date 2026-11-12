@@ -1,0 +1,85 @@
+# The aval.yaml of testdata/shop before aval gen dotnet: hand-written
+# defaults for the inputs every project shares.
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [global.json]
+  environment:
+    toolchain: {dotnet: "9.0"}
+  cacheability: hermetic
+fragments:
+  dotnet.shop.api:
+    scope:
+      source:
+        - Directory.Build.props
+        - Directory.Packages.props
+        - protos/*.proto
+        - shared/Version.cs
+        - src/Shop.Api/**
+  dotnet.shop.api.tests:
+    scope:
+      source:
+        - Directory.Build.props
+        - Directory.Packages.props
+        - tests/Directory.Build.props
+        - tests/Shop.Api.Tests/**
+  dotnet.shop.core:
+    scope:
+      source:
+        - Directory.Build.props
+        - Directory.Packages.props
+        - src/Shop.Core/**
+  dotnet.shop.core.tests:
+    scope:
+      source:
+        - Directory.Build.props
+        - Directory.Packages.props
+        - tests/Directory.Build.props
+        - tests/Shop.Core.Tests/**
+  dotnet.shop.data:
+    scope:
+      source:
+        - Directory.Build.props
+        - Directory.Packages.props
+        - src/Shop.Data/**
+  dotnet.shop.legacy:
+    scope:
+      source:
+        - Directory.Build.props
+        - Directory.Packages.props
+        - tools/Shop.Legacy/**
+tests:
+  - metadata: {name: dotnet.shop.api}
+    runner: {command: [dotnet, test, src/Shop.Api/Shop.Api.csproj]}
+    use:
+      - dotnet.shop.api
+      - dotnet.shop.core
+      - dotnet.shop.data
+      - dotnet.shop.legacy
+  - metadata: {name: dotnet.shop.api.tests}
+    runner: {command: [dotnet, test, tests/Shop.Api.Tests/Shop.Api.Tests.fsproj]}
+    use:
+      - dotnet.shop.api
+      - dotnet.shop.api.tests
+      - dotnet.shop.core
+      - dotnet.shop.data
+      - dotnet.shop.legacy
+  - metadata: {name: dotnet.shop.core}
+    runner: {command: [dotnet, test, src/Shop.Core/Shop.Core.csproj]}
+    use:
+      - dotnet.shop.core
+  - metadata: {name: dotnet.shop.core.tests}
+    runner: {command: [dotnet, test, tests/Shop.Core.Tests/Shop.Core.Tests.csproj]}
+    use:
+      - dotnet.shop.core
+      - dotnet.shop.core.tests
+  - metadata: {name: dotnet.shop.data}
+    runner: {command: [dotnet, test, src/Shop.Data/Shop.Data.csproj]}
+    use:
+      - dotnet.shop.core
+      - dotnet.shop.data
+  - metadata: {name: dotnet.shop.legacy}
+    runner: {command: [dotnet, test, tools/Shop.Legacy/Shop.Legacy.vbproj]}
+    use:
+      - dotnet.shop.legacy
