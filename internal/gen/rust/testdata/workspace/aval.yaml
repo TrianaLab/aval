@@ -1,0 +1,12 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [Cargo.toml, Cargo.lock]
+  environment:
+    toolchain: {rust: "1.90"}
+  cacheability: hermetic
+tests:
+  - metadata: {name: e2e}   # hand-written, kept as is
+    use: [rust.cli]
+    runner: {command: [make, e2e]}

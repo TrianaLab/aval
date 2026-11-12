@@ -4,3 +4,4 @@ internal/fingerprint/testdata/golden/** -text
 docs/javascripts/vendor/** -text linguist-vendored
 # TestGolden compares these bytes: no EOL conversion on checkout.
 internal/gen/dotnet/testdata/** -text
+internal/gen/js/testdata/** -text

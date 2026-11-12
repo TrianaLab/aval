@@ -1,0 +1,11 @@
+{
+  "name": "@acme/ui",
+  "version": "1.0.0",
+  "scripts": {"test": "vitest run"},
+  "dependencies": {
+    "@acme/utils": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

@@ -15,10 +15,16 @@ import (
 
 	"github.com/TrianaLab/aval/internal/gen"
 	"github.com/TrianaLab/aval/internal/gen/dotnet"
+	"github.com/TrianaLab/aval/internal/gen/js"
+	"github.com/TrianaLab/aval/internal/gen/rust"
 )
 
 // adapters are the languages aval gen knows, by name.
-var adapters = map[string]gen.Adapter{"dotnet": dotnet.Adapter{}}
+var adapters = map[string]gen.Adapter{
+	"dotnet": dotnet.Adapter{},
+	"js":     js.Adapter{},
+	"rust":   rust.Adapter{},
+}
 
 func newGenCmd() *cobra.Command {
 	var file string
@@ -66,9 +72,6 @@ of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 
 // languages lists the adapters for help and errors.
 func languages() string {
-	if len(adapters) == 0 {
-		return "none yet"
-	}
 	return strings.Join(slices.Sorted(maps.Keys(adapters)), ", ")
 }
 

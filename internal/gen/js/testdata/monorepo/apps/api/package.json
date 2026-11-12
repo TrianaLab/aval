@@ -1,0 +1,9 @@
+{
+  "name": "@acme/api",
+  "private": true,
+  "scripts": {"test": "vitest run"},
+  "dependencies": {
+    "@acme/utils": "workspace:^",
+    "express": "^5.1.0"
+  }
+}
