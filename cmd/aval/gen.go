@@ -17,12 +17,17 @@ import (
 	"github.com/TrianaLab/aval/internal/gen"
 	"github.com/TrianaLab/aval/internal/gen/js"
 	"github.com/TrianaLab/aval/internal/gen/python"
+	"github.com/TrianaLab/aval/internal/gen/rust"
 )
 
 // adapters are the languages aval gen knows, by name.
 // ponytail: adapters hold flag values; newGenCmd re-registers (and resets)
 // them on every call.
-var adapters = map[string]gen.Adapter{"js": js.Adapter{}, "python": &python.Adapter{}}
+var adapters = map[string]gen.Adapter{
+	"js":     js.Adapter{},
+	"python": &python.Adapter{},
+	"rust":   rust.Adapter{},
+}
 
 // flagger is an adapter with flags of its own. gen registers them, and
 // rejects them for another language.

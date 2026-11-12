@@ -11,8 +11,9 @@ result: `aval run`, `verify` and `push` never call it, and the scope stays
 declared in `aval.yaml`.
 
 !!! note "Languages"
-    JavaScript, TypeScript and Python ship (`aval gen js`, `aval gen python`,
-    below). The other adapters (Go, Java, Rust, .NET) are the next stories of
+    JavaScript and TypeScript ([below](#javascript-and-typescript)), Python
+    ([below](#python)) and Rust ([below](#rust)) ship. The other adapters (Go,
+    Java, .NET) are the next stories of
     [Epic 16](https://github.com/TrianaLab/aval/issues/291). `aval gen --help`
     lists the languages your build has.
 
@@ -225,6 +226,59 @@ fragments:
 
 No Python 3.11+, an unreadable or invalid `pyproject.toml` or a `.py` syntax
 error: nothing is written, exit 1.
+
+## Rust
+
+`aval gen rust` reads the Cargo workspace found from the contract root with
+`cargo metadata --no-deps` (no network, no build scripts). Each workspace
+member is a unit named after its package: its scope is the member's
+directory, its test is `cargo test -p <member>`, and its path dependencies
+on other members (normal, dev and build) are its edges. Registry and git
+dependencies are not units: put the root `Cargo.toml` (workspace
+inheritance) and `Cargo.lock` in `defaults`.
+
+```yaml
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [Cargo.toml, Cargo.lock]
+  cacheability: hermetic
+fragments:
+  rust.domain:
+    scope:
+      source:
+        - crates/domain/**
+  rust.store:
+    scope:
+      source:
+        - crates/store/**
+tests:
+  - metadata: {name: rust.domain}
+    runner: {command: [cargo, test, -p, domain]}
+    use:
+      - rust.domain
+  - metadata: {name: rust.store}
+    runner: {command: [cargo, test, -p, store]}
+    use:
+      - rust.domain
+      - rust.store
+```
+
+- A path dependency on a crate that is not a workspace member, or a member
+  outside the contract root, is an error: its files would be in no scope.
+- A dev-dependency is an edge like any other, so the tests of a member's
+  dependents use its dev-dependencies too: more re-runs, never a stale reuse.
+- A package at the workspace root gets `**`: add `target/**` to
+  `defaults.scope.exclude`.
+- `cargo metadata` does not show path overrides, so `aval gen` reads them
+  from the workspace root: `path` entries of `[patch]` tables in
+  `Cargo.toml` and `.cargo/config.toml`, and `paths` in
+  `.cargo/config.toml`. An override inside a member makes every member
+  depend on that member. One outside every member, or one it cannot read,
+  is an error naming the file. `.cargo/config.toml` files in parent
+  directories or in `CARGO_HOME` are not read: keep overrides at the
+  workspace root.
 
 ## Cross-language dependencies
 
