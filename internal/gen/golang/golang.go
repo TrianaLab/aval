@@ -88,10 +88,7 @@ func (a *Adapter) Units(root string) ([]gen.Unit, error) {
 // list returns the packages of the main modules that go list reports in
 // root, each with Dir relative to root and slash-separated.
 func list(root string) ([]pkg, error) {
-	abs, err := filepath.EvalSymlinks(root)
-	if err == nil {
-		abs, err = filepath.Abs(abs)
-	}
+	abs, err := gen.Canonical(root)
 	if err != nil {
 		return nil, err
 	}
