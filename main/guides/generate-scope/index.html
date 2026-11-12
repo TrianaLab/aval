@@ -1010,6 +1010,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rust" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rust
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-language-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2265,6 +2276,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rust" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rust
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-language-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2370,8 +2392,9 @@ result: <code>aval run</code>, <code>verify</code> and <code>push</code> never c
 declared in <code>aval.yaml</code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Languages</p>
-<p>JavaScript and TypeScript ship (<code>aval gen js</code>, below). The other
-adapters (Go, Python, Java, Rust, .NET) are the next stories of
+<p>JavaScript and TypeScript (<a href="#javascript-and-typescript">below</a>) and Rust
+(<a href="#rust">below</a>) ship. The other adapters (Go, Python, Java, .NET) are the
+next stories of
 <a href="https://github.com/TrianaLab/aval/issues/291">Epic 16</a>. <code>aval gen --help</code>
 lists the languages your build has.</p>
 </div>
@@ -2521,6 +2544,56 @@ without a <code>name</code>, and a <code>workspace:</code> or <code>file:</code>
 is not a workspace package are errors: nothing is written, exit 1. A package
 without a <code>test</code> script still gets a test; its command fails until you add
 the script.</p>
+<h2 id="rust">Rust<a class="headerlink" href="#rust" title="Anchor link">&para;</a></h2>
+<p><code>aval gen rust</code> reads the Cargo workspace found from the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root with
+<code>cargo metadata --no-deps</code> (no network, no build scripts). Each workspace
+member is a unit named after its package: its <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> is the member's
+directory, its test is <code>cargo test -p &lt;member&gt;</code>, and its path dependencies
+on other members (normal, dev and build) are its edges. Registry and git
+dependencies are not units: put the root <code>Cargo.toml</code> (workspace
+inheritance) and <code>Cargo.lock</code> in <code>defaults</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TestSet</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">defaults</span><span class="p">:</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">Cargo.toml</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">Cargo.lock</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">rust.domain</span><span class="p">:</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">crates/domain/**</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">  </span><span class="nt">rust.store</span><span class="p">:</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">crates/store/**</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">rust.domain</span><span class="p p-Indicator">}</span>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cargo</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-p</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">domain</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rust.domain</span>
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">rust.store</span><span class="p p-Indicator">}</span>
+</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cargo</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-p</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">store</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rust.domain</span>
+</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rust.store</span>
+</span></code></pre></div>
+<ul>
+<li>A path dependency on a crate that is not a workspace member, or a member
+  outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, is an error: its files would be in no <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.</li>
+<li>A dev-dependency is an edge like any other, so the tests of a member's
+  dependents use its dev-dependencies too: more re-runs, never a stale reuse.</li>
+<li>A package at the workspace root gets <code>**</code>: add <code>target/**</code> to
+  <code>defaults.scope.exclude</code>.</li>
+<li><code>cargo metadata</code> does not show path overrides, so <code>aval gen</code> reads them
+  from the workspace root: <code>path</code> entries of <code>[patch]</code> tables in
+  <code>Cargo.toml</code> and <code>.cargo/config.toml</code>, and <code>paths</code> in
+  <code>.cargo/config.toml</code>. An override inside a member makes every member
+  depend on that member. One outside every member, or one it cannot read,
+  is an error naming the file. <code>.cargo/config.toml</code> files in parent
+  directories or in <code>CARGO_HOME</code> are not read: keep overrides at the
+  workspace root.</li>
+</ul>
 <h2 id="cross-language-dependencies">Cross-language dependencies<a class="headerlink" href="#cross-language-dependencies" title="Anchor link">&para;</a></h2>
 <p>A generator sees one ecosystem. Declare a dependency across languages by
 hand only when no shared file carries it. When a Go binary embeds the
