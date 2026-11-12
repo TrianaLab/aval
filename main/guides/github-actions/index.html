@@ -2447,7 +2447,7 @@ milestone 14), a test with <code>outputs</code> fails with exit 1; others work.<
 <p>The action <a href="https://github.com/TrianaLab/aval/blob/main/integrations/github/publish/action.yml"><code>integrations/github/publish</code></a>
 takes <code>file</code>, <code>policy</code>, <code>registry-username</code>, <code>registry-password</code> (default
 <code>github.actor</code> and <code>github.token</code>), <code>stats</code> and <code>allow-unprotected</code> (both
-default <code>false</code>). In order, it:</p>
+default <code>false</code>) and <code>stats-registry</code> (default empty). In order, it:</p>
 <ol>
 <li>Refuses a ref other than the default branch unless <code>allow-unprotected:
    true</code>, always refuses <code>pull_request_target</code> and <code>workflow_run</code>, and fails
@@ -2459,8 +2459,8 @@ default <code>false</code>). In order, it:</p>
    <code>registry</code>, where results go. No <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr> or no <code>registry</code> fails the step.</li>
 <li>For each <code>aval-&lt;name&gt;</code>, fetches a fresh OIDC token (audience <code>sigstore</code>) and runs <code>aval push --test &lt;name&gt;</code>.
    It tries them all, then exits with the worst code; 5 is <code>aval SECURITY</code>, never downgraded.</li>
-<li>With <code>stats: true</code>, publishes each pushed test's run record; a failure
-   is a warning.</li>
+<li>With <code>stats: true</code>, publishes every artifact's run record (hit, miss or verification failure) to <code>stats-registry</code>,
+   or the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code> when empty (<a href="../../stats/#publish-from-github-actions">shared stats</a>); a failure is a warning.</li>
 </ol>
 <p>What <code>aval push</code> does with each artifact:</p>
 <ul>

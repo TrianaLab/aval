@@ -2007,6 +2007,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#publish-from-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publish from GitHub Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2144,6 +2155,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#publish-from-github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publish from GitHub Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2234,6 +2256,27 @@ or more than 6 hours old.</p>
 <a href="../guides/measure-reuse/">Measure reuse</a>. To add a TrianaLab repository to
 these numbers, see
 <a href="https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md#join-the-public-stats">CONTRIBUTING.md</a>.</p>
+<h2 id="publish-from-github-actions">Publish from GitHub Actions<a class="headerlink" href="#publish-from-github-actions" title="Anchor link">&para;</a></h2>
+<p>The <a href="../guides/github-actions/#split-credentials">publish action</a> sends the run
+record of every artifact in the workflow run, verified hits and verification
+failures included, to a registry of another repository's package:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TrianaLab/aval/integrations/github/publish@&lt;sha&gt;</span><span class="w"> </span><span class="c1"># pin by commit SHA</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">stats</span><span class="p">:</span><span class="w"> </span><span class="s">"true"</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">stats-registry</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io/trianalab/aval-stats</span>
+</span></code></pre></div>
+<ul>
+<li><code>stats-registry</code> is <code>host[:port]/path</code>, with no scheme, credentials or <code>@</code>;
+  anything else exits 2 before anything is pushed. Empty, records go to the
+  <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code>.</li>
+<li>The registry credentials (<code>github.token</code> by default) go to it only when it
+  is on the host of the <abbr title="Your file that lists trusted signers and their trust levels.">policy</abbr>'s <code>registry</code>.</li>
+<li>The job's <code>packages: write</code> reaches another repository's package only when
+  that package grants the publishing repository write access (package
+  settings, "Manage Actions access"). Until then each record is a warning.</li>
+<li>A record that cannot be published never fails the step, and a verification
+  failure still exits 5.</li>
+</ul>
 
 
 
