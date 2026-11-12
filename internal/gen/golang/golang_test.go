@@ -156,6 +156,18 @@ func TestFalseHitEmbedOtherOS(t *testing.T) {
 	}
 }
 
+// A file added later under an embedded directory is embedded too, so it
+// is in scope without regenerating.
+func TestFalseHitNewEmbeddedFile(t *testing.T) {
+	root := shop(t)
+	set := generate(t, &Adapter{}, root)
+	before := digest(t, set, root, "go.web")
+	write(t, filepath.Join(root, "web/static/new.css"), "body{}\n")
+	if digest(t, set, root, "go.web") == before {
+		t.Error("web/static/new.css added but the fingerprint of go.web did not change")
+	}
+}
+
 // A new local import, even in a file under a build tag, is drift that
 // aval gen go --check reports.
 func TestFalseHitNewImportIsDrift(t *testing.T) {

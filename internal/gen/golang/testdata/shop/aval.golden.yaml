@@ -56,5 +56,6 @@ fragments:
   go.web:
     scope:
       source:
+        - web/**
         - web/*.go
         - web/static/index.html

@@ -107,9 +107,11 @@ works. Each package is one unit:
 
 - Its id is the package directory (`internal/orders`); the root package
   takes the last element of its import path (`shop`).
-- Its files are `<dir>/*.go`, the files it embeds with `go:embed` (test
-  embeds included), its non-Go sources (C, assembly, `.syso`) and
-  `<dir>/testdata/**` when `testdata` holds a file.
+- Its files are `<dir>/*.go`, its non-Go sources (C, assembly, `.syso`)
+  and `<dir>/testdata/**` when `testdata` holds a file. A package that
+  uses `go:embed` (test embeds included) gets its whole directory,
+  `<dir>/**`, so a file added later under an embedded directory is in
+  scope without regenerating.
 - Its dependencies are the packages of the main modules it imports, from
   any `.go` file, test files and files under any build tag included. The
   standard library and external modules are not units: keep `go.mod` and

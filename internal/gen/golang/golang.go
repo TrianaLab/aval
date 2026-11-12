@@ -145,7 +145,10 @@ func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string)
 	// go list reports embedded files only for linux/amd64. A file for another
 	// OS that embeds puts the whole directory in scope, which fails closed.
 	// ponytail: over-broad scope; parse its //go:embed patterns if it costs too many misses.
-	if embeds(dir, p.IgnoredGoFiles) {
+	// A //go:embed pattern can name a directory, so a file added under it
+	// later changes what is embedded: the whole package directory is in
+	// scope whenever the package embeds anything (embeds cannot leave it).
+	if len(p.EmbedFiles)+len(p.TestEmbedFiles)+len(p.XTestEmbedFiles) > 0 || embeds(dir, p.IgnoredGoFiles) {
 		u.Source = append(u.Source, glob("**"))
 	}
 	// Tests read testdata/ by convention. A glob must match a file, so it is
