@@ -44,9 +44,11 @@ var notFiles = map[string]bool{
 // which the hand-written environment covers.
 var toolchain = []string{"$(MSBuildExtensionsPath", "$(MSBuildToolsPath", "$(MSBuildBinPath", "$(MSBuildSDKsPath", "$(VSToolsPath"}
 
-// fileAbove matches $([MSBuild]::GetPathOfFileAbove('file', 'start')), whose
-// start directory is optional.
-var fileAbove = regexp.MustCompile(`GetPathOfFileAbove\(\s*'([^']*)'\s*(?:,\s*'([^']*)'\s*)?\)`)
+// fileAbove matches an Import that is exactly
+// $([MSBuild]::GetPathOfFileAbove('file', 'start')), whose start directory
+// is optional. Anything around the call falls through to resolve, which
+// rejects the property.
+var fileAbove = regexp.MustCompile(`^\$\(\[MSBuild\]::GetPathOfFileAbove\(\s*'([^']*)'\s*(?:,\s*'([^']*)'\s*)?\)\)$`)
 
 var slnProject = regexp.MustCompile(`(?m)^Project\("[^"]*"\)\s*=\s*"[^"]*",\s*"([^"]*)"`)
 
@@ -284,7 +286,7 @@ func (r *reader) imp(n *node, this string) error {
 	if v == "" || n.attr("Sdk") != "" || slices.ContainsFunc(toolchain, func(t string) bool { return strings.HasPrefix(v, t) }) {
 		return nil // an SDK or toolchain file
 	}
-	if m := fileAbove.FindStringSubmatch(v); m != nil {
+	if m := fileAbove.FindStringSubmatch(strings.TrimSpace(v)); m != nil {
 		return r.above(v, this, m[1], m[2])
 	}
 	p, err := r.resolve(this, this, v)

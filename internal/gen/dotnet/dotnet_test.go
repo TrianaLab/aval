@@ -277,6 +277,8 @@ func TestErrors(t *testing.T) {
 		{"glob characters in an import", map[string]string{"p/A.csproj": `<Project><Import Project="..\[b]\x.props"/></Project>`, "[b]/x.props": "<Project/>"}, "glob characters"},
 		{"file above that is not Directory.*", map[string]string{"A.csproj": `<Project><Import Project="$([MSBuild]::GetPathOfFileAbove('Custom.props', '$(MSBuildThisFileDirectory)../'))"/></Project>`}, "GetPathOfFileAbove of a file other than"},
 		{"file above from a sibling directory", map[string]string{"p/A.csproj": `<Project><Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../build/'))"/></Project>`}, "GetPathOfFileAbove from build"},
+		{"file above with a suffix", map[string]string{"p/A.csproj": `<Project><Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)'))\..\build\extra.props"/></Project>`, "build/extra.props": "<Project/>"}, "MSBuild properties"},
+		{"file above with a prefix", map[string]string{"p/A.csproj": `<Project><Import Project="$(Root)$([MSBuild]::GetPathOfFileAbove('Directory.Build.props'))"/></Project>`}, "MSBuild properties"},
 		{"file above from a property", map[string]string{"A.csproj": `<Project><Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(Dir)'))"/></Project>`}, "MSBuild properties"},
 		{"wildcard import", map[string]string{"p/A.csproj": `<Project><Import Project="..\b\*.targets" Condition="true"/></Project>`, "b/x.targets": "<Project/>"}, "wildcard imports"},
 		{"two solutions", map[string]string{"A.sln": "", "B.slnx": "<Solution/>"}, "several solutions"},

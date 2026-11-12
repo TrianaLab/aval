@@ -152,7 +152,9 @@ func TestGenLanguages(t *testing.T) {
 // leaves the TestSet as it was.
 func TestGenDotnet(t *testing.T) {
 	file, dir := genFile(t)
-	_ = os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(`<Project Sdk="Microsoft.NET.Sdk"/>`), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(`<Project Sdk="Microsoft.NET.Sdk"/>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if code, out, errOut := runCLI("gen", "dotnet", "-f", file); code != ExitOK || !strings.Contains(out, "wrote the dotnet entries for 1 units") {
 		t.Fatalf("gen dotnet: exit %d, stdout %q, stderr %q", code, out, errOut)
 	}
@@ -160,7 +162,9 @@ func TestGenDotnet(t *testing.T) {
 	if !strings.Contains(string(written), "runner: {command: [dotnet, test, App.csproj]}") {
 		t.Fatalf("written:\n%s", written)
 	}
-	_ = os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(`<Project>`), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(`<Project>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	code, _, errOut := runCLI("gen", "dotnet", "-f", file)
 	if after, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, "gen dotnet: App.csproj: XML syntax error") || string(after) != string(written) {
 		t.Errorf("malformed project: exit %d, stderr %q", code, errOut)

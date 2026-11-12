@@ -132,6 +132,7 @@ tests:
       - dotnet.shop.api
       - dotnet.shop.core        # through Shop.Data
       - dotnet.shop.data        # <ProjectReference Include="..\Shop.Data\Shop.Data.csproj" />
+      - dotnet.shop.legacy      # referenced, not in the .sln
 ```
 
 - A unit's files are its project directory, the `Directory.Build.props`,
