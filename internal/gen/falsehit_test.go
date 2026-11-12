@@ -180,6 +180,8 @@ func FuzzRewrite(f *testing.F) {
 	f.Add([]byte(handWritten))
 	f.Add([]byte(base))
 	f.Add([]byte("# only a comment\n"))
+	f.Add([]byte(strings.ReplaceAll(handWritten, "\n", "\r\n")))
+	f.Add([]byte(strings.ReplaceAll(base, "\n", "\r") + "tests:\r- metadata: {name: \"go.x\u2028\"}\n"))
 	f.Add([]byte(base + "tests:\n  -\n    metadata: {name: go.x}\n"))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		out, err := Rewrite(data, "go", []Unit{unit("a", "b"), unit("b")})

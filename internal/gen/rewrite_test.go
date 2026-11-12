@@ -117,6 +117,29 @@ func TestRewriteKeepsHandWritten(t *testing.T) {
 	}
 }
 
+// Line numbers follow yaml.v3, which also breaks lines on a lone \r: a
+// file with \r\n or old Mac \r endings is rewritten in its own endings and
+// round-trips byte for byte.
+func TestRewriteLineEndings(t *testing.T) {
+	for _, eol := range []string{"\r\n", "\r"} {
+		in, want := strings.ReplaceAll(handWritten, "\n", eol), strings.ReplaceAll(generatedWant, "\n", eol)
+		if got := rewrite(t, in, "go", unit("b"), unit("a", "b")); got != want {
+			t.Errorf("%q: got %q", eol, got)
+		}
+		if got := rewrite(t, want, "go", unit("a", "b"), unit("b")); got != want {
+			t.Errorf("%q: up to date file changed: %q", eol, got)
+		}
+	}
+	// A quoted U+2028 or U+0085 is a line break to yaml.v3 too.
+	for _, br := range []string{"\u2028", "\u0085", "\r"} {
+		in := "kind: TestSet\napiVersion: aval.trianalab.io/v1\ndefaults: {cacheability: hermetic}\ntests:\n- metadata: {name: e2e}\n  runner: {command: [\"x" + br + "y\"]}\n  scope: {source: [x]}\n- metadata: {name: go.old}\n  runner: {command: [x]}\n  scope: {source: [x]}\n"
+		got := rewrite(t, in, "go", unit("a"))
+		if strings.Contains(got, "go.old") || !strings.Contains(got, "x"+br+"y") || !strings.Contains(got, "- metadata: {name: go.a}") {
+			t.Errorf("%q: got %q", br, got)
+		}
+	}
+}
+
 func TestRewriteInsertsWhenNothingOwned(t *testing.T) {
 	for name, tc := range map[string]struct{ in, want string }{
 		"append to the collections": {
