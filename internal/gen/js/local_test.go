@@ -110,7 +110,6 @@ func TestLocalErrors(t *testing.T) {
 		"absolute extends": {"a/tsconfig.json", `{"extends": "/etc/ts.json"}`, `extends: "/etc/ts.json": an absolute path`},
 		"escaping extends": {"a/tsconfig.json", `{"extends": "../../ts"}`, `extends: "../../ts": outside the contract root`},
 		"missing extends":  {"a/tsconfig.json", `{"extends": "./base"}`, "base.json"},
-		"glob extends":     {"a/tsconfig.json", `{"extends": "../t[1].json"}`, "a glob character"},
 		"chained error":    {"a/tsconfig.json", `{"extends": "../base.json"}`, "base.json"},
 		"outside ref":      {"a/tsconfig.json", `{"references": [{"path": "../shared"}]}`, `references: "../shared" is not in a workspace package`},
 		"absolute ref":     {"a/tsconfig.json", `{"references": [{"path": "/b"}]}`, `references: "/b" is not in a workspace package`},
@@ -155,5 +154,44 @@ func TestJSONC(t *testing.T) {
 		if got := string(jsonc([]byte(in))); got != want {
 			t.Errorf("jsonc(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// A tsconfig extends file named with glob metacharacters gets an escaped
+// glob: a change to it changes the package's fingerprint, a change to the
+// sibling a raw glob would match does not. A name no contract glob can
+// express fails closed.
+func TestFalseHitMetacharacterExtends(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, map[string]string{
+		"package-lock.json": "{}",
+		"package.json":      `{"workspaces": ["a"]}`,
+		"a/package.json":    `{"name": "a"}`,
+		"a/tsconfig.json":   `{"extends": "../t[1].json"}`,
+		"t[1].json":         "{}",
+		"t1.json":           "{}",
+		"aval.yaml":         "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults:\n  scope: {dependencies: [package-lock.json]}\n  cacheability: hermetic\n",
+	})
+	units, err := (Adapter{}).Units(dir)
+	if err != nil || len(units) != 1 || !slices.Contains(units[0].Source, "t[[]1].json") {
+		t.Fatalf("units %+v, error %v; want t[[]1].json in the source", units, err)
+	}
+	_, out := generate(t, dir)
+	write(t, dir, map[string]string{"aval.yaml": out})
+	before := digests(t, dir)
+	write(t, dir, map[string]string{"t1.json": `{"x": 1}`})
+	if after := digests(t, dir); after["js.a"] != before["js.a"] {
+		t.Errorf("t1.json changed js.a")
+	}
+	write(t, dir, map[string]string{"t[1].json": `{"x": 1}`})
+	if after := digests(t, dir); after["js.a"] == before["js.a"] {
+		t.Errorf("t[1].json did not change js.a")
+	}
+	if runtime.GOOS == "windows" { // no backslash in a file name
+		return
+	}
+	write(t, dir, map[string]string{"a/tsconfig.json": `{"extends": "../t\\1.json"}`})
+	if _, err := (Adapter{}).Units(dir); err == nil || !strings.Contains(err.Error(), "a contract glob cannot express") {
+		t.Errorf("error %v; want a contract glob cannot express", err)
 	}
 }
