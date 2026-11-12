@@ -137,6 +137,12 @@ func TestFalseHitTransitive(t *testing.T) {
 		{"web/static/index.html", "go.internal.orders", false},    // unrelated
 		{"web/web.go", "go.shop", false},                          // unrelated
 		{"internal/orders/orders.go", "go.internal.money", false}, // a dependent, not a dependency
+		{"fixtures/order.json", "go.internal.orders", true},       // read by a test through ../../fixtures
+		{"fixtures/order.json", "go.shop", true},                  // a dependent of orders
+		{"fixtures/order.json", "go.internal.money", false},       // a dependency of orders
+		{"fixtures/order.json", "go.web", false},                  // unrelated
+		{"fixtures/pages/home.html", "go.web", true},              // under a directory a test reads
+		{"fixtures/pages/home.html", "go.internal.orders", false}, // unrelated
 	} {
 		before := digest(t, set, root, tc.test)
 		file := filepath.Join(root, filepath.FromSlash(tc.file))
@@ -146,6 +152,48 @@ func TestFalseHitTransitive(t *testing.T) {
 			t.Errorf("%s changed: fingerprint of %s changed = %v, want %v", tc.file, tc.test, changed, tc.changes)
 		}
 		write(t, file, string(old))
+	}
+}
+
+// A file added later under a directory a test reads is in scope without
+// regenerating.
+func TestFalseHitNewFileInReadDirectory(t *testing.T) {
+	root := shop(t)
+	set := generate(t, &Adapter{}, root)
+	before := digest(t, set, root, "go.web")
+	write(t, filepath.Join(root, "fixtures/pages/new.html"), "<p>new</p>\n")
+	if digest(t, set, root, "go.web") == before {
+		t.Error("fixtures/pages/new.html added but the fingerprint of go.web did not change")
+	}
+}
+
+// A read the adapter cannot resolve, that may leave the package directory,
+// fails closed and names the file, the line and the escape hatch;
+// --go-allow-dynamic accepts it, and a pattern that matches no package is
+// an error.
+func TestDynamicRead(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/dynamic_test.go"), "package web\n\nimport (\n\t\"os\"\n\t\"path/filepath\"\n\t\"testing\"\n)\n\nfunc TestDynamic(t *testing.T) {\n\tname := t.Name()\n\t_, _ = os.ReadFile(filepath.Join(\"../fixtures\", name))\n}\n")
+	_, err := (&Adapter{}).Units(root)
+	if want := "package example.com/shop/web: web/dynamic_test.go:11: os.ReadFile reads a path that it cannot resolve and that may leave the package directory; declare what it reads by hand and pass --go-allow-dynamic web"; err == nil || err.Error() != want {
+		t.Fatalf("a dynamic read: %v\nwant %s", err, want)
+	}
+	a := &Adapter{}
+	fs := pflag.NewFlagSet("go", pflag.ContinueOnError)
+	a.Flags(fs)
+	if err := fs.Parse([]string{"--go-allow-dynamic", "w*"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Units(root); err != nil {
+		t.Errorf("--go-allow-dynamic w*: %v", err)
+	}
+	for _, tc := range []struct{ pattern, want string }{
+		{"nope/**", "--go-allow-dynamic nope/**: matches no package"},
+		{"/abs", "--go-allow-dynamic: "},
+	} {
+		if _, err := (&Adapter{AllowDynamic: []string{tc.pattern}}).Units(root); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("--go-allow-dynamic %s: %v, want %q", tc.pattern, err, tc.want)
+		}
 	}
 }
 
@@ -255,8 +303,11 @@ func TestErrors(t *testing.T) {
 func TestParseError(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.go"), "package a\n\nimport (\n")
-	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"a.go"}}, nil, nil); err == nil || !strings.Contains(err.Error(), "a.go:3:10") {
+	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"a.go"}}, nil, nil, false); err == nil || !strings.Contains(err.Error(), "a.go:3:10") {
 		t.Errorf("a file that does not parse: %v", err)
+	}
+	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"gone.go"}}, nil, nil, false); err == nil || !strings.Contains(err.Error(), "gone.go") {
+		t.Errorf("a file that cannot be read: %v", err)
 	}
 }
 

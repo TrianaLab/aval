@@ -155,7 +155,84 @@ works. Each package is one unit:
   any `.go` file, test files and files under any build tag included. The
   standard library and external modules are not units: `go.module` covers
   them through `go.mod` and `go.sum`.
+- Its files also include what its code and tests read at run time by a
+  path `aval gen go` can resolve, such as `../../fixtures/order.json`
+  ([below](#files-a-package-reads)).
 - Its test is `go test ./<dir>` and `use`s `go.module`.
+
+### Files a package reads
+
+Tests often read files outside their package. `aval gen go` finds the
+reads in every `.go` file of a package, tests included, and adds their
+files to the package's fragment:
+
+```go
+// internal/orders/orders_test.go
+const fixtures = "../../fixtures"
+
+func TestFixture(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(fixtures, "order.json"))
+	// ...
+}
+```
+
+```yaml
+fragments:
+  go.internal.orders:
+    scope:
+      source:
+        - fixtures/order.json
+        - internal/orders/*.go
+```
+
+An edit to `fixtures/order.json` re-runs `go.internal.orders` and the
+tests of the packages that import it, and no other test.
+
+- Reads: `os.ReadFile`, `Open`, `OpenFile`, `ReadDir`, `Stat`, `Lstat`,
+  `Readlink`, `DirFS`, `OpenRoot` and `OpenInRoot`; `ioutil.ReadFile` and
+  `ReadDir`; `filepath.Walk`, `WalkDir` and `Glob`; and `os.Chdir` and
+  `t.Chdir`, since later relative reads land under that directory (going
+  back to the working directory is not a read). Dot imports count.
+- Paths it resolves: string literals and constants, `+`, `filepath` and
+  `path` `Join`, `Clean`, `Dir`, `Abs`, `FromSlash` and `ToSlash`, every
+  value assigned to a variable of the package, ranges over slice and map
+  literals, fields of struct literals (table tests), results and
+  parameters of the package's own functions (from every call in the
+  package), and the source file `runtime.Caller(0)` returns.
+- A path is relative to the package directory, where `go test` runs. A
+  file becomes its own glob, a directory `<dir>/**` (for `Glob`, the
+  directory before the first wildcard). A path that does not exist adds
+  nothing; once it exists, `--check` reports the drift.
+
+It fails closed, naming the file and line (exit 1, nothing written):
+
+- a read whose path it cannot resolve and that may leave the package
+  directory: one built from `os.Getwd`, `os.Executable`, an environment
+  variable (`os.Getenv`, `LookupEnv`, `ExpandEnv`) or `runtime.Caller`
+  with another depth, or from a literal with a `..`
+  segment that names a file or directory of the contract root outside the
+  package (`filepath.Join(root, name)` with `root` from `"../.."`). A
+  path built on `t.TempDir()` is fine;
+- a path outside the contract root, absolute ones included
+  (`/proc/self/cgroup`);
+- a relative path in a non-test file of a package that is not `main`:
+  it is relative to the directory of whichever package's test calls it.
+
+`--go-allow-dynamic <pattern>` (repeatable, a contract glob over package
+IDs such as `tests/**`) turns those errors off for the packages it
+matches; files it resolves are still added. Declare the rest by hand:
+in `defaults`, which every test inherits, or with `--no-test` for the
+package and a hand-written test that `use`s its `go.*` fragments and a
+fragment of your own. A pattern that matches no package fails, and
+`--check` needs the same flags.
+
+It does not see, so declare by hand: a path that comes from another
+package (`testutil.Read(t, "../x")`), a method, a closure parameter or a
+struct field not set from a literal in the package; parameters of a
+function also used as a value; a slice or map literal that a function it
+is passed to changes; a path that climbs without a `..` in any literal
+(`"." + "./x"`); and files read through other APIs, such as
+`exec.Command` or `template.ParseFiles`.
 
 ### The go.module fragment
 
