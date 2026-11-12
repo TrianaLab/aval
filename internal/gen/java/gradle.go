@@ -27,11 +27,17 @@ var (
 	parentRe = regexp.MustCompile(`\b(parent|getParent|parentFile)\b|\brootProject\s*\.\s*(get)?([cC]hildProjects|[sS]ubprojects|[aA]llprojects)\b`)
 	// project(":").subprojects and kin: the root project's children, from a subproject.
 	rootChildrenRe = regexp.MustCompile(`\bproject\s*\(\s*(path\s*[:=]\s*)?["']:["']\s*\)\s*\.\s*(get)?([cC]hildProjects|[sS]ubprojects|[aA]llprojects)\b`)
-	rootDirRe      = regexp.MustCompile(`^\$(rootDir|\{(rootDir|rootProject\.rootDir|project\.rootDir|rootProject\.projectDir)\})/`)
+	// A literal anchored at the root: $rootDir/, ${x.rootDir}/, ${x.projectDir}/
+	// (another project's directory; the script's own is stripped first).
+	rootDirRe = regexp.MustCompile(`^\$(rootDir|settingsDir|\{([\w.]+\.)?(rootDir|projectDir|settingsDir)\})/`)
 	// A root variable anywhere in a literal.
+	rootVarAnyRe = regexp.MustCompile(`\$(rootDir|settingsDir)\b|\$\{([\w.]+\.)?(rootDir|settingsDir)\b|\$\{[\w.]+\.(projectDir|layout|file)\b`)
 	// Calls whose arguments are paths: file, files, layout.*.dir, resolve, ...
-	pathCallRe   = regexp.MustCompile(`\b(file|files|dir|resolve|fileTree|from|into|File)\s*\(`)
-	rootVarAnyRe = regexp.MustCompile(`\$(rootDir\b|\{(rootDir|rootProject\.(rootDir|projectDir|layout|file)|project\.rootDir|settingsDir)\b)`)
+	pathCallRe = regexp.MustCompile(`\b(file|files|dir|resolve|fileTree|from|into|File)\s*\(`)
+	// A call on a root-anchored directory, and the next call of its chain.
+	rootChainRe = regexp.MustCompile(`(\brootDir|\brootProject\s*\.\s*projectDir|\blayout\s*\.\s*settingsDirectory|\.\s*projectDir)\s*\.\s*(resolve|dir|file)\s*\(`)
+	chainNextRe = regexp.MustCompile(`^\s*\.\s*(resolve|dir|file)\s*\(`)
+	siblingRe   = regexp.MustCompile(`\bresolveSibling\s*\(`)
 	// Build logic every project applies.
 	logicExt = map[string]bool{".kts": true, ".gradle": true, ".kt": true, ".groovy": true, ".java": true}
 )
@@ -319,16 +325,68 @@ func checkLiterals(text, name, dir string, known map[string]bool) error {
 			return fmt.Errorf("%s: %q %w", name, l, err)
 		}
 	}
+	if siblingRe.MatchString(masked) {
+		return fmt.Errorf("%s: resolveSibling: %w", name, errUnsupported)
+	}
 	// A bare project directory ("common") is a path only as the argument of
-	// a call that takes one; elsewhere (include("common")) it is a name.
+	// a call that takes one; elsewhere (include("common")) it is a name. So
+	// is an absolute path ("/META-INF/*" in an exclude is a pattern).
 	for _, loc := range pathCallRe.FindAllStringIndex(masked, -1) {
 		for _, r := range callArgs(masked, loc[1]) {
-			a := strings.TrimSpace(text[r[0]:r[1]])
-			l, j, err := literal(a, 0)
-			if err == nil && j == len(a) && known[l] && l != dir && (dir == "" || !strings.HasPrefix(l, dir+"/")) {
+			l, ok := wholeLiteral(text[r[0]:r[1]])
+			switch {
+			case ok && absolute(l):
+				return fmt.Errorf("%s: %q is an absolute path: %w", name, l, errUnsupported)
+			case ok && !strings.Contains(l, "/") && foreign(l, dir, known):
 				return fmt.Errorf("%s: %q refers to files of another project: %w", name, l, errUnsupported)
 			}
 		}
+	}
+	for _, loc := range rootChainRe.FindAllStringIndex(masked, -1) {
+		if err := rootChain(text, masked, loc[1], dir, known); err != nil {
+			return fmt.Errorf("%s: %s...: %w", name, strings.Join(strings.Fields(masked[loc[0]:loc[1]]), ""), err)
+		}
+	}
+	return nil
+}
+
+// wholeLiteral returns the value of an argument that is one plain string
+// literal.
+func wholeLiteral(arg string) (string, bool) {
+	a := strings.TrimSpace(arg)
+	l, j, err := literal(a, 0)
+	return l, err == nil && j == len(a)
+}
+
+// rootChain checks a chain of resolve, dir or file calls on a root-anchored
+// directory (rootDir.resolve("services").resolve("api")) whose first "("
+// ends at i: every argument must be one literal, and the joined path must
+// stay in the root and out of other projects' directories.
+func rootChain(text, masked string, i int, dir string, known map[string]bool) error {
+	var segs []string
+	for {
+		args := callArgs(masked, i)
+		l, ok := wholeLiteral(text[args[0][0]:args[0][1]])
+		if len(args) != 1 || !ok {
+			return fmt.Errorf("an argument other than a string literal: %w", errUnsupported)
+		}
+		segs = append(segs, l)
+		end := args[0][1] + 1
+		if end > len(masked) {
+			break
+		}
+		m := chainNextRe.FindStringIndex(masked[end:])
+		if m == nil {
+			break
+		}
+		i = end + m[1]
+	}
+	p := path.Clean(strings.Join(segs, "/"))
+	switch {
+	case p == ".." || strings.HasPrefix(p, "../") || outside(p):
+		return fmt.Errorf("refers to files outside the root: %w", errUnsupported)
+	case foreign(p, dir, known):
+		return fmt.Errorf("refers to files of another project: %w", errUnsupported)
 	}
 	return nil
 }
@@ -375,22 +433,24 @@ func checkLiteral(l, dir string, known map[string]bool) error {
 	if p == ".." || strings.HasPrefix(p, "../") {
 		return fmt.Errorf("refers to files outside the root: %w", errUnsupported)
 	}
-	for k := range known {
-		if (p == k || strings.HasPrefix(p, k+"/")) && k != dir && (dir == "" || !strings.HasPrefix(k, dir+"/")) && !strings.HasPrefix(p, dir+"/") {
-			return fmt.Errorf("refers to files of another project: %w", errUnsupported)
-		}
+	if foreign(p, dir, known) {
+		return fmt.Errorf("refers to files of another project: %w", errUnsupported)
 	}
 	return nil
 }
 
 // literalPath returns the path a literal names, relative to the root when
 // it goes through ".." or rootDir, "" when it names none worth checking, or
-// an error for an absolute path or a path inside larger text.
+// an error for a path inside larger text. Absolute paths are checked only
+// as arguments of path-taking calls (see checkLiterals): elsewhere they are
+// patterns, such as excludes += "/META-INF/*".
 func literalPath(l, dir string) (string, error) {
 	for _, prefix := range []string{"$projectDir/", "${projectDir}/", "${project.projectDir}/"} {
 		l = strings.TrimPrefix(l, prefix)
 	}
-	inText := func(t string) bool { return strings.Contains(t, "../") || rootVarAnyRe.MatchString(t) }
+	inText := func(t string) bool {
+		return strings.Contains(t, "../") || strings.Contains(t, `..\`) || rootVarAnyRe.MatchString(t)
+	}
 	switch {
 	case rootDirRe.MatchString(l):
 		p := rootDirRe.ReplaceAllString(l, "")
@@ -402,9 +462,7 @@ func literalPath(l, dir string) (string, error) {
 		return path.Clean(path.Join(dir, l)), nil
 	case inText(l):
 		return "", fmt.Errorf("holds a path inside larger text: %w", errUnsupported)
-	case outside(l):
-		return "", fmt.Errorf("is an absolute path: %w", errUnsupported)
-	case !strings.Contains(l, "/"):
+	case !strings.Contains(l, "/") || strings.HasPrefix(l, "/"):
 		return "", nil // a bare name: checkLiterals reads it as a path only in a path-taking call
 	}
 	return l, nil

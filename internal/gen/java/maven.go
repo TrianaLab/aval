@@ -43,6 +43,7 @@ type pom struct {
 	model
 	Profiles []model `xml:"profiles>profile"`
 	refs     []coord // every coordinate the POM names, see coordRefs
+	texts    []elem  // every element text, for checkPath
 }
 
 // props holds the children of <properties> by element name.
@@ -85,7 +86,8 @@ type reactor struct {
 	root    string
 	poms    map[string]*pom
 	byCoord map[coord]*pom
-	config  map[string]string // user property -> the .mvn file that sets it
+	config  map[string]string   // user property -> the .mvn file that sets it
+	defined map[string][]string // every property the reactor POMs define -> its values
 }
 
 // maven walks <modules> (and Maven 4 <subprojects>) from the root POM, in
@@ -104,11 +106,14 @@ func maven(root string) ([]gen.Unit, error) {
 	if err != nil {
 		return nil, err
 	}
-	tops := map[string]bool{}
+	modules := map[string]bool{}
 	for _, d := range dirs {
-		tops[d] = true
+		modules[d] = true
 	}
-	shared, err := rootContext(root, tops)
+	if err := r.checkPaths(modules); err != nil {
+		return nil, err
+	}
+	shared, err := rootContext(root, modules)
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +173,27 @@ func (r reactor) walk() ([]string, error) {
 	return dirs, nil
 }
 
+// checkPaths runs checkPath on every element of the root POM and the
+// modules.
+func (r *reactor) checkPaths(modules map[string]bool) error {
+	r.defined = map[string][]string{}
+	for _, p := range r.poms {
+		for _, m := range p.models() {
+			for k, v := range m.Properties {
+				r.defined[k] = append(r.defined[k], v)
+			}
+		}
+	}
+	for dir, p := range r.poms {
+		for _, e := range p.texts {
+			if err := r.checkPath(e, dir, modules); err != nil {
+				return fmt.Errorf("%s: %w", pomPath(dir), err)
+			}
+		}
+	}
+	return nil
+}
+
 // index returns the module directories by groupId:artifactId.
 func (r reactor) index(dirs []string) (map[string]string, error) {
 	index := map[string]string{}
@@ -189,9 +215,10 @@ func (r reactor) index(dirs []string) (map[string]string, error) {
 // reactor, by groupId:artifactId. It skips target, build, node_modules and
 // hidden directories at any depth: a POM there is build output, a
 // downloaded package or tool state, not a source Maven builds. A module
-// named target or build is still read, through <modules>. A module that refers to one would depend on files no
-// unit covers, so deps rejects it. A POM it cannot parse or resolve is no
-// build Maven could resolve a reference to, and is left out.
+// named target or build is still read, through <modules>. A module that
+// refers to one would depend on files no unit covers, so deps rejects it.
+// A POM it cannot parse or resolve is no build Maven could resolve a
+// reference to, and is left out.
 func (r reactor) strays() (map[string]string, error) {
 	strays := map[string]string{}
 	err := filepath.WalkDir(r.root, func(p string, d fs.DirEntry, err error) error {
@@ -269,7 +296,7 @@ func readPom(root, dir string) (*pom, error) {
 	if err := xml.Unmarshal(data, &p); err != nil {
 		return nil, fmt.Errorf("%s: %w", pomPath(dir), err)
 	}
-	if p.refs, err = coordRefs(data); err != nil { // also rejects what follows </project>
+	if p.refs, p.texts, err = coordRefs(data); err != nil { // also rejects what follows </project>
 		return nil, fmt.Errorf("%s: %w", pomPath(dir), err)
 	}
 	if p.XMLName.Local != "project" {
@@ -278,6 +305,13 @@ func readPom(root, dir string) (*pom, error) {
 	return &p, nil
 }
 
+// elem is the trimmed text of a POM element (a property value too).
+type elem struct{ name, text string }
+
+// rootStartRe matches a value that starts with a property naming the build
+// root (the working directory under mvn -pl included).
+var rootStartRe = regexp.MustCompile(`^\$\{(maven\.multiModuleProjectDirectory|rootDirectory|project\.rootDirectory|session\.rootDirectory|session\.executionRootDirectory|user\.dir)\}(/|$)`)
+
 // rootVar reports whether a property name points outside the module: the
 // build root, the working directory, the environment, the session or a
 // parent project (its coordinates excepted: they are not files).
@@ -285,30 +319,92 @@ func rootVar(name string) bool {
 	switch name {
 	case "user.dir", "maven.multiModuleProjectDirectory", "project.rootDirectory", "rootDirectory":
 		return true
-	case "project.parent.groupId", "project.parent.artifactId", "project.parent.version":
+	case "project.parent.groupId", "project.parent.artifactId", "project.parent.version",
+		"pom.parent.groupId", "pom.parent.artifactId", "pom.parent.version":
 		return false
 	}
-	return strings.HasPrefix(name, "env.") || strings.HasPrefix(name, "session.") || strings.HasPrefix(name, "project.parent.")
+	for _, prefix := range []string{"env.", "session.", "project.parent.", "pom.parent."} {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
-// checkPath rejects the text of a POM element (a property value too) that
-// refers to files outside the module directory, which its <dir>/** glob
-// would miss: filters, suiteXmlFile, profile activation files, systemPath,
-// source directories, an argLine with -Dx=../y. It rejects "../" or a
-// property from rootVar anywhere in the text, and a whole value that is
-// absolute. relativePath and modules are checked elsewhere.
-func checkPath(name, text string) error {
-	if name == "relativePath" || name == "module" || name == "subproject" {
-		return nil
+// builtin reports whether Maven or the JVM sets the property name.
+func builtin(name string) bool {
+	for _, prefix := range []string{"project.", "pom.", "settings.", "maven.", "java.", "os.", "user.", "env.", "session."} {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
 	}
-	bad := outside(text) || strings.Contains(filepath.ToSlash(text), "../")
-	for _, m := range propRe.FindAllStringSubmatch(text, -1) {
-		bad = bad || rootVar(m[1])
+	return name == "basedir"
+}
+
+// rootish reports whether a property points outside the module: rootVar,
+// or a reactor property whose value uses one (main.basedir set to
+// ${maven.multiModuleProjectDirectory}). A property defined nowhere in the
+// reactor, nor by Maven, is set at run time (directory-maven-plugin) and
+// counts too.
+func (r reactor) rootish(name string, depth int) bool {
+	vals, ok := r.defined[name]
+	if rootVar(name) || !ok && !builtin(name) || depth > 8 {
+		return true
 	}
-	if bad {
-		return fmt.Errorf("<%s>%s</%s> refers to files outside the module directory: %w", name, text, name, errUnsupported)
+	for _, v := range vals {
+		for _, m := range propRe.FindAllStringSubmatch(v, -1) {
+			if r.rootish(m[1], depth+1) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// checkPath rejects the text of an element of the POM of the module in dir
+// ("" for the root POM) that refers to files outside the module, which its
+// <dir>/** glob would miss: filters, suiteXmlFile, profile activation
+// files, systemPath, an argLine with -Dx=../y. A backslash counts as a
+// separator. It rejects "../" anywhere, an absolute value, a rootish
+// property next to a separator (${env.X} alone is fine), and a path that
+// starts with another module's directory. A value that starts with a root
+// property (${maven.multiModuleProjectDirectory}/x) is resolved against
+// the root first; files there outside every module are in the root context.
+func (r reactor) checkPath(e elem, dir string, modules map[string]bool) error {
+	t := strings.ReplaceAll(e.text, `\`, "/")
+	if m := rootStartRe.FindString(t); m != "" {
+		t = strings.TrimPrefix(t[len(m):], "/")
+		if c := path.Clean(t); c == ".." || strings.HasPrefix(c, "../") || foreign(c, dir, modules) {
+			return pathErr(e)
+		}
+	} else if outside(t) {
+		return pathErr(e)
+	}
+	if strings.Contains(t, "../") || r.rootishPath(t) {
+		return pathErr(e)
+	}
+	for _, prefix := range []string{"${project.basedir}/", "${basedir}/"} {
+		t = strings.TrimPrefix(t, prefix)
+	}
+	if strings.Contains(t, "/") && foreign(path.Clean(t), dir, modules) {
+		return pathErr(e)
 	}
 	return nil
+}
+
+// rootishPath reports whether t has a rootish property next to a "/".
+func (r reactor) rootishPath(t string) bool {
+	for _, loc := range propRe.FindAllStringSubmatchIndex(t, -1) {
+		sep := loc[1] < len(t) && t[loc[1]] == '/' || loc[0] > 0 && t[loc[0]-1] == '/'
+		if sep && r.rootish(t[loc[2]:loc[3]], 0) {
+			return true
+		}
+	}
+	return false
+}
+
+func pathErr(e elem) error {
+	return fmt.Errorf("<%s>%s</%s> refers to files outside the module directory: %w", e.name, e.text, e.name, errUnsupported)
 }
 
 // outside reports whether a path, relative to the module directory, is
@@ -319,9 +415,14 @@ func outside(p string) bool {
 	}
 	s := filepath.ToSlash(p)
 	c := path.Clean(s)
-	return c == ".." || strings.HasPrefix(c, "../") ||
-		len(s) > 1 && s[0] == '/' && isAlnum(s[1]) || // ponytail: "/" alone is a separator, not a path
-		len(s) > 2 && s[1] == ':' && (s[2] == '/' || s[2] == '\\') && isAlnum(s[0]) // C:\ or C:/
+	return c == ".." || strings.HasPrefix(c, "../") || absolute(s)
+}
+
+// absolute reports whether s is an absolute path: /x or C:\x (a lone "/"
+// is a separator, not a path).
+func absolute(s string) bool {
+	return len(s) > 1 && s[0] == '/' && isAlnum(s[1]) ||
+		len(s) > 2 && s[1] == ':' && (s[2] == '/' || s[2] == '\\') && isAlnum(s[0])
 }
 
 func isAlnum(b byte) bool {
@@ -336,18 +437,20 @@ func isAlnum(b byte) bool {
 // in a plugin's configuration, and a change to that module would then be
 // reused. A managed plugin is an edge even if no module uses it: more
 // re-runs, never a false hit. It also rejects any element that refers to
-// files outside the module (see checkPath).
-func coordRefs(data []byte) ([]coord, error) {
+// files outside the module: it returns the text of every element but
+// relativePath and modules (checked elsewhere) for checkPath.
+func coordRefs(data []byte) ([]coord, []elem, error) {
 	var refs []coord
+	var texts []elem
 	var stack []*frame
 	d := xml.NewDecoder(bytes.NewReader(data))
 	for {
 		tok, err := d.Token()
 		if err == io.EOF {
-			return refs, nil
+			return refs, texts, nil
 		}
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
@@ -359,8 +462,8 @@ func coordRefs(data []byte) ([]coord, error) {
 		case xml.EndElement:
 			f := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			if err := checkPath(f.name, strings.TrimSpace(f.text.String())); err != nil {
-				return nil, err
+			if v := strings.TrimSpace(f.text.String()); v != "" && f.name != "relativePath" && f.name != "module" && f.name != "subproject" {
+				texts = append(texts, elem{f.name, v})
 			}
 			if len(stack) == 0 {
 				continue // the project's own coordinates

@@ -115,6 +115,21 @@ func rootContext(root string, units map[string]bool) ([]string, error) {
 	return globs, nil
 }
 
+// foreign reports whether the root-relative path p is in the directory of
+// a unit (units) other than dir and the units below it, and not below dir
+// itself: files of another unit, which dir's scope does not cover.
+func foreign(p, dir string, units map[string]bool) bool {
+	if dir != "" && (p == dir || strings.HasPrefix(p, dir+"/")) {
+		return false
+	}
+	for k := range units {
+		if (p == k || strings.HasPrefix(p, k+"/")) && k != dir && (dir == "" || !strings.HasPrefix(k, dir+"/")) {
+			return true
+		}
+	}
+	return false
+}
+
 // tool returns the wrapper script at root (./mvnw, ./gradlew) when there is
 // one, otherwise the tool on PATH.
 func tool(root, wrapper, name string) string {

@@ -455,17 +455,21 @@ What it cannot read for certain is an error (exit 1), not a guess:
   `buildFileName`, `apply from` or a triple-quoted string;
 - in Gradle, `parent`, `getParent`, `parentFile`, or
   `rootProject.subprojects` and `project(":").subprojects` (and kin) in a
-  subproject; in any script, an absolute path, a string with `../` or
-  `rootDir` inside larger text (`"-Dfx=../common"`), or a path that leaves
-  the root or starts with another project's directory
-  (`rootProject.file("common/fixtures")`, or `file("common")` and other
-  path-taking calls);
-- in Maven, an element or property value with `../` anywhere (an
-  `argLine` too), an absolute path, or `${user.dir}`,
-  `${maven.multiModuleProjectDirectory}`, `${env.*}`, `${session.*}` or
-  `${project.parent.*}` other than the parent's coordinates;
-- a Maven property it cannot resolve, or that a profile or
-  `.mvn/maven.config` sets;
+  subproject; in any script, `resolveSibling`, an absolute path given to a
+  path-taking call (`file`, `files`, `File`, `dir`, `resolve`, ...), a
+  string with `../` or `rootDir` inside larger text (`"-Dfx=../common"`),
+  a `resolve` chain on `rootDir` with a computed argument, or a path that
+  leaves the root or starts with another project's directory
+  (`rootProject.file("common/fixtures")`, `file("common")`,
+  `rootDir.resolve("services").resolve("api")`);
+- in Maven, an element or property value with `../` or `..\` anywhere (an
+  `argLine` too), an absolute path, a path that starts with another
+  module's directory (`config/` is fine, `${maven.multiModuleProjectDirectory}/`
+  and `${rootDirectory}/` are read from the root), or `${env.*}`,
+  `${session.*}`, `${project.parent.*}` or a property set at run time
+  (`${main.basedir}`) next to a `/`;
+- a Maven property it cannot resolve in a coordinate, or that a profile,
+  `.mvn/maven.config` or `.mvn/jvm.config` sets;
 - a reference to a local POM that is not a module, or a local `<parent>`
   that is neither the root POM nor a module;
 - a root with both a POM and a Gradle settings script.
