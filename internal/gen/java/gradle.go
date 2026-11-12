@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -22,8 +23,11 @@ var (
 	accessorRe = regexp.MustCompile(`\bprojects\.`)
 	// apply(from = "...") or apply from: '...' pulls in a script no unit covers.
 	applyFromRe = regexp.MustCompile(`\bapply\s*\(?\s*from\b`)
-	// Names that reach files outside the project directory.
-	rootRe = regexp.MustCompile(`\b(rootDir|rootProject|parentFile)\b`)
+	// Names that reach the files of another project from a subproject.
+	parentRe  = regexp.MustCompile(`\b(parent|getParent|parentFile)\b|\brootProject\s*\.\s*(get)?([cC]hildProjects|[sS]ubprojects|[aA]llprojects)\b`)
+	rootDirRe = regexp.MustCompile(`^\$(rootDir|\{(rootDir|rootProject\.rootDir|project\.rootDir|rootProject\.projectDir)\})/`)
+	// Build output and VCS directories the root context leaves out.
+	notContext = map[string]bool{".git": true, ".gradle": true, "build": true, "out": true, "target": true}
 	// Build logic every project applies.
 	logicExt = map[string]bool{".kts": true, ".gradle": true, ".kt": true, ".groovy": true, ".java": true}
 )
@@ -41,6 +45,13 @@ func gradle(root, settings string) ([]gen.Unit, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The settings script may name projects too (gradle.beforeProject { ... }).
+	text, _ := script(root, settings) // read by projects already
+	more, err := projectRefs(text, settings, ":", nil)
+	if err != nil {
+		return nil, err
+	}
+	common = append(common, more...)
 	gradle := tool(root, "gradlew", "gradle")
 	seen := map[string]bool{}
 	var units []gen.Unit
@@ -73,7 +84,7 @@ func gradle(root, settings string) ([]gen.Unit, error) {
 		deps = append(deps, more...)
 		src := slices.Concat(shared, inherited)
 		if info, err := os.Stat(dir); err == nil && info.IsDir() {
-			src = append(src, id+"/**")
+			src = append(src, under(id, "**"))
 		}
 		units = append(units, gen.Unit{
 			ID:      id,
@@ -113,23 +124,43 @@ func projects(root, settings string) ([]string, map[string]bool, error) {
 	return paths, known, nil
 }
 
-// buildLogic returns the files that configure every project (the settings
-// script, the root build script and buildSrc) and the units they refer to
-// (subprojects { ... }, convention plugins): files and edges of every unit.
+// buildLogic returns the root context, the files of every unit, and the
+// units the root build script and buildSrc refer to (subprojects { ... },
+// convention plugins), edges of every unit. The root context is every
+// top-level entry of the root that is not a project directory nor build
+// output: root and buildSrc scripts read files relative to the root
+// (config/checkstyle.xml, gradle/*.gradle.kts, version catalogs) through
+// too many APIs to follow one by one. A directory that holds projects is
+// included whole: more re-runs, never a false hit.
 func buildLogic(root, settings string, known map[string]bool) (shared, common []string, err error) {
-	shared = []string{settings}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, e := range entries {
+		n := e.Name()
+		if known[n] || notContext[n] {
+			continue
+		}
+		g, err := gen.Literal(n)
+		if e.IsDir() {
+			g, err = gen.Under(n, "**")
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		shared = append(shared, g)
+	}
 	build, err := oneOf(root, "build.gradle.kts", "build.gradle")
 	if err != nil {
 		return nil, nil, err
 	}
 	if build != "" {
-		shared = append(shared, build)
 		if common, err = refs(root, build, ":", known); err != nil {
 			return nil, nil, err
 		}
 	}
 	if info, err := os.Stat(filepath.Join(root, "buildSrc")); err == nil && info.IsDir() {
-		shared = append(shared, "buildSrc/**")
 		more, err := buildSrc(root, known)
 		if err != nil {
 			return nil, nil, err
@@ -187,7 +218,7 @@ func ancestors(root, id string, known map[string]bool) (files, deps []string, er
 			return nil, nil, err
 		}
 		deps = append(deps, r...)
-		files = append([]string{anc + "/" + b}, files...)
+		files = append([]string{under(anc, b)}, files...)
 	}
 	return files, deps, nil
 }
@@ -252,9 +283,11 @@ func includes(text string) ([]string, error) {
 
 // refs reads the build script name of the project at path self and returns
 // the units it refers to (see projectRefs). Anything that reaches files
-// outside the project directory, which its <dir>/** glob would miss, is an
-// error: apply from, rootDir, rootProject, parentFile and string literals
-// that are absolute paths or start with "..".
+// neither in the project directory nor in the root context is an error:
+// apply from (its script's references would be missed), parent, getParent,
+// parentFile and rootProject.subprojects (and kin) in a subproject, and
+// string literals that are absolute or lead, through ".." or rootDir, out
+// of the root or into another project's directory.
 func refs(root, name, self string, known map[string]bool) ([]string, error) {
 	text, err := script(root, name)
 	if err != nil {
@@ -271,15 +304,44 @@ func scriptRefs(text, name, self string, known map[string]bool) ([]string, error
 	if applyFromRe.MatchString(masked) {
 		return nil, fmt.Errorf("%s: apply from: %w, put the script in defaults or a fragment", name, errUnsupported)
 	}
-	if m := rootRe.FindString(text); m != "" {
-		return nil, fmt.Errorf("%s: %s refers to files outside the project directory: %w", name, m, errUnsupported)
+	dir := projectID(self)
+	if m := parentRe.FindString(masked); m != "" && (dir != "" || m == "parentFile") {
+		return nil, fmt.Errorf("%s: %s refers to files of another project: %w", name, m, errUnsupported)
 	}
 	for _, l := range lits {
-		if outside(l) {
-			return nil, fmt.Errorf("%s: %q refers to files outside the project directory: %w", name, l, errUnsupported)
+		if err := checkLiteral(l, dir, known); err != nil {
+			return nil, fmt.Errorf("%s: %q %w", name, l, err)
 		}
 	}
 	return projectRefs(text, name, self, known)
+}
+
+// checkLiteral rejects a string literal of the script of the project in
+// dir ("" for the root) that is an absolute path, or a path through ".."
+// or rootDir that leaves the root or lands in another project's directory.
+func checkLiteral(l, dir string, known map[string]bool) error {
+	for _, prefix := range []string{"$projectDir/", "${projectDir}/", "${project.projectDir}/"} {
+		l = strings.TrimPrefix(l, prefix)
+	}
+	var p string
+	switch {
+	case rootDirRe.MatchString(l):
+		p = path.Clean(rootDirRe.ReplaceAllString(l, ""))
+	case l == ".." || strings.HasPrefix(l, "../"):
+		p = path.Clean(path.Join(dir, l))
+	case outside(l):
+		return fmt.Errorf("is an absolute path: %w", errUnsupported)
+	default:
+		return nil
+	}
+	top, _, _ := strings.Cut(p, "/")
+	switch {
+	case p == ".." || strings.HasPrefix(p, "../"):
+		return fmt.Errorf("refers to files outside the root: %w", errUnsupported)
+	case known[top] && p != dir && !strings.HasPrefix(p, dir+"/"):
+		return fmt.Errorf("refers to files of another project: %w", errUnsupported)
+	}
+	return nil
 }
 
 // projectRefs returns the unit IDs a script refers to with project(...),
@@ -288,6 +350,9 @@ func scriptRefs(text, name, self string, known map[string]bool) ([]string, error
 // a string literal names as a path prefix (":b:jar" in dependsOn names :b).
 // The root project (":") is not a unit and is skipped.
 func projectRefs(text, name, self string, known map[string]bool) ([]string, error) {
+	if strings.Contains(text, `"""`) || strings.Contains(text, "'''") {
+		return nil, fmt.Errorf("%s: a triple-quoted string: %w", name, errUnsupported)
+	}
 	masked, lits := literals(text)
 	var ids []string
 	for _, loc := range projectRe.FindAllStringIndex(masked, -1) {

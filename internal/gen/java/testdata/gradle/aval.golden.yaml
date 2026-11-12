@@ -1,35 +1,54 @@
 apiVersion: aval.trianalab.io/v1
 kind: TestSet
-# Shared inputs aval gen java does not list: the version catalog.
+# aval gen java lists the root context (root files and gradle/) in every unit.
 defaults:
   scope:
-    dependencies: [gradle/libs.versions.toml]
     exclude: ["**/build/**", "**/.gradle/**"]
   cacheability: hermetic
 fragments:
   java.common:
     scope:
       source:
+        - aval.golden.yaml
+        - aval.yaml
         - build.gradle.kts
         - common/**
+        - gradle/**
+        - gradlew
+        - services/**
         - settings.gradle.kts
   java.inventory:
     scope:
       source:
+        - aval.golden.yaml
+        - aval.yaml
         - build.gradle.kts
+        - gradle/**
+        - gradlew
         - inventory/**
+        - services/**
         - settings.gradle.kts
   java.services.api:
     scope:
       source:
+        - aval.golden.yaml
+        - aval.yaml
         - build.gradle.kts
+        - gradle/**
+        - gradlew
+        - services/**
         - services/api/**
         - services/build.gradle.kts
         - settings.gradle.kts
   java.services.web:
     scope:
       source:
+        - aval.golden.yaml
+        - aval.yaml
         - build.gradle.kts
+        - gradle/**
+        - gradlew
+        - services/**
         - services/build.gradle.kts
         - services/web/**
         - settings.gradle.kts

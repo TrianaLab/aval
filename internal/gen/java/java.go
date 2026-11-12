@@ -65,14 +65,21 @@ func isFile(p string) bool {
 }
 
 // checkDir rejects a unit directory (slash-separated, relative to the root)
-// that is not a clean path inside the root, or that holds a glob character
-// the generated globs could not express.
+// that is not a clean path inside the root, or that no contract glob can
+// express (gen.Literal; metacharacters are escaped, a backslash is not).
 func checkDir(dir string) error {
-	if dir == "" || dir == "." || path.Clean(dir) != dir || path.IsAbs(dir) || dir == ".." || strings.HasPrefix(dir, "../") ||
-		strings.ContainsAny(dir, `*?[]{}\`) {
-		return fmt.Errorf("%q: want a directory inside the root, without glob characters", dir)
+	if dir == "" || dir == "." || path.Clean(dir) != dir || path.IsAbs(dir) || dir == ".." || strings.HasPrefix(dir, "../") {
+		return fmt.Errorf("%q: want a directory inside the root", dir)
 	}
-	return nil
+	_, err := gen.Literal(dir)
+	return err
+}
+
+// under is gen.Under for a path checkDir accepted, or that extends one with
+// a plain file name or pattern, which cannot fail.
+func under(dir, pattern string) string {
+	g, _ := gen.Under(dir, pattern)
+	return g
 }
 
 // tool returns the wrapper script at root (./mvnw, ./gradlew) when there is

@@ -373,61 +373,46 @@ tool. A unit's files are its whole directory (`<module>/**`), so add
   Managed dependencies and `exclusions` are not edges. The test is
   `mvn -B -pl <module> test` (`./mvnw` when the root has it), which takes
   the other modules from the local repository: run
-  `mvn -B install -DskipTests` before `aval run`.
+  `mvn -B install -DskipTests` before `aval run`. The root POM and
+  `.mvn/**` go in `defaults`.
 - Gradle: one unit per `include` in `settings.gradle.kts` or
   `settings.gradle`. A subproject depends on the projects its build script
   names in `project(...)`, `evaluationDependsOn(...)` or a task path such
-  as `":common:jar"`. The settings script, the root build script,
-  `buildSrc/**` and the build scripts of its parent projects are among its
-  files, and the projects they name are its edges. The test is
-  `./gradlew :<path>:test` (`gradle` without a wrapper).
-
-The root POM, version catalogs, `gradle.properties`, `gradle/wrapper/**`
-and `.mvn/**` go in `defaults`:
+  as `":common:jar"`, and on those the settings script, the root build
+  script, `buildSrc` and its parent projects' build scripts name. Every
+  unit also gets the root context: each top-level file and directory of the
+  root that is not a project directory or build output (`.git`, `.gradle`,
+  `build`, `out`, `target`), so root scripts can read `config/` or
+  `gradle/` files. The test is `./gradlew :<path>:test` (`gradle` without
+  a wrapper).
 
 ```yaml
-apiVersion: aval.trianalab.io/v1
-kind: TestSet
-defaults:
-  scope:
-    dependencies: [gradle/libs.versions.toml]
-    exclude: ["**/build/**", "**/.gradle/**"]
-  cacheability: hermetic
 fragments:
   java.common:
     scope:
       source:
-        - build.gradle.kts
+        - build.gradle.kts      # root context
         - common/**
-        - settings.gradle.kts
-  java.inventory:
-    scope:
-      source:
-        - build.gradle.kts
-        - inventory/**
-        - settings.gradle.kts
-tests:
-  - metadata: {name: java.common}
-    runner: {command: [./gradlew, ':common:test']}
-    use:
-      - java.common
-  - metadata: {name: java.inventory}
-    runner: {command: [./gradlew, ':inventory:test']}
-    use:
-      - java.common
-      - java.inventory
+        - gradle/**             # root context
+        - gradlew               # root context
+        - services/**           # holds projects, not one itself
+        - settings.gradle.kts   # root context
 ```
 
 What it cannot read for certain is an error (exit 1), not a guess:
 
 - a computed `include`, `project(...)` or `evaluationDependsOn(...)` path,
   type-safe accessors (`projects.common`), `includeBuild`, `projectDir`,
-  `buildFileName` or `apply from`;
-- a path outside the module directory: `..`, an absolute path, Gradle
-  `rootDir`, `rootProject` or `parentFile`, Maven
-  `${maven.multiModuleProjectDirectory}` or a directory, `systemPath` or
-  plugin `<source>` that leaves the module;
-- a Maven property it cannot resolve, or that a profile sets;
+  `buildFileName`, `apply from` or a triple-quoted string;
+- in Gradle, `parent`, `getParent`, `parentFile` or
+  `rootProject.subprojects` in a subproject, an absolute path, or a path
+  through `..` or `rootDir` that leaves the root or reaches another
+  project's directory;
+- in Maven, an element or property whose whole value leaves the module:
+  `..`, an absolute path or `${maven.multiModuleProjectDirectory}` (`..`
+  inside a larger value, such as an `argLine`, is not seen);
+- a Maven property it cannot resolve, or that a profile or
+  `.mvn/maven.config` sets;
 - a reference to a local POM that is not a module, or a local `<parent>`
   that is neither the root POM nor a module;
 - a root with both a POM and a Gradle settings script.

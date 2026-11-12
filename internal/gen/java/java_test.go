@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -112,23 +113,25 @@ func digest(t *testing.T, fsys fstest.MapFS, name string) string {
 
 func TestFalseHitTransitiveDependency(t *testing.T) {
 	for _, tc := range []struct {
-		build, test, transitive, unrelated, shared, parent string
+		build, test, transitive, shared, parent, unrelatedTest, unrelated string
 	}{
 		// web -> api -> inventory -> common; tools stands alone.
-		{"maven", "java.services.web", "common/src/main/java/com/acme/common/Money.java", "tools/src/main/java/com/acme/tools/Gen.java", "pom.xml", "services/pom.xml"},
+		{"maven", "java.services.web", "common/src/main/java/com/acme/common/Money.java", "pom.xml", "services/pom.xml",
+			"java.services.web", "tools/src/main/java/com/acme/tools/Gen.java"},
 		// web -> api -> inventory -> common; services/build.gradle.kts configures web.
-		{"gradle", "java.services.web", "common/src/main/kotlin/com/acme/common/Money.kt", "gradlew", "gradle/libs.versions.toml", "services/build.gradle.kts"},
+		// gradlew is in every unit's root context; common does not use inventory.
+		{"gradle", "java.services.web", "common/src/main/kotlin/com/acme/common/Money.kt", "gradlew", "services/build.gradle.kts",
+			"java.common", "inventory/src/main/java/com/acme/inventory/Stock.java"},
 	} {
 		fsys := fixture(t, tc.build)
-		before := digest(t, fsys, tc.test)
-		for file, reuse := range map[string]bool{tc.transitive: false, tc.unrelated: true, tc.shared: false, tc.parent: false} {
-			changed := fstest.MapFS{}
-			for k, v := range fsys {
-				changed[k] = v
-			}
-			changed[file] = &fstest.MapFile{Data: append(read(t, filepath.Join("testdata", tc.build, file)), "// changed\n"...)}
-			if got := digest(t, changed, tc.test) == before; got != reuse {
-				t.Errorf("%s: %s after changing %s: same fingerprint %v, want %v", tc.build, tc.test, file, got, reuse)
+		for _, c := range []struct {
+			test, file string
+			reuse      bool
+		}{{tc.test, tc.transitive, false}, {tc.test, tc.shared, false}, {tc.test, tc.parent, false}, {tc.unrelatedTest, tc.unrelated, true}} {
+			changed := maps.Clone(fsys)
+			changed[c.file] = &fstest.MapFile{Data: append(read(t, filepath.Join("testdata", tc.build, c.file)), "// changed\n"...)}
+			if got := digest(t, changed, c.test) == digest(t, fsys, c.test); got != c.reuse {
+				t.Errorf("%s: %s after changing %s: same fingerprint %v, want %v", tc.build, c.test, c.file, got, c.reuse)
 			}
 		}
 	}
@@ -186,15 +189,20 @@ var inherited = map[string]string{
 // conventions is a Gradle build whose convention plugin in buildSrc names b,
 // and whose c depends on a task of d.
 var conventions = map[string]string{
-	"settings.gradle.kts":                      `rootProject.name = "include-demo"` + "\n" + `include(":a", ":b", ":c", ":d")`,
-	"buildSrc/src/main/kotlin/conv.gradle.kts": `dependencies { "implementation"(project(":b")) }`,
-	"buildSrc/build/generated/Ignored.kt":      "project(name)",
-	"a/src/A.kt":                               "",
-	"b/src/B.kt":                               "",
-	"c/build.gradle.kts":                       `tasks.test { dependsOn(":d:jar") }`,
-	"d/build.gradle.kts":                       `evaluationDependsOn(":b")`,
-	"d/libs/x.jar":                             "",
-	"buildSrc/README.md":                       "project(name) is not code here",
+	"settings.gradle.kts":                        `rootProject.name = "include-demo"` + "\n" + `include(":a", ":b", ":c", ":d", ":e")` + "\n" + `gradle.beforeProject { extra["shared"] = project(":e") }`,
+	"build.gradle.kts":                           `subprojects { checkstyle { configFile = rootProject.file("config/checkstyle.xml") } }`,
+	"config/checkstyle.xml":                      "",
+	"config/detekt.yml":                          "",
+	"buildSrc/src/main/kotlin/detekt.gradle.kts": `detekt { config.setFrom(rootProject.file("config/detekt.yml")) }`,
+	"e/src/E.kt":                                 "",
+	"buildSrc/src/main/kotlin/conv.gradle.kts":   `dependencies { "implementation"(project(":b")) }`,
+	"buildSrc/build/generated/Ignored.kt":        "project(name)",
+	"a/src/A.kt":                                 "",
+	"b/src/B.kt":                                 "",
+	"c/build.gradle.kts":                         `tasks.test { dependsOn(":d:jar") }`,
+	"d/build.gradle.kts":                         `evaluationDependsOn(":b")`,
+	"d/libs/x.jar":                               "",
+	"buildSrc/README.md":                         "project(name) is not code here",
 }
 
 // The files and edges a unit gets from inheritance, build logic and its own
@@ -215,7 +223,10 @@ func TestFalseHitInheritedAndImported(t *testing.T) {
 			"java.a": "buildSrc/src/main/kotlin/conv.gradle.kts",
 			"java.c": "b/src/B.kt", // c -> d (task path) -> b (evaluationDependsOn)
 			"java.d": "d/libs/x.jar",
+			"java.b": "config/detekt.yml",     // read by a buildSrc convention plugin
+			"java.e": "config/checkstyle.xml", // read by the root build script
 		}},
+		{conventions, map[string]string{"java.a": "e/src/E.kt"}}, // named in the settings script
 	} {
 		set := generate(t, tree(t, tc.files), []byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"))
 		fsys := fstest.MapFS{"aval.golden.yaml": {Data: set}}
@@ -262,9 +273,9 @@ func TestUnits(t *testing.T) {
 				"a/c/build.gradle.kts": "val s = \"// not a comment \\\" still a string\"\n",
 			},
 			want: []gen.Unit{
-				{ID: "a", Source: []string{"settings.gradle", "build.gradle", "a/**"}, Deps: []string{"a/c", "b"}, Command: []string{"gradle", ":a:test"}},
-				{ID: "b", Source: []string{"settings.gradle", "build.gradle", "b/**"}, Command: []string{"gradle", ":b:test"}},
-				{ID: "a/c", Source: []string{"settings.gradle", "build.gradle", "a/build.gradle", "a/c/**"}, Deps: []string{"b"}, Command: []string{"gradle", ":a:c:test"}},
+				{ID: "a", Source: []string{"build.gradle", "settings.gradle", "a/**"}, Deps: []string{"a/c", "b"}, Command: []string{"gradle", ":a:test"}},
+				{ID: "b", Source: []string{"build.gradle", "settings.gradle", "b/**"}, Command: []string{"gradle", ":b:test"}},
+				{ID: "a/c", Source: []string{"build.gradle", "settings.gradle", "a/build.gradle", "a/c/**"}, Deps: []string{"b"}, Command: []string{"gradle", ":a:c:test"}},
 			},
 		},
 		"gradle intermediate project not included, source sets in the project": {
@@ -276,8 +287,8 @@ func TestUnits(t *testing.T) {
 				"common/build.gradle.kts":            `sourceSets.main { kotlin.setSrcDirs(listOf("src/kt")) }`,
 			},
 			want: []gen.Unit{
-				{ID: "common", Source: []string{"settings.gradle.kts", "common/**"}, Command: []string{"gradle", ":common:test"}},
-				{ID: "services/web/app", Source: []string{"settings.gradle.kts", "services/build.gradle.kts", "services/web/app/**"}, Deps: []string{"common"}, Command: []string{"gradle", ":services:web:app:test"}},
+				{ID: "common", Source: []string{"services/**", "settings.gradle.kts", "common/**"}, Command: []string{"gradle", ":common:test"}},
+				{ID: "services/web/app", Source: []string{"services/**", "settings.gradle.kts", "services/build.gradle.kts", "services/web/app/**"}, Deps: []string{"common"}, Command: []string{"gradle", ":services:web:app:test"}},
 			},
 		},
 		"maven parent by relative path, a module or from a repository": {
@@ -340,10 +351,11 @@ func TestUnits(t *testing.T) {
 		"gradle buildSrc, task paths, include in a string": {
 			files: conventions,
 			want: []gen.Unit{
-				{ID: "a", Source: []string{"settings.gradle.kts", "buildSrc/**", "a/**"}, Deps: []string{"b"}, Command: []string{"gradle", ":a:test"}},
-				{ID: "b", Source: []string{"settings.gradle.kts", "buildSrc/**", "b/**"}, Command: []string{"gradle", ":b:test"}},
-				{ID: "c", Source: []string{"settings.gradle.kts", "buildSrc/**", "c/**"}, Deps: []string{"b", "d"}, Command: []string{"gradle", ":c:test"}},
-				{ID: "d", Source: []string{"settings.gradle.kts", "buildSrc/**", "d/**"}, Deps: []string{"b"}, Command: []string{"gradle", ":d:test"}},
+				{ID: "a", Source: []string{"build.gradle.kts", "buildSrc/**", "config/**", "settings.gradle.kts", "a/**"}, Deps: []string{"b", "e"}, Command: []string{"gradle", ":a:test"}},
+				{ID: "b", Source: []string{"build.gradle.kts", "buildSrc/**", "config/**", "settings.gradle.kts", "b/**"}, Deps: []string{"e"}, Command: []string{"gradle", ":b:test"}},
+				{ID: "c", Source: []string{"build.gradle.kts", "buildSrc/**", "config/**", "settings.gradle.kts", "c/**"}, Deps: []string{"b", "d", "e"}, Command: []string{"gradle", ":c:test"}},
+				{ID: "d", Source: []string{"build.gradle.kts", "buildSrc/**", "config/**", "settings.gradle.kts", "d/**"}, Deps: []string{"b", "e"}, Command: []string{"gradle", ":d:test"}},
+				{ID: "e", Source: []string{"build.gradle.kts", "buildSrc/**", "config/**", "settings.gradle.kts", "e/**"}, Deps: []string{"b"}, Command: []string{"gradle", ":e:test"}},
 			},
 		},
 		"imported local BOM and managed plugin are edges, managed dependency is not": {
@@ -395,7 +407,6 @@ func TestUnitsFailClosed(t *testing.T) {
 		"missing module":          {map[string]string{"pom.xml": pomHead + `<modules><module>gone</module></modules></project>`}, "gone"},
 		"module pom file":         {map[string]string{"pom.xml": pomHead + `<modules><module>a/pom.xml</module></modules></project>`}, "names a POM file"},
 		"module outside":          {map[string]string{"pom.xml": pomHead + `<subprojects><subproject>../x</subproject></subprojects></project>`}, `"../x": want a directory inside the root`},
-		"module glob":             {map[string]string{"pom.xml": pomHead + `<modules><module>a*</module></modules></project>`}, "without glob characters"},
 		"source in the module":    {sub(`<project><groupId>g</groupId><artifactId>a</artifactId><build><testSourceDirectory>test</testSourceDirectory></build></project>`), ""},
 		"resource outside":        {sub(`<project><profiles><profile><build><resources><resource><directory>../conf</directory></resource></resources></build></profile></profiles></project>`), "a/pom.xml: <directory>../conf</directory> refers to files outside the module directory"},
 		"system path outside":     {sub(`<project><dependencies><dependency><systemPath>${basedir}/../lib/x.jar</systemPath></dependency></dependencies></project>`), "<systemPath>"},
@@ -435,33 +446,48 @@ func TestUnitsFailClosed(t *testing.T) {
 			"x/pom.xml":   `<project><groupId>g</groupId><artifactId>p</artifactId></project>`,
 		}, "parent x/pom.xml is a local POM outside the build"},
 
-		"include build":          {kts(`pluginManagement { includeBuild("build-logic") }`), "settings.gradle.kts: includeBuild: not supported by aval gen java"},
-		"project dir":            {kts(`include(":a")` + "\n" + `project(":a").projectDir = file("x")`), "projectDir"},
-		"computed include":       {kts(`listOf("a").forEach { include(it) }`), "include: an argument other than a string literal"},
-		"concatenated":           {kts(`include(":a" + suffix)`), "include: an argument other than a string literal"},
-		"groovy concatenated":    {map[string]string{"settings.gradle": "include ':a' + suffix\n"}, "include: an argument other than a string literal"},
-		"interpolated":           {kts(`include(":${name}")`), "a string with interpolation or escapes"},
-		"unterminated":           {kts(`include(":a`), "a string with interpolation or escapes"},
-		"include outside":        {kts(`include("..")`), `include ":..": ".."`},
-		"two root builds":        {kts(`include(":a")`, "build.gradle", "", "build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
-		"two unit builds":        {kts(`include(":a")`, "a/build.gradle", "", "a/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
-		"accessor in root":       {kts(`include(":a")`, "build.gradle.kts", "dependencies { implementation(projects.a) }"), "build.gradle.kts: type-safe project accessors"},
-		"computed project":       {kts(`include(":a")`, "a/build.gradle.kts", "dependencies { implementation(project(name)) }"), "a/build.gradle.kts: project(...): an argument other than a string literal"},
-		"apply from kotlin":      {kts(`include(":a")`, "a/build.gradle.kts", `apply(from = "../gradle/shared.gradle.kts")`), "a/build.gradle.kts: apply from: not supported"},
-		"apply from groovy":      {kts(`include(":a")`, "build.gradle", "subprojects { apply from: '../x.gradle' }"), "build.gradle: apply from"},
-		"source set outside":     {kts(`include(":a")`, "a/build.gradle.kts", `sourceSets { main { java.srcDir("../gen") } }`), `a/build.gradle.kts: "../gen" refers to files outside the project directory`},
-		"source set in project":  {kts(`include(":a")`, "a/build.gradle.kts", `sourceSets { main { java.srcDir("gen") }; java.srcDir(layout.buildDirectory.dir("gen")) }; val p = "a.b".replace('.', '/')`), ""},
-		"absolute file":          {kts(`include(":a")`, "a/build.gradle.kts", `dependencies { implementation(files("/opt/x.jar")) }`), `"/opt/x.jar" refers to files outside`},
-		"root dir":               {kts(`include(":a")`, "a/build.gradle.kts", `val c = file("$rootDir/config/x.xml")`), "a/build.gradle.kts: rootDir refers to files outside"},
-		"root project file":      {kts(`include(":a")`, "build.gradle.kts", `subprojects { val c = rootProject.file("x") }`), "build.gradle.kts: rootProject refers to files outside"},
-		"apply from in settings": {kts(`include(":a")` + "\n" + `apply(from = "more.settings.gradle.kts")`), "settings.gradle.kts: apply from"},
-		"empty project segment":  {kts(`include(":a")`, "a/build.gradle.kts", `evaluationDependsOn("::")`), `a/build.gradle.kts: project path "::"`},
-		"computed evaluation":    {kts(`include(":a")`, "a/build.gradle.kts", `evaluationDependsOn(other)`), "a/build.gradle.kts: evaluationDependsOn(...): an argument other than a string literal"},
-		"buildSrc computed ref":  {kts(`include(":a")`, "buildSrc/src/main/kotlin/c.gradle.kts", `dependencies { "implementation"(project(name)) }`), "buildSrc/src/main/kotlin/c.gradle.kts: project(...)"},
-		"ancestor two builds":    {kts(`include(":s:a")`, "s/build.gradle", "", "s/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
-		"ancestor computed ref":  {kts(`include(":s:a")`, "s/build.gradle.kts", "subprojects { dependencies { implementation(project(name)) } }"), "s/build.gradle.kts: project(...)"},
-		"comment hides rest":     {kts("include(\":a\") /* unterminated\ninclude(name)"), ""},
-		"comment at the end":     {kts(`include(":a") // no line break after it`), ""},
+		"include build":                  {kts(`pluginManagement { includeBuild("build-logic") }`), "settings.gradle.kts: includeBuild: not supported by aval gen java"},
+		"project dir":                    {kts(`include(":a")` + "\n" + `project(":a").projectDir = file("x")`), "projectDir"},
+		"computed include":               {kts(`listOf("a").forEach { include(it) }`), "include: an argument other than a string literal"},
+		"concatenated":                   {kts(`include(":a" + suffix)`), "include: an argument other than a string literal"},
+		"groovy concatenated":            {map[string]string{"settings.gradle": "include ':a' + suffix\n"}, "include: an argument other than a string literal"},
+		"interpolated":                   {kts(`include(":${name}")`), "a string with interpolation or escapes"},
+		"unterminated":                   {kts(`include(":a`), "a string with interpolation or escapes"},
+		"include outside":                {kts(`include("..")`), `include ":..": ".."`},
+		"two root builds":                {kts(`include(":a")`, "build.gradle", "", "build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
+		"two unit builds":                {kts(`include(":a")`, "a/build.gradle", "", "a/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
+		"accessor in root":               {kts(`include(":a")`, "build.gradle.kts", "dependencies { implementation(projects.a) }"), "build.gradle.kts: type-safe project accessors"},
+		"computed project":               {kts(`include(":a")`, "a/build.gradle.kts", "dependencies { implementation(project(name)) }"), "a/build.gradle.kts: project(...): an argument other than a string literal"},
+		"apply from kotlin":              {kts(`include(":a")`, "a/build.gradle.kts", `apply(from = "../gradle/shared.gradle.kts")`), "a/build.gradle.kts: apply from: not supported"},
+		"apply from groovy":              {kts(`include(":a")`, "build.gradle", "subprojects { apply from: '../x.gradle' }"), "build.gradle: apply from"},
+		"source set in another project":  {kts(`include(":a", ":b")`, "a/build.gradle.kts", `sourceSets { main { java.srcDir("../b/gen") } }`), `a/build.gradle.kts: "../b/gen" refers to files of another project`},
+		"source set in the root context": {kts(`include(":a", ":b")`, "a/build.gradle.kts", `sourceSets { main { java.srcDir("../gen") } }; val c = file("$rootDir/config/x.xml")`), ""},
+		"path outside the root":          {kts(`include(":a")`, "a/build.gradle.kts", `val x = file("../../x")`), `"../../x" refers to files outside the root`},
+		"project dir prefix":             {kts(`include(":a")`, "a/build.gradle.kts", `val x = file("$projectDir/../../x")`), "refers to files outside the root"},
+		"source set in project":          {kts(`include(":a")`, "a/build.gradle.kts", `sourceSets { main { java.srcDir("gen") }; java.srcDir(layout.buildDirectory.dir("gen")) }; val p = "a.b".replace('.', '/')`), ""},
+		"absolute file":                  {kts(`include(":a")`, "a/build.gradle.kts", `dependencies { implementation(files("/opt/x.jar")) }`), `"/opt/x.jar" is an absolute path`},
+		"root dir into a project":        {kts(`include(":a", ":b")`, "a/build.gradle.kts", `val c = file("${rootDir}/b/x.xml")`), `"${rootDir}/b/x.xml" refers to files of another project`},
+		"root dir outside":               {kts(`include(":a")`, "build.gradle.kts", `val c = file("$rootDir/../x")`), "refers to files outside the root"},
+		"parent from a subproject":       {kts(`include(":a", ":b")`, "a/build.gradle.kts", `val s = parent!!.childProjects`), "a/build.gradle.kts: parent refers to files of another project"},
+		"root subprojects":               {kts(`include(":a", ":b")`, "a/build.gradle.kts", `rootProject.subprojects { }`), "rootProject.subprojects refers to files of another project"},
+		"parent file in the root":        {kts(`include(":a")`, "build.gradle.kts", `val d = projectDir.parentFile`), "build.gradle.kts: parentFile refers"},
+		"triple-quoted string":           {kts(`include(":a", ":b")`, "a/build.gradle.kts", `val x = """project(":b")"""`), "a/build.gradle.kts: a triple-quoted string"},
+		"triple-quoted settings":         {kts(`include(":a")` + "\nval x = '''y'''"), "settings.gradle.kts: a triple-quoted string"},
+		"maven filter":                   {sub(`<project><build><filters><filter>../shared/f.properties</filter></filters></build></project>`), "<filter>../shared/f.properties</filter>"},
+		"maven suiteXmlFile":             {sub(`<project><build><plugins><plugin><configuration><suiteXmlFiles><suiteXmlFile>../testng.xml</suiteXmlFile></suiteXmlFiles></configuration></plugin></plugins></build></project>`), "<suiteXmlFile>"},
+		"maven activation file":          {sub(`<project><profiles><profile><activation><file><exists>${basedir}/../x</exists></file></activation></profile></profiles></project>`), "<exists>"},
+		"maven property path":            {sub(`<project><properties><d>../shared</d></properties></project>`), "<d>../shared</d>"},
+		"maven.config property":          {map[string]string{".mvn/maven.config": "-B -D a=1 --define=b=2 -Dlib=x --define", "pom.xml": pomHead + `<properties><lib>a</lib></properties><modules><module>a</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${lib}</artifactId></dependency></dependencies></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, "a/pom.xml: property lib set by .mvn/maven.config"},
+		"maven.config other property":    {map[string]string{".mvn/maven.config": "-Dother=x", "pom.xml": pomHead + `<properties><lib>a</lib></properties><modules><module>a</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${lib}</artifactId></dependency></dependencies></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, ""},
+		"unreadable maven.config":        {map[string]string{".mvn/maven.config/x": "", "pom.xml": pomHead + `</project>`}, "maven.config"},
+		"apply from in settings":         {kts(`include(":a")` + "\n" + `apply(from = "more.settings.gradle.kts")`), "settings.gradle.kts: apply from"},
+		"empty project segment":          {kts(`include(":a")`, "a/build.gradle.kts", `evaluationDependsOn("::")`), `a/build.gradle.kts: project path "::"`},
+		"computed evaluation":            {kts(`include(":a")`, "a/build.gradle.kts", `evaluationDependsOn(other)`), "a/build.gradle.kts: evaluationDependsOn(...): an argument other than a string literal"},
+		"buildSrc computed ref":          {kts(`include(":a")`, "buildSrc/src/main/kotlin/c.gradle.kts", `dependencies { "implementation"(project(name)) }`), "buildSrc/src/main/kotlin/c.gradle.kts: project(...)"},
+		"ancestor two builds":            {kts(`include(":s:a")`, "s/build.gradle", "", "s/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
+		"ancestor computed ref":          {kts(`include(":s:a")`, "s/build.gradle.kts", "subprojects { dependencies { implementation(project(name)) } }"), "s/build.gradle.kts: project(...)"},
+		"comment hides rest":             {kts("include(\":a\") /* unterminated\ninclude(name)"), ""},
+		"comment at the end":             {kts(`include(":a") // no line break after it`), ""},
 	} {
 		_, err := Adapter{}.Units(tree(t, tc.files))
 		switch {
@@ -492,6 +518,14 @@ func TestUnreadableScript(t *testing.T) {
 		if _, err := (Adapter{}).Units(root); !errors.Is(err, fs.ErrPermission) {
 			t.Errorf("%s unreadable: %v", file, err)
 		}
+	}
+	root := tree(t, gradle) // the settings script is readable, the root not listable
+	if err := os.Chmod(root, 0o311); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
+	if _, err := (Adapter{}).Units(root); !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("root not listable: %v", err)
 	}
 }
 
@@ -562,4 +596,42 @@ func FuzzGradleRefs(f *testing.F) {
 			}
 		}
 	})
+}
+
+// A module or project directory named with glob metacharacters gets an
+// escaped glob, so a change to its files changes its test's fingerprint and
+// no other; a name no contract glob can express fails closed.
+func TestFalseHitMetacharacterDirectory(t *testing.T) {
+	set := []byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n")
+	for _, files := range []map[string]string{
+		{"pom.xml": pomHead + `<modules><module>a[1]</module><module>a1</module></modules></project>`,
+			"a[1]/pom.xml": `<project><groupId>g</groupId><artifactId>x</artifactId></project>`, "a[1]/A.java": "",
+			"a1/pom.xml": `<project><groupId>g</groupId><artifactId>y</artifactId></project>`},
+		{"settings.gradle.kts": `include(":a[1]", ":a1")`, "a[1]/A.java": "", "a1/B.java": ""},
+	} {
+		out := generate(t, tree(t, files), set)
+		if !strings.Contains(string(out), "a[[]1]/**") {
+			t.Fatalf("no escaped glob:\n%s", out)
+		}
+		fsys := fstest.MapFS{"aval.golden.yaml": {Data: out}}
+		for k, v := range files {
+			fsys[k] = &fstest.MapFile{Data: []byte(v)}
+		}
+		changed := maps.Clone(fsys)
+		changed["a[1]/A.java"] = &fstest.MapFile{Data: []byte("changed")}
+		if digest(t, changed, "java.a-1") == digest(t, fsys, "java.a-1") || digest(t, changed, "java.a1") != digest(t, fsys, "java.a1") {
+			t.Errorf("%v: want only java.a-1 to change", files)
+		}
+	}
+	if runtime.GOOS == "windows" { // no backslash in a file name
+		return
+	}
+	for files, want := range map[*map[string]string]string{
+		{"pom.xml": pomHead + `<modules><module>b\c</module></modules></project>`, `b\c/pom.xml`: `<project><groupId>g</groupId><artifactId>b</artifactId></project>`}: `"b\\c": a contract glob cannot express`,
+		{"settings.gradle.kts": `include(":a")`, `x\y`: ""}: `"x\\y": a contract glob cannot express`,
+	} {
+		if _, err := (Adapter{}).Units(tree(t, *files)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("error %v, want %q", err, want)
+		}
+	}
 }

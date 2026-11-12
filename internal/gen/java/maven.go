@@ -3,6 +3,7 @@ package java
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -84,12 +85,17 @@ type reactor struct {
 	root    string
 	poms    map[string]*pom
 	byCoord map[coord]*pom
+	config  map[string]bool // user properties set in .mvn/maven.config
 }
 
 // maven walks <modules> (and Maven 4 <subprojects>) from the root POM, in
 // the root project and every profile, and returns one unit per module.
 func maven(root string) ([]gen.Unit, error) {
-	r := reactor{root: root, poms: map[string]*pom{}, byCoord: map[coord]*pom{}}
+	config, err := mavenConfig(root)
+	if err != nil {
+		return nil, err
+	}
+	r := reactor{root: root, poms: map[string]*pom{}, byCoord: map[coord]*pom{}, config: config}
 	var dirs []string
 	seen := map[string]bool{"": true}
 	for queue := []string{""}; len(queue) > 0; queue = queue[1:] {
@@ -119,17 +125,9 @@ func maven(root string) ([]gen.Unit, error) {
 			}
 		}
 	}
-	index := map[string]string{} // groupId:artifactId -> module directory
-	for _, dir := range dirs {
-		p := r.poms[dir]
-		key, err := r.key(p, coord{p.group(), p.ArtifactID})
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", pomPath(dir), err)
-		}
-		if other, dup := index[key]; dup {
-			return nil, fmt.Errorf("modules %s and %s are both %s", other, dir, key)
-		}
-		index[key] = dir
+	index, err := r.index(dirs)
+	if err != nil {
+		return nil, err
 	}
 	strays, err := r.strays()
 	if err != nil {
@@ -144,12 +142,29 @@ func maven(root string) ([]gen.Unit, error) {
 		}
 		units = append(units, gen.Unit{
 			ID:      dir,
-			Source:  []string{dir + "/**"},
+			Source:  []string{under(dir, "**")},
 			Deps:    deps,
 			Command: []string{mvn, "-B", "-pl", dir, "test"},
 		})
 	}
 	return units, nil
+}
+
+// index returns the module directories by groupId:artifactId.
+func (r reactor) index(dirs []string) (map[string]string, error) {
+	index := map[string]string{}
+	for _, dir := range dirs {
+		p := r.poms[dir]
+		key, err := r.key(p, coord{p.group(), p.ArtifactID})
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", pomPath(dir), err)
+		}
+		if other, dup := index[key]; dup {
+			return nil, fmt.Errorf("modules %s and %s are both %s", other, dir, key)
+		}
+		index[key] = dir
+	}
+	return index, nil
 }
 
 // strays indexes the pom.xml files under the root that are not in the
@@ -191,6 +206,35 @@ func (r reactor) strays() (map[string]string, error) {
 	return strays, err
 }
 
+// mavenConfig returns the user properties .mvn/maven.config sets with -D
+// or --define, which override the POM's.
+func mavenConfig(root string) (map[string]bool, error) {
+	data, err := os.ReadFile(filepath.Join(root, ".mvn", "maven.config"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	keys := map[string]bool{}
+	args := strings.Fields(string(data))
+	for i, a := range args {
+		switch {
+		case (a == "-D" || a == "--define") && i+1 < len(args):
+			a = args[i+1]
+		case strings.HasPrefix(a, "--define="):
+			a = a[len("--define="):]
+		case strings.HasPrefix(a, "-D"):
+			a = a[2:]
+		default:
+			continue
+		}
+		k, _, _ := strings.Cut(a, "=")
+		keys[k] = true
+	}
+	return keys, nil
+}
+
 func pomPath(dir string) string { return path.Join(dir, "pom.xml") }
 
 func readPom(root, dir string) (*pom, error) {
@@ -211,23 +255,21 @@ func readPom(root, dir string) (*pom, error) {
 	return &p, nil
 }
 
-// pathElems are the POM elements that name a file or directory: source and
-// resource directories, systemPath and the usual plugin parameters
-// (build-helper <source>, checkstyle <configLocation>).
-var pathElems = map[string]bool{
-	"directory": true, "sourceDirectory": true, "testSourceDirectory": true, "scriptSourceDirectory": true,
-	"systemPath": true, "source": true, "file": true, "location": true, "configLocation": true,
-	"suppressionsLocation": true, "headerLocation": true, "basedir": true, "workingDirectory": true,
-}
-
 // rootVarRe matches a property that points at the build root or a parent
 // directory instead of the module.
 var rootVarRe = regexp.MustCompile(`\$\{(maven\.multiModuleProjectDirectory|session\.(executionRootDirectory|rootDirectory)|project\.(rootDirectory|parent\.basedir))\}`)
 
-// checkPath rejects the text of a POM element that refers to files outside
-// the module directory, which its <dir>/** glob would miss.
+// checkPath rejects the text of a POM element (a property value too) that
+// refers to files outside the module directory, which its <dir>/** glob
+// would miss: filters, suiteXmlFile, profile activation files, systemPath,
+// source directories. Only a whole value is read: ".." inside larger text,
+// such as an argLine, is not seen. relativePath and modules are checked
+// elsewhere.
 func checkPath(name, text string) error {
-	if rootVarRe.MatchString(text) || pathElems[name] && outside(text) {
+	if name == "relativePath" || name == "module" || name == "subproject" {
+		return nil
+	}
+	if rootVarRe.MatchString(text) || outside(text) {
 		return fmt.Errorf("<%s>%s</%s> refers to files outside the module directory: %w", name, text, name, errUnsupported)
 	}
 	return nil
@@ -439,6 +481,9 @@ func (r reactor) prop(p *pom, name string) (string, bool, error) {
 		return p.ArtifactID, true, nil
 	case "project.parent.groupId":
 		return p.Parent.GroupID, true, nil
+	}
+	if r.config[name] {
+		return "", false, fmt.Errorf("property %s set by .mvn/maven.config: %w", name, errUnsupported)
 	}
 	chain := r.chain(p)
 	for _, q := range chain {
