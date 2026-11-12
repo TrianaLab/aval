@@ -15,6 +15,8 @@ import (
 
 	"github.com/TrianaLab/aval/internal/gen"
 	"github.com/TrianaLab/aval/internal/gen/golang"
+	"github.com/TrianaLab/aval/internal/gen/js"
+	"github.com/TrianaLab/aval/internal/gen/rust"
 )
 
 // goAdapter is the go adapter, whose options are flags of aval gen.
@@ -22,7 +24,11 @@ var goAdapter = &golang.Adapter{}
 
 // adapters are the languages aval gen knows, by name. An adapter's own
 // flags are named "<language>-<option>".
-var adapters = map[string]gen.Adapter{"go": goAdapter}
+var adapters = map[string]gen.Adapter{
+	"go":   goAdapter,
+	"js":   js.Adapter{},
+	"rust": rust.Adapter{},
+}
 
 func newGenCmd() *cobra.Command {
 	var file string
@@ -71,9 +77,6 @@ of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 
 // languages lists the adapters for help and errors.
 func languages() string {
-	if len(adapters) == 0 {
-		return "none yet"
-	}
 	return strings.Join(slices.Sorted(maps.Keys(adapters)), ", ")
 }
 
