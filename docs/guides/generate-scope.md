@@ -190,9 +190,11 @@ tests of the packages that import it, and no other test.
 
 - Reads: `os.ReadFile`, `Open`, `OpenFile`, `ReadDir`, `Stat`, `Lstat`,
   `Readlink`, `DirFS`, `OpenRoot` and `OpenInRoot`; `ioutil.ReadFile` and
-  `ReadDir`; `filepath.Walk`, `WalkDir` and `Glob`; and `os.Chdir` and
-  `t.Chdir`, since later relative reads land under that directory (going
-  back to the working directory is not a read). Dot imports count.
+  `ReadDir`; `filepath.Walk`, `WalkDir` and `Glob`; the `html/template`
+  and `text/template` functions `ParseFiles` (every argument) and
+  `ParseGlob`; `http.Dir`; and `os.Chdir` and `t.Chdir`, since later
+  relative reads land under that directory (going back to the directory
+  `os.Getwd` returned is not a read). Dot imports count.
 - Paths it resolves: string literals and constants, `+`, `filepath` and
   `path` `Join`, `Clean`, `Dir`, `Abs`, `FromSlash` and `ToSlash`, every
   value assigned to a variable of the package, ranges over slice and map
@@ -211,8 +213,16 @@ It fails closed, naming the file and line (exit 1, nothing written):
   variable (`os.Getenv`, `LookupEnv`, `ExpandEnv`) or `runtime.Caller`
   with another depth, or from a literal with a `..`
   segment that names a file or directory of the contract root outside the
-  package (`filepath.Join(root, name)` with `root` from `"../.."`). A
-  path built on `t.TempDir()` is fine;
+  package (`filepath.Join(root, name)` with `root` from `"../.."`). Paths
+  it cannot follow count as built from anywhere: a parameter of a method
+  or closure, or of a function that no call in the package passes or that
+  is also used as a value; a variable written through a pointer; a call
+  to another package (other than `strings`, `fmt`, `strconv`, `path` and
+  `filepath`, which keep what their arguments may climb to), to a method
+  or to a function value; a variable of another package; and a `Chdir` to
+  a directory it cannot resolve. A path built on `t.TempDir()`,
+  `t.Name()`, `os.TempDir()`, `os.MkdirTemp` or the `Name()` of an
+  `os.CreateTemp` file is fine;
 - a path outside the contract root, absolute ones included
   (`/proc/self/cgroup`);
 - a relative path in a non-test file of a package that is not `main`:
@@ -226,13 +236,17 @@ package and a hand-written test that `use`s its `go.*` fragments and a
 fragment of your own. A pattern that matches no package fails, and
 `--check` needs the same flags.
 
-It does not see, so declare by hand: a path that comes from another
-package (`testutil.Read(t, "../x")`), a method, a closure parameter or a
-struct field not set from a literal in the package; parameters of a
-function also used as a value; a slice or map literal that a function it
-is passed to changes; a path that climbs without a `..` in any literal
-(`"." + "./x"`); and files read through other APIs, such as
-`exec.Command` or `template.ParseFiles`.
+A helper that reads a path its callers pass, such as
+`testutil.Read(t, "../x")`, fails closed in the helper's package. Let the
+caller open the directory instead (`testutil.Read(t, os.DirFS("../x"),
+"a.json")` with `fs.ReadFile` in the helper), so the read is in the
+caller's package.
+
+It does not see, so declare by hand: a slice or map literal that a
+function it is passed to changes; a path that climbs without a `..` in
+any literal (`"." + "./x"`); and files read through other APIs, such as
+`exec.Command`, the `ParseFiles` method of a template, or a function of
+another package that opens a path of its own.
 
 ### The go.module fragment
 

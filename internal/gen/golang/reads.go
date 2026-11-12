@@ -19,13 +19,21 @@ import (
 )
 
 // readCalls are the functions that read a path, by import path and name.
-// The path is their first argument.
+// The path is their first argument (every argument of ParseFiles).
 var readCalls = map[string]map[string]bool{
 	"os": {"ReadFile": true, "Open": true, "OpenFile": true, "ReadDir": true, "Stat": true, "Lstat": true,
 		"DirFS": true, "Readlink": true, "OpenRoot": true, "OpenInRoot": true},
 	"io/ioutil":     {"ReadFile": true, "ReadDir": true},
 	"path/filepath": {"Walk": true, "WalkDir": true, "Glob": true},
+	"html/template": {"ParseFiles": true, "ParseGlob": true},
+	"text/template": {"ParseFiles": true, "ParseGlob": true},
+	"net/http":      {"Dir": true},
 }
+
+// stringPkgs are the packages whose functions build a string only from
+// their arguments: an unknown result keeps what the arguments may escape
+// through. A call to any other package may return any path.
+var stringPkgs = map[string]bool{"strings": true, "fmt": true, "strconv": true, "path": true, "path/filepath": true}
 
 // pathFuncs are the functions of path and path/filepath the resolver
 // evaluates, with the number of arguments they take (-1: any).
@@ -148,6 +156,7 @@ type resolver struct {
 	top   map[token.Pos]types.Object       // each package-level name's first object, by declaring identifier
 	calls map[types.Object][]*ast.CallExpr
 	refs  map[types.Object]int  // uses, calls included
+	tests map[types.Object]bool // variables of type *testing.T, B, F or testing.TB
 	guard map[types.Object]bool // names composite and field are following
 	stack map[any]int           // keys once is computing, by depth
 	memo  map[any]val
@@ -212,7 +221,7 @@ func newResolver(fset *token.FileSet, files []*ast.File) *resolver {
 	r := &resolver{fset: fset, info: &types.Info{Defs: map[*ast.Ident]types.Object{}, Uses: map[*ast.Ident]types.Object{},
 		Types: map[ast.Expr]types.TypeAndValue{}},
 		defs: map[types.Object][]def{}, funcs: map[types.Object][]*ast.FuncDecl{}, calls: map[types.Object][]*ast.CallExpr{}, top: map[token.Pos]types.Object{},
-		refs: map[types.Object]int{}, guard: map[types.Object]bool{}, stack: map[any]int{}, memo: map[any]val{}, low: math.MaxInt}
+		refs: map[types.Object]int{}, tests: map[types.Object]bool{}, guard: map[types.Object]bool{}, stack: map[any]int{}, memo: map[any]val{}, low: math.MaxInt}
 	conf := types.Config{Importer: fakeImporter{}, Error: func(error) {}, FakeImportC: true}
 	_, _ = conf.Check(files[0].Name.Name, fset, files, r.info) // errors are expected: imports are empty
 	r.topLevel(files)
@@ -304,23 +313,42 @@ func (r *resolver) record(n ast.Node) bool {
 		r.define(n.Key, def{e: n.X, rng: true, key: true})
 		r.define(n.Value, def{e: n.X, rng: true})
 	case *ast.FuncDecl:
-		if n.Recv == nil {
-			if o := r.obj(n.Name); o != nil {
-				r.funcs[o] = append(r.funcs[o], n)
-			}
+		if o := r.obj(n.Name); o != nil && n.Recv == nil {
+			r.funcs[o] = append(r.funcs[o], n)
 		}
 	case *ast.CallExpr:
-		if id, ok := ast.Unparen(n.Fun).(*ast.Ident); ok {
-			if o := r.obj(id); o != nil {
-				r.calls[o] = append(r.calls[o], n)
-			}
-		}
+		r.callSite(n)
 	case *ast.Ident:
 		if o := r.obj(n); o != nil && r.info.Uses[n] != nil {
 			r.refs[o]++
 		}
+	case *ast.Field:
+		r.testingField(n)
 	}
 	return true
+}
+
+// callSite records a call of a function of the package.
+func (r *resolver) callSite(c *ast.CallExpr) {
+	if id, ok := ast.Unparen(c.Fun).(*ast.Ident); ok {
+		if o := r.obj(id); o != nil {
+			r.calls[o] = append(r.calls[o], c)
+		}
+	}
+}
+
+// testingField records the names a field of type *testing.T, B, F or
+// testing.TB declares.
+func (r *resolver) testingField(f *ast.Field) {
+	t := f.Type
+	if s, ok := t.(*ast.StarExpr); ok {
+		t = s.X
+	}
+	if ip, name := r.callee(t); ip == "testing" && strings.Contains(" T B F TB ", " "+name+" ") {
+		for _, id := range f.Names {
+			r.tests[r.obj(id)] = true
+		}
+	}
 }
 
 // spec records the values a var or const declaration gives.
@@ -424,13 +452,17 @@ func (r *resolver) reads(files []*ast.File) []read {
 				return true
 			}
 			call, ok := r.readCall(c.Fun, dot)
-			if ok {
-				rd := read{pos: r.fset.Position(c.Pos()), call: call, main: f.Name.Name == "main", glob: strings.HasSuffix(call, ".Glob"), val: r.eval(c.Args[0], 0)}
-				if strings.HasSuffix(call, "Chdir") {
-					// The directory a test moves to: what it reads there is
-					// under it. Going back to the working directory is not
-					// a read.
-					rd.val.cwd = false
+			if !ok {
+				return true
+			}
+			args := c.Args[:1]
+			if strings.HasSuffix(call, "ParseFiles") {
+				args = c.Args
+			}
+			for _, a := range args {
+				rd := read{pos: r.fset.Position(c.Pos()), call: call, main: f.Name.Name == "main", glob: strings.HasSuffix(call, "Glob"), val: r.eval(a, 0)}
+				if strings.HasSuffix(call, "Chdir") && r.getwd(a) {
+					rd.val = val{} // back to the working directory: not a read
 				}
 				out = append(out, rd)
 			}
@@ -438,6 +470,28 @@ func (r *resolver) reads(files []*ast.File) []read {
 		})
 	}
 	return out
+}
+
+// getwd reports whether e is a variable whose only value is the working
+// directory os.Getwd returned, which a test changes back to. A test that
+// moves anywhere else reads under that directory.
+func (r *resolver) getwd(e ast.Expr) bool {
+	id, _ := ast.Unparen(e).(*ast.Ident)
+	return id != nil && r.from(r.obj(id), "os", "Getwd")
+}
+
+// from reports whether every value of the variable o is the first result
+// of a call to the function name of package ip.
+func (r *resolver) from(o types.Object, ip, name string) bool {
+	ds := r.defs[o]
+	return len(ds) > 0 && !slices.ContainsFunc(ds, func(d def) bool {
+		c, ok := ast.Unparen(d.e).(*ast.CallExpr)
+		if !ok || d.idx != 0 || d.rng || d.opAsg {
+			return true
+		}
+		cip, cname := r.callee(c.Fun)
+		return cip != ip || cname != name
+	})
 }
 
 // readCall returns the name of the read call fun is, such as os.ReadFile:
@@ -515,8 +569,8 @@ func (r *resolver) eval(e ast.Expr, idx int) val {
 			return r.object(o)
 		}
 	case *ast.SelectorExpr:
-		if ip, name := r.callee(e); ip == "os" && name == "DevNull" {
-			return val{} // not a file of the repository
+		if v, ok := r.member(e); ok {
+			return v
 		}
 		if v, ok := r.field(e); ok {
 			return v
@@ -525,19 +579,75 @@ func (r *resolver) eval(e ast.Expr, idx int) val {
 		if v, ok := r.call(e, idx); ok {
 			return v
 		}
+		return r.opaque(e)
 	}
 	return r.taint(e)
 }
 
+// member returns the value of a member of another package, such as
+// os.DevNull: any value, unless the resolver knows it.
+func (r *resolver) member(sel *ast.SelectorExpr) (val, bool) {
+	switch ip, name := r.callee(sel); {
+	case ip == "os" && name == "DevNull":
+		return val{}, true // not a file of the repository
+	case ip == "os" && name == "PathSeparator", ip == "path/filepath" && name == "Separator":
+		return known("/"), true
+	case ip != "":
+		return val{cwd: true}, true
+	}
+	return val{}, false
+}
+
+// opaque returns the value of a call the resolver does not evaluate. A
+// temporary path or a test's name is not a file of the repository, and a
+// function of stringPkgs keeps what its arguments may escape through. Any
+// other call (another package, a method, a function value) may return any
+// path: fail closed.
+func (r *resolver) opaque(c *ast.CallExpr) val {
+	ip, name := r.callee(c.Fun)
+	switch {
+	case ip == "os" && (name == "TempDir" || name == "MkdirTemp"), r.temp(c.Fun):
+		return val{}
+	case stringPkgs[ip]:
+		vs := make([]val, len(c.Args))
+		for i, a := range c.Args {
+			vs[i] = r.eval(a, 0)
+		}
+		return unknown(vs...)
+	}
+	return val{cwd: true}
+}
+
+// temp reports whether fun is t.TempDir or t.Name of a testing variable,
+// or the Name method of a file os.CreateTemp returned.
+func (r *resolver) temp(fun ast.Expr) bool {
+	sel, _ := ast.Unparen(fun).(*ast.SelectorExpr)
+	if sel == nil {
+		return false
+	}
+	id, _ := sel.X.(*ast.Ident)
+	if id == nil {
+		return false
+	}
+	o := r.obj(id)
+	if r.tests[o] {
+		return sel.Sel.Name == "TempDir" || sel.Sel.Name == "Name"
+	}
+	return sel.Sel.Name == "Name" && r.from(o, "os", "CreateTemp")
+}
+
 // taint reports whether an expression the resolver cannot evaluate may
 // still leave the package directory: the unknown value built from the
-// string literals, names and calls in it.
+// string literals, names, selectors and calls in it.
 func (r *resolver) taint(e ast.Expr) val {
-	if id, ok := ast.Unparen(e).(*ast.Ident); ok {
-		if o := r.obj(id); o != nil {
+	switch x := ast.Unparen(e).(type) {
+	case *ast.Ident:
+		if o := r.obj(x); o != nil {
 			return unknown(r.object(o))
 		}
-		return val{}
+		return val{} // a builtin, a type or a field name
+	case *ast.CallExpr:
+		return r.opaque(x)
 	}
 	var vs []val
 	ast.Inspect(e, func(n ast.Node) bool {
@@ -546,7 +656,7 @@ func (r *resolver) taint(e ast.Expr) val {
 			if s, err := strconv.Unquote(n.Value); err == nil && n.Kind == token.STRING {
 				vs = append(vs, known(s))
 			}
-		case *ast.Ident, *ast.CallExpr:
+		case *ast.Ident, *ast.CallExpr, *ast.SelectorExpr:
 			if n != e {
 				vs = append(vs, r.eval(n.(ast.Expr), 0))
 				return false
@@ -562,7 +672,12 @@ func (r *resolver) object(o types.Object) val {
 	return r.once(o, func() val {
 		defs := r.defs[o]
 		if len(defs) == 0 {
-			return val{} // a parameter of a method or literal, or a name without a value
+			if v, ok := o.(*types.Var); ok && (v.Kind() == types.ParamVar || v.Kind() == types.RecvVar) {
+				// A parameter of a method or literal, or of a function
+				// no call in the package passes: any value.
+				return val{cwd: true}
+			}
+			return val{} // a name without a value: the zero value, or no path
 		}
 		vs := make([]val, len(defs))
 		for i, d := range defs {
@@ -576,7 +691,7 @@ func (r *resolver) object(o types.Object) val {
 func (r *resolver) def(d def) val {
 	switch {
 	case d.e == nil:
-		return val{}
+		return val{cwd: true} // written through a pointer, or a parameter of a function used as a value: any value
 	case d.opAsg:
 		return unknown(r.eval(d.e, 0))
 	case d.rng && d.key:
@@ -799,7 +914,7 @@ func (r *resolver) results(fn types.Object, idx int) val {
 // statement.
 func (r *resolver) returns(decl *ast.FuncDecl, idx int) []val {
 	if decl.Body == nil {
-		return []val{{}} // implemented elsewhere (assembly, linkname)
+		return []val{{cwd: true}} // implemented elsewhere (assembly, linkname): any value
 	}
 	var named []*ast.Ident
 	if decl.Type.Results != nil {

@@ -197,6 +197,23 @@ func TestDynamicRead(t *testing.T) {
 	}
 }
 
+// A read whose path comes from a closure parameter, another package or a
+// Chdir to a computed directory may read fixtures/order.json: each fails
+// closed instead of leaving it out of the scope (a false hit on edit).
+func TestFalseHitUnresolvedRead(t *testing.T) {
+	for _, body := range []string{
+		"read := func(p string) { _, _ = os.ReadFile(p) }\n\tread(\"../fixtures/order.json\")",
+		"_, _ = os.ReadFile(filepath.Join(testutil.Root(), \"fixtures\", \"order.json\"))",
+		"wd, _ := os.Getwd()\n\tt.Chdir(filepath.Dir(wd))\n\t_, _ = os.ReadFile(\"fixtures/order.json\")",
+	} {
+		root := shop(t)
+		write(t, filepath.Join(root, "web/unresolved_test.go"), "package web\n\nimport (\n\t\"os\"\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"example.com/shop/internal/testutil\"\n)\n\nvar _ = filepath.Join\nvar _ = testutil.Equal\n\nfunc TestUnresolved(t *testing.T) {\n\t"+body+"\n}\n")
+		if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "web/unresolved_test.go:") || !strings.Contains(err.Error(), "cannot resolve") {
+			t.Errorf("%s: %v, want an error naming web/unresolved_test.go", body, err)
+		}
+	}
+}
+
 // A file embedded only by a file for another OS is still in scope.
 func TestFalseHitEmbedOtherOS(t *testing.T) {
 	root := shop(t)

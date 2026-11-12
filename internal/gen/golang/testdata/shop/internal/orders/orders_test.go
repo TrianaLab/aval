@@ -13,7 +13,7 @@ import (
 const fixtures = "../../fixtures"
 
 func TestTotal(t *testing.T) {
-	testutil.Equal(t, orders.Total([]int{100, 50}), testutil.Read(t, "testdata/order.txt"))
+	testutil.Equal(t, orders.Total([]int{100, 50}), testutil.Read(t, os.DirFS("testdata"), "order.txt"))
 }
 
 func TestFixture(t *testing.T) {

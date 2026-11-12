@@ -2,14 +2,15 @@
 package testutil
 
 import (
-	"os"
+	"io/fs"
 	"strings"
 	"testing"
 )
 
-// Read returns the trimmed content of file.
-func Read(t *testing.T, file string) string {
-	data, err := os.ReadFile(file)
+// Read returns the trimmed content of file in fsys. The caller picks the
+// directory (os.DirFS), so aval gen go sees what it reads.
+func Read(t *testing.T, fsys fs.FS, file string) string {
+	data, err := fs.ReadFile(fsys, file)
 	if err != nil {
 		t.Fatal(err)
 	}
