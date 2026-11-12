@@ -1054,6 +1054,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#java-and-kotlin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Java and Kotlin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-language-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2353,6 +2364,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#java-and-kotlin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Java and Kotlin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-language-dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2460,8 +2482,8 @@ declared in <code>aval.yaml</code>.</p>
 <p class="admonition-title">Languages</p>
 <p>Go (<a href="#go">below</a>), JavaScript and TypeScript
 (<a href="#javascript-and-typescript">below</a>), Python (<a href="#python">below</a>), Rust
-(<a href="#rust">below</a>) and .NET (<a href="#net">below</a>) ship. The other adapter (Java)
-is the next story of
+(<a href="#rust">below</a>), .NET (<a href="#net">below</a>), and Java and Kotlin
+(<a href="#java-and-kotlin">below</a>) ship, as part of
 <a href="https://github.com/TrianaLab/aval/issues/291">Epic 16</a>. <code>aval gen --help</code>
 lists the languages your build has.</p>
 </div>
@@ -2829,6 +2851,83 @@ in <code>internal/gen/dotnet/testdata/golden.yaml</code>.</p>
   solutions at the root, or two projects with the same name is an error.</li>
 <li>Files that only a property names (such as a <code>KeyOriginatorFile</code>) are not
   followed: add them to <code>defaults</code>.</li>
+</ul>
+<h2 id="java-and-kotlin">Java and Kotlin<a class="headerlink" href="#java-and-kotlin" title="Anchor link">&para;</a></h2>
+<p><code>aval gen java</code> reads the build files at the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root and runs no JVM
+tool. A unit's files are its whole directory (<code>&lt;module&gt;/**</code>) plus the root
+context: each top-level file and directory of the root that is not a module
+directory or build output (<code>.git</code>, <code>.gradle</code>, <code>build</code>, <code>out</code>, <code>target</code>),
+since build files read root files such as <code>config/checkstyle.xml</code>. A
+directory that holds modules is included whole. Exclude each build output
+directory in <code>defaults</code> by hand: the root <code>target/**</code>, <code>build/**</code> and
+<code>.gradle/**</code>, plus <code>&lt;module&gt;/target/**</code> or <code>&lt;module&gt;/build/**</code> per module,
+such as <code>app/build/**</code>. Do not write <code>**/build/**</code> or <code>**/target/**</code>: they
+also hide source packages named <code>build</code> or <code>target</code>, and a change there
+would be reused.</p>
+<ul>
+<li>Maven: one unit per module in <code>&lt;modules&gt;</code> (Maven 4 <code>&lt;subprojects&gt;</code>), in
+  the root POM, nested aggregators and every profile. A module depends on
+  every local module its POM names with a <code>groupId</code> and <code>artifactId</code>:
+  <code>&lt;parent&gt;</code>, dependencies, plugins and <code>pluginManagement</code>, extensions,
+  imported BOMs or plugin configuration such as
+  <code>annotationProcessorPaths</code>, or a <code>groupId:artifactId</code> string (a
+  <code>resourceBundle</code>, <code>dependenciesToScan</code>), and on what its local parents
+  and the root POM name, resolved with its own properties. Managed dependencies and
+  <code>exclusions</code> are not edges. The test is <code>mvn -B -pl &lt;module&gt; test</code>
+  (<code>./mvnw</code> when the root has it), which takes the other modules from the
+  local repository: run <code>mvn -B install -DskipTests</code> before <code>aval run</code>.</li>
+<li>Gradle: one unit per <code>include</code> in <code>settings.gradle.kts</code> or
+  <code>settings.gradle</code>. A subproject depends on its parent projects and on the
+  projects named in <code>project(...)</code>, a type-safe accessor
+  (<code>projects.feature.ui</code>), <code>evaluationDependsOn(...)</code> or a task path such
+  as <code>":common:jar"</code> by its build script, the settings script, the root
+  build script, <code>buildSrc</code>, an <code>includeBuild</code> of a top-level directory
+  (<code>build-logic</code>) and its parent projects' build scripts. The test is
+  <code>./gradlew :&lt;path&gt;:test</code> (<code>gradle</code> without a wrapper).</li>
+</ul>
+<p>Neither adapter sees test code that reads another module's files at run
+time: declare those by hand in a fragment.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">defaults</span><span class="p">:</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">.gradle/**</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">build/**</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">common/build/**</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">inventory/build/**</span><span class="p p-Indicator">]</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nt">java.common</span><span class="p">:</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build.gradle.kts</span><span class="w">      </span><span class="c1"># root context</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">common/**</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gradle/**</span><span class="w">             </span><span class="c1"># root context</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gradlew</span><span class="w">               </span><span class="c1"># root context</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">services/**</span><span class="w">           </span><span class="c1"># holds projects, not one itself</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">settings.gradle.kts</span><span class="w">   </span><span class="c1"># root context</span>
+</span></code></pre></div>
+<p>What it cannot read for certain is an error (exit 1), not a guess:</p>
+<ul>
+<li>a computed <code>include</code>, <code>project(...)</code> or <code>evaluationDependsOn(...)</code> path,
+  an accessor that names no included project, an <code>includeBuild</code> of
+  anything but a top-level directory that is not a project, <code>projectDir</code>,
+  <code>buildFileName</code>, <code>apply from</code> or a triple-quoted string;</li>
+<li>in Gradle, <code>parent</code>, <code>getParent</code>, <code>parentFile</code>, or
+  <code>rootProject.subprojects</code> and <code>project(":").subprojects</code> (and kin) in a
+  subproject; in any script, <code>resolveSibling</code>, an absolute path given to a
+  path-taking call (<code>file</code>, <code>files</code>, <code>File</code>, <code>dir</code>, <code>resolve</code>, ...), a
+  string with <code>../</code> or <code>rootDir</code> inside larger text (<code>"-Dfx=../common"</code>),
+  a <code>resolve</code> chain on <code>rootDir</code> with a computed argument, or a path that
+  leaves the root or starts with another project's directory
+  (<code>rootProject.file("common/fixtures")</code>, <code>file("common")</code>,
+  <code>rootDir.resolve("services").resolve("api")</code>);</li>
+<li>in Maven, an element or property value with <code>../</code> or <code>..\</code> anywhere (an
+  <code>argLine</code> too), an absolute path, a path that starts with another
+  module's directory (<code>config/</code> is fine, <code>${maven.multiModuleProjectDirectory}/</code>
+  and <code>${rootDirectory}/</code> are read from the root), or <code>${env.*}</code>,
+  <code>${session.*}</code>, <code>${project.parent.*}</code> or a property set at run time
+  (<code>${main.basedir}</code>) next to a <code>/</code>;</li>
+<li>a Maven property it cannot resolve in a coordinate, or that a profile,
+  <code>.mvn/maven.config</code> or <code>.mvn/jvm.config</code> sets;</li>
+<li>a reference to a local POM that is not a module, or a local <code>&lt;parent&gt;</code>
+  that is neither the root POM nor a module;</li>
+<li>a root with both a POM and a Gradle settings script.</li>
 </ul>
 <h2 id="cross-language-dependencies">Cross-language dependencies<a class="headerlink" href="#cross-language-dependencies" title="Anchor link">&para;</a></h2>
 <p>A generator sees one ecosystem. Declare a dependency across languages by
