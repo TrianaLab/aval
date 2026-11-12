@@ -66,6 +66,7 @@ tests:
   of `fragments` and `tests`) and keeps every other line byte for byte,
   comments and blank lines included. Comment lines right above a later
   generated entry go with it, and a missing final newline is added.
+  Generated lines use the file's line endings (`\n`, `\r\n` or `\r`).
 - The prefix is reserved: a hand-written `go.*` entry is replaced.
 - Two generators share a file: `aval gen js` owns `js.*` and leaves `go.*`
   alone.
