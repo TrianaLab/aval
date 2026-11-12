@@ -163,6 +163,10 @@ Merge rules, in the order `defaults`, each used fragment, then the test:
 - The order of `use` does not change the result. A fragment cannot `use`
   another fragment.
 
+`aval gen <language>` writes one fragment and one test per unit from the
+repository's dependency graph into a TestSet, and leaves hand-written entries
+alone ([Generate scope](guides/generate-scope.md)).
+
 `matrix` maps variables to lists of strings and creates one test per
 combination. It substitutes `{var}` into `metadata.name`, `runner.command`
 and the values of `environment.toolchain` (inherited ones too), in one pass,

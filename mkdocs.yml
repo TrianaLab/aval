@@ -185,6 +185,7 @@ nav:
       - Write a contract: guides/write-a-contract.md
       - Depend on another part of the repo: guides/depend-on-a-contract.md
       - Shards and matrices: guides/shards-and-matrices.md
+      - Generate scope from the dependency graph: guides/generate-scope.md
       - Use GitHub Actions: guides/github-actions.md
       - Integrate Aval in 5 files: guides/integrate-in-5-files.md
       - Write a trust policy: guides/trust-policy.md

@@ -209,7 +209,7 @@ policy's registry field. There is no config file.`,
 	}
 	root.RunE = func(c *cobra.Command, _ []string) error { return c.Help() }
 	root.PersistentFlags().Bool("plain", false, "plain aval run output even on a terminal, as in CI (also $"+outputEnv+"=plain or TERM=dumb)")
-	root.AddCommand(newInitCmd(), newRunCmd(), newExplainCmd(), newPushCmd(), newKeygenCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
+	root.AddCommand(newInitCmd(), newRunCmd(), newExplainCmd(), newGenCmd(), newPushCmd(), newKeygenCmd(), newRecordCmd(), newStatsCmd(), newVerifyCmd(), newVersionCmd(), newUpgradeCmd())
 	guide(root)
 	return root
 }

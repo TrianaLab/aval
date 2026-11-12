@@ -74,6 +74,8 @@ func exampleProblems(t *testing.T, doc, md, dir string) []string {
 		switch {
 		case kind == contract.Kind:
 			_, err = contract.Parse([]byte(y))
+		case kind == contract.KindTestSet:
+			_, err = contract.ParseAll([]byte(y))
 		case kind == policy.Kind:
 			d := filepath.Join(dir, fmt.Sprintf("%s-%d", strings.NewReplacer("/", "_").Replace(doc), i))
 			for _, k := range docPubKeys.FindAllStringSubmatch(y, -1) {
@@ -81,7 +83,7 @@ func exampleProblems(t *testing.T, doc, md, dir string) []string {
 			}
 			_, err = policy.Parse([]byte(y), d)
 		case docAval.MatchString(y):
-			err = fmt.Errorf("kind %q: want %s or %s", kind, contract.Kind, policy.Kind)
+			err = fmt.Errorf("kind %q: want %s, %s or %s", kind, contract.Kind, contract.KindTestSet, policy.Kind)
 		default:
 			continue
 		}

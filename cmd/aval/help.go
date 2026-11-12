@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -38,8 +39,13 @@ var commandHelp = map[string]struct{ group, example string }{
   aval explain --digest`},
 	"keygen": {"publishing", `  aval keygen        # aval.key and aval.pub
   aval keygen ci     # ci.key and ci.pub`},
-	"record":     {"", `  aval stats publish --registry ghcr.io/acme/orders-aval record.json`},
-	"stats":      {"statistics", `  aval stats --registry ghcr.io/acme/orders-aval --since 30d`},
+	"record": {"", `  aval stats publish --registry ghcr.io/acme/orders-aval record.json`},
+	"stats":  {"statistics", `  aval stats --registry ghcr.io/acme/orders-aval --since 30d`},
+	"gen": {"core", `  # Write one test per unit into aval.yaml
+  aval gen <language>
+
+  # In CI: fail with a diff when aval.yaml is out of date
+  aval gen <language> --check`},
 	"version":    {"", `  aval version`},
 	"upgrade":    {"", `  aval upgrade --check`},
 	"help":       {"", `  aval help run`},
@@ -82,8 +88,9 @@ func guide(root *cobra.Command) {
 // with the closest subcommand if one is near.
 func unknownCommand(c *cobra.Command, name string) error {
 	msg := fmt.Sprintf("unknown command %q", name)
-	if s := c.SuggestionsFor(name); len(s) > 0 {
-		msg += fmt.Sprintf("; did you mean %q?", s[0])
+	if s := c.SuggestionsFor(name); len(s) > 0 { // the closest first
+		best := slices.MinFunc(s, func(a, b string) int { return levenshtein(name, a) - levenshtein(name, b) })
+		msg += fmt.Sprintf("; did you mean %q?", best)
 	}
 	return usageError{errors.New(msg)}
 }

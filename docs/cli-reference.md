@@ -39,6 +39,7 @@ Usage:
 
 Core:
   explain     Print what the execution fingerprint covers, with the digest last
+  gen         Generate one test per unit from a dependency graph into a TestSet
   init        Write aval.yaml, a signing key and a trust policy for a test
   run         Reuse a verified result for the current inputs, or run the test
   verify      Check whether a trusted result exists for the current inputs
@@ -130,6 +131,48 @@ Flags:
   -h, --help[=true|false]     help for explain
   -o, --output string         output format of --all: text or json (default "text")
   -t, --test string           the test to use, by metadata.name: required on a TestSet of more than one test; output files default to .aval/<test>/
+
+Global Flags:
+      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+```
+
+## aval gen
+
+gen writes declared scope from a repository's dependency graph into the
+kind: TestSet in -f. For each unit (a package, module or project) it writes
+a fragment with the unit's own files and a test that uses the fragments of
+the unit and of every unit it depends on, both named LANGUAGE.UNIT (such as
+go.internal.contract). A change to a unit then re-runs its test and the
+tests of the units that depend on it.
+
+gen owns only the fragments and tests whose names start with "LANGUAGE.";
+every other line, comments included, is kept as it is. Shared inputs
+(lockfiles, root build files, toolchain, cacheability) belong in the
+hand-written defaults. aval run, verify and push never run gen: commit its
+output and check it in CI with --check.
+
+Languages: none yet.
+
+Exit codes: 0 written or up to date, 1 error (the language tool failed, the
+dependency graph is invalid, the file cannot be written) or with --check out
+of date (the diff is printed), 2 usage (an unknown language, no TestSet at
+-f, or a result that is not a valid TestSet).
+
+```text
+Usage:
+  aval gen <language> [flags]
+
+Examples:
+  # Write one test per unit into aval.yaml
+  aval gen <language>
+
+  # In CI: fail with a diff when aval.yaml is out of date
+  aval gen <language> --check
+
+Flags:
+      --check[=true|false]   write nothing; exit 1 with a diff when the generated entries are out of date
+  -f, --file string          the kind: TestSet to write (default "aval.yaml")
+  -h, --help[=true|false]    help for gen
 
 Global Flags:
       --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
