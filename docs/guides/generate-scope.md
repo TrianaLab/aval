@@ -126,7 +126,29 @@ A unit's ID is its package name and its files are its directory, so
 dependency becomes an edge when it names another workspace package (any
 range, or `workspace:`), or when a `file:`, `link:` or `portal:` path points
 to one. External packages are not edges: the lockfile in `defaults` covers
-them. Exclude `node_modules` there too:
+them. Exclude `node_modules` there too.
+
+Two local dependencies that `package.json` does not name are edges as well:
+
+- TypeScript configs. Every `tsconfig*.json` in a package (JSON with comments
+  and trailing commas) adds an edge for each `references` path that lands in
+  another workspace package. Its `extends` chain is followed the way
+  TypeScript does (a relative path, a directory meaning its `tsconfig.json`,
+  `.json` added when missing, or `<workspace package>/<path>`): a file in
+  another workspace package is an edge, and a file outside every package,
+  such as a root `tsconfig.base.json`, joins the unit's own files. `extends`
+  of an external package is not followed.
+- Relative imports. Every `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`,
+  `.mts`, `.cts`, `.vue`, `.svelte` and `.astro` file in a package is
+  scanned for relative specifiers (`./`, `../`) of `import ... from`,
+  `export ... from`, `import "..."`, `import(...)` and `require(...)`. One
+  that lands in another workspace package is an edge. Comments are not
+  stripped, so a commented-out import still counts.
+
+The scan skips `node_modules`, hidden directories and nested workspace
+packages, and it reads only those references: `paths` aliases and
+`include` globs that reach outside the package are not edges, so declare
+those by hand.
 
 ```yaml
 apiVersion: aval.trianalab.io/v1
@@ -160,7 +182,12 @@ tests:
 No lockfile or lockfiles of two package managers, an unreadable
 `package.json` or `pnpm-workspace.yaml`, no workspaces, a workspace package
 without a `name`, and a `workspace:` or `file:` reference to something that
-is not a workspace package are errors: nothing is written, exit 1. A package
+is not a workspace package are errors: nothing is written, exit 1. So are a
+relative import that lands outside every workspace package or outside the
+contract root, or that is computed (a template literal with `${...}`),
+named by file and line; a `references` path outside every workspace
+package; and an unreadable tsconfig or a missing, absolute or out-of-root
+`extends`. A package
 without a `test` script still gets a test; its command fails until you add
 the script.
 
