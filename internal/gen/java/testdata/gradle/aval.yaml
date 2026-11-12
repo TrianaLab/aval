@@ -1,0 +1,7 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+# Shared inputs: the root build files. aval gen java writes the rest.
+defaults:
+  scope:
+    dependencies: [settings.gradle.kts, build.gradle.kts, gradle/libs.versions.toml]
+  cacheability: hermetic

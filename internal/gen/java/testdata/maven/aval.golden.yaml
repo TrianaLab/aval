@@ -1,0 +1,70 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+# Shared inputs: the root build files. aval gen java writes the rest.
+defaults:
+  scope:
+    dependencies: [pom.xml]
+  cacheability: hermetic
+fragments:
+  java.common:
+    scope:
+      source:
+        - common/pom.xml
+        - common/src/**
+  java.inventory:
+    scope:
+      source:
+        - inventory/pom.xml
+        - inventory/src/**
+  java.services:
+    scope:
+      source:
+        - services/pom.xml
+  java.services.api:
+    scope:
+      source:
+        - services/api/pom.xml
+        - services/api/src/**
+  java.services.web:
+    scope:
+      source:
+        - services/web/pom.xml
+        - services/web/src/**
+  java.tools:
+    scope:
+      source:
+        - tools/pom.xml
+        - tools/src/**
+tests:
+  - metadata: {name: java.common}
+    runner: {command: [mvn, -B, -pl, common, test]}
+    use:
+      - java.common
+  - metadata: {name: java.inventory}
+    runner: {command: [mvn, -B, -pl, inventory, test]}
+    use:
+      - java.common
+      - java.inventory
+  - metadata: {name: java.services}
+    runner: {command: [mvn, -B, -pl, services, test]}
+    use:
+      - java.services
+  - metadata: {name: java.services.api}
+    runner: {command: [mvn, -B, -pl, services/api, test]}
+    use:
+      - java.common
+      - java.inventory
+      - java.services
+      - java.services.api
+  - metadata: {name: java.services.web}
+    runner: {command: [mvn, -B, -pl, services/web, test]}
+    use:
+      - java.common
+      - java.inventory
+      - java.services
+      - java.services.api
+      - java.services.web
+  - metadata: {name: java.tools}
+    runner: {command: [mvn, -B, -pl, tools, test]}
+    use:
+      - java.tools

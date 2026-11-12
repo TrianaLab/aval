@@ -1,0 +1,51 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+# Shared inputs: the root build files. aval gen java writes the rest.
+defaults:
+  scope:
+    dependencies: [settings.gradle.kts, build.gradle.kts, gradle/libs.versions.toml]
+  cacheability: hermetic
+fragments:
+  java.common:
+    scope:
+      source:
+        - common/build.gradle.kts
+        - common/src/**
+  java.inventory:
+    scope:
+      source:
+        - inventory/build.gradle.kts
+        - inventory/src/**
+  java.services.api:
+    scope:
+      source:
+        - services/api/build.gradle
+        - services/api/src/**
+  java.services.web:
+    scope:
+      source:
+        - services/web/build.gradle.kts
+        - services/web/src/**
+tests:
+  - metadata: {name: java.common}
+    runner: {command: [./gradlew, ':common:test']}
+    use:
+      - java.common
+  - metadata: {name: java.inventory}
+    runner: {command: [./gradlew, ':inventory:test']}
+    use:
+      - java.common
+      - java.inventory
+  - metadata: {name: java.services.api}
+    runner: {command: [./gradlew, ':services:api:test']}
+    use:
+      - java.common
+      - java.inventory
+      - java.services.api
+  - metadata: {name: java.services.web}
+    runner: {command: [./gradlew, ':services:web:test']}
+    use:
+      - java.common
+      - java.inventory
+      - java.services.api
+      - java.services.web

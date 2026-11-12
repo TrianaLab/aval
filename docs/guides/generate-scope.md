@@ -11,8 +11,9 @@ result: `aval run`, `verify` and `push` never call it, and the scope stays
 declared in `aval.yaml`.
 
 !!! note "Languages"
-    JavaScript and TypeScript ship (`aval gen js`, below). The other
-    adapters (Go, Python, Java, Rust, .NET) are the next stories of
+    JavaScript, TypeScript, Java and Kotlin ship (`aval gen js` and
+    `aval gen java`, below). The other adapters (Go, Python, Rust, .NET)
+    are the next stories of
     [Epic 16](https://github.com/TrianaLab/aval/issues/291). `aval gen --help`
     lists the languages your build has.
 
@@ -163,6 +164,66 @@ without a `name`, and a `workspace:` or `file:` reference to something that
 is not a workspace package are errors: nothing is written, exit 1. A package
 without a `test` script still gets a test; its command fails until you add
 the script.
+
+## Java and Kotlin
+
+`aval gen java` reads the build files at the contract root and runs no JVM
+tool:
+
+- Maven: one unit per module in `<modules>` (Maven 4 `<subprojects>`), in
+  the root POM, nested aggregators and every profile. A module depends on
+  the local modules it names as `<parent>`, in `<dependencies>` or as a
+  build plugin; `dependencyManagement` and `pluginManagement` declare
+  versions, not edges. The test is `mvn -B -pl <module> test` (`./mvnw` when
+  the root has it), which tests that module only and takes the other
+  modules from the local repository: run `mvn -B install -DskipTests`
+  before `aval run`.
+- Gradle: one unit per `include` in `settings.gradle.kts` or
+  `settings.gradle`. A subproject depends on the `project(":path")`
+  references of its build script; a reference in the root build script
+  (`subprojects { ... }`) becomes an edge of every subproject. The test is
+  `./gradlew :<path>:test` (`gradle` without a wrapper).
+
+A unit's files are its `pom.xml` or `build.gradle(.kts)` and `src/**`. The
+root project is not a unit; its build files, the wrapper and version
+catalogs go in `defaults`:
+
+```yaml
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [settings.gradle.kts, build.gradle.kts, gradle/libs.versions.toml]
+  cacheability: hermetic
+fragments:
+  java.common:
+    scope:
+      source:
+        - common/build.gradle.kts
+        - common/src/**
+  java.inventory:
+    scope:
+      source:
+        - inventory/build.gradle.kts
+        - inventory/src/**
+tests:
+  - metadata: {name: java.common}
+    runner: {command: [./gradlew, ':common:test']}
+    use:
+      - java.common
+  - metadata: {name: java.inventory}
+    runner: {command: [./gradlew, ':inventory:test']}
+    use:
+      - java.common
+      - java.inventory
+```
+
+What it cannot read for certain is an error (exit 1), not a guess: a
+computed `include` or `project(...)` path, type-safe accessors
+(`projects.common`), `includeBuild`, `projectDir`, `buildFileName`, a
+source or resource directory outside `src`, a property it cannot resolve in
+a local module's coordinates, or a root with both a POM and a Gradle
+settings script.
 
 ## Cross-language dependencies
 
