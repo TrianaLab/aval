@@ -97,7 +97,6 @@ func (Adapter) Units(root string) ([]gen.Unit, error) {
 		if err != nil {
 			return nil, fmt.Errorf("package %s: %w", p.Name, err)
 		}
-		// files need no escaping: extended() rejects glob characters in them.
 		units[i] = gen.Unit{ID: p.Name, Source: append([]string{source}, files...), Deps: deps, Command: command(pm, p.Name)}
 	}
 	return units, nil

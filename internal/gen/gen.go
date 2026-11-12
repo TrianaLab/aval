@@ -36,8 +36,9 @@ type Unit struct {
 }
 
 // globEscape turns the glob metacharacters path.Match knows into one-character
-// classes. Contract globs reject backslashes, so `]`, `{` and `}`, which are
-// literal outside a class, stay as they are.
+// classes. `]`, `{` and `}` are literal to path.Match outside a class, so they
+// stay as they are; contract globs reject backslashes, so `\` cannot be
+// escaped.
 var globEscape = strings.NewReplacer("*", "[*]", "?", "[?]", "[", "[[]")
 
 // Literal returns the glob that matches exactly the slash-separated path p,
