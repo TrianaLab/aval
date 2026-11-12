@@ -468,7 +468,60 @@ func (r *resolver) reads(files []*ast.File) []read {
 			}
 			return true
 		})
+		out = append(out, r.readValues(f, dot)...)
 	}
+	return out
+}
+
+// readValues returns a read of any value for each read function f uses as
+// a value (var readFile = os.ReadFile): it reads whatever its later callers
+// pass, so it fails closed. A callee, and a value assigned to _ (keeping an
+// import), is not one.
+func (r *resolver) readValues(f *ast.File, dot []string) []read {
+	var out []read
+	skip := map[ast.Expr]bool{}
+	mark := func(e ast.Expr) {
+		for {
+			skip[e] = true
+			p, ok := e.(*ast.ParenExpr)
+			if !ok {
+				return
+			}
+			e = p.X
+		}
+	}
+	blank := func(lhs []*ast.Ident, rhs []ast.Expr) {
+		for i, id := range lhs {
+			if id != nil && id.Name == "_" && len(lhs) == len(rhs) {
+				mark(rhs[i])
+			}
+		}
+	}
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.CallExpr:
+			mark(n.Fun)
+		case *ast.ValueSpec:
+			blank(n.Names, n.Values)
+		case *ast.AssignStmt:
+			ids := make([]*ast.Ident, len(n.Lhs))
+			for i, e := range n.Lhs {
+				ids[i], _ = e.(*ast.Ident)
+			}
+			blank(ids, n.Rhs)
+		}
+		return true
+	})
+	ast.Inspect(f, func(n ast.Node) bool {
+		e, ok := n.(ast.Expr)
+		if !ok || skip[e] {
+			return true
+		}
+		if call, ok := r.readCall(e, dot); ok {
+			out = append(out, read{pos: r.fset.Position(e.Pos()), call: call, main: f.Name.Name == "main", val: val{cwd: true}})
+		}
+		return true
+	})
 	return out
 }
 
@@ -503,7 +556,7 @@ func (r *resolver) readCall(fun ast.Expr, dot []string) (string, bool) {
 	switch fun := ast.Unparen(fun).(type) {
 	case *ast.Ident: // a dot import: the empty package declares no member
 		for _, d := range dot {
-			if readCalls[d][fun.Name] && r.obj(fun) == nil {
+			if (readCalls[d][fun.Name] || d == "os" && fun.Name == "Chdir") && r.obj(fun) == nil {
 				return path.Base(d) + "." + fun.Name, true
 			}
 		}
@@ -953,20 +1006,26 @@ func (r *resolver) returns(decl *ast.FuncDecl, idx int) []val {
 // calls it) are
 // errors (invariant 3).
 func readScope(root, id string, p pkg, rs []read, allow bool) ([]string, error) {
+	dirs, err := p.chdirs(root, id, rs)
+	if err != nil && !allow {
+		return nil, err
+	}
 	var out []string
 	var errs []error
 	for _, rd := range rs {
 		problem := ""
-		if !rd.val.known && p.escapes(root, rd.val) {
+		if !rd.val.known && p.escapes(root, dirs, rd.val) {
 			problem = "reads a path that it cannot resolve and that may leave the package directory"
 		}
 		for _, s := range rd.val.ss {
-			g, why := p.readGlob(root, rd, s)
-			if g != "" {
-				out = append(out, g)
-			}
-			if problem == "" {
-				problem = why
+			for _, c := range candidates(dirs, rd, s) {
+				g, why := p.readGlob(root, rd, c)
+				if g != "" {
+					out = append(out, g)
+				}
+				if problem == "" {
+					problem = why
+				}
 			}
 		}
 		if problem != "" && !allow {
@@ -976,24 +1035,98 @@ func readScope(root, id string, p pkg, rs []read, allow bool) ([]string, error) 
 	return out, errors.Join(errs...)
 }
 
+// maxChdirs bounds the Chdir chains chdirs follows.
+const maxChdirs = 64
+
+// chdirs returns the directories, relative to the package directory, that
+// a relative read of the package may run in: os.Chdir lasts for the whole
+// process, so the package directory and every existing directory of the
+// contract root that its known Chdir targets reach, in any order, each
+// once. A target
+// that does not exist fails the Chdir; one outside the root is an error of
+// its own read.
+func (p pkg) chdirs(root, id string, rs []read) ([]string, error) {
+	var ts []string
+	for _, rd := range rs {
+		if strings.HasSuffix(rd.call, "Chdir") && rd.val.known {
+			ts = append(ts, rd.val.ss...)
+		}
+	}
+	// ponytail: each chain uses a target once; a Chdir the tests repeat
+	// (os.Chdir("..") in a loop) is not followed (see the guide).
+	type state struct {
+		dir  string
+		used []bool
+	}
+	q := []state{{".", make([]bool, len(ts))}}
+	dirs := []string{"."}
+	for i := 0; i < len(q); i++ {
+		for j, t := range ts {
+			t = strings.ReplaceAll(t, `\`, "/")
+			d := path.Join(q[i].dir, t)
+			rel := path.Join(p.Dir, d)
+			if q[i].used[j] || path.IsAbs(t) || filepath.VolumeName(t) != "" || climbs(rel) {
+				continue
+			}
+			if fi, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err != nil || !fi.IsDir() {
+				continue
+			}
+			if len(q) == maxChdirs {
+				return dirs, fmt.Errorf("%s: os.Chdir and Chdir reach more than %d directories; declare what the package reads by hand and pass --go-allow-dynamic %s", p.Dir, maxChdirs, id)
+			}
+			used := slices.Clone(q[i].used)
+			used[j] = true
+			q = append(q, state{d, used})
+			if !slices.Contains(dirs, d) {
+				dirs = append(dirs, d)
+			}
+		}
+	}
+	return dirs, nil
+}
+
+// candidates returns the paths, relative to the package directory, that
+// the path s rd reads may name: s itself and, for a relative read other
+// than a Chdir, s under each directory in dirs the package changes to.
+func candidates(dirs []string, rd read, s string) []string {
+	if s == "" || strings.HasSuffix(rd.call, "Chdir") || path.IsAbs(s) || filepath.VolumeName(s) != "" {
+		return []string{s}
+	}
+	out := make([]string, 0, len(dirs))
+	for _, d := range dirs {
+		if d == "." {
+			out = append(out, s)
+		} else {
+			out = append(out, path.Join(d, s))
+		}
+	}
+	return slices.Compact(out)
+}
+
 // escapes reports whether the unknown value v may read a file of the
 // contract root outside the package directory: it is built from the working
 // directory, or from a relative path with a ".." segment that names an
-// existing file or directory inside the root. A literal that names nothing
+// existing file or directory inside the root, from the package directory or
+// any of the directories dirs it changes to. A literal that names nothing
 // (test data such as "../evil") is not a read; once it names something,
 // aval gen go --check fails on it.
-func (p pkg) escapes(root string, v val) bool {
+func (p pkg) escapes(root string, dirs []string, v val) bool {
 	return v.cwd || slices.ContainsFunc(v.esc, func(s string) bool {
 		s = strings.ReplaceAll(s, `\`, "/")
 		if slices.Contains(strings.Split(s, "/"), "..") {
 			s = strings.TrimLeft(s, "/") // "/.." appended to a relative path
 		}
-		rel := path.Join(p.Dir, s)
-		if path.IsAbs(s) || filepath.VolumeName(s) != "" || climbs(rel) {
+		if path.IsAbs(s) || filepath.VolumeName(s) != "" {
 			return false // outside the root: test data, or a file no scope can hold
 		}
-		_, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
-		return err == nil
+		return slices.ContainsFunc(dirs, func(d string) bool {
+			rel := path.Join(p.Dir, d, s)
+			if climbs(rel) {
+				return false
+			}
+			_, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
+			return err == nil
+		})
 	})
 }
 

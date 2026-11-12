@@ -205,12 +205,23 @@ func TestFalseHitUnresolvedRead(t *testing.T) {
 		"read := func(p string) { _, _ = os.ReadFile(p) }\n\tread(\"../fixtures/order.json\")",
 		"_, _ = os.ReadFile(filepath.Join(testutil.Root(), \"fixtures\", \"order.json\"))",
 		"wd, _ := os.Getwd()\n\tt.Chdir(filepath.Dir(wd))\n\t_, _ = os.ReadFile(\"fixtures/order.json\")",
+		"readFile := os.ReadFile\n\t_, _ = readFile(\"../fixtures/order.json\")",
+		"_, _ = (os.ReadFile)(\"x\")\n\tvar open func(string) (*os.File, error) = (os.Open)\n\t_, _ = open(\"../fixtures/order.json\")",
 	} {
 		root := shop(t)
 		write(t, filepath.Join(root, "web/unresolved_test.go"), "package web\n\nimport (\n\t\"os\"\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"example.com/shop/internal/testutil\"\n)\n\nvar _ = filepath.Join\nvar _ = testutil.Equal\n\nfunc TestUnresolved(t *testing.T) {\n\t"+body+"\n}\n")
 		if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "web/unresolved_test.go:") || !strings.Contains(err.Error(), "cannot resolve") {
 			t.Errorf("%s: %v, want an error naming web/unresolved_test.go", body, err)
 		}
+	}
+}
+
+// A dot-imported Chdir moves later relative reads like os.Chdir does.
+func TestFalseHitDotImportChdir(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/dot_test.go"), "package web\n\nimport (\n\t. \"os\"\n\t\"testing\"\n)\n\nfunc TestDot(t *testing.T) {\n\t_ = Chdir(Getenv(\"D\"))\n}\n")
+	if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "web/dot_test.go:9: os.Chdir") {
+		t.Errorf("err = %v, want an error naming web/dot_test.go:9", err)
 	}
 }
 

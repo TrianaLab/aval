@@ -195,6 +195,9 @@ tests of the packages that import it, and no other test.
   `ParseGlob`; `http.Dir`; and `os.Chdir` and `t.Chdir`, since later
   relative reads land under that directory (going back to the directory
   `os.Getwd` returned is not a read). Dot imports count.
+- After a `Chdir`, a relative read of the package resolves against the
+  package directory and against every directory its `Chdir` targets
+  reach, in any order; a candidate outside the contract root fails.
 - Paths it resolves: string literals and constants, `+`, `filepath` and
   `path` `Join`, `Clean`, `Dir`, `Abs`, `FromSlash` and `ToSlash`, every
   value assigned to a variable of the package, ranges over slice and map
@@ -216,7 +219,8 @@ It fails closed, naming the file and line (exit 1, nothing written):
   package (`filepath.Join(root, name)` with `root` from `"../.."`). Paths
   it cannot follow count as built from anywhere: a parameter of a method
   or closure, or of a function that no call in the package passes or that
-  is also used as a value; a variable written through a pointer; a call
+  is also used as a value; a read function itself used as a value
+  (`var readFile = os.ReadFile`, other than assigned to `_`); a variable written through a pointer; a call
   to another package (other than `strings`, `fmt`, `strconv`, `path` and
   `filepath`, which keep what their arguments may climb to), to a method
   or to a function value; a variable of another package; and a `Chdir` to
@@ -244,7 +248,8 @@ caller's package.
 
 It does not see, so declare by hand: a slice or map literal that a
 function it is passed to changes; a path that climbs without a `..` in
-any literal (`"." + "./x"`); and files read through other APIs, such as
+any literal (`"." + "./x"`); a `Chdir` the tests run more than once
+in a row (`os.Chdir("..")` in a loop); and files read through other APIs, such as
 `exec.Command`, the `ParseFiles` method of a template, or a function of
 another package that opens a path of its own.
 

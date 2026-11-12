@@ -490,6 +490,55 @@ func TestReadScope(t *testing.T) {
 	}
 }
 
+// A relative read after a Chdir to a known directory runs there too:
+// os.Chdir lasts for the whole process, and Chdirs compose.
+func TestReadScopeAfterChdir(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "fixtures/x.json"), "{}")
+	write(t, filepath.Join(root, "internal/b/x.txt"), "b")
+	write(t, filepath.Join(root, "internal/a/sub/deep/y"), "y")
+	pos := token.Position{Filename: "internal/a/a_test.go", Line: 3}
+	p := pkg{Dir: "internal/a", Name: "a"}
+	chdir := func(s ...string) read { return read{pos: pos, call: "os.Chdir", val: known(s...)} }
+	for _, tc := range []struct {
+		name string
+		rs   []read
+		want []string
+		err  string
+	}{
+		{"into a subdirectory", []read{chdir("sub"), {pos: pos, val: known("../../b/x.txt")}},
+			[]string{"internal/a/sub/**", "internal/b/x.txt"}, ""},
+		{"up", []read{{pos: pos, val: known("../fixtures/x.json")}, chdir("..")},
+			[]string{"fixtures/x.json", "internal/**"}, ""},
+		{"composed", []read{chdir("sub"), chdir("deep"), {pos: pos, val: known("../../../b/x.txt")}},
+			[]string{"internal/a/sub/**", "internal/b/x.txt"}, "reads ../../../b/x.txt, outside the contract root"}, // before the Chdirs
+		{"missing or outside the root", []read{chdir("nope", "../../../.."), {pos: pos, val: known("x")}}, nil, "outside the contract root"},
+		{"climbing literal after a Chdir", []read{chdir("sub"), {pos: pos, call: "os.Open", val: val{esc: []string{"../../b/"}}}},
+			[]string{"internal/a/sub/**"}, "cannot resolve"},
+	} {
+		got, err := readScope(root, "a", p, tc.rs, false)
+		if tc.err == "" && err != nil || tc.err != "" && (err == nil || !strings.Contains(err.Error(), tc.err)) || !slices.Equal(got, tc.want) {
+			t.Errorf("%s: %q, %v; want %q, %q", tc.name, got, err, tc.want, tc.err)
+		}
+	}
+}
+
+// Chdir chains past maxChdirs fail closed.
+func TestReadScopeChdirChains(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "p"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ts := []string{".", "./.", "././.", "./././.", "././././."} // 325 chains
+	rs := []read{{pos: token.Position{Filename: "p/p_test.go"}, call: "os.Chdir", val: known(ts...)}}
+	if _, err := readScope(root, "p", pkg{Dir: "p"}, rs, false); err == nil || !strings.Contains(err.Error(), "more than 64 directories") {
+		t.Errorf("err = %v", err)
+	}
+	if _, err := readScope(root, "p", pkg{Dir: "p"}, rs, true); err != nil {
+		t.Errorf("allowed: %v", err)
+	}
+}
+
 // FuzzResolve checks that the resolver never panics and that its values
 // stay bounded and deterministic, whatever the path expression.
 func FuzzResolve(f *testing.F) {
