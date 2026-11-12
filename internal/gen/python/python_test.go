@@ -286,3 +286,49 @@ func TestPython310(t *testing.T) {
 		t.Errorf("output %q", out)
 	}
 }
+
+// Paths named with glob metacharacters get escaped globs, so a change to
+// those files changes the generated test's fingerprint; a name no contract
+// glob can express fails closed.
+func TestFalseHitMetacharacterPaths(t *testing.T) {
+	needPython(t)
+	root := t.TempDir()
+	for f, data := range map[string]string{
+		"aval.yaml":                "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults:\n  cacheability: hermetic\n",
+		"pyproject.toml":           "[project]\nname = \"top\"\n",
+		"x[1].py":                  "x = 1\n",
+		"x1.py":                    "x = 1\n",
+		"d*/m.py":                  "m = 1\n",
+		"libs/a[1]/pyproject.toml": "[project]\nname = \"a\"\n",
+		"libs/a[1]/a.py":           "a = 1\n",
+		"libs/a?/pyproject.toml":   "[project]\nname = \"b\"\n",
+		"libs/a?/b.py":             "b = 1\n",
+		"libs/a1/pyproject.toml":   "[project]\nname = \"c\"\n",
+		"libs/a1/c.py":             "c = 1\n",
+	} {
+		write(t, root, f, data)
+	}
+	set := generate(t, &Adapter{}, root)
+	for _, g := range []string{"x[[]1].py", "d[*]/**", "libs/a[[]1]/**", "libs/a[?]/**"} {
+		if !strings.Contains(set, g) {
+			t.Fatalf("no escaped glob %s:\n%s", g, set)
+		}
+	}
+	for _, tc := range []struct{ file, test string }{
+		{"x[1].py", "python.top"}, {"d*/m.py", "python.top"},
+		{"libs/a[1]/a.py", "python.a"}, {"libs/a?/b.py", "python.b"},
+	} {
+		before, other := digest(t, set, root, tc.test), digest(t, set, root, "python.c")
+		write(t, root, tc.file, "changed = 1\n")
+		if digest(t, set, root, tc.test) == before || digest(t, set, root, "python.c") != other {
+			t.Errorf("%s changed: want only %s to change", tc.file, tc.test)
+		}
+	}
+	if runtime.GOOS == "windows" { // no backslash in a file name
+		return
+	}
+	write(t, root, `a\b.txt`, "")
+	if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), `project top: "a\\b.txt": a contract glob cannot express`) {
+		t.Errorf("error %v; want one naming a\\b.txt", err)
+	}
+}
