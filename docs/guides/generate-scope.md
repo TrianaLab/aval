@@ -114,7 +114,8 @@ needs no .NET SDK. Its units are the projects of the `.sln` or `.slnx` at the
 contract root, or every `.csproj`, `.fsproj` and `.vbproj` under it when
 there is no solution (skipping hidden, `bin`, `obj` and `node_modules`
 directories), plus every project they reference. A unit's ID is its project
-name, and its test is `dotnet test <project>`.
+name, and its test is `dotnet test <project>`. An excerpt; the full output is
+in `internal/gen/dotnet/testdata/golden.yaml`.
 
 ```yaml
 fragments:
@@ -143,7 +144,9 @@ tests:
   `NuGet.config` and `packages.lock.json` files in `defaults`.
 - Fails closed: a malformed file, a missing referenced project, a path
   outside the repository or built from an MSBuild property other than
-  `$(MSBuildThisFileDirectory)` or `$(MSBuildProjectDirectory)`, several
+  `$(MSBuildThisFileDirectory)` or `$(MSBuildProjectDirectory)`, a wildcard
+  `Import`, a `GetPathOfFileAbove` of a file other than the `Directory.*`
+  files or from outside the project's directory and those above it, several
   solutions at the root, or two projects with the same name is an error.
 - Files that only a property names (such as a `KeyOriginatorFile`) are not
   followed: add them to `defaults`.

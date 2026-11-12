@@ -44,6 +44,10 @@ var notFiles = map[string]bool{
 // which the hand-written environment covers.
 var toolchain = []string{"$(MSBuildExtensionsPath", "$(MSBuildToolsPath", "$(MSBuildBinPath", "$(MSBuildSDKsPath", "$(VSToolsPath"}
 
+// fileAbove matches $([MSBuild]::GetPathOfFileAbove('file', 'start')), whose
+// start directory is optional.
+var fileAbove = regexp.MustCompile(`GetPathOfFileAbove\(\s*'([^']*)'\s*(?:,\s*'([^']*)'\s*)?\)`)
+
 var slnProject = regexp.MustCompile(`(?m)^Project\("[^"]*"\)\s*=\s*"[^"]*",\s*"([^"]*)"`)
 
 // Units implements gen.Adapter.
@@ -277,16 +281,40 @@ func (r *reader) node(n *node, parent, this string) error {
 // imp follows an Import of a local file.
 func (r *reader) imp(n *node, this string) error {
 	v := n.attr("Project")
-	if v == "" || n.attr("Sdk") != "" || strings.Contains(v, "GetPathOfFileAbove") || slices.ContainsFunc(toolchain, func(t string) bool { return strings.HasPrefix(v, t) }) {
-		// An SDK or toolchain file, or the Directory.* file above, which
-		// project already reads up to the root.
-		return nil
+	if v == "" || n.attr("Sdk") != "" || slices.ContainsFunc(toolchain, func(t string) bool { return strings.HasPrefix(v, t) }) {
+		return nil // an SDK or toolchain file
+	}
+	if m := fileAbove.FindStringSubmatch(v); m != nil {
+		return r.above(v, this, m[1], m[2])
 	}
 	p, err := r.resolve(this, this, v)
 	if err != nil {
 		return err
 	}
+	if strings.ContainsAny(p, "*?") {
+		return fmt.Errorf("%q: wildcard imports are not supported", v)
+	}
 	return r.file(p, n.attr("Condition") != "")
+}
+
+// above accepts a GetPathOfFileAbove import v, in an MSBuild file in
+// directory this, only when project already reads every file it can find:
+// a Directory.* file searched from the project's directory or one above it.
+func (r *reader) above(v, this, file, start string) error {
+	if !slices.Contains(implicit, file) {
+		return fmt.Errorf("%q: GetPathOfFileAbove of a file other than %s is not supported", v, strings.Join(implicit, ", "))
+	}
+	d := this
+	if start != "" {
+		var err error
+		if d, err = r.resolve(this, this, start); err != nil {
+			return err
+		}
+	}
+	if d != "." && d != r.dir && !strings.HasPrefix(r.dir, d+"/") {
+		return fmt.Errorf("%q: GetPathOfFileAbove from %s, which is not the project's directory or above it, is not supported", v, d)
+	}
+	return nil
 }
 
 // resolve is the package resolve for a path in an MSBuild file in directory
