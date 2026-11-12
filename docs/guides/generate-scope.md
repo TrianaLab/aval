@@ -125,11 +125,14 @@ repository-wide 100% gate becomes one gate per package. It needs `sh`,
 `mktemp` and `awk`.
 
 The package set and the embedded files are read as for `linux/amd64` with
-cgo, so the output is the same on every machine. `aval gen go` fails and
+cgo, with `GOFLAGS` cleared, so the output is the same on every machine. A
+package with a file for another OS that uses `//go:embed` gets its whole
+directory in scope. `aval gen go` fails and
 writes nothing (exit 1) when `go` is missing, `go list` fails (no `go.mod`,
 a broken import), a file does not parse, a package of a main module lies
 outside the contract root, a `.go` file imports a package of a main module
-that `go list` did not list, or a dependency is replaced by a local
+that `go list` did not list (this includes a local package that builds
+only for another OS, such as one with `//go:build windows`), or a dependency is replaced by a local
 directory (its files are not in `go.sum`: add it to a `go.work` instead).
 
 A test's scope follows the imports of the package's tests too, so a helper

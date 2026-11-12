@@ -135,6 +135,19 @@ func TestFalseHitTransitive(t *testing.T) {
 	}
 }
 
+// A file embedded only by a file for another OS is still in scope.
+func TestFalseHitEmbedOtherOS(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/win.txt"), "windows\n")
+	write(t, filepath.Join(root, "web/assets_windows.go"), "package web\n\nimport _ \"embed\"\n\n//go:embed win.txt\nvar win string\n")
+	set := generate(t, &Adapter{}, root)
+	before := digest(t, set, root, "go.web")
+	write(t, filepath.Join(root, "web/win.txt"), "changed\n")
+	if digest(t, set, root, "go.web") == before {
+		t.Error("web/win.txt changed but the fingerprint of go.web did not")
+	}
+}
+
 // A new local import, even in a file under a build tag, is drift that
 // aval gen go --check reports.
 func TestFalseHitNewImportIsDrift(t *testing.T) {
@@ -197,16 +210,17 @@ func TestParseError(t *testing.T) {
 }
 
 func TestToolErrors(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("a fake go needs sh")
-	}
 	t.Setenv("PATH", t.TempDir())
 	if _, err := (&Adapter{}).Units(fixture); err == nil || !strings.Contains(err.Error(), "executable file not found") {
 		t.Errorf("no go on PATH: %v", err)
 	}
 	bin := t.TempDir()
-	write(t, filepath.Join(bin, "go"), "#!/bin/sh\necho '{'\n")
-	_ = os.Chmod(filepath.Join(bin, "go"), 0o755)
+	fake, script := filepath.Join(bin, "go"), "#!/bin/sh\necho '{'\n"
+	if runtime.GOOS == "windows" { // exec.LookPath finds go.bat through PATHEXT
+		fake, script = filepath.Join(bin, "go.bat"), "@echo {\r\n"
+	}
+	write(t, fake, script)
+	_ = os.Chmod(fake, 0o755)
 	t.Setenv("PATH", bin)
 	if _, err := (&Adapter{}).Units(fixture); err == nil || !strings.Contains(err.Error(), "go list: unexpected EOF") {
 		t.Errorf("truncated go list output: %v", err)

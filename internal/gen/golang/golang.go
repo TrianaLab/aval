@@ -90,7 +90,7 @@ func list(root string) ([]pkg, error) {
 	cmd := exec.Command("go", "list", "-deps", "-test", "-json", "./...")
 	cmd.Dir = abs
 	// PWD: go list reports directories under abs, which they are cut from.
-	cmd.Env = append(os.Environ(), "PWD="+abs, "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1")
+	cmd.Env = append(os.Environ(), "PWD="+abs, "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOFLAGS=")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -135,6 +135,12 @@ func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string)
 		}
 	}
 	dir := filepath.Join(root, filepath.FromSlash(p.Dir))
+	// go list reports embedded files only for linux/amd64. A file for another
+	// OS that embeds puts the whole directory in scope, which fails closed.
+	// ponytail: over-broad scope; parse its //go:embed patterns if it costs too many misses.
+	if embeds(dir, p.IgnoredGoFiles) {
+		u.Source = append(u.Source, glob("**"))
+	}
 	// Tests read testdata/ by convention. A glob must match a file, so it is
 	// listed only when testdata holds one.
 	_ = filepath.WalkDir(filepath.Join(dir, "testdata"), func(_ string, d fs.DirEntry, err error) error {
@@ -165,6 +171,14 @@ func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string)
 		u.Command = []string{"sh", "-c", coverScript, u.Command[2]}
 	}
 	return u, nil
+}
+
+// embeds reports whether a file in dir mentions //go:embed.
+func embeds(dir string, files []string) bool {
+	return slices.ContainsFunc(files, func(f string) bool {
+		src, err := os.ReadFile(filepath.Join(dir, f))
+		return err == nil && bytes.Contains(src, []byte("//go:embed"))
+	})
 }
 
 // parseImports returns the sorted import paths of files in dir: every .go
