@@ -6,6 +6,7 @@ package golang
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/parser"
 	"go/token"
@@ -131,17 +132,26 @@ func list(root string) ([]pkg, error) {
 	}
 }
 
-// unit builds the unit of p, whose Dir is relative to root.
-func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string) (gen.Unit, error) {
-	glob := func(name string) string { return path.Join(p.Dir, name) }
-	u := gen.Unit{ID: ids[p.ImportPath], Source: []string{glob("*.go")}}
+// sources returns the escaped scope globs of p, whose files are in dir.
+func (p pkg) sources(dir string) ([]string, error) {
+	var out []string
+	// Names are escaped (gen.Under, gen.Literal): a [ or * in a file or
+	// directory name must not turn the scope into a different pattern.
+	var errs []error
+	glob := func(pattern string) {
+		g, err := gen.Under(p.Dir, pattern)
+		errs = append(errs, err)
+		out = append(out, g)
+	}
+	glob("*.go")
 	for _, files := range [][]string{p.EmbedFiles, p.TestEmbedFiles, p.XTestEmbedFiles, p.CFiles, p.CXXFiles,
 		p.MFiles, p.HFiles, p.FFiles, p.SFiles, p.SwigFiles, p.SwigCXXFiles, p.SysoFiles, p.IgnoredOtherFiles} {
 		for _, f := range files {
-			u.Source = append(u.Source, glob(f))
+			g, err := gen.Literal(path.Join(p.Dir, f))
+			errs = append(errs, err)
+			out = append(out, g)
 		}
 	}
-	dir := filepath.Join(root, filepath.FromSlash(p.Dir))
 	// go list reports embedded files only for linux/amd64. A file for another
 	// OS that embeds puts the whole directory in scope, which fails closed.
 	// ponytail: over-broad scope; parse its //go:embed patterns if it costs too many misses.
@@ -149,17 +159,28 @@ func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string)
 	// later changes what is embedded: the whole package directory is in
 	// scope whenever the package embeds anything (embeds cannot leave it).
 	if p.embeds(dir) {
-		u.Source = append(u.Source, glob("**"))
+		glob("**")
 	}
 	// Tests read testdata/ by convention. A glob must match a file, so it is
 	// listed only when testdata holds one.
 	_ = filepath.WalkDir(filepath.Join(dir, "testdata"), func(_ string, d fs.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
-			u.Source = append(u.Source, glob("testdata/**"))
+			glob("testdata/**")
 			return fs.SkipAll
 		}
 		return nil // never an error: a missing or unreadable testdata adds nothing
 	})
+	return out, errors.Join(errs...)
+}
+
+// unit builds the unit of p, whose Dir is relative to root.
+func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string) (gen.Unit, error) {
+	dir := filepath.Join(root, filepath.FromSlash(p.Dir))
+	src, err := p.sources(dir)
+	if err != nil {
+		return gen.Unit{}, fmt.Errorf("package %s: %w", p.ImportPath, err)
+	}
+	u := gen.Unit{ID: ids[p.ImportPath], Source: src}
 	imports, err := parseImports(dir, slices.Concat(p.GoFiles, p.CgoFiles, p.TestGoFiles, p.XTestGoFiles, p.IgnoredGoFiles))
 	if err != nil {
 		return u, err

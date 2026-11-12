@@ -168,6 +168,31 @@ func TestFalseHitNewEmbeddedFile(t *testing.T) {
 	}
 }
 
+// A glob character in a file name is escaped: the scope names that file,
+// not a pattern that misses it, and a name a glob cannot express fails
+// closed.
+func TestFalseHitMetacharacterName(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/a[1].h"), "int a;\n")
+	write(t, filepath.Join(root, "web/a1.h"), "int b;\n")
+	set := generate(t, &Adapter{}, root)
+	if !strings.Contains(set, "web/a[[]1].h") {
+		t.Fatalf("no escaped glob for web/a[1].h in:\n%s", set)
+	}
+	before := digest(t, set, root, "go.web")
+	write(t, filepath.Join(root, "web/a[1].h"), "int c;\n")
+	if digest(t, set, root, "go.web") == before {
+		t.Error("web/a[1].h changed but the fingerprint of go.web did not")
+	}
+	if runtime.GOOS == "windows" {
+		return // a backslash is a separator there
+	}
+	write(t, filepath.Join(root, "web/b\\c.h"), "int d;\n")
+	if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "cannot express") {
+		t.Errorf("a backslash in a file name: err = %v", err)
+	}
+}
+
 // A new local import, even in a file under a build tag, is drift that
 // aval gen go --check reports.
 func TestFalseHitNewImportIsDrift(t *testing.T) {
