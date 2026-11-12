@@ -114,7 +114,7 @@ func TestGenErrors(t *testing.T) {
 		want string
 	}{
 		{[]string{"gen"}, ExitUsage, "accepts 1 arg"},
-		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake)`},
+		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, dotnet, fake)`},
 		{[]string{"gen", "fake", "-f", filepath.Join(dir, "none.yaml")}, ExitUsage, "aval init --set"},
 		{[]string{"gen", "fake", "-f", test}, ExitUsage, "kind: TestSet"},
 		{[]string{"gen", "broken", "-f", set}, ExitError, "gen broken: tool not found"},
@@ -137,7 +137,32 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenLanguages(t *testing.T) {
+	if got := languages(); got != "dotnet" {
+		t.Errorf("languages() = %q", got)
+	}
+	saved := adapters
+	adapters = map[string]gen.Adapter{}
+	t.Cleanup(func() { adapters = saved })
 	if got := languages(); got != "none yet" {
 		t.Errorf("languages() = %q with no adapters", got)
+	}
+}
+
+// aval gen dotnet fails closed: an unreadable project file exits 1 and
+// leaves the TestSet as it was.
+func TestGenDotnet(t *testing.T) {
+	file, dir := genFile(t)
+	_ = os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(`<Project Sdk="Microsoft.NET.Sdk"/>`), 0o644)
+	if code, out, errOut := runCLI("gen", "dotnet", "-f", file); code != ExitOK || !strings.Contains(out, "wrote the dotnet entries for 1 units") {
+		t.Fatalf("gen dotnet: exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	written, _ := os.ReadFile(file)
+	if !strings.Contains(string(written), "runner: {command: [dotnet, test, App.csproj]}") {
+		t.Fatalf("written:\n%s", written)
+	}
+	_ = os.WriteFile(filepath.Join(dir, "App.csproj"), []byte(`<Project>`), 0o644)
+	code, _, errOut := runCLI("gen", "dotnet", "-f", file)
+	if after, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, "gen dotnet: App.csproj: XML syntax error") || string(after) != string(written) {
+		t.Errorf("malformed project: exit %d, stderr %q", code, errOut)
 	}
 }

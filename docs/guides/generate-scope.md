@@ -11,8 +11,8 @@ result: `aval run`, `verify` and `push` never call it, and the scope stays
 declared in `aval.yaml`.
 
 !!! note "Languages"
-    The core is in place; no language ships yet. The adapters (Go,
-    JavaScript, Python, Java, Rust, .NET) are the next stories of
+    .NET ships first ([below](#net)). The other adapters (Go, JavaScript,
+    Python, Java, Rust) are the next stories of
     [Epic 16](https://github.com/TrianaLab/aval/issues/291). `aval gen --help`
     lists the languages your build has.
 
@@ -106,6 +106,47 @@ aval gen go --check
 `--check` writes nothing. It exits 0 when the generated entries match the
 graph, and 1 with a diff when they do not, such as a new import or a dropped
 one. Run it in the same job as your linters.
+
+## .NET
+
+`aval gen dotnet` reads the solution and project files themselves, so it
+needs no .NET SDK. Its units are the projects of the `.sln` or `.slnx` at the
+contract root, or every `.csproj`, `.fsproj` and `.vbproj` under it when
+there is no solution (skipping hidden, `bin`, `obj` and `node_modules`
+directories), plus every project they reference. A unit's ID is its project
+name, and its test is `dotnet test <project>`.
+
+```yaml
+fragments:
+  dotnet.shop.api:
+    scope:
+      source:
+        - Directory.Build.props
+        - shared/Version.cs     # <Compile Include="..\..\shared\Version.cs" />
+        - src/Shop.Api/**
+tests:
+  - metadata: {name: dotnet.shop.api}
+    runner: {command: [dotnet, test, src/Shop.Api/Shop.Api.csproj]}
+    use:
+      - dotnet.shop.api
+      - dotnet.shop.core        # through Shop.Data
+      - dotnet.shop.data        # <ProjectReference Include="..\Shop.Data\Shop.Data.csproj" />
+```
+
+- A unit's files are its project directory, the `Directory.Build.props`,
+  `Directory.Build.targets` and `Directory.Packages.props` files from there
+  up to the root, the files its `Import`s name, and the items it includes
+  from outside its directory, such as a shared `Compile` or `Protobuf` glob.
+  Imported files are read too, so a `ProjectReference` in a
+  `Directory.Build.props` counts.
+- Only `ProjectReference`s become dependencies. Keep `global.json`,
+  `NuGet.config` and `packages.lock.json` files in `defaults`.
+- Fails closed: a malformed file, a missing referenced project, a path
+  outside the repository or built from an MSBuild property other than
+  `$(MSBuildThisFileDirectory)` or `$(MSBuildProjectDirectory)`, several
+  solutions at the root, or two projects with the same name is an error.
+- Files that only a property names (such as a `KeyOriginatorFile`) are not
+  followed: add them to `defaults`.
 
 ## Cross-language dependencies
 

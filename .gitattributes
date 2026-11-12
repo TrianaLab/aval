@@ -2,3 +2,5 @@
 internal/fingerprint/testdata/golden/** -text
 # TestVendoredMermaid hashes these bytes: no EOL conversion on checkout.
 docs/javascripts/vendor/** -text linguist-vendored
+# TestGolden compares these bytes: no EOL conversion on checkout.
+internal/gen/dotnet/testdata/** -text

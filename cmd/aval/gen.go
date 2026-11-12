@@ -14,11 +14,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/TrianaLab/aval/internal/gen"
+	"github.com/TrianaLab/aval/internal/gen/dotnet"
 )
 
 // adapters are the languages aval gen knows, by name.
-// ponytail: empty until the language stories of Epic 16 (#293-#298) add theirs.
-var adapters = map[string]gen.Adapter{}
+var adapters = map[string]gen.Adapter{"dotnet": dotnet.Adapter{}}
 
 func newGenCmd() *cobra.Command {
 	var file string
