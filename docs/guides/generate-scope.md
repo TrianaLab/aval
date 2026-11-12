@@ -11,9 +11,10 @@ result: `aval run`, `verify` and `push` never call it, and the scope stays
 declared in `aval.yaml`.
 
 !!! note "Languages"
-    JavaScript and TypeScript ([below](#javascript-and-typescript)), Python
-    ([below](#python)), Rust ([below](#rust)) and .NET ([below](#net)) ship.
-    The other adapters (Go, Java) are the next stories of
+    Go ([below](#go)), JavaScript and TypeScript
+    ([below](#javascript-and-typescript)), Python ([below](#python)), Rust
+    ([below](#rust)) and .NET ([below](#net)) ship. The other adapter (Java)
+    is the next story of
     [Epic 16](https://github.com/TrianaLab/aval/issues/291). `aval gen --help`
     lists the languages your build has.
 
@@ -101,6 +102,50 @@ tests:
 
 A hand-written test can `use` generated fragments. When the unit behind one
 disappears, `aval gen` fails (exit 2) and writes nothing.
+
+## Go
+
+`aval gen go` reads the graph with `go list -deps -test -json ./...` in the
+contract root, so it needs `go` on `PATH`. A module or a `go.work` workspace
+works. Each package is one unit:
+
+- Its id is the package directory (`internal/orders`); the root package
+  takes the last element of its import path (`shop`).
+- Its files are `<dir>/*.go`, its non-Go sources (C, assembly, `.syso`)
+  and `<dir>/testdata/**` when `testdata` holds a file. A package that
+  uses `go:embed` (test embeds included) gets its whole directory,
+  `<dir>/**`, so a file added later under an embedded directory is in
+  scope without regenerating.
+- Its dependencies are the packages of the main modules it imports, from
+  any `.go` file, test files and files under any build tag included. The
+  standard library and external modules are not units: keep `go.mod` and
+  `go.sum` in `defaults`.
+- Its test is `go test ./<dir>`.
+
+```sh
+aval gen go             # writes go.* into aval.yaml
+aval gen go --go-cover  # each test also fails below 100% coverage of its package
+```
+
+`--go-cover` runs the tests through `sh -c` with `go test -coverprofile`
+and fails when any statement of the package did not run, so a
+repository-wide 100% gate becomes one gate per package. It needs `sh`,
+`mktemp` and `awk`.
+
+The package set and the embedded files are read as for `linux/amd64` with
+cgo, with `GOFLAGS` cleared, so the output is the same on every machine. A
+package with a file for another OS that uses `//go:embed` gets its whole
+directory in scope. `aval gen go` fails and
+writes nothing (exit 1) when `go` is missing, `go list` fails (no `go.mod`,
+a broken import), a file does not parse, a package of a main module lies
+outside the contract root, a `.go` file imports a package of a main module
+that `go list` did not list (this includes a local package that builds
+only for another OS, such as one with `//go:build windows`), or a dependency is replaced by a local
+directory (its files are not in `go.sum`: add it to a `go.work` instead).
+
+A test's scope follows the imports of the package's tests too, so a helper
+package that only tests import is in the scope of every package that
+depends on it. That re-runs more than needed, never less.
 
 ## Keep it up to date in CI
 
