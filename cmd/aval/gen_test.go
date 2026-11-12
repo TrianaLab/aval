@@ -114,7 +114,7 @@ func TestGenErrors(t *testing.T) {
 		want string
 	}{
 		{[]string{"gen"}, ExitUsage, "accepts 1 arg"},
-		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake, js)`},
+		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake, js, python)`},
 		{[]string{"gen", "fake", "-f", filepath.Join(dir, "none.yaml")}, ExitUsage, "aval init --set"},
 		{[]string{"gen", "fake", "-f", test}, ExitUsage, "kind: TestSet"},
 		{[]string{"gen", "broken", "-f", set}, ExitError, "gen broken: tool not found"},
@@ -137,8 +137,8 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenLanguages(t *testing.T) {
-	if got := languages(); got != "js" {
-		t.Errorf("languages() = %q, want js", got)
+	if got := languages(); got != "js, python" {
+		t.Errorf("languages() = %q, want js, python", got)
 	}
 }
 
@@ -158,5 +158,25 @@ func TestGenJS(t *testing.T) {
 	code, _, errOut := runCLI("gen", "js", "-f", set)
 	if data, _ := os.ReadFile(set); code != ExitError || !strings.Contains(errOut, "package.json: unexpected end of JSON input") || string(data) != plain {
 		t.Errorf("broken package.json: exit %d, stderr %q, file %q", code, errOut, data)
+	}
+}
+
+func TestGenAdapterFlags(t *testing.T) {
+	file, _ := genFile(t)
+	withAdapter(t, "fake", fakeAdapter{units: fakeUnits()})
+	code, _, errOut := runCLI("gen", "fake", "-f", file, "--strict-imports")
+	if code != ExitUsage || !strings.Contains(errOut, "gen fake: --strict-imports is a python flag") {
+		t.Errorf("exit %d, stderr %q", code, errOut)
+	}
+}
+
+// Without Python, gen python fails (exit 1) and writes nothing.
+func TestGenPythonNoTool(t *testing.T) {
+	file, dir := genFile(t)
+	_ = os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"a\"\n"), 0o644)
+	t.Setenv("PATH", t.TempDir())
+	code, _, errOut := runCLI("gen", "python", "-f", file, "--strict-imports")
+	if data, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, "gen python: python3 not found on PATH") || string(data) != genSet {
+		t.Errorf("exit %d, stderr %q, file %q", code, errOut, data)
 	}
 }

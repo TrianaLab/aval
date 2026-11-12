@@ -1,0 +1,68 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [uv.lock]
+    exclude: ["**/__pycache__/**"]
+  cacheability: hermetic
+tests:
+  - metadata: {name: e2e}   # hand-written, kept as is
+    use: [python.acme]
+    runner: {command: [make, e2e]}
+  - metadata: {name: python.acme}
+    runner: {command: [uv, run, --package, acme, pytest, ., --ignore=packages/api, --ignore=packages/cli, --ignore=packages/core, --ignore=tools/lint]}
+    use:
+      - python.acme
+      - python.acme-api
+      - python.acme-core
+  - metadata: {name: python.acme-api}
+    runner: {command: [uv, run, --package, acme-api, pytest, packages/api]}
+    use:
+      - python.acme-api
+      - python.acme-core
+  - metadata: {name: python.acme-cli}
+    runner: {command: [uv, run, --package, acme-cli, pytest, packages/cli]}
+    use:
+      - python.acme-api
+      - python.acme-cli
+      - python.acme-core
+  - metadata: {name: python.acme-core}
+    runner: {command: [uv, run, --package, acme-core, pytest, packages/core]}
+    use:
+      - python.acme-core
+  - metadata: {name: python.lint-rules}
+    runner: {command: [python, -m, pytest, tools/lint]}
+    use:
+      - python.lint-rules
+fragments:
+  python.acme:
+    scope:
+      source:
+        - aval.yaml
+        - docs/**
+        - packages/README.md
+        - pyproject.toml
+        - src/**
+        - uv.lock
+  python.acme-api:
+    scope:
+      source:
+        - packages/api/pyproject.toml
+        - packages/api/src/**
+  python.acme-cli:
+    scope:
+      source:
+        - packages/cli/acme_cli/**
+        - packages/cli/pyproject.toml
+  python.acme-core:
+    scope:
+      source:
+        - packages/core/pyproject.toml
+        - packages/core/src/**
+        - packages/core/tests/**
+  python.lint-rules:
+    scope:
+      source:
+        - tools/lint/lint_rules.py
+        - tools/lint/poetry.lock
+        - tools/lint/pyproject.toml
