@@ -1,0 +1,54 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [package.json, pnpm-lock.yaml, pnpm-workspace.yaml]
+    exclude: ["**/node_modules/**"]
+  cacheability: hermetic
+fragments:
+  js.acme.api:
+    scope:
+      source:
+        - apps/api/**
+  js.acme.tsconfig:
+    scope:
+      source:
+        - packages/tsconfig/**
+  js.acme.ui:
+    scope:
+      source:
+        - packages/ui/**
+  js.acme.utils:
+    scope:
+      source:
+        - packages/utils/**
+  js.acme.web:
+    scope:
+      source:
+        - apps/web/**
+tests:
+  - metadata: {name: js.acme.api}
+    runner: {command: [pnpm, --filter, '@acme/api', test]}
+    use:
+      - js.acme.api
+      - js.acme.utils
+  - metadata: {name: js.acme.tsconfig}
+    runner: {command: [pnpm, --filter, '@acme/tsconfig', test]}
+    use:
+      - js.acme.tsconfig
+  - metadata: {name: js.acme.ui}
+    runner: {command: [pnpm, --filter, '@acme/ui', test]}
+    use:
+      - js.acme.ui
+      - js.acme.utils
+  - metadata: {name: js.acme.utils}
+    runner: {command: [pnpm, --filter, '@acme/utils', test]}
+    use:
+      - js.acme.utils
+  - metadata: {name: js.acme.web}
+    runner: {command: [pnpm, --filter, '@acme/web', test]}
+    use:
+      - js.acme.tsconfig
+      - js.acme.ui
+      - js.acme.utils
+      - js.acme.web

@@ -1,0 +1,11 @@
+{
+  "name": "acme",
+  "private": true,
+  "scripts": {
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

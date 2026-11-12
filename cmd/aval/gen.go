@@ -14,11 +14,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/TrianaLab/aval/internal/gen"
+	"github.com/TrianaLab/aval/internal/gen/js"
 )
 
 // adapters are the languages aval gen knows, by name.
-// ponytail: empty until the language stories of Epic 16 (#293-#298) add theirs.
-var adapters = map[string]gen.Adapter{}
+var adapters = map[string]gen.Adapter{
+	"js": js.Adapter{},
+}
 
 func newGenCmd() *cobra.Command {
 	var file string
@@ -66,9 +68,6 @@ of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 
 // languages lists the adapters for help and errors.
 func languages() string {
-	if len(adapters) == 0 {
-		return "none yet"
-	}
 	return strings.Join(slices.Sorted(maps.Keys(adapters)), ", ")
 }
 
