@@ -1,0 +1,17 @@
+/* Aval brand palette, derived from the logo. Tokens only:
+   stylesheets/extra.css (listed after this file in mkdocs.yml) builds the
+   site theme on them. */
+
+[data-md-color-scheme="default"] {
+  --aval-emerald: #059669;      /* the mark on light */
+  --aval-emerald-text: #047857; /* links: 5.5:1 on white, #059669 is 3.8:1 */
+  --aval-ink: #0f172a;          /* the wordmark on light */
+  --aval-surface: #ffffff;
+}
+
+[data-md-color-scheme="slate"] {
+  --aval-emerald: #34d399;      /* the mark on dark */
+  --aval-emerald-text: #34d399;
+  --aval-ink: #e2e8f0;          /* the wordmark on dark */
+  --aval-surface: #0b1220;
+}
