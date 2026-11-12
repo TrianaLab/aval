@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -114,7 +115,7 @@ func TestGenErrors(t *testing.T) {
 		want string
 	}{
 		{[]string{"gen"}, ExitUsage, "accepts 1 arg"},
-		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake, js)`},
+		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, fake, js, rust)`},
 		{[]string{"gen", "fake", "-f", filepath.Join(dir, "none.yaml")}, ExitUsage, "aval init --set"},
 		{[]string{"gen", "fake", "-f", test}, ExitUsage, "kind: TestSet"},
 		{[]string{"gen", "broken", "-f", set}, ExitError, "gen broken: tool not found"},
@@ -137,8 +138,8 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenLanguages(t *testing.T) {
-	if got := languages(); got != "js" {
-		t.Errorf("languages() = %q, want js", got)
+	if got := languages(); got != "js, rust" {
+		t.Errorf("languages() = %q, want js, rust", got)
 	}
 }
 
@@ -158,5 +159,50 @@ func TestGenJS(t *testing.T) {
 	code, _, errOut := runCLI("gen", "js", "-f", set)
 	if data, _ := os.ReadFile(set); code != ExitError || !strings.Contains(errOut, "package.json: unexpected end of JSON input") || string(data) != plain {
 		t.Errorf("broken package.json: exit %d, stderr %q, file %q", code, errOut, data)
+	}
+}
+
+// aval gen rust fails closed: no cargo, or a manifest cargo cannot read,
+// exits 1 and leaves the TestSet as it was.
+func TestGenRustFailClosed(t *testing.T) {
+	cases := map[string]string{"missing tool": "cargo metadata: exec:"}
+	if _, err := exec.LookPath("cargo"); err == nil {
+		cases["unreadable manifest"] = "cargo metadata: exit status"
+	}
+	for name, want := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(dir, "aval.yaml")
+			_ = os.WriteFile(file, []byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"), 0o644)
+			_ = os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte("[package\n"), 0o644)
+			if name == "missing tool" {
+				t.Setenv("PATH", "")
+			}
+			before, _ := os.ReadFile(file)
+			code, _, errOut := runCLI("gen", "rust", "-f", file)
+			if after, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, want) || string(after) != string(before) {
+				t.Errorf("exit %d, stderr %q, file changed %v; want exit 1 and %q", code, errOut, string(after) != string(before), want)
+			}
+		})
+	}
+}
+
+// A [patch] path outside every member, invisible to cargo metadata
+// --no-deps, exits 1, names the file and writes nothing.
+func TestGenRustPatchOutsideMembers(t *testing.T) {
+	if _, err := exec.LookPath("cargo"); err != nil {
+		t.Skip("cargo not installed")
+	}
+	dir := t.TempDir()
+	file := filepath.Join(dir, "aval.yaml")
+	set := "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"
+	_ = os.MkdirAll(filepath.Join(dir, "a", "src"), 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "a", "src", "lib.rs"), nil, 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "a", "Cargo.toml"), []byte("[package]\nname = \"a\"\nversion = \"0.1.0\"\nedition = \"2021\"\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte("[workspace]\nmembers = [\"a\"]\nresolver = \"2\"\n[patch.crates-io]\nserde = { path = \"vendor/serde\" }\n"), 0o644)
+	_ = os.WriteFile(file, []byte(set), 0o644)
+	code, _, errOut := runCLI("gen", "rust", "-f", file)
+	if after, _ := os.ReadFile(file); code != ExitError || !strings.Contains(errOut, "Cargo.toml: path override vendor/serde is not inside a workspace member") || string(after) != set {
+		t.Errorf("exit %d, stderr %q, file %q", code, errOut, after)
 	}
 }
