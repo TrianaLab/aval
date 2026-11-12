@@ -230,6 +230,15 @@ func TestFalseHitDotImportChdir(t *testing.T) {
 	}
 }
 
+// A dot-imported syscall.Chdir counts too.
+func TestFalseHitDotImportSyscallChdir(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/dotsys_test.go"), "package web\n\nimport (\n\t\"os\"\n\t. \"syscall\"\n\t\"testing\"\n)\n\nfunc TestDotSys(t *testing.T) {\n\t_ = Chdir(os.Getenv(\"D\"))\n}\n")
+	if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "web/dotsys_test.go:10: syscall.Chdir") {
+		t.Errorf("err = %v, want an error naming web/dotsys_test.go:10 and syscall.Chdir", err)
+	}
+}
+
 // A file embedded only by a file for another OS is still in scope.
 func TestFalseHitEmbedOtherOS(t *testing.T) {
 	root := shop(t)

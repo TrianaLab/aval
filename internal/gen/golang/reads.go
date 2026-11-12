@@ -555,22 +555,24 @@ func (r *resolver) from(o types.Object, ip, name string) bool {
 	})
 }
 
+// chdirPkgs are the packages whose Chdir moves the process's directory.
+var chdirPkgs = map[string]bool{"os": true, "syscall": true, "golang.org/x/sys/unix": true}
+
 // readCall returns the name of the read call fun is, such as os.ReadFile:
 // a function of readCalls, through a dot import too, or os.Chdir,
 // syscall.Chdir, unix.Chdir or a Chdir method (testing.T.Chdir), which make
-// later relative reads land
-// under their directory.
+// later relative reads land under their directory.
 func (r *resolver) readCall(fun ast.Expr, dot []string) (string, bool) {
 	ip, name := r.callee(fun)
 	switch fun := ast.Unparen(fun).(type) {
 	case *ast.Ident: // a dot import: the empty package declares no member
 		for _, d := range dot {
-			if (readCalls[d][fun.Name] || d == "os" && fun.Name == "Chdir") && r.obj(fun) == nil {
+			if (readCalls[d][fun.Name] || chdirPkgs[d] && fun.Name == "Chdir") && r.obj(fun) == nil {
 				return path.Base(d) + "." + fun.Name, true
 			}
 		}
 	case *ast.SelectorExpr:
-		if readCalls[ip][name] || (ip == "os" || ip == "syscall" || ip == "golang.org/x/sys/unix") && name == "Chdir" {
+		if readCalls[ip][name] || chdirPkgs[ip] && name == "Chdir" {
 			return path.Base(ip) + "." + name, true
 		}
 		if ip == "" && fun.Sel.Name == "Chdir" {

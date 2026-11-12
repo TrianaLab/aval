@@ -254,8 +254,9 @@ function it is passed to changes; a path that climbs without a `..` in
 any literal (`"." + "./x"`, `strings.TrimPrefix("x../../y", "x")`); a
 `Chdir` the tests run more than once in a row (`os.Chdir("..")` in a
 loop); and files read through other APIs, such as
-`exec.Command`, the `ParseFiles` method of a template, or a function of
-another package that opens a path of its own.
+`exec.Command`, `tls.LoadX509KeyPair`, `http.ServeFile`, the `ParseFiles`
+method of a template, or any other function, standard library included,
+that opens a path of its own.
 
 ### The go.module fragment
 
