@@ -83,9 +83,9 @@ func (Adapter) Units(root string) ([]gen.Unit, error) {
 		if err != nil || !filepath.IsLocal(dir) {
 			return nil, fmt.Errorf("member %s: %s is outside the contract root %s", p.Name, p.ManifestPath, root)
 		}
-		source := "**"
-		if dir != "." {
-			source = filepath.ToSlash(dir) + "/**"
+		source, err := gen.Under(filepath.ToSlash(dir), "**")
+		if err != nil {
+			return nil, fmt.Errorf("member %s: %w", p.Name, err)
 		}
 		u := gen.Unit{ID: p.Name, Source: []string{source}, Command: []string{"cargo", "test", "-p", p.Name}}
 		for _, d := range p.Dependencies {

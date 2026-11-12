@@ -54,6 +54,10 @@ tests:
   an error.
 - Entries are sorted by name, so the output is the same on every run and
   platform.
+- Real file and directory names become globs that match exactly them: `*`,
+  `?` and `[` turn into `[*]`, `[?]` and `[[]`, so a package in `libs/a[1]`
+  gets `libs/a[[]1]/**`. A name no contract glob can express (one with a
+  backslash) fails (exit 1) and nothing is written; rename it.
 
 ## Ownership
 

@@ -2,6 +2,7 @@ package gen
 
 import (
 	"fmt"
+	"maps"
 	"math/rand/v2"
 	"slices"
 	"strconv"
@@ -193,4 +194,56 @@ func FuzzRewrite(f *testing.F) {
 			t.Fatalf("second run: %v\n%s", err, Diff("first", "second", out, again))
 		}
 	})
+}
+
+// A unit whose directory or file name holds a glob metacharacter still has
+// its own files in scope: changing one changes its test's fingerprint, and
+// a sibling the raw name would match as a glob stays out of it.
+func TestFalseHitGlobMetacharacters(t *testing.T) {
+	for _, c := range []string{"[", "]", "*", "?", "{", "}", "[x]", "{a,b}", "**"} {
+		t.Run(c, func(t *testing.T) {
+			dir, file := "pkg/a"+c+"b", "lib/f"+c+".go"
+			own, err := Under(dir, "**")
+			if err != nil {
+				t.Fatal(err)
+			}
+			lit, err := Literal(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			u := Unit{ID: "a", Source: []string{own, lit}, Command: []string{"test"}}
+			set := rewrite(t, base, "go", u)
+			files := map[string]string{"go.mod": "m", dir + "/x.go": "x", file: "f", "pkg/axb/x.go": "s", "lib/fx.go": "s"}
+			before := digest(t, set, files, "go.a")
+			for _, p := range []string{dir + "/x.go", file} {
+				changed := maps.Clone(files)
+				changed[p] = "changed"
+				if digest(t, set, changed, "go.a") == before {
+					t.Errorf("go.a reused after %s changed", p)
+				}
+			}
+			for _, p := range []string{"pkg/axb/x.go", "lib/fx.go"} {
+				changed := maps.Clone(files)
+				changed[p] = "changed"
+				if digest(t, set, changed, "go.a") != before {
+					t.Errorf("go.a changed after the sibling %s changed", p)
+				}
+			}
+		})
+	}
+}
+
+// A path no contract glob can express fails closed, naming the path.
+func TestFalseHitInexpressiblePath(t *testing.T) {
+	for _, p := range []string{`pkg/a\b`, `a\`, "a//b", "a/./b", "../a", "/abs", ""} {
+		if g, err := Literal(p); err == nil || !strings.Contains(err.Error(), strconv.Quote(p)) {
+			t.Errorf("Literal(%q) = %q, %v; want an error naming the path", p, g, err)
+		}
+		if g, err := Under(p, "**"); err == nil {
+			t.Errorf("Under(%q) = %q, want an error", p, g)
+		}
+	}
+	if g, err := Under(".", "**"); err != nil || g != "**" {
+		t.Errorf(`Under(".") = %q, %v; want "**"`, g, err)
+	}
 }
