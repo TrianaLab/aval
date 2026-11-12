@@ -2475,6 +2475,10 @@ lists the languages your build has.</p>
   an error.</li>
 <li>Entries are sorted by name, so the output is the same on every run and
   platform.</li>
+<li>Real file and directory names become globs that match exactly them: <code>*</code>,
+  <code>?</code> and <code>[</code> turn into <code>[*]</code>, <code>[?]</code> and <code>[[]</code>, so a package in <code>libs/a[1]</code>
+  gets <code>libs/a[[]1]/**</code>. A name no <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> glob can express (one with a
+  backslash) fails (exit 1) and nothing is written; rename it.</li>
 </ul>
 <h2 id="ownership">Ownership<a class="headerlink" href="#ownership" title="Anchor link">&para;</a></h2>
 <p><code>aval gen go</code> owns the fragments and tests named <code>go.*</code> and nothing else:</p>
