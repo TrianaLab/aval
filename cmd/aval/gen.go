@@ -21,7 +21,7 @@ import (
 // adapters are the languages aval gen knows, by name.
 var adapters = map[string]gen.Adapter{
 	"java": java.Adapter{},
-	"js": js.Adapter{},
+	"js":   js.Adapter{},
 }
 
 func newGenCmd() *cobra.Command {

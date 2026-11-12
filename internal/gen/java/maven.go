@@ -1,8 +1,10 @@
 package java
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -25,28 +27,18 @@ type parentRef struct {
 	RelativePath *string `xml:"relativePath"`
 }
 
-type plugin struct {
-	coord
-	Dependencies []coord `xml:"dependencies>dependency"`
-}
-
 type build struct {
 	SourceDirectory     string   `xml:"sourceDirectory"`
 	TestSourceDirectory string   `xml:"testSourceDirectory"`
 	Resources           []string `xml:"resources>resource>directory"`
 	TestResources       []string `xml:"testResources>testResource>directory"`
-	Plugins             []plugin `xml:"plugins>plugin"`
 }
 
-// model is what a POM and each of its profiles share. dependencyManagement
-// and pluginManagement are left out on purpose: they declare versions, not
-// dependencies, and a parent that manages every module would otherwise
-// depend on all of them.
+// model is what a POM and each of its profiles share.
 type model struct {
-	Modules      []string `xml:"modules>module"`
-	Subprojects  []string `xml:"subprojects>subproject"` // Maven 4
-	Dependencies []coord  `xml:"dependencies>dependency"`
-	Build        build    `xml:"build"`
+	Modules     []string `xml:"modules>module"`
+	Subprojects []string `xml:"subprojects>subproject"` // Maven 4
+	Build       build    `xml:"build"`
 }
 
 type pom struct {
@@ -56,6 +48,7 @@ type pom struct {
 	Properties props     `xml:"properties"`
 	model
 	Profiles []model `xml:"profiles>profile"`
+	refs     []coord // every coordinate the POM names, see coordRefs
 }
 
 // props holds the children of <properties> by element name.
@@ -173,6 +166,9 @@ func readPom(root, dir string) (*pom, error) {
 	if err := xml.Unmarshal(data, &p); err != nil {
 		return nil, fmt.Errorf("%s: %w", pomPath(dir), err)
 	}
+	if p.refs, err = coordRefs(data); err != nil { // also rejects what follows </project>
+		return nil, fmt.Errorf("%s: %w", pomPath(dir), err)
+	}
 	if p.XMLName.Local != "project" {
 		return nil, fmt.Errorf("%s: the root element is <%s>, want <project>", pomPath(dir), p.XMLName.Local)
 	}
@@ -204,29 +200,86 @@ func checkSrc(d string) error {
 	return nil
 }
 
-// deps returns the modules p refers to: its parent, its dependencies and
-// its build plugins and their dependencies, in the project and in every
-// profile.
+// notRefs are subtrees whose coordinates do not make a module depend on
+// another: dependencyManagement and pluginManagement declare versions (a
+// parent that manages every module would otherwise depend on all of them),
+// exclusions remove artifacts, and properties are free-form names.
+var notRefs = map[string]bool{"dependencyManagement": true, "pluginManagement": true, "exclusions": true, "properties": true}
+
+// coordRefs returns every element of a POM with an <artifactId> child,
+// wherever it is: <parent>, dependencies, plugins and their dependencies,
+// extensions, reporting plugins, annotationProcessorPaths, artifactItems,
+// in the project and in every profile. Reading only the places Maven itself
+// resolves would drop the edge of a local module named in a plugin's
+// configuration, and a change to that module would then be reused.
+func coordRefs(data []byte) ([]coord, error) {
+	var refs []coord
+	var stack []*frame
+	d := xml.NewDecoder(bytes.NewReader(data))
+	for {
+		tok, err := d.Token()
+		if err == io.EOF {
+			return refs, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			if notRefs[t.Name.Local] {
+				if err := d.Skip(); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			stack = append(stack, &frame{name: t.Name.Local})
+		case xml.CharData:
+			if len(stack) > 0 {
+				stack[len(stack)-1].text.Write(t)
+			}
+		case xml.EndElement:
+			f := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if len(stack) == 0 {
+				continue // the project's own coordinates
+			}
+			if c, ok := f.close(stack[len(stack)-1]); ok {
+				refs = append(refs, c)
+			}
+		}
+	}
+}
+
+// frame is an open POM element: its name, the coordinates of its children
+// and its text.
+type frame struct {
+	name string
+	c    coord
+	text strings.Builder
+}
+
+// close hands a groupId or artifactId to the enclosing element up and
+// returns f's own coordinates when it has an artifactId.
+func (f *frame) close(up *frame) (coord, bool) {
+	switch f.name {
+	case "groupId":
+		up.c.GroupID = strings.TrimSpace(f.text.String())
+	case "artifactId":
+		up.c.ArtifactID = strings.TrimSpace(f.text.String())
+	}
+	if f.c.GroupID == "" && f.name == "plugin" {
+		f.c.GroupID = "org.apache.maven.plugins"
+	}
+	return f.c, f.c.ArtifactID != ""
+}
+
+// deps returns the local modules p refers to (see coordRefs).
 func (r reactor) deps(p *pom, dir string, index map[string]string) ([]string, error) {
 	if err := r.checkParent(p, dir); err != nil {
 		return nil, err
 	}
-	refs := []coord{p.Parent.coord}
-	for _, m := range p.models() {
-		refs = append(refs, m.Dependencies...)
-		for _, pl := range m.Build.Plugins {
-			if pl.GroupID == "" {
-				pl.GroupID = "org.apache.maven.plugins"
-			}
-			refs = append(refs, pl.coord)
-			refs = append(refs, pl.Dependencies...)
-		}
-	}
 	var deps []string
-	for _, c := range refs {
-		if c.ArtifactID == "" {
-			continue // no <parent>
-		}
+	for _, c := range p.refs {
 		key, err := r.key(p, c)
 		if err != nil {
 			return nil, err

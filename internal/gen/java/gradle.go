@@ -19,6 +19,8 @@ var (
 	projectRe  = regexp.MustCompile(`\b(project|findProject)\s*\(`)
 	pathArgRe  = regexp.MustCompile(`^path\s*[:=]\s*`)
 	accessorRe = regexp.MustCompile(`\bprojects\.`)
+	// apply(from = "...") or apply from: '...' pulls in a script no unit covers.
+	applyFromRe = regexp.MustCompile(`\bapply\s*\(?\s*from\b`)
 	// A source set directory the src/** glob would miss: srcDir("gen"),
 	// srcDirs = ['gen'], setSrcDirs(listOf("gen")).
 	srcDirRe = regexp.MustCompile(`\b(srcDirs?|setSrcDirs)\b\s*(\+?=)?\s*[(\[]?\s*((listOf|setOf|files)\s*\()?`)
@@ -191,6 +193,9 @@ func refs(root, name, self string) ([]string, error) {
 	}
 	if accessorRe.MatchString(text) {
 		return nil, fmt.Errorf("%s: type-safe project accessors (projects.*): %w, use project(\":path\")", name, errUnsupported)
+	}
+	if applyFromRe.MatchString(text) {
+		return nil, fmt.Errorf("%s: apply from: %w, put the script in defaults or a fragment", name, errUnsupported)
 	}
 	if err := srcDirs(text); err != nil {
 		return nil, fmt.Errorf("%s: %w", name, err)

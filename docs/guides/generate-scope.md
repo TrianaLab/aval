@@ -172,9 +172,10 @@ tool:
 
 - Maven: one unit per module in `<modules>` (Maven 4 `<subprojects>`), in
   the root POM, nested aggregators and every profile. A module depends on
-  the local modules it names as `<parent>`, in `<dependencies>` or as a
-  build plugin; `dependencyManagement` and `pluginManagement` declare
-  versions, not edges. The test is `mvn -B -pl <module> test` (`./mvnw` when
+  every local module its POM names with a `groupId` and `artifactId`:
+  `<parent>`, dependencies, plugins, extensions or plugin configuration
+  such as `annotationProcessorPaths`. `dependencyManagement`,
+  `pluginManagement` and `exclusions` are not edges. The test is `mvn -B -pl <module> test` (`./mvnw` when
   the root has it), which tests that module only and takes the other
   modules from the local repository: run `mvn -B install -DskipTests`
   before `aval run`.
@@ -225,12 +226,14 @@ tests:
 
 What it cannot read for certain is an error (exit 1), not a guess: a
 computed `include` or `project(...)` path, type-safe accessors
-(`projects.common`), `includeBuild`, `projectDir`, `buildFileName`, a
+(`projects.common`), `includeBuild`, `projectDir`, `buildFileName`,
+`apply from`, a
 source or resource directory outside `src` (a Gradle `srcDir` that is not a
 string literal under `src`), a local `<parent>` POM that is neither the root
 POM nor a module, a property it cannot resolve in
 a local module's coordinates, or a root with both a POM and a Gradle
-settings script.
+settings script. Local files a build script names outside `src`, such as
+`files("libs/x.jar")`, are not read: add them to `defaults` or a fragment.
 
 ## Cross-language dependencies
 

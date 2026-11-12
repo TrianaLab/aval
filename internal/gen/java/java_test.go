@@ -222,6 +222,23 @@ func TestUnits(t *testing.T) {
 				{ID: "c", Source: []string{"c/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "c", "test"}},
 			},
 		},
+		"maven references outside dependencies and plugins": {
+			files: map[string]string{
+				"pom.xml": pomHead + `<modules><module>a</module><module>b</module><module>proc</module><module>ext</module></modules></project>`,
+				"a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId><build><plugins><plugin><artifactId>maven-compiler-plugin</artifactId>
+					<configuration><annotationProcessorPaths><path><groupId>g</groupId><artifactId>proc</artifactId></path></annotationProcessorPaths></configuration></plugin></plugins></build>
+					<dependencies><dependency><groupId>x</groupId><artifactId>lib</artifactId><exclusions><exclusion><groupId>g</groupId><artifactId>b</artifactId></exclusion></exclusions></dependency></dependencies></project>`,
+				"b/pom.xml":    `<project><groupId>g</groupId><artifactId>b</artifactId><build><extensions><extension><groupId>g</groupId><artifactId>ext</artifactId></extension></extensions></build></project>`,
+				"proc/pom.xml": `<project><groupId>g</groupId><artifactId>proc</artifactId><reporting><plugins><plugin><groupId>g</groupId><artifactId>ext</artifactId></plugin></plugins></reporting></project>`,
+				"ext/pom.xml":  `<project><groupId>g</groupId><artifactId>ext</artifactId></project>`,
+			},
+			want: []gen.Unit{
+				{ID: "a", Source: []string{"a/pom.xml"}, Deps: []string{"proc"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
+				{ID: "b", Source: []string{"b/pom.xml"}, Deps: []string{"ext"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
+				{ID: "proc", Source: []string{"proc/pom.xml"}, Deps: []string{"ext"}, Command: []string{"mvn", "-B", "-pl", "proc", "test"}},
+				{ID: "ext", Source: []string{"ext/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "ext", "test"}},
+			},
+		},
 	} {
 		got, err := Adapter{}.Units(tree(t, tc.files))
 		if err != nil || !reflect.DeepEqual(got, tc.want) {
@@ -267,6 +284,8 @@ func TestUnitsFailClosed(t *testing.T) {
 		"unresolved dependency property": {sub(`<project><groupId>g</groupId><artifactId>a</artifactId><dependencies><dependency><groupId>g</groupId><artifactId>${x}</artifactId></dependency></dependencies></project>`), "cannot resolve the properties in g:${x}"},
 		"bad property element":           {sub(`<project><properties><a>x</b></properties></project>`), "a/pom.xml: XML syntax error"},
 		"unclosed properties":            {sub(`<project><properties>`), "a/pom.xml: XML syntax error"},
+		"element after the project":      {sub(`<project/><x>`), "a/pom.xml: XML syntax error"},
+		"skipped element after project":  {sub(`<project/><exclusions>`), "a/pom.xml: XML syntax error"},
 		"parent outside the build": {map[string]string{
 			"pom.xml":        pomHead + `<modules><module>a</module></modules></project>`,
 			"a/pom.xml":      `<project><parent><groupId>g</groupId><artifactId>p</artifactId><relativePath>../parent/pom.xml</relativePath></parent><artifactId>a</artifactId></project>`,
@@ -290,6 +309,8 @@ func TestUnitsFailClosed(t *testing.T) {
 		"two unit builds":        {kts(`include(":a")`, "a/build.gradle", "", "a/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
 		"accessor in root":       {kts(`include(":a")`, "build.gradle.kts", "dependencies { implementation(projects.a) }"), "build.gradle.kts: type-safe project accessors"},
 		"computed project":       {kts(`include(":a")`, "a/build.gradle.kts", "dependencies { implementation(project(name)) }"), "a/build.gradle.kts: project(...): an argument other than a string literal"},
+		"apply from kotlin":      {kts(`include(":a")`, "a/build.gradle.kts", `apply(from = "../gradle/shared.gradle.kts")`), "a/build.gradle.kts: apply from: not supported"},
+		"apply from groovy":      {kts(`include(":a")`, "build.gradle", "subprojects { apply from: '../x.gradle' }"), "build.gradle: apply from"},
 		"source set outside src": {kts(`include(":a")`, "a/build.gradle.kts", `sourceSets { main { java.srcDir("gen") } }`), `a/build.gradle.kts: source or resource directory "gen" outside src`},
 		"source set in root":     {kts(`include(":a")`, "build.gradle.kts", `subprojects { sourceSets.main { java.srcDirs("src/a", "") } }`), `"." outside src`},
 		"computed source set":    {kts(`include(":a")`, "a/build.gradle.kts", `java.srcDir(layout.buildDirectory.dir("gen"))`), "source set directory: an argument other than a string literal"},
