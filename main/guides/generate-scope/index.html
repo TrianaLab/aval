@@ -2710,7 +2710,9 @@ inheritance) and <code>Cargo.lock</code> in <code>defaults</code>.</p>
 </span></code></pre></div>
 <ul>
 <li>A path dependency on a crate that is not a workspace member, or a member
-  outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, is an error: its files would be in no <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.</li>
+  outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, is an error: its files would be in no <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.
+  Paths are compared after resolving symlinks, so a root reached through one
+  (a clone under macOS <code>/tmp</code>) works.</li>
 <li>A dev-dependency is an edge like any other, so the tests of a member's
   dependents use its dev-dependencies too: more re-runs, never a stale reuse.</li>
 <li>A package at the workspace root gets <code>**</code>: add <code>target/**</code> to
