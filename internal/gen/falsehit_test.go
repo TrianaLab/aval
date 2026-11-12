@@ -249,3 +249,26 @@ func TestFalseHitInexpressiblePath(t *testing.T) {
 		t.Errorf(`Under(".") = %q, %v; want "**"`, g, err)
 	}
 }
+
+// A unit without a test keeps its fragment: a change to its files still
+// re-runs the tests of the units that depend on it.
+func TestFalseHitNoTestKeepsScope(t *testing.T) {
+	out, err := Rewrite([]byte(base), "go", graph, "b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := string(out)
+	if strings.Contains(set, "{name: go.b}") {
+		t.Fatal("go.b still has a test")
+	}
+	files := map[string]string{"go.mod": "module x", "a/a.go": "a", "b/b.go": "b", "c/c.go": "c", "d/d.go": "d"}
+	before := digest(t, set, files, "go.a")
+	files["b/b.go"] = "b2"
+	if digest(t, set, files, "go.a") == before {
+		t.Error("go.a reused after the files of go.b, which has no test, changed")
+	}
+	files["b/b.go"], files["c/c.go"] = "b", "c2"
+	if digest(t, set, files, "go.a") == before {
+		t.Error("go.a reused after c, reached through go.b, changed")
+	}
+}

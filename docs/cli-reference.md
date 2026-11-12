@@ -148,7 +148,10 @@ tests of the units that depend on it.
 gen owns only the fragments and tests whose names start with "LANGUAGE.";
 every other line, comments included, is kept as it is. Shared inputs
 (lockfiles, root build files, toolchain, cacheability) belong in the
-hand-written defaults. aval run, verify and push never run gen: commit its
+hand-written defaults. --no-test PATTERN (repeatable, a contract glob such as
+cmd/gen* or tests/**) writes no test for the units whose ID matches; they keep
+their fragment, so their files stay in the scope of the tests that use them.
+aval run, verify and push never run gen: commit its
 output and check it in CI with --check.
 
 Languages: dotnet, go, java, js, python, rust.
@@ -156,7 +159,8 @@ Languages: dotnet, go, java, js, python, rust.
 Exit codes: 0 written or up to date, 1 error (the language tool failed, the
 dependency graph is invalid, the file cannot be written) or with --check out
 of date (the diff is printed), 2 usage (an unknown language, no TestSet at
--f, or a result that is not a valid TestSet).
+-f, a --no-test pattern that matches no unit, or a result that is not a valid
+TestSet).
 
 ```text
 Usage:
@@ -174,6 +178,7 @@ Flags:
   -f, --file string                   the kind: TestSet to write (default "aval.yaml")
       --go-cover[=true|false]         go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)
   -h, --help[=true|false]             help for gen
+      --no-test stringArray           write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)
       --strict-imports[=true|false]   python: fail on an import_module or __import__ call whose module is not a string literal
 
 Global Flags:

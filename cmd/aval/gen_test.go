@@ -98,6 +98,32 @@ func TestGenCheck(t *testing.T) {
 	}
 }
 
+func TestGenNoTest(t *testing.T) {
+	file, _ := genFile(t)
+	withAdapter(t, "fake", fakeAdapter{units: fakeUnits("b")})
+	if code, _, errOut := runCLI("gen", "fake", "-f", file, "--no-test", "b"); code != ExitOK {
+		t.Fatalf("--no-test b: exit %d, stderr %q", code, errOut)
+	}
+	data, _ := os.ReadFile(file)
+	if s := string(data); strings.Contains(s, "{name: fake.b}") || !strings.Contains(s, "  fake.b:\n") || !strings.Contains(s, "      - fake.b\n") {
+		t.Fatalf("fake.b: want its fragment used by fake.a and no test:\n%s", s)
+	}
+	// --check compares the output of the same flags.
+	if code, out, _ := runCLI("gen", "fake", "-f", file, "--check", "--no-test", "b"); code != ExitOK || !strings.Contains(out, "up to date") {
+		t.Errorf("--check --no-test b: exit %d, stdout %q", code, out)
+	}
+	if code, out, _ := runCLI("gen", "fake", "-f", file, "--check"); code != ExitError || !strings.Contains(out, "+  - metadata: {name: fake.b}") {
+		t.Errorf("--check without --no-test: exit %d, stdout %q", code, out)
+	}
+	// A pattern that matches no unit is a usage error; nothing is written.
+	for _, args := range [][]string{{"--no-test", "c"}, {"--no-test", "b", "--no-test", "a*/x"}, {"--check", "--no-test", "c"}} {
+		code, _, errOut := runCLI(append([]string{"gen", "fake", "-f", file}, args...)...)
+		if after, _ := os.ReadFile(file); code != ExitUsage || !strings.Contains(errOut, "matches no unit") || string(after) != string(data) {
+			t.Errorf("%v: exit %d, stderr %q", args, code, errOut)
+		}
+	}
+}
+
 func TestGenErrors(t *testing.T) {
 	dir := t.TempDir()
 	set := filepath.Join(dir, "aval.yaml")
