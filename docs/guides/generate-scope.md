@@ -456,7 +456,8 @@ What it cannot read for certain is an error (exit 1), not a guess:
   subproject; in any script, an absolute path, a string with `../` or
   `rootDir` inside larger text (`"-Dfx=../common"`), or a path that leaves
   the root or starts with another project's directory
-  (`rootProject.file("common/fixtures")`);
+  (`rootProject.file("common/fixtures")`, or `file("common")` and other
+  path-taking calls);
 - in Maven, an element or property value with `../` anywhere (an
   `argLine` too), an absolute path, or `${user.dir}`,
   `${maven.multiModuleProjectDirectory}`, `${env.*}`, `${session.*}` or

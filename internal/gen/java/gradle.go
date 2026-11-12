@@ -29,6 +29,8 @@ var (
 	rootChildrenRe = regexp.MustCompile(`\bproject\s*\(\s*(path\s*[:=]\s*)?["']:["']\s*\)\s*\.\s*(get)?([cC]hildProjects|[sS]ubprojects|[aA]llprojects)\b`)
 	rootDirRe      = regexp.MustCompile(`^\$(rootDir|\{(rootDir|rootProject\.rootDir|project\.rootDir|rootProject\.projectDir)\})/`)
 	// A root variable anywhere in a literal.
+	// Calls whose arguments are paths: file, files, layout.*.dir, resolve, ...
+	pathCallRe   = regexp.MustCompile(`\b(file|files|dir|resolve|fileTree|from|into)\s*\(`)
 	rootVarAnyRe = regexp.MustCompile(`\$(rootDir\b|\{(rootDir|rootProject\.(rootDir|projectDir|layout|file)|project\.rootDir|settingsDir)\b)`)
 	// Build output and VCS directories the root context leaves out.
 	notContext = map[string]bool{".git": true, ".gradle": true, "build": true, "out": true, "target": true}
@@ -327,10 +329,26 @@ func scriptRefs(text, name, self string, known map[string]bool) ([]string, error
 
 // checkLiterals runs checkLiteral on every string literal of a script.
 func checkLiterals(text, name, dir string, known map[string]bool) error {
-	_, lits := literals(text)
+	masked, lits := literals(text)
 	for _, l := range lits {
 		if err := checkLiteral(l, dir, known); err != nil {
 			return fmt.Errorf("%s: %q %w", name, l, err)
+		}
+	}
+	// A bare project directory ("common") is a path only as the argument of
+	// a call that takes one; elsewhere (include("common")) it is a name.
+	for _, loc := range pathCallRe.FindAllStringIndex(masked, -1) {
+		for i := loc[1]; ; i++ {
+			l, j, err := literal(text, skip(text, i, true))
+			if err != nil {
+				break // not a plain literal: checked above, or no path
+			}
+			if known[l] && l != dir && (dir == "" || !strings.HasPrefix(l, dir+"/")) {
+				return fmt.Errorf("%s: %q refers to files of another project: %w", name, l, errUnsupported)
+			}
+			if i = skip(text, j, true); i >= len(text) || text[i] != ',' {
+				break
+			}
 		}
 	}
 	return nil
@@ -383,7 +401,7 @@ func literalPath(l, dir string) (string, error) {
 	case outside(l):
 		return "", fmt.Errorf("is an absolute path: %w", errUnsupported)
 	case !strings.Contains(l, "/"):
-		return "", nil // ponytail: a bare name ("common") is too often not a path to reject
+		return "", nil // a bare name: checkLiterals reads it as a path only in a path-taking call
 	}
 	return l, nil
 }
