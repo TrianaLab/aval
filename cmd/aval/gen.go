@@ -41,7 +41,7 @@ type flagger interface{ Flags(*pflag.FlagSet) }
 
 func newGenCmd() *cobra.Command {
 	var file string
-	var check bool
+	var check, list bool
 	var noTest []string
 	cmd := &cobra.Command{
 		Use:   "gen <language>",
@@ -59,12 +59,15 @@ every other line, comments included, is kept as it is. Shared inputs
 hand-written defaults. --no-test PATTERN (repeatable, a contract glob such as
 cmd/gen* or tests/**) writes no test for the units whose ID matches; they keep
 their fragment, so their files stay in the scope of the tests that use them.
+--list-tests writes nothing and prints the IDs of the units that get a test,
+one per line, so a project's own gate (a coverage package list) derives from
+the same --no-test patterns.
 aval run, verify and push never run gen: commit its
 output and check it in CI with --check.
 
 Languages: ` + languages() + `.
 
-Exit codes: 0 written or up to date, 1 error (the language tool failed, the
+Exit codes: 0 written, up to date or listed, 1 error (the language tool failed, the
 dependency graph is invalid, the file cannot be written) or with --check out
 of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 -f, a --no-test pattern that matches no unit, or a result that is not a valid
@@ -89,11 +92,15 @@ TestSet).`,
 			if err != nil {
 				return err
 			}
-			return runGen(cmd, a, args[0], file, check, noTest)
+			if list && check {
+				return usageError{errors.New("gen: --list-tests and --check do not go together")}
+			}
+			return runGen(cmd, a, args[0], file, check, list, noTest)
 		},
 	}
 	cmd.Flags().StringVarP(&file, "file", "f", "aval.yaml", "the kind: TestSet to write")
 	cmd.Flags().BoolVar(&check, "check", false, "write nothing; exit 1 with a diff when the generated entries are out of date")
+	cmd.Flags().BoolVar(&list, "list-tests", false, "write nothing; print the IDs of the units that get a test, one per line")
 	cmd.Flags().StringArrayVar(&noTest, "no-test", nil, "write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)")
 	for _, lang := range slices.Sorted(maps.Keys(adapters)) {
 		if a, ok := adapters[lang].(flagger); ok {
@@ -111,7 +118,7 @@ TestSet).`,
 // languages lists the adapters for help and errors.
 func languages() string { return strings.Join(slices.Sorted(maps.Keys(adapters)), ", ") }
 
-func runGen(cmd *cobra.Command, a gen.Adapter, lang, file string, check bool, noTest []string) error {
+func runGen(cmd *cobra.Command, a gen.Adapter, lang, file string, check, list bool, noTest []string) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return usageError{fmt.Errorf("gen: %w (start a TestSet with aval init --set)", err)}
@@ -124,12 +131,19 @@ func runGen(cmd *cobra.Command, a gen.Adapter, lang, file string, check bool, no
 	if err != nil {
 		return fmt.Errorf("gen %s: %w", lang, err)
 	}
+	if list {
+		ids, err := gen.Tested(lang, units, noTest...)
+		if err != nil {
+			return genError(lang, file, err)
+		}
+		for _, id := range ids {
+			fmt.Fprintln(cmd.OutOrStdout(), id)
+		}
+		return nil
+	}
 	out, err := gen.Rewrite(data, lang, units, noTest...)
-	switch {
-	case errors.Is(err, gen.ErrUnits):
-		return fmt.Errorf("gen %s: %w", lang, err)
-	case err != nil:
-		return usageError{fmt.Errorf("gen %s: %s: %w", lang, file, err)}
+	if err != nil {
+		return genError(lang, file, err)
 	}
 	w := cmd.OutOrStdout()
 	if bytes.Equal(out, data) {
@@ -145,6 +159,15 @@ func runGen(cmd *cobra.Command, a gen.Adapter, lang, file string, check bool, no
 	}
 	fmt.Fprintf(w, "%s: wrote the %s entries for %d units\n", file, lang, len(units))
 	return nil
+}
+
+// genError: invalid units are an error (exit 1), anything else, such as a
+// --no-test pattern that matches no unit, a usage error (exit 2).
+func genError(lang, file string, err error) error {
+	if errors.Is(err, gen.ErrUnits) {
+		return fmt.Errorf("gen %s: %w", lang, err)
+	}
+	return usageError{fmt.Errorf("gen %s: %s: %w", lang, file, err)}
 }
 
 // replaceFile replaces file with data in one rename, keeping its mode, so a

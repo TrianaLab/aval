@@ -151,12 +151,15 @@ every other line, comments included, is kept as it is. Shared inputs
 hand-written defaults. --no-test PATTERN (repeatable, a contract glob such as
 cmd/gen* or tests/**) writes no test for the units whose ID matches; they keep
 their fragment, so their files stay in the scope of the tests that use them.
+--list-tests writes nothing and prints the IDs of the units that get a test,
+one per line, so a project's own gate (a coverage package list) derives from
+the same --no-test patterns.
 aval run, verify and push never run gen: commit its
 output and check it in CI with --check.
 
 Languages: dotnet, go, java, js, python, rust.
 
-Exit codes: 0 written or up to date, 1 error (the language tool failed, the
+Exit codes: 0 written, up to date or listed, 1 error (the language tool failed, the
 dependency graph is invalid, the file cannot be written) or with --check out
 of date (the diff is printed), 2 usage (an unknown language, no TestSet at
 -f, a --no-test pattern that matches no unit, or a result that is not a valid
@@ -178,6 +181,7 @@ Flags:
   -f, --file string                   the kind: TestSet to write (default "aval.yaml")
       --go-cover[=true|false]         go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)
   -h, --help[=true|false]             help for gen
+      --list-tests[=true|false]       write nothing; print the IDs of the units that get a test, one per line
       --no-test stringArray           write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)
       --strict-imports[=true|false]   python: fail on an import_module or __import__ call whose module is not a string literal
 

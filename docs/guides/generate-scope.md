@@ -111,6 +111,27 @@ stays while another test uses it, so their files stay in that test's scope. A
 pattern that matches no unit fails (exit 2), and `--check` needs the same
 flags.
 
+`--list-tests` writes nothing and prints the IDs of the units that get a
+test under the same `--no-test` patterns, one per line, with the same
+errors. Keep the patterns once, in a Makefile for example, and derive both
+`aval gen` and your own gate from them, so the two lists cannot drift:
+
+```make
+NO_TEST := --no-test 'cmd/gen*' --no-test 'tests/**'
+
+gen:
+	aval gen go $(NO_TEST)
+
+gen-check:
+	aval gen go $(NO_TEST) --check
+
+cover:  # the coverage gate covers what gets a test
+	go test -coverprofile=cover.out $$(aval gen go $(NO_TEST) --list-tests | sed 's|^|./|')
+```
+
+IDs are per language (a Go package directory, a crate or package name);
+the Go root package's ID is the last element of its import path, not `.`.
+
 ## Go
 
 `aval gen go` reads the graph with `go list -deps -test -json ./...` in the
