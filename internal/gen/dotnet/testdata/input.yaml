@@ -1,0 +1,10 @@
+# The aval.yaml of testdata/shop before aval gen dotnet: hand-written
+# defaults for the inputs every project shares.
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [global.json]
+  environment:
+    toolchain: {dotnet: "9.0"}
+  cacheability: hermetic

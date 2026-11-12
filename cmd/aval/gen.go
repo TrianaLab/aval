@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/TrianaLab/aval/internal/gen"
+	"github.com/TrianaLab/aval/internal/gen/dotnet"
 	"github.com/TrianaLab/aval/internal/gen/js"
 	"github.com/TrianaLab/aval/internal/gen/python"
 	"github.com/TrianaLab/aval/internal/gen/rust"
@@ -24,6 +25,7 @@ import (
 // ponytail: adapters hold flag values; newGenCmd re-registers (and resets)
 // them on every call.
 var adapters = map[string]gen.Adapter{
+	"dotnet": dotnet.Adapter{},
 	"js":     js.Adapter{},
 	"python": &python.Adapter{},
 	"rust":   rust.Adapter{},
