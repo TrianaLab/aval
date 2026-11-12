@@ -14,11 +14,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/TrianaLab/aval/internal/gen"
+	"github.com/TrianaLab/aval/internal/gen/js"
 	"github.com/TrianaLab/aval/internal/gen/rust"
 )
 
 // adapters are the languages aval gen knows, by name.
 var adapters = map[string]gen.Adapter{
+	"js":   js.Adapter{},
 	"rust": rust.Adapter{},
 }
 

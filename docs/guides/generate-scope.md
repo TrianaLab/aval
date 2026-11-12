@@ -11,8 +11,9 @@ result: `aval run`, `verify` and `push` never call it, and the scope stays
 declared in `aval.yaml`.
 
 !!! note "Languages"
-    Rust ships ([below](#rust)). The other adapters (Go, JavaScript, Python,
-    Java, .NET) are the next stories of
+    JavaScript and TypeScript ([below](#javascript-and-typescript)) and Rust
+    ([below](#rust)) ship. The other adapters (Go, Python, Java, .NET) are the
+    next stories of
     [Epic 16](https://github.com/TrianaLab/aval/issues/291). `aval gen --help`
     lists the languages your build has.
 
@@ -106,6 +107,63 @@ aval gen go --check
 `--check` writes nothing. It exits 0 when the generated entries match the
 graph, and 1 with a diff when they do not, such as a new import or a dropped
 one. Run it in the same job as your linters.
+
+## JavaScript and TypeScript
+
+`aval gen js` reads the manifests and runs no tool. It makes one unit per
+workspace package: the workspaces of `package.json` for npm and yarn,
+`pnpm-workspace.yaml` for pnpm (`!` globs excluded). The root package is not
+a unit. The lockfile at the contract root picks the package manager and the
+test command:
+
+| Lockfile | Command |
+|---|---|
+| `package-lock.json`, `npm-shrinkwrap.json` | `npm test --workspace <name>` |
+| `pnpm-lock.yaml` | `pnpm --filter <name> test` |
+| `yarn.lock` | `yarn workspace <name> test` |
+
+A unit's ID is its package name and its files are its directory, so
+`@acme/ui` in `packages/ui` becomes `js.acme.ui` with `packages/ui/**`. A
+dependency becomes an edge when it names another workspace package (any
+range, or `workspace:`), or when a `file:`, `link:` or `portal:` path points
+to one. External packages are not edges: the lockfile in `defaults` covers
+them. Exclude `node_modules` there too:
+
+```yaml
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+defaults:
+  scope:
+    dependencies: [package.json, pnpm-lock.yaml, pnpm-workspace.yaml]
+    exclude: ["**/node_modules/**"]
+  cacheability: hermetic
+fragments:
+  js.acme.ui:
+    scope:
+      source:
+        - packages/ui/**
+  js.acme.utils:
+    scope:
+      source:
+        - packages/utils/**
+tests:
+  - metadata: {name: js.acme.ui}
+    runner: {command: [pnpm, --filter, '@acme/ui', test]}
+    use:
+      - js.acme.ui
+      - js.acme.utils
+  - metadata: {name: js.acme.utils}
+    runner: {command: [pnpm, --filter, '@acme/utils', test]}
+    use:
+      - js.acme.utils
+```
+
+No lockfile or lockfiles of two package managers, an unreadable
+`package.json` or `pnpm-workspace.yaml`, no workspaces, a workspace package
+without a `name`, and a `workspace:` or `file:` reference to something that
+is not a workspace package are errors: nothing is written, exit 1. A package
+without a `test` script still gets a test; its command fails until you add
+the script.
 
 ## Rust
 
