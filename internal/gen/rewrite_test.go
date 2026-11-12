@@ -299,3 +299,37 @@ func TestRewriteNoTestErrors(t *testing.T) {
 		}
 	}
 }
+
+// Tested lists exactly the units Rewrite writes a test for, and fails the
+// same way on a pattern that matches no unit or on invalid units.
+func TestTested(t *testing.T) {
+	units := []Unit{unit("b"), unit("cmd/gen"), unit("a")}
+	for _, tc := range []struct {
+		noTest []string
+		want   []string
+	}{
+		{nil, []string{"a", "b", "cmd/gen"}},
+		{[]string{"cmd/*"}, []string{"a", "b"}},
+		{[]string{"a", "b", "cmd/**"}, nil},
+	} {
+		got, err := Tested("go", units, tc.noTest...)
+		if err != nil || !slices.Equal(got, tc.want) {
+			t.Errorf("%v: got %v, %v; want %v", tc.noTest, got, err, tc.want)
+		}
+		// The list never drifts from what Rewrite writes.
+		hand := base + "tests:\n  - metadata: {name: e2e}\n    runner: {command: [x]}\n    scope: {source: [x]}\n"
+		out := string(must(Rewrite([]byte(hand), "go", units, tc.noTest...)))
+		for _, u := range units {
+			name, _ := Name("go", u.ID)
+			if strings.Contains(out, "{name: "+name+"}") != slices.Contains(got, u.ID) {
+				t.Errorf("%v: %s listed %v, Rewrite disagrees:\n%s", tc.noTest, u.ID, slices.Contains(got, u.ID), out)
+			}
+		}
+	}
+	if _, err := Tested("go", units, "a", "c"); err == nil || !strings.Contains(err.Error(), "--no-test c: matches no unit") || errors.Is(err, ErrUnits) {
+		t.Errorf("unmatched: %v", err)
+	}
+	if _, err := Tested("go", append(units, unit("a"))); !errors.Is(err, ErrUnits) {
+		t.Errorf("duplicate unit: %v, want ErrUnits", err)
+	}
+}
