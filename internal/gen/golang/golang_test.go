@@ -4,10 +4,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/spf13/pflag"
+	"golang.org/x/mod/modfile"
 
 	"github.com/TrianaLab/aval/internal/contract"
 	"github.com/TrianaLab/aval/internal/fingerprint"
@@ -37,7 +39,11 @@ func generate(t *testing.T, a *Adapter, root string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := gen.Rewrite(data, "go", units)
+	shared, err := a.Shared(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := gen.Rewrite(data, "go", units, shared)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,5 +275,141 @@ func TestToolErrors(t *testing.T) {
 	t.Setenv("PATH", bin)
 	if _, err := (&Adapter{}).Units(fixture); err == nil || !strings.Contains(err.Error(), "go list: unexpected EOF") {
 		t.Errorf("truncated go list output: %v", err)
+	}
+}
+
+// go.module: a change to go.mod (its go or toolchain directive included),
+// go.sum, go.work or go.work.sum changes the fingerprint of every
+// generated test, and a version bump is drift that --check reports.
+func TestFalseHitShared(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "go.sum"), "example.com/x v1.0.0 h1:x=\n")
+	set := generate(t, &Adapter{}, root)
+	if !strings.Contains(set, "        - go.sum\n") {
+		t.Fatalf("go.sum is not in go.module:\n%s", set)
+	}
+	tests := []string{"go.internal.money", "go.internal.orders", "go.internal.testutil", "go.shop", "go.web"}
+	for _, tc := range []struct{ file, data, drift string }{
+		{"go.mod", "module example.com/shop\n\ngo 1.23\n", `{go: "1.23"}`},
+		{"go.mod", "module example.com/shop\n\ngo 1.22\n\ntoolchain go1.22.5\n", `{go: 1.22.5}`},
+		{"go.sum", "example.com/x v1.0.1 h1:y=\n", ""},
+	} {
+		file := filepath.Join(root, tc.file)
+		old, _ := os.ReadFile(file)
+		before := map[string]string{}
+		for _, n := range tests {
+			before[n] = digest(t, set, root, n)
+		}
+		write(t, file, tc.data)
+		for _, n := range tests {
+			if digest(t, set, root, n) == before[n] {
+				t.Errorf("%s changed to %q but the fingerprint of %s did not", tc.file, tc.data, n)
+			}
+		}
+		if now := generate(t, &Adapter{}, root); tc.drift != "" && !strings.Contains(gen.Diff("old", "new", []byte(set), []byte(now)), "+      toolchain: "+tc.drift) {
+			t.Errorf("%s: the version bump is not drift:\n%s", tc.file, gen.Diff("old", "new", []byte(set), []byte(now)))
+		}
+		write(t, file, string(old))
+	}
+}
+
+// In a workspace go.module takes the version from go.work and lists
+// go.work, go.work.sum and each module's go.mod and go.sum.
+func TestFalseHitSharedWorkspace(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "ws")
+	write(t, filepath.Join(root, "go.work"), "go 1.22\n\ntoolchain go1.22.5\n\nuse (\n\t.\n\t./a\n\t./b\n)\n")
+	write(t, filepath.Join(root, "go.mod"), "module example.com/ws\n\ngo 1.22\n")
+	write(t, filepath.Join(root, "ws.go"), "package ws\n\nimport _ \"example.com/a\"\n")
+	write(t, filepath.Join(root, "go.work.sum"), "example.com/x v1.0.0 h1:x=\n")
+	write(t, filepath.Join(root, "a/go.mod"), "module example.com/a\n\ngo 1.22\n")
+	write(t, filepath.Join(root, "a/go.sum"), "example.com/x v1.0.0 h1:x=\n")
+	write(t, filepath.Join(root, "a/a.go"), "package a\n\nimport _ \"example.com/b\"\n")
+	write(t, filepath.Join(root, "b/go.mod"), "module example.com/b\n\ngo 1.21\n")
+	write(t, filepath.Join(root, "b/b.go"), "package b\n")
+	write(t, filepath.Join(root, "aval.yaml"), "apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults:\n  cacheability: hermetic\n")
+	s, err := (&Adapter{}).Shared(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"go.work", "go.work.sum", "go.mod", "a/go.mod", "a/go.sum", "b/go.mod"}; !slices.Equal(s.Dependencies, want) || s.Toolchain["go"] != "1.22.5" {
+		t.Fatalf("dependencies %q, toolchain %q", s.Dependencies, s.Toolchain)
+	}
+	set := generate(t, &Adapter{}, root)
+	for _, file := range []string{"go.work", "go.work.sum", "a/go.mod", "a/go.sum", "b/go.mod"} {
+		before := digest(t, set, root, "go.a")
+		f := filepath.Join(root, filepath.FromSlash(file))
+		old, _ := os.ReadFile(f)
+		write(t, f, string(old)+"// changed\n")
+		if digest(t, set, root, "go.a") == before {
+			t.Errorf("%s changed but the fingerprint of go.a did not", file)
+		}
+		write(t, f, string(old))
+	}
+}
+
+func TestGoVersion(t *testing.T) {
+	for _, tc := range []struct {
+		g    *modfile.Go
+		tc   *modfile.Toolchain
+		want string
+	}{
+		{nil, nil, ""},
+		{&modfile.Go{Version: "1.22"}, nil, "1.22"},
+		{&modfile.Go{Version: "1.22"}, &modfile.Toolchain{Name: "go1.22.5"}, "1.22.5"},
+		{&modfile.Go{Version: "1.22"}, &modfile.Toolchain{Name: "default"}, "1.22"},
+	} {
+		if got := goVersion(tc.g, tc.tc); got != tc.want {
+			t.Errorf("goVersion(%v, %v) = %q, want %q", tc.g, tc.tc, got, tc.want)
+		}
+	}
+}
+
+// Shared fails closed: no version, an unreadable file, a file outside the
+// root or a path no glob can express is an error, never a guess.
+func TestSharedErrors(t *testing.T) {
+	noVersion := t.TempDir()
+	write(t, filepath.Join(noVersion, "go.mod"), "module example.com/x\n")
+	badMod := t.TempDir()
+	write(t, filepath.Join(badMod, "go.mod"), "module example.com/x\n\ngo 1.22\n\nbogus\n")
+	badWork := t.TempDir()
+	write(t, filepath.Join(badWork, "go.work"), "go 1.22\n\nbogus\n")
+	outside := filepath.Join(t.TempDir(), "ws")
+	write(t, filepath.Join(outside, "root/go.work"), "go 1.22\n\nuse ../other\n")
+	write(t, filepath.Join(outside, "other/go.mod"), "module example.com/other\n\ngo 1.22\n")
+	for _, tc := range []struct{ root, want string }{
+		{filepath.Join(t.TempDir(), "none"), "no such file"},
+		{t.TempDir(), "no go.mod or go.work"},
+		{noVersion, "cannot read the Go version"},
+		{badMod, "unknown directive: bogus"},
+		{badWork, "unknown directive: bogus"},
+		{filepath.Join(outside, "root"), "is outside the contract root"},
+	} {
+		if s, err := (&Adapter{}).Shared(tc.root); err == nil || !strings.Contains(err.Error(), tc.want) || s != nil {
+			t.Errorf("%s: shared %v, error %v; want %q", tc.root, s, err, tc.want)
+		}
+	}
+
+	t.Setenv("PATH", t.TempDir())
+	if _, err := (&Adapter{}).Shared(fixture); err == nil || !strings.Contains(err.Error(), "go env: ") {
+		t.Errorf("no go on PATH: %v", err)
+	}
+	if runtime.GOOS == "windows" {
+		return // the fake go below is a POSIX script
+	}
+	dir, _ := filepath.EvalSymlinks(t.TempDir()) // go reports canonical paths
+	write(t, filepath.Join(dir, `a\b/go.mod`), "module example.com/x\n\ngo 1.22\n")
+	bin := t.TempDir()
+	t.Setenv("PATH", bin)
+	for _, tc := range []struct{ out, want string }{
+		{"{", "go env: unexpected end of JSON input"},
+		{`{"GOWORK": "/nonexistent/go.work"}`, "no such file"},
+		{`{"GOMOD": "/nonexistent/go.mod"}`, "no such file"},
+		{`{"GOMOD": "` + dir + `/a\\b/go.mod"}`, "cannot express"},
+	} {
+		write(t, filepath.Join(bin, "go"), "#!/bin/sh\nprintf '%s\\n' '"+tc.out+"'\n")
+		_ = os.Chmod(filepath.Join(bin, "go"), 0o755)
+		if _, err := (&Adapter{}).Shared(dir); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("go env printing %s: %v; want %q", tc.out, err, tc.want)
+		}
 	}
 }

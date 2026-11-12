@@ -374,3 +374,39 @@ func TestGenDotnet(t *testing.T) {
 		t.Errorf("malformed project: exit %d, stderr %q", code, errOut)
 	}
 }
+
+// fakeSharer is a fakeAdapter whose shared fragment fails to read.
+type fakeSharer struct{ fakeAdapter }
+
+func (fakeSharer) Shared(string) (*gen.Shared, error) { return nil, errors.New("no version") }
+
+// A shared fragment that cannot be read exits 1 and writes nothing.
+func TestGenSharedError(t *testing.T) {
+	file, _ := genFile(t)
+	withAdapter(t, "fake", fakeSharer{fakeAdapter{units: fakeUnits()}})
+	if code, _, errOut := runCLI("gen", "fake", "-f", file); code != ExitError || !strings.Contains(errOut, "gen fake: no version") {
+		t.Errorf("exit %d, stderr %q", code, errOut)
+	}
+	if data, _ := os.ReadFile(file); string(data) != genSet {
+		t.Error("written although the shared fragment failed")
+	}
+}
+
+// A toolchain bump in go.mod is drift in go.module that --check reports.
+func TestGenGoSharedDrift(t *testing.T) {
+	const fixture = "../../internal/gen/golang/testdata/shop"
+	dir := filepath.Join(t.TempDir(), "shop")
+	if err := os.CopyFS(dir, os.DirFS(fixture)); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "aval.yaml")
+	if code, _, errOut := runCLI("gen", "go", "-f", file); code != ExitOK {
+		t.Fatalf("gen go: exit %d, stderr %q", code, errOut)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/shop\n\ngo 1.22\n\ntoolchain go1.22.5\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, _ := runCLI("gen", "go", "-f", file, "--check"); code != ExitError || !strings.Contains(out, "+      toolchain: {go: 1.22.5}") {
+		t.Errorf("--check after a toolchain bump: exit %d, stdout %q", code, out)
+	}
+}

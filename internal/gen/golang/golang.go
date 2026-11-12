@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+	"golang.org/x/mod/modfile"
 
 	"github.com/TrianaLab/aval/internal/gen"
 )
@@ -92,15 +93,9 @@ func list(root string) ([]pkg, error) {
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.Command("go", "list", "-deps", "-test", "-json", "./...")
-	cmd.Dir = abs
-	// PWD: go list reports directories under abs, which they are cut from.
-	cmd.Env = append(os.Environ(), "PWD="+abs, "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOFLAGS=")
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	out, err := goCmd(abs, "list", "-deps", "-test", "-json", "./...")
 	if err != nil {
-		return nil, fmt.Errorf("go list: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return nil, err
 	}
 	var pkgs []pkg
 	for dec := json.NewDecoder(bytes.NewReader(out)); ; {
@@ -127,6 +122,135 @@ func list(root string) ([]pkg, error) {
 			pkgs = append(pkgs, p)
 		}
 	}
+}
+
+// goCmd runs go args in abs, a canonical root, as for linux/amd64 with cgo
+// and GOFLAGS cleared, so the result is the same on every host.
+func goCmd(abs string, args ...string) ([]byte, error) {
+	cmd := exec.Command("go", args...)
+	cmd.Dir = abs
+	// PWD: go reports paths under abs, which they are cut from.
+	cmd.Env = append(os.Environ(), "PWD="+abs, "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOFLAGS=")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("go %s: %w: %s", args[0], err, strings.TrimSpace(stderr.String()))
+	}
+	return out, nil
+}
+
+// buildEnv are the variables that change what go builds or how it runs the
+// tests.
+var buildEnv = []string{"CGO_ENABLED", "GOARCH", "GODEBUG", "GOEXPERIMENT", "GOFLAGS", "GOOS", "GOTOOLCHAIN", "GOWORK"}
+
+// Shared returns go.module: the Go version from the toolchain directive,
+// else the go directive, of go.work in a workspace or of go.mod otherwise,
+// checked by go env GOVERSION; go.work, go.work.sum and every main module's
+// go.mod and go.sum that exist; and the Go build environment. A version it
+// cannot read, or a file outside root, is an error.
+func (a *Adapter) Shared(root string) (*gen.Shared, error) {
+	abs, err := gen.Canonical(root)
+	if err != nil {
+		return nil, err
+	}
+	version, files, err := goFiles(abs, root)
+	if err != nil {
+		return nil, err
+	}
+	s := &gen.Shared{
+		Toolchain: map[string]string{"go": version},
+		Probe:     map[string][]string{"go": {"go", "env", "GOVERSION"}},
+		Env:       buildEnv,
+	}
+	for _, f := range files {
+		if _, err := os.Stat(f); strings.HasSuffix(f, ".sum") && errors.Is(err, fs.ErrNotExist) {
+			continue // a module without dependencies has no go.sum
+		}
+		rel, err := filepath.Rel(abs, f)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return nil, fmt.Errorf("%s is outside the contract root %s", f, root)
+		}
+		g, err := gen.Literal(filepath.ToSlash(rel))
+		if err != nil {
+			return nil, err
+		}
+		s.Dependencies = append(s.Dependencies, g)
+	}
+	return s, nil
+}
+
+// goFiles returns the Go version and the absolute paths of go.work and
+// go.work.sum in a workspace, plus the go.mod and go.sum of each main module.
+func goFiles(abs, root string) (string, []string, error) {
+	out, err := goCmd(abs, "env", "-json", "GOWORK", "GOMOD")
+	var env struct{ GOWORK, GOMOD string }
+	if err == nil {
+		if err = json.Unmarshal(out, &env); err != nil {
+			err = fmt.Errorf("go env: %w", err)
+		}
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	file := env.GOWORK
+	work := file != "" && file != "off"
+	if !work {
+		file = env.GOMOD
+	}
+	if file == "" || file == os.DevNull {
+		return "", nil, fmt.Errorf("go env: no go.mod or go.work for %s", root)
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return "", nil, err
+	}
+	var version string
+	var files []string
+	if work {
+		version, files, err = workFiles(file, data)
+	} else {
+		var m *modfile.File
+		if m, err = modfile.Parse(file, data, nil); err == nil {
+			version, files = goVersion(m.Go, m.Toolchain), []string{file, strings.TrimSuffix(file, ".mod") + ".sum"}
+		}
+	}
+	if err == nil && version == "" {
+		err = fmt.Errorf("%s: cannot read the Go version: no go or toolchain directive", file)
+	}
+	return version, files, err
+}
+
+// workFiles parses the go.work file: its version, itself, its go.work.sum
+// and the go.mod and go.sum of each module it uses.
+func workFiles(file string, data []byte) (string, []string, error) {
+	w, err := modfile.ParseWork(file, data, nil)
+	if err != nil {
+		return "", nil, err
+	}
+	files := []string{file, file + ".sum"}
+	for _, u := range w.Use {
+		dir := u.Path
+		if !filepath.IsAbs(dir) {
+			dir = filepath.Join(filepath.Dir(file), dir)
+		}
+		files = append(files, filepath.Join(dir, "go.mod"), filepath.Join(dir, "go.sum"))
+	}
+	return goVersion(w.Go, w.Toolchain), files, nil
+}
+
+// goVersion returns the toolchain directive without its "go" prefix, else
+// the go directive, else "". "toolchain default" names no version.
+func goVersion(g *modfile.Go, t *modfile.Toolchain) string {
+	if t != nil {
+		if v, ok := strings.CutPrefix(t.Name, "go"); ok {
+			return v
+		}
+	}
+	if g != nil {
+		return g.Version
+	}
+	return ""
 }
 
 // sources returns the escaped scope globs of p, whose files are in dir.

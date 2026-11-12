@@ -65,7 +65,7 @@ func generate(t *testing.T, root string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := gen.Rewrite(data, "rust", units)
+	out, err := gen.Rewrite(data, "rust", units, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

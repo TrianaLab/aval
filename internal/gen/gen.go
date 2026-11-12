@@ -16,6 +16,8 @@ import (
 	"slices"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/TrianaLab/aval/internal/contract"
 )
 
@@ -73,6 +75,28 @@ func Under(dir, pattern string) (string, error) {
 // an error, never a partial list (invariant 3).
 type Adapter interface {
 	Units(root string) ([]Unit, error)
+}
+
+// SharedName is the name, after "<lang>.", of the fragment a Sharer emits.
+const SharedName = "module"
+
+// Shared is the one fragment, "<lang>.module", that every test a generator
+// writes uses: the inputs all of its units share, such as the toolchain,
+// the module files and the build environment. Dependencies are globs
+// relative to the contract root (see Literal). It is owned and checked like
+// the per-unit entries, so it cannot go stale.
+type Shared struct {
+	Toolchain    map[string]string
+	Probe        map[string][]string
+	Dependencies []string
+	Env          []string
+}
+
+// Sharer is an Adapter that also emits a Shared fragment. A value it cannot
+// read for certain, such as the toolchain version, is an error, never a
+// guess (invariant 3).
+type Sharer interface {
+	Shared(root string) (*Shared, error)
 }
 
 // Canonical returns root as an absolute path with every symlink resolved,
@@ -135,12 +159,13 @@ func owned(lang, name string) bool { return strings.HasPrefix(name, lang+".") }
 
 // planned is one unit ready to write: its name, its own files, its command
 // and the names of the fragments its test uses (itself and its transitive
-// dependencies), sorted.
+// dependencies), sorted. A shared fragment has a body instead, and no test.
 type planned struct {
 	name    string
 	source  []string
 	command []string
 	use     []string
+	body    *yaml.Node
 }
 
 // plan checks units and computes each unit's transitive closure, sorted by

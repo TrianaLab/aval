@@ -51,10 +51,13 @@ kind: TestSet in -f. For each unit (a package, module or project) it writes
 a fragment with the unit's own files and a test that uses the fragments of
 the unit and of every unit it depends on, both named LANGUAGE.UNIT (such as
 go.internal.contract). A change to a unit then re-runs its test and the
-tests of the units that depend on it.
+tests of the units that depend on it. gen go also writes the fragment
+go.module, which every go.* test uses: the toolchain version from go.mod or
+go.work with a probe, go.mod, go.sum, go.work and go.work.sum, and the Go
+build environment.
 
 gen owns only the fragments and tests whose names start with "LANGUAGE.";
-every other line, comments included, is kept as it is. Shared inputs
+every other line, comments included, is kept as it is. Other shared inputs
 (lockfiles, root build files, toolchain, cacheability) belong in the
 hand-written defaults. --no-test PATTERN (repeatable, a contract glob such as
 cmd/gen* or tests/**) writes no test for the units whose ID matches; they keep
@@ -141,7 +144,13 @@ func runGen(cmd *cobra.Command, a gen.Adapter, lang, file string, check, list bo
 		}
 		return nil
 	}
-	out, err := gen.Rewrite(data, lang, units, noTest...)
+	var shared *gen.Shared
+	if s, ok := a.(gen.Sharer); ok {
+		if shared, err = s.Shared(root); err != nil {
+			return fmt.Errorf("gen %s: %w", lang, err)
+		}
+	}
+	out, err := gen.Rewrite(data, lang, units, shared, noTest...)
 	if err != nil {
 		return genError(lang, file, err)
 	}

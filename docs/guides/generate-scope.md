@@ -20,7 +20,9 @@ declared in `aval.yaml`.
 
 ## What it writes
 
-Given units `a` and `b` where `a` imports `b`, `aval gen go` adds:
+Given units `a` and `b` where `a` imports `b`, `aval gen go` adds (leaving
+out the shared [`go.module`](#the-gomodule-fragment) fragment that each test
+also uses):
 
 ```yaml
 fragments:
@@ -73,20 +75,22 @@ tests:
   alone.
 - `fragments` and `tests` must be block style (not `{}` or `[]`).
 
-Shared inputs stay hand-written. Put lockfiles, root build files, the
-toolchain, probes, `env` and `cacheability` in `defaults` or in your own
-fragments; every generated test inherits `defaults`.
+Other shared inputs stay hand-written. Put lockfiles, root build files,
+the toolchain, probes, `env` and `cacheability` in `defaults` or in your own
+fragments; every generated test inherits `defaults`. `aval gen go` writes
+its shared inputs itself, in [`go.module`](#the-gomodule-fragment).
 
 ```yaml
 apiVersion: aval.trianalab.io/v1
 kind: TestSet
 defaults:
   scope:
-    dependencies: [go.mod, go.sum]
-  environment:
-    toolchain: {go: "1.25"}
+    dependencies: [Makefile]
   cacheability: hermetic
 fragments:
+  go.module:                # generated, see below; shortened here
+    scope:
+      dependencies: [go.mod, go.sum]
   go.web:
     scope:
       source:
@@ -98,6 +102,7 @@ tests:
   - metadata: {name: go.web}
     runner: {command: [go, test, ./web]}
     use:
+      - go.module
       - go.web
 ```
 
@@ -148,9 +153,58 @@ works. Each package is one unit:
   scope without regenerating.
 - Its dependencies are the packages of the main modules it imports, from
   any `.go` file, test files and files under any build tag included. The
-  standard library and external modules are not units: keep `go.mod` and
-  `go.sum` in `defaults`.
-- Its test is `go test ./<dir>`.
+  standard library and external modules are not units: `go.module` covers
+  them through `go.mod` and `go.sum`.
+- Its test is `go test ./<dir>` and `use`s `go.module`.
+
+### The go.module fragment
+
+`aval gen go` also writes one fragment, `go.module`, with what every Go
+test shares, and every generated test `use`s it:
+
+```yaml
+fragments:
+  go.module:
+    scope:
+      dependencies:
+        - go.mod
+        - go.sum
+    environment:
+      toolchain: {go: 1.25.4}
+      probe:
+        go: [go, env, GOVERSION]
+      env:
+        - CGO_ENABLED
+        - GOARCH
+        - GODEBUG
+        - GOEXPERIMENT
+        - GOFLAGS
+        - GOOS
+        - GOTOOLCHAIN
+        - GOWORK
+```
+
+- `toolchain.go` is the `toolchain` directive without its `go` prefix, else
+  the `go` directive, of `go.work` in a workspace or of `go.mod`. The probe
+  makes `aval run` check it against `go env GOVERSION` before the lookup, so
+  the installed Go must match it exactly: with only `go 1.25.0`, a machine
+  on go1.25.3 records and reuses nothing. Pin the patch version (a
+  `toolchain` line, or `go` with the patch you install).
+- `dependencies` are `go.work`, `go.work.sum`, and the `go.mod` and
+  `go.sum` of every main module, when they exist, relative to the contract
+  root.
+- `env` are the variables that change what `go` builds and how it runs the
+  tests.
+
+It is owned like the other `go.*` entries, so a toolchain bump in `go.mod`
+or a new `go.sum` is drift that `--check` reports. Do not repeat its
+toolchain or probe in `defaults`: a different value there is a conflict,
+and `aval gen` fails (exit 2). `aval gen go` fails and writes nothing
+(exit 1) when it cannot read the version (a `go.mod` without a `go` directive, a
+file that does not parse), finds no `go.mod` or `go.work`, or a module file
+lies outside the contract root. A unit whose name would be `go.module` (a
+package directory `module`, or a root package whose import path ends in
+`/module`) is an error too.
 
 ```sh
 aval gen go             # writes go.* into aval.yaml
