@@ -311,52 +311,52 @@ tests:
 ## Java and Kotlin
 
 `aval gen java` reads the build files at the contract root and runs no JVM
-tool:
+tool. A unit's files are its whole directory (`<module>/**`), so add
+`exclude: ["**/target/**", "**/build/**"]` to `defaults`.
 
 - Maven: one unit per module in `<modules>` (Maven 4 `<subprojects>`), in
   the root POM, nested aggregators and every profile. A module depends on
   every local module its POM names with a `groupId` and `artifactId`:
-  `<parent>`, dependencies, plugins, extensions or plugin configuration
-  such as `annotationProcessorPaths`. References in the root POM
-  (inherited dependencies and plugins) are edges of every module.
-  `dependencyManagement` (except imported BOMs), `pluginManagement` and
-  `exclusions` are not edges. The test is `mvn -B -pl <module> test`
-  (`./mvnw` when the root has it), which tests that module only and takes
+  `<parent>`, dependencies, plugins and `pluginManagement`, extensions,
+  imported BOMs or plugin configuration such as
+  `annotationProcessorPaths`. The references of its local parents and of
+  the root POM are its edges too, resolved with its own properties.
+  Managed dependencies and `exclusions` are not edges. The test is
+  `mvn -B -pl <module> test` (`./mvnw` when the root has it), which takes
   the other modules from the local repository: run
   `mvn -B install -DskipTests` before `aval run`.
 - Gradle: one unit per `include` in `settings.gradle.kts` or
-  `settings.gradle`. A subproject depends on the `project(":path")`
-  references of its build script; a reference in the root build script
-  (`subprojects { ... }`) becomes an edge of every subproject. The build
-  script of an intermediate project (`services` for `:services:web`) is an
-  input of the subprojects under it, and its references are their edges.
-  The test is `./gradlew :<path>:test` (`gradle` without a wrapper).
+  `settings.gradle`. A subproject depends on the projects its build script
+  names in `project(...)`, `evaluationDependsOn(...)` or a task path such
+  as `":common:jar"`. The settings script, the root build script,
+  `buildSrc/**` and the build scripts of its parent projects are among its
+  files, and the projects they name are its edges. The test is
+  `./gradlew :<path>:test` (`gradle` without a wrapper).
 
-A unit's files are its `pom.xml` or `build.gradle(.kts)`, a Gradle
-subproject's `gradle.properties` and `src/**`. Other files in the module
-directory, such as `lombok.config`, go in a hand-written fragment. The root
-project is not a unit; its build files and whatever else configures every
-module (`buildSrc/**`, `gradle.properties`, `gradle/wrapper/**`, version
-catalogs, `.mvn/**`) go in `defaults`:
+The root POM, version catalogs, `gradle.properties`, `gradle/wrapper/**`
+and `.mvn/**` go in `defaults`:
 
 ```yaml
 apiVersion: aval.trianalab.io/v1
 kind: TestSet
 defaults:
   scope:
-    dependencies: [settings.gradle.kts, build.gradle.kts, gradle/libs.versions.toml]
+    dependencies: [gradle/libs.versions.toml]
+    exclude: ["**/build/**", "**/.gradle/**"]
   cacheability: hermetic
 fragments:
   java.common:
     scope:
       source:
-        - common/build.gradle.kts
-        - common/src/**
+        - build.gradle.kts
+        - common/**
+        - settings.gradle.kts
   java.inventory:
     scope:
       source:
-        - inventory/build.gradle.kts
-        - inventory/src/**
+        - build.gradle.kts
+        - inventory/**
+        - settings.gradle.kts
 tests:
   - metadata: {name: java.common}
     runner: {command: [./gradlew, ':common:test']}
@@ -369,15 +369,19 @@ tests:
       - java.inventory
 ```
 
-What it cannot read for certain is an error (exit 1), not a guess: a
-computed `include` or `project(...)` path, type-safe accessors
-(`projects.common`), `includeBuild`, `projectDir`, `buildFileName`,
-`apply from`, a source or resource directory outside `src` (a Gradle
-`srcDir` that is not a string literal under `src`), a local `<parent>` POM
-that is neither the root POM nor a module, a property it cannot resolve in
-a local module's coordinates, or a root with both a POM and a Gradle
-settings script. Local files a build script names outside `src`, such as
-`files("libs/x.jar")`, are not read: add them to `defaults` or a fragment.
+What it cannot read for certain is an error (exit 1), not a guess:
+
+- a computed `include`, `project(...)` or `evaluationDependsOn(...)` path,
+  type-safe accessors (`projects.common`), `includeBuild`, `projectDir`,
+  `buildFileName` or `apply from`;
+- a path outside the module directory: `..`, an absolute path, Gradle
+  `rootDir`, `rootProject` or `parentFile`, Maven
+  `${maven.multiModuleProjectDirectory}` or a directory, `systemPath` or
+  plugin `<source>` that leaves the module;
+- a Maven property it cannot resolve, or that a profile sets;
+- a reference to a local POM that is not a module, or a local `<parent>`
+  that is neither the root POM nor a module;
+- a root with both a POM and a Gradle settings script.
 
 ## Cross-language dependencies
 

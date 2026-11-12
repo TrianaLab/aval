@@ -75,20 +75,6 @@ func checkDir(dir string) error {
 	return nil
 }
 
-// source returns the globs of a unit's own files: its build file, when it
-// has one, and src/**, when src is a directory. Sources outside src are
-// rejected by the callers, so nothing the build compiles is left out.
-func source(root, dir, build string) []string {
-	var s []string
-	if build != "" {
-		s = append(s, dir+"/"+build)
-	}
-	if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(dir), "src")); err == nil && info.IsDir() {
-		s = append(s, dir+"/src/**")
-	}
-	return s
-}
-
 // tool returns the wrapper script at root (./mvnw, ./gradlew) when there is
 // one, otherwise the tool on PATH.
 func tool(root, wrapper, name string) string {

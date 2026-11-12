@@ -1,33 +1,38 @@
 apiVersion: aval.trianalab.io/v1
 kind: TestSet
-# Shared inputs: the root build files. aval gen java writes the rest.
+# Shared inputs aval gen java does not list: the version catalog.
 defaults:
   scope:
-    dependencies: [settings.gradle.kts, build.gradle.kts, gradle/libs.versions.toml]
+    dependencies: [gradle/libs.versions.toml]
+    exclude: ["**/build/**", "**/.gradle/**"]
   cacheability: hermetic
 fragments:
   java.common:
     scope:
       source:
-        - common/build.gradle.kts
-        - common/src/**
+        - build.gradle.kts
+        - common/**
+        - settings.gradle.kts
   java.inventory:
     scope:
       source:
-        - inventory/build.gradle.kts
-        - inventory/src/**
+        - build.gradle.kts
+        - inventory/**
+        - settings.gradle.kts
   java.services.api:
     scope:
       source:
-        - services/api/build.gradle
-        - services/api/src/**
+        - build.gradle.kts
+        - services/api/**
         - services/build.gradle.kts
+        - settings.gradle.kts
   java.services.web:
     scope:
       source:
+        - build.gradle.kts
         - services/build.gradle.kts
-        - services/web/build.gradle.kts
-        - services/web/src/**
+        - services/web/**
+        - settings.gradle.kts
 tests:
   - metadata: {name: java.common}
     runner: {command: [./gradlew, ':common:test']}

@@ -1,12 +1,15 @@
 package java
 
 import (
+	"encoding/xml"
 	"errors"
 	"io/fs"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -160,32 +163,72 @@ func TestFalseHitNewReferenceIsDrift(t *testing.T) {
 const pomHead = `<project><groupId>g</groupId><artifactId>root</artifactId>`
 
 // inherited is a reactor whose root POM names common in a plugin's
-// dependencies (a shared build-tools module), and app imports bom as a BOM.
+// dependencies (a shared build-tools module) and lint in pluginManagement,
+// resolves ${lib} per module (app sets it to util), and app imports bom as
+// a BOM.
 var inherited = map[string]string{
-	"pom.xml": pomHead + `<modules><module>common</module><module>tools</module><module>bom</module><module>app</module></modules>
-		<build><plugins><plugin><artifactId>maven-checkstyle-plugin</artifactId><dependencies><dependency><groupId>g</groupId><artifactId>common</artifactId></dependency></dependencies></plugin></plugins></build></project>`,
-	"common/pom.xml":    `<project><groupId>g</groupId><artifactId>common</artifactId></project>`,
-	"common/src/C.java": "",
-	"tools/pom.xml":     `<project><groupId>g</groupId><artifactId>tools</artifactId></project>`,
-	"bom/pom.xml":       `<project><groupId>g</groupId><artifactId>bom</artifactId></project>`,
-	"app/pom.xml": `<project><groupId>g</groupId><artifactId>app</artifactId><dependencyManagement><dependencies>
+	"pom.xml": pomHead + `<properties><lib>common</lib></properties>
+		<modules><module>common</module><module>util</module><module>lint</module><module>tools</module><module>bom</module><module>app</module></modules>
+		<dependencies><dependency><groupId>g</groupId><artifactId>${lib}</artifactId></dependency></dependencies>
+		<build><plugins><plugin><artifactId>maven-checkstyle-plugin</artifactId><dependencies><dependency><groupId>g</groupId><artifactId>common</artifactId></dependency></dependencies></plugin></plugins>
+		<pluginManagement><plugins><plugin><groupId>g</groupId><artifactId>lint</artifactId></plugin></plugins></pluginManagement></build></project>`,
+	"common/pom.xml":       `<project><groupId>g</groupId><artifactId>common</artifactId></project>`,
+	"common/src/C.java":    "",
+	"common/lombok.config": "",
+	"util/pom.xml":         `<project><groupId>g</groupId><artifactId>util</artifactId></project>`,
+	"lint/pom.xml":         `<project><groupId>g</groupId><artifactId>lint</artifactId></project>`,
+	"tools/pom.xml":        `<project><groupId>g</groupId><artifactId>tools</artifactId></project>`,
+	"bom/pom.xml":          `<project><groupId>g</groupId><artifactId>bom</artifactId></project>`,
+	"app/pom.xml": `<project><groupId>g</groupId><artifactId>app</artifactId><properties><lib>util</lib></properties><dependencyManagement><dependencies>
 		<dependency><groupId>g</groupId><artifactId>bom</artifactId><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement></project>`,
 }
 
-// A module inherits the root POM's references and resolves versions from an
-// imported BOM: a change to either must change its fingerprint.
+// conventions is a Gradle build whose convention plugin in buildSrc names b,
+// and whose c depends on a task of d.
+var conventions = map[string]string{
+	"settings.gradle.kts":                      `rootProject.name = "include-demo"` + "\n" + `include(":a", ":b", ":c", ":d")`,
+	"buildSrc/src/main/kotlin/conv.gradle.kts": `dependencies { "implementation"(project(":b")) }`,
+	"buildSrc/build/generated/Ignored.kt":      "project(name)",
+	"a/src/A.kt":                               "",
+	"b/src/B.kt":                               "",
+	"c/build.gradle.kts":                       `tasks.test { dependsOn(":d:jar") }`,
+	"d/build.gradle.kts":                       `evaluationDependsOn(":b")`,
+	"d/libs/x.jar":                             "",
+	"buildSrc/README.md":                       "project(name) is not code here",
+}
+
+// The files and edges a unit gets from inheritance, build logic and its own
+// directory: a change to any of them must change its fingerprint.
 func TestFalseHitInheritedAndImported(t *testing.T) {
-	set := generate(t, tree(t, inherited), []byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"))
-	fsys := fstest.MapFS{"aval.golden.yaml": {Data: set}}
-	for k, v := range inherited {
-		fsys[k] = &fstest.MapFile{Data: []byte(v)}
-	}
-	for test, file := range map[string]string{"java.tools": "common/src/C.java", "java.app": "bom/pom.xml"} {
-		before := digest(t, fsys, test)
-		changed := maps.Clone(fsys)
-		changed[file] = &fstest.MapFile{Data: []byte("<!-- changed -->")}
-		if digest(t, changed, test) == before {
-			t.Errorf("%s: same fingerprint after changing %s", test, file)
+	for _, tc := range []struct {
+		files   map[string]string
+		changes map[string]string // test -> file
+	}{
+		{inherited, map[string]string{
+			"java.tools": "common/src/C.java", // root plugin dependency
+			"java.bom":   "lint/pom.xml",      // root pluginManagement
+			"java.app":   "bom/pom.xml",       // imported BOM
+			"java.util":  "common/lombok.config",
+		}},
+		{inherited, map[string]string{"java.app": "util/pom.xml", "java.common": "common/lombok.config"}}, // ${lib} resolved in app's context
+		{conventions, map[string]string{
+			"java.a": "buildSrc/src/main/kotlin/conv.gradle.kts",
+			"java.c": "b/src/B.kt", // c -> d (task path) -> b (evaluationDependsOn)
+			"java.d": "d/libs/x.jar",
+		}},
+	} {
+		set := generate(t, tree(t, tc.files), []byte("apiVersion: aval.trianalab.io/v1\nkind: TestSet\ndefaults: {cacheability: hermetic}\n"))
+		fsys := fstest.MapFS{"aval.golden.yaml": {Data: set}}
+		for k, v := range tc.files {
+			fsys[k] = &fstest.MapFile{Data: []byte(v)}
+		}
+		for test, file := range tc.changes {
+			before := digest(t, fsys, test)
+			changed := maps.Clone(fsys)
+			changed[file] = &fstest.MapFile{Data: []byte("<!-- changed -->")}
+			if digest(t, changed, test) == before {
+				t.Errorf("%s: same fingerprint after changing %s", test, file)
+			}
 		}
 	}
 }
@@ -206,8 +249,8 @@ func TestUnits(t *testing.T) {
 				"plugin/pom.xml": "not listed as a module",
 			},
 			want: []gen.Unit{
-				{ID: "a", Source: []string{"a/pom.xml", "a/src/**"}, Deps: []string{"b"}, Command: []string{"./mvnw", "-B", "-pl", "a", "test"}},
-				{ID: "b", Source: []string{"b/pom.xml"}, Command: []string{"./mvnw", "-B", "-pl", "b", "test"}},
+				{ID: "a", Source: []string{"a/**"}, Deps: []string{"b"}, Command: []string{"./mvnw", "-B", "-pl", "a", "test"}},
+				{ID: "b", Source: []string{"b/**"}, Command: []string{"./mvnw", "-B", "-pl", "b", "test"}},
 			},
 		},
 		"gradle groovy, root references, relative and root project paths": {
@@ -219,12 +262,12 @@ func TestUnits(t *testing.T) {
 				"a/c/build.gradle.kts": "val s = \"// not a comment \\\" still a string\"\n",
 			},
 			want: []gen.Unit{
-				{ID: "a", Source: []string{"a/build.gradle"}, Deps: []string{"a/c", "b", "b"}, Command: []string{"gradle", ":a:test"}},
-				{ID: "b", Source: []string{"b/src/**"}, Command: []string{"gradle", ":b:test"}},
-				{ID: "a/c", Source: []string{"a/build.gradle", "a/c/build.gradle.kts"}, Deps: []string{"b", "b"}, Command: []string{"gradle", ":a:c:test"}},
+				{ID: "a", Source: []string{"settings.gradle", "build.gradle", "a/**"}, Deps: []string{"a/c", "b"}, Command: []string{"gradle", ":a:test"}},
+				{ID: "b", Source: []string{"settings.gradle", "build.gradle", "b/**"}, Command: []string{"gradle", ":b:test"}},
+				{ID: "a/c", Source: []string{"settings.gradle", "build.gradle", "a/build.gradle", "a/c/**"}, Deps: []string{"b"}, Command: []string{"gradle", ":a:c:test"}},
 			},
 		},
-		"gradle intermediate project not included, source sets under src, gradle.properties": {
+		"gradle intermediate project not included, source sets in the project": {
 			files: map[string]string{
 				"settings.gradle.kts":                `include(":common", ":services:web:app")`,
 				"services/build.gradle.kts":          "subprojects { dependencies { \"implementation\"(project(\":common\")) } }\n",
@@ -233,8 +276,8 @@ func TestUnits(t *testing.T) {
 				"common/build.gradle.kts":            `sourceSets.main { kotlin.setSrcDirs(listOf("src/kt")) }`,
 			},
 			want: []gen.Unit{
-				{ID: "common", Source: []string{"common/build.gradle.kts"}, Command: []string{"gradle", ":common:test"}},
-				{ID: "services/web/app", Source: []string{"services/build.gradle.kts", "services/web/app/build.gradle", "services/web/app/gradle.properties"}, Deps: []string{"common"}, Command: []string{"gradle", ":services:web:app:test"}},
+				{ID: "common", Source: []string{"settings.gradle.kts", "common/**"}, Command: []string{"gradle", ":common:test"}},
+				{ID: "services/web/app", Source: []string{"settings.gradle.kts", "services/build.gradle.kts", "services/web/app/**"}, Deps: []string{"common"}, Command: []string{"gradle", ":services:web:app:test"}},
 			},
 		},
 		"maven parent by relative path, a module or from a repository": {
@@ -247,10 +290,10 @@ func TestUnits(t *testing.T) {
 				"b/other/pom.xml": "not read",
 			},
 			want: []gen.Unit{
-				{ID: "parent", Source: []string{"parent/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "parent", "test"}},
-				{ID: "a", Source: []string{"a/pom.xml"}, Deps: []string{"parent"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
-				{ID: "b", Source: []string{"b/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
-				{ID: "c", Source: []string{"c/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "c", "test"}},
+				{ID: "parent", Source: []string{"parent/**"}, Command: []string{"mvn", "-B", "-pl", "parent", "test"}},
+				{ID: "a", Source: []string{"a/**"}, Deps: []string{"parent"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
+				{ID: "b", Source: []string{"b/**"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
+				{ID: "c", Source: []string{"c/**"}, Command: []string{"mvn", "-B", "-pl", "c", "test"}},
 			},
 		},
 		"maven references outside dependencies and plugins": {
@@ -264,22 +307,46 @@ func TestUnits(t *testing.T) {
 				"ext/pom.xml":  `<project><groupId>g</groupId><artifactId>ext</artifactId></project>`,
 			},
 			want: []gen.Unit{
-				{ID: "a", Source: []string{"a/pom.xml"}, Deps: []string{"proc"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
-				{ID: "b", Source: []string{"b/pom.xml"}, Deps: []string{"ext"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
-				{ID: "proc", Source: []string{"proc/pom.xml"}, Deps: []string{"ext"}, Command: []string{"mvn", "-B", "-pl", "proc", "test"}},
-				{ID: "ext", Source: []string{"ext/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "ext", "test"}},
+				{ID: "a", Source: []string{"a/**"}, Deps: []string{"proc"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
+				{ID: "b", Source: []string{"b/**"}, Deps: []string{"ext"}, Command: []string{"mvn", "-B", "-pl", "b", "test"}},
+				{ID: "proc", Source: []string{"proc/**"}, Deps: []string{"ext"}, Command: []string{"mvn", "-B", "-pl", "proc", "test"}},
+				{ID: "ext", Source: []string{"ext/**"}, Command: []string{"mvn", "-B", "-pl", "ext", "test"}},
 			},
 		},
-		"root plugin dependency is inherited by every module": {
+		"root references are inherited by every module, resolved in its context": {
 			files: inherited,
 			want: []gen.Unit{
-				{ID: "common", Source: []string{"common/pom.xml", "common/src/**"}, Command: []string{"mvn", "-B", "-pl", "common", "test"}},
-				{ID: "tools", Source: []string{"tools/pom.xml"}, Deps: []string{"common"}, Command: []string{"mvn", "-B", "-pl", "tools", "test"}},
-				{ID: "bom", Source: []string{"bom/pom.xml"}, Deps: []string{"common"}, Command: []string{"mvn", "-B", "-pl", "bom", "test"}},
-				{ID: "app", Source: []string{"app/pom.xml"}, Deps: []string{"bom", "common"}, Command: []string{"mvn", "-B", "-pl", "app", "test"}},
+				{ID: "common", Source: []string{"common/**"}, Deps: []string{"lint"}, Command: []string{"mvn", "-B", "-pl", "common", "test"}},
+				{ID: "util", Source: []string{"util/**"}, Deps: []string{"common", "lint"}, Command: []string{"mvn", "-B", "-pl", "util", "test"}},
+				{ID: "lint", Source: []string{"lint/**"}, Deps: []string{"common"}, Command: []string{"mvn", "-B", "-pl", "lint", "test"}},
+				{ID: "tools", Source: []string{"tools/**"}, Deps: []string{"common", "lint"}, Command: []string{"mvn", "-B", "-pl", "tools", "test"}},
+				{ID: "bom", Source: []string{"bom/**"}, Deps: []string{"common", "lint"}, Command: []string{"mvn", "-B", "-pl", "bom", "test"}},
+				{ID: "app", Source: []string{"app/**"}, Deps: []string{"bom", "common", "lint", "util"}, Command: []string{"mvn", "-B", "-pl", "app", "test"}},
 			},
 		},
-		"imported local BOM, managed entries are not edges": {
+		"root ${project.artifactId} reference, stray POMs in build output or unparsable": {
+			files: map[string]string{
+				"pom.xml":              pomHead + `<modules><module>a</module><module>a-fixtures</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${project.artifactId}-fixtures</artifactId><scope>test</scope></dependency></dependencies></project>`,
+				"a/pom.xml":            `<project><groupId>g</groupId><artifactId>a</artifactId><dependencies><dependency><groupId>g</groupId><artifactId>x</artifactId></dependency></dependencies></project>`,
+				"a-fixtures/pom.xml":   `<project><groupId>g</groupId><artifactId>a-fixtures</artifactId></project>`,
+				"a/target/x/pom.xml":   `<project><groupId>g</groupId><artifactId>x</artifactId></project>`,
+				"a/src/it/bad/pom.xml": `<project>`,
+			},
+			want: []gen.Unit{
+				{ID: "a", Source: []string{"a/**"}, Deps: []string{"a-fixtures"}, Command: []string{"mvn", "-B", "-pl", "a", "test"}},
+				{ID: "a-fixtures", Source: []string{"a-fixtures/**"}, Command: []string{"mvn", "-B", "-pl", "a-fixtures", "test"}},
+			},
+		},
+		"gradle buildSrc, task paths, include in a string": {
+			files: conventions,
+			want: []gen.Unit{
+				{ID: "a", Source: []string{"settings.gradle.kts", "buildSrc/**", "a/**"}, Deps: []string{"b"}, Command: []string{"gradle", ":a:test"}},
+				{ID: "b", Source: []string{"settings.gradle.kts", "buildSrc/**", "b/**"}, Command: []string{"gradle", ":b:test"}},
+				{ID: "c", Source: []string{"settings.gradle.kts", "buildSrc/**", "c/**"}, Deps: []string{"b", "d"}, Command: []string{"gradle", ":c:test"}},
+				{ID: "d", Source: []string{"settings.gradle.kts", "buildSrc/**", "d/**"}, Deps: []string{"b"}, Command: []string{"gradle", ":d:test"}},
+			},
+		},
+		"imported local BOM and managed plugin are edges, managed dependency is not": {
 			files: map[string]string{
 				"pom.xml":     pomHead + `<modules><module>bom</module><module>lib</module><module>app</module></modules></project>`,
 				"bom/pom.xml": `<project><groupId>g</groupId><artifactId>bom</artifactId></project>`,
@@ -290,9 +357,9 @@ func TestUnits(t *testing.T) {
 					<build><pluginManagement><plugins><plugin><groupId>g</groupId><artifactId>lib</artifactId><scope>import</scope></plugin></plugins></pluginManagement></build></project>`,
 			},
 			want: []gen.Unit{
-				{ID: "bom", Source: []string{"bom/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "bom", "test"}},
-				{ID: "lib", Source: []string{"lib/pom.xml"}, Command: []string{"mvn", "-B", "-pl", "lib", "test"}},
-				{ID: "app", Source: []string{"app/pom.xml"}, Deps: []string{"bom"}, Command: []string{"mvn", "-B", "-pl", "app", "test"}},
+				{ID: "bom", Source: []string{"bom/**"}, Command: []string{"mvn", "-B", "-pl", "bom", "test"}},
+				{ID: "lib", Source: []string{"lib/**"}, Command: []string{"mvn", "-B", "-pl", "lib", "test"}},
+				{ID: "app", Source: []string{"app/**"}, Deps: []string{"bom", "lib"}, Command: []string{"mvn", "-B", "-pl", "app", "test"}},
 			},
 		},
 	} {
@@ -320,17 +387,31 @@ func TestUnitsFailClosed(t *testing.T) {
 		files map[string]string
 		want  string
 	}{
-		"no build":             {map[string]string{"README": ""}, "has no pom.xml, settings.gradle.kts or settings.gradle"},
-		"maven and gradle":     {map[string]string{"pom.xml": "", "settings.gradle": ""}, "both pom.xml and settings.gradle"},
-		"two settings":         {map[string]string{"settings.gradle": "", "settings.gradle.kts": ""}, "both settings.gradle.kts and settings.gradle"},
-		"bad xml":              {map[string]string{"pom.xml": "<project>"}, "pom.xml: XML syntax error"},
-		"not a pom":            {map[string]string{"pom.xml": "<html/>"}, "the root element is <html>"},
-		"missing module":       {map[string]string{"pom.xml": pomHead + `<modules><module>gone</module></modules></project>`}, "gone"},
-		"module pom file":      {map[string]string{"pom.xml": pomHead + `<modules><module>a/pom.xml</module></modules></project>`}, "names a POM file"},
-		"module outside":       {map[string]string{"pom.xml": pomHead + `<subprojects><subproject>../x</subproject></subprojects></project>`}, `"../x": want a directory inside the root`},
-		"module glob":          {map[string]string{"pom.xml": pomHead + `<modules><module>a*</module></modules></project>`}, "without glob characters"},
-		"source outside src":   {sub(`<project><build><testSourceDirectory>test</testSourceDirectory></build></project>`), `"test" outside src`},
-		"resource outside src": {sub(`<project><profiles><profile><build><resources><resource><directory>../conf</directory></resource></resources></build></profile></profiles></project>`), `"../conf" outside src`},
+		"no build":                {map[string]string{"README": ""}, "has no pom.xml, settings.gradle.kts or settings.gradle"},
+		"maven and gradle":        {map[string]string{"pom.xml": "", "settings.gradle": ""}, "both pom.xml and settings.gradle"},
+		"two settings":            {map[string]string{"settings.gradle": "", "settings.gradle.kts": ""}, "both settings.gradle.kts and settings.gradle"},
+		"bad xml":                 {map[string]string{"pom.xml": "<project>"}, "pom.xml: XML syntax error"},
+		"not a pom":               {map[string]string{"pom.xml": "<html/>"}, "the root element is <html>"},
+		"missing module":          {map[string]string{"pom.xml": pomHead + `<modules><module>gone</module></modules></project>`}, "gone"},
+		"module pom file":         {map[string]string{"pom.xml": pomHead + `<modules><module>a/pom.xml</module></modules></project>`}, "names a POM file"},
+		"module outside":          {map[string]string{"pom.xml": pomHead + `<subprojects><subproject>../x</subproject></subprojects></project>`}, `"../x": want a directory inside the root`},
+		"module glob":             {map[string]string{"pom.xml": pomHead + `<modules><module>a*</module></modules></project>`}, "without glob characters"},
+		"source in the module":    {sub(`<project><groupId>g</groupId><artifactId>a</artifactId><build><testSourceDirectory>test</testSourceDirectory></build></project>`), ""},
+		"resource outside":        {sub(`<project><profiles><profile><build><resources><resource><directory>../conf</directory></resource></resources></build></profile></profiles></project>`), "a/pom.xml: <directory>../conf</directory> refers to files outside the module directory"},
+		"system path outside":     {sub(`<project><dependencies><dependency><systemPath>${basedir}/../lib/x.jar</systemPath></dependency></dependencies></project>`), "<systemPath>"},
+		"absolute source":         {sub(`<project><build><plugins><plugin><configuration><sources><source>/opt/gen</source></sources></configuration></plugin></plugins></build></project>`), "<source>/opt/gen</source>"},
+		"root directory property": {map[string]string{"pom.xml": pomHead + `<properties><cfg>${maven.multiModuleProjectDirectory}/c.xml</cfg></properties><modules><module>a</module></modules></project>`}, "pom.xml: <cfg>"},
+		"property set by a profile": {sub(`<project><groupId>g</groupId><artifactId>a</artifactId><properties><x>b</x></properties><profiles><profile><properties><x>c</x></properties></profile></profiles>
+			<dependencies><dependency><groupId>g</groupId><artifactId>${x}</artifactId></dependency></dependencies></project>`), "a/pom.xml: property x set by a profile"},
+		"property set by a root profile": {map[string]string{
+			"pom.xml":   pomHead + `<modules><module>a</module></modules><profiles><profile><properties><x>c</x></properties></profile></profiles></project>`,
+			"a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId><dependencies><dependency><groupId>g</groupId><artifactId>${x}</artifactId></dependency></dependencies></project>`,
+		}, "property x set by a profile"},
+		"reference to a POM outside the reactor": {map[string]string{
+			"pom.xml":   pomHead + `<modules><module>a</module></modules></project>`,
+			"a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId><dependencies><dependency><groupId>g</groupId><artifactId>x</artifactId></dependency></dependencies></project>`,
+			"x/pom.xml": `<project><groupId>g</groupId><artifactId>x</artifactId></project>`,
+		}, "a/pom.xml: g:x refers to x/pom.xml, a local POM outside the build"},
 		"duplicate coordinates": {map[string]string{
 			"pom.xml":   pomHead + `<modules><module>a</module><module>b</module></modules></project>`,
 			"a/pom.xml": `<project><groupId>g</groupId><artifactId>x</artifactId></project>`,
@@ -338,7 +419,7 @@ func TestUnitsFailClosed(t *testing.T) {
 		}, "modules a and b are both g:x"},
 		"unresolved own property":        {sub(`<project><groupId>${nope}</groupId><artifactId>a</artifactId></project>`), "a/pom.xml: cannot resolve the properties in ${nope}:a"},
 		"unresolved dependency property": {sub(`<project><groupId>g</groupId><artifactId>a</artifactId><dependencies><dependency><groupId>g</groupId><artifactId>${x}</artifactId></dependency></dependencies></project>`), "cannot resolve the properties in g:${x}"},
-		"unresolved root property":       {map[string]string{"pom.xml": pomHead + `<modules><module>a</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${y}</artifactId></dependency></dependencies></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, "pom.xml: cannot resolve the properties in g:${y}"},
+		"unresolved root property":       {map[string]string{"pom.xml": pomHead + `<modules><module>a</module></modules><dependencies><dependency><groupId>g</groupId><artifactId>${y}</artifactId></dependency></dependencies></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`}, "a/pom.xml: cannot resolve the properties in g:${y}"},
 		"bad property element":           {sub(`<project><properties><a>x</b></properties></project>`), "a/pom.xml: XML syntax error"},
 		"unclosed properties":            {sub(`<project><properties>`), "a/pom.xml: XML syntax error"},
 		"element after the project":      {sub(`<project/><x>`), "a/pom.xml: XML syntax error"},
@@ -368,9 +449,15 @@ func TestUnitsFailClosed(t *testing.T) {
 		"computed project":       {kts(`include(":a")`, "a/build.gradle.kts", "dependencies { implementation(project(name)) }"), "a/build.gradle.kts: project(...): an argument other than a string literal"},
 		"apply from kotlin":      {kts(`include(":a")`, "a/build.gradle.kts", `apply(from = "../gradle/shared.gradle.kts")`), "a/build.gradle.kts: apply from: not supported"},
 		"apply from groovy":      {kts(`include(":a")`, "build.gradle", "subprojects { apply from: '../x.gradle' }"), "build.gradle: apply from"},
-		"source set outside src": {kts(`include(":a")`, "a/build.gradle.kts", `sourceSets { main { java.srcDir("gen") } }`), `a/build.gradle.kts: source or resource directory "gen" outside src`},
-		"source set in root":     {kts(`include(":a")`, "build.gradle.kts", `subprojects { sourceSets.main { java.srcDirs("src/a", "") } }`), `"." outside src`},
-		"computed source set":    {kts(`include(":a")`, "a/build.gradle.kts", `java.srcDir(layout.buildDirectory.dir("gen"))`), "source set directory: an argument other than a string literal"},
+		"source set outside":     {kts(`include(":a")`, "a/build.gradle.kts", `sourceSets { main { java.srcDir("../gen") } }`), `a/build.gradle.kts: "../gen" refers to files outside the project directory`},
+		"source set in project":  {kts(`include(":a")`, "a/build.gradle.kts", `sourceSets { main { java.srcDir("gen") }; java.srcDir(layout.buildDirectory.dir("gen")) }; val p = "a.b".replace('.', '/')`), ""},
+		"absolute file":          {kts(`include(":a")`, "a/build.gradle.kts", `dependencies { implementation(files("/opt/x.jar")) }`), `"/opt/x.jar" refers to files outside`},
+		"root dir":               {kts(`include(":a")`, "a/build.gradle.kts", `val c = file("$rootDir/config/x.xml")`), "a/build.gradle.kts: rootDir refers to files outside"},
+		"root project file":      {kts(`include(":a")`, "build.gradle.kts", `subprojects { val c = rootProject.file("x") }`), "build.gradle.kts: rootProject refers to files outside"},
+		"apply from in settings": {kts(`include(":a")` + "\n" + `apply(from = "more.settings.gradle.kts")`), "settings.gradle.kts: apply from"},
+		"empty project segment":  {kts(`include(":a")`, "a/build.gradle.kts", `evaluationDependsOn("::")`), `a/build.gradle.kts: project path "::"`},
+		"computed evaluation":    {kts(`include(":a")`, "a/build.gradle.kts", `evaluationDependsOn(other)`), "a/build.gradle.kts: evaluationDependsOn(...): an argument other than a string literal"},
+		"buildSrc computed ref":  {kts(`include(":a")`, "buildSrc/src/main/kotlin/c.gradle.kts", `dependencies { "implementation"(project(name)) }`), "buildSrc/src/main/kotlin/c.gradle.kts: project(...)"},
 		"ancestor two builds":    {kts(`include(":s:a")`, "s/build.gradle", "", "s/build.gradle.kts", ""), "both build.gradle.kts and build.gradle"},
 		"ancestor computed ref":  {kts(`include(":s:a")`, "s/build.gradle.kts", "subprojects { dependencies { implementation(project(name)) } }"), "s/build.gradle.kts: project(...)"},
 		"comment hides rest":     {kts("include(\":a\") /* unterminated\ninclude(name)"), ""},
@@ -390,11 +477,18 @@ func TestUnreadableScript(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores permissions")
 	}
-	for _, file := range []string{"settings.gradle.kts", "a/build.gradle.kts"} {
-		root := tree(t, map[string]string{"settings.gradle.kts": `include(":a")`, "a/build.gradle.kts": ""})
-		if err := os.Chmod(filepath.Join(root, filepath.FromSlash(file)), 0); err != nil {
+	gradle := map[string]string{"settings.gradle.kts": `include(":a")`, "a/build.gradle.kts": "", "buildSrc/c.kt": "", "buildSrc/d/e.kt": ""}
+	maven := map[string]string{"pom.xml": pomHead + `<modules><module>a</module></modules></project>`, "a/pom.xml": `<project><groupId>g</groupId><artifactId>a</artifactId></project>`, "x/pom.xml": "", "y/z/pom.xml": ""}
+	for file, files := range map[string]map[string]string{
+		"settings.gradle.kts": gradle, "a/build.gradle.kts": gradle, "buildSrc/c.kt": gradle, "buildSrc/d": gradle,
+		"x/pom.xml": maven, "y": maven,
+	} {
+		root := tree(t, files)
+		p := filepath.Join(root, filepath.FromSlash(file))
+		if err := os.Chmod(p, 0); err != nil {
 			t.Fatal(err)
 		}
+		t.Cleanup(func() { _ = os.Chmod(p, 0o755) })
 		if _, err := (Adapter{}).Units(root); !errors.Is(err, fs.ErrPermission) {
 			t.Errorf("%s unreadable: %v", file, err)
 		}
@@ -412,6 +506,59 @@ func FuzzGradleSettings(f *testing.F) {
 		for _, p := range paths {
 			if err == nil && !strings.Contains(s, p) {
 				t.Fatalf("include %q is not in %q", p, s)
+			}
+		}
+	})
+}
+
+var tagRe = regexp.MustCompile(`<[^>]*>`)
+
+// The POM reader never panics, and every artifactId it returns is text of
+// the input (checked when the input has no entities, comments or CDATA,
+// which change the text).
+func FuzzPom(f *testing.F) {
+	for _, s := range []string{
+		pomHead + `<dependencies><dependency><groupId>g</groupId><artifactId>a</artifactId></dependency></dependencies></project>`,
+		`<project><dependencyManagement><dependencies><dependency><artifactId>b</artifactId><scope>import</scope></dependency></dependencies></dependencyManagement></project>`,
+		`<project><properties><artifactId>x</artifactId></properties><build><directory>../t</directory></build></project>`,
+		`<project><artifactId>a<!--c-->b</artifactId>`,
+	} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		var p pom
+		_ = xml.Unmarshal([]byte(s), &p)
+		refs, err := coordRefs([]byte(s))
+		if err != nil || strings.Contains(s, "&") || strings.Contains(s, "<!") {
+			return
+		}
+		text := tagRe.ReplaceAllString(s, "")
+		for _, c := range refs {
+			if !strings.Contains(text, c.ArtifactID) {
+				t.Fatalf("artifactId %q is not in %q", c.ArtifactID, s)
+			}
+		}
+	})
+}
+
+// The build script reader never panics, and every unit it returns is named
+// by a literal of the script.
+func FuzzGradleRefs(f *testing.F) {
+	for _, s := range []string{
+		`dependencies { implementation(project(":a")) }`,
+		`implementation findProject(path: 'b'); evaluationDependsOn(":a")`,
+		`tasks.test { dependsOn(":a:b:jar") }`,
+		`val x = "$rootDir/../y"`,
+		`project(":${x}")`,
+	} {
+		f.Add(s)
+	}
+	known := map[string]bool{"a": true, "a/b": true, "b": true}
+	f.Fuzz(func(t *testing.T, s string) {
+		ids, err := scriptRefs(stripComments(s), "build.gradle.kts", ":", known)
+		for _, id := range ids {
+			if err == nil && !strings.Contains(s, path.Base(id)) {
+				t.Fatalf("unit %q is not in %q", id, s)
 			}
 		}
 	})

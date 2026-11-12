@@ -4,37 +4,33 @@ kind: TestSet
 defaults:
   scope:
     dependencies: [pom.xml]
+    exclude: ["**/target/**"]
   cacheability: hermetic
 fragments:
   java.common:
     scope:
       source:
-        - common/pom.xml
-        - common/src/**
+        - common/**
   java.inventory:
     scope:
       source:
-        - inventory/pom.xml
-        - inventory/src/**
+        - inventory/**
   java.services:
     scope:
       source:
-        - services/pom.xml
+        - services/**
   java.services.api:
     scope:
       source:
-        - services/api/pom.xml
-        - services/api/src/**
+        - services/api/**
   java.services.web:
     scope:
       source:
-        - services/web/pom.xml
-        - services/web/src/**
+        - services/web/**
   java.tools:
     scope:
       source:
-        - tools/pom.xml
-        - tools/src/**
+        - tools/**
 tests:
   - metadata: {name: java.common}
     runner: {command: [mvn, -B, -pl, common, test]}

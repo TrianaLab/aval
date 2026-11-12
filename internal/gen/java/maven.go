@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -27,25 +28,17 @@ type parentRef struct {
 	RelativePath *string `xml:"relativePath"`
 }
 
-type build struct {
-	SourceDirectory     string   `xml:"sourceDirectory"`
-	TestSourceDirectory string   `xml:"testSourceDirectory"`
-	Resources           []string `xml:"resources>resource>directory"`
-	TestResources       []string `xml:"testResources>testResource>directory"`
-}
-
 // model is what a POM and each of its profiles share.
 type model struct {
+	Properties  props    `xml:"properties"`
 	Modules     []string `xml:"modules>module"`
 	Subprojects []string `xml:"subprojects>subproject"` // Maven 4
-	Build       build    `xml:"build"`
 }
 
 type pom struct {
 	XMLName xml.Name
 	coord
-	Parent     parentRef `xml:"parent"`
-	Properties props     `xml:"properties"`
+	Parent parentRef `xml:"parent"`
 	model
 	Profiles []model `xml:"profiles>profile"`
 	refs     []coord // every coordinate the POM names, see coordRefs
@@ -138,26 +131,64 @@ func maven(root string) ([]gen.Unit, error) {
 		}
 		index[key] = dir
 	}
-	// The root POM is inherited: its dependencies and plugins reach every module.
-	common, err := r.deps(r.poms[""], "", index)
+	strays, err := r.strays()
 	if err != nil {
-		return nil, fmt.Errorf("pom.xml: %w", err)
+		return nil, err
 	}
 	mvn := tool(root, "mvnw", "mvn")
 	units := make([]gen.Unit, 0, len(dirs))
 	for _, dir := range dirs {
-		deps, err := r.deps(r.poms[dir], dir, index)
+		deps, err := r.deps(r.poms[dir], dir, index, strays)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", pomPath(dir), err)
 		}
 		units = append(units, gen.Unit{
 			ID:      dir,
-			Source:  source(root, dir, "pom.xml"),
-			Deps:    without(append(deps, common...), dir),
+			Source:  []string{dir + "/**"},
+			Deps:    deps,
 			Command: []string{mvn, "-B", "-pl", dir, "test"},
 		})
 	}
 	return units, nil
+}
+
+// strays indexes the pom.xml files under the root that are not in the
+// reactor (outside target, build output and hidden directories), by
+// groupId:artifactId. A module that refers to one would depend on files no
+// unit covers, so deps rejects it. A POM it cannot parse or resolve is no
+// build Maven could resolve a reference to, and is left out.
+func (r reactor) strays() (map[string]string, error) {
+	strays := map[string]string{}
+	err := filepath.WalkDir(r.root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(r.root, p)
+		rel = filepath.ToSlash(rel)
+		if d.IsDir() {
+			if n := d.Name(); rel != "." && (n == "target" || n == "build" || n == "node_modules" || strings.HasPrefix(n, ".")) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		dir := strings.TrimSuffix(path.Dir(rel), ".")
+		if d.Name() != "pom.xml" || r.poms[dir] != nil {
+			return nil
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		var q pom
+		if xml.Unmarshal(data, &q) != nil {
+			return nil
+		}
+		if key, err := r.key(&q, coord{q.group(), q.ArtifactID}); err == nil {
+			strays[key] = rel
+		}
+		return nil
+	})
+	return strays, err
 }
 
 func pomPath(dir string) string { return path.Join(dir, "pom.xml") }
@@ -177,48 +208,57 @@ func readPom(root, dir string) (*pom, error) {
 	if p.XMLName.Local != "project" {
 		return nil, fmt.Errorf("%s: the root element is <%s>, want <project>", pomPath(dir), p.XMLName.Local)
 	}
-	for _, m := range p.models() {
-		b := m.Build
-		for _, d := range slices.Concat([]string{b.SourceDirectory, b.TestSourceDirectory}, b.Resources, b.TestResources) {
-			if err := checkSrc(d); err != nil {
-				return nil, fmt.Errorf("%s: %w", pomPath(dir), err)
-			}
-		}
-	}
 	return &p, nil
 }
 
-// checkSrc rejects a source or resource directory outside src, which the
-// generated globs (pom.xml and src/**) would miss.
-func checkSrc(d string) error {
-	d = strings.TrimSpace(d)
-	if d == "" {
-		return nil
-	}
-	c := d
-	for _, prefix := range []string{"${project.basedir}/", "${basedir}/"} {
-		c = strings.TrimPrefix(c, prefix)
-	}
-	if c = path.Clean(filepath.ToSlash(c)); c != "src" && !strings.HasPrefix(c, "src/") {
-		return fmt.Errorf("source or resource directory %q outside src: %w", d, errUnsupported)
+// pathElems are the POM elements that name a file or directory: source and
+// resource directories, systemPath and the usual plugin parameters
+// (build-helper <source>, checkstyle <configLocation>).
+var pathElems = map[string]bool{
+	"directory": true, "sourceDirectory": true, "testSourceDirectory": true, "scriptSourceDirectory": true,
+	"systemPath": true, "source": true, "file": true, "location": true, "configLocation": true,
+	"suppressionsLocation": true, "headerLocation": true, "basedir": true, "workingDirectory": true,
+}
+
+// rootVarRe matches a property that points at the build root or a parent
+// directory instead of the module.
+var rootVarRe = regexp.MustCompile(`\$\{(maven\.multiModuleProjectDirectory|session\.(executionRootDirectory|rootDirectory)|project\.(rootDirectory|parent\.basedir))\}`)
+
+// checkPath rejects the text of a POM element that refers to files outside
+// the module directory, which its <dir>/** glob would miss.
+func checkPath(name, text string) error {
+	if rootVarRe.MatchString(text) || pathElems[name] && outside(text) {
+		return fmt.Errorf("<%s>%s</%s> refers to files outside the module directory: %w", name, text, name, errUnsupported)
 	}
 	return nil
 }
 
-// notRefs are subtrees whose coordinates do not make a module depend on
-// another: pluginManagement declares versions (a parent that manages every
-// module would otherwise depend on all of them), exclusions remove
-// artifacts, and properties are free-form names. dependencyManagement also
-// declares versions, but an imported BOM (<scope>import</scope>) sets the
-// versions the module resolves, so coordRefs keeps those entries.
-var notRefs = map[string]bool{"pluginManagement": true, "exclusions": true, "properties": true}
+// outside reports whether a path, relative to the module directory, is
+// absolute or leaves it.
+func outside(p string) bool {
+	for _, prefix := range []string{"${project.basedir}/", "${basedir}/", "${projectDir}/", "${project.projectDir}/", "$projectDir/"} {
+		p = strings.TrimPrefix(p, prefix)
+	}
+	s := filepath.ToSlash(p)
+	c := path.Clean(s)
+	return c == ".." || strings.HasPrefix(c, "../") ||
+		len(s) > 1 && s[0] == '/' && isAlnum(s[1]) || // ponytail: "/" alone is a separator, not a path
+		len(s) > 2 && s[1] == ':' && (s[2] == '/' || s[2] == '\\') && isAlnum(s[0]) // C:\ or C:/
+}
+
+func isAlnum(b byte) bool {
+	return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9'
+}
 
 // coordRefs returns every element of a POM with an <artifactId> child,
 // wherever it is: <parent>, dependencies, plugins and their dependencies,
 // extensions, reporting plugins, annotationProcessorPaths, artifactItems,
-// in the project and in every profile. Reading only the places Maven itself
-// resolves would drop the edge of a local module named in a plugin's
-// configuration, and a change to that module would then be reused.
+// pluginManagement, in the project and in every profile. Reading only the
+// places Maven itself resolves would drop the edge of a local module named
+// in a plugin's configuration, and a change to that module would then be
+// reused. A managed plugin is an edge even if no module uses it: more
+// re-runs, never a false hit. It also rejects any element that refers to
+// files outside the module (see checkPath).
 func coordRefs(data []byte) ([]coord, error) {
 	var refs []coord
 	var stack []*frame
@@ -233,12 +273,6 @@ func coordRefs(data []byte) ([]coord, error) {
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
-			if notRefs[t.Name.Local] {
-				if err := d.Skip(); err != nil {
-					return nil, err
-				}
-				continue
-			}
 			stack = append(stack, open(stack, t.Name.Local))
 		case xml.CharData:
 			if len(stack) > 0 {
@@ -247,6 +281,9 @@ func coordRefs(data []byte) ([]coord, error) {
 		case xml.EndElement:
 			f := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
+			if err := checkPath(f.name, strings.TrimSpace(f.text.String())); err != nil {
+				return nil, err
+			}
 			if len(stack) == 0 {
 				continue // the project's own coordinates
 			}
@@ -258,11 +295,13 @@ func coordRefs(data []byte) ([]coord, error) {
 }
 
 // frame is an open POM element: its name, whether it is inside
-// dependencyManagement, the coordinates and scope of its children and its
-// text.
+// dependencyManagement or a subtree whose coordinates are no reference
+// (exclusions remove artifacts, properties are free-form names), the
+// coordinates and scope of its children and its text.
 type frame struct {
 	name  string
 	dm    bool
+	noRef bool
 	c     coord
 	scope string
 	text  strings.Builder
@@ -270,16 +309,18 @@ type frame struct {
 
 // open returns a frame for element name, a child of the top of stack.
 func open(stack []*frame, name string) *frame {
-	dm := name == "dependencyManagement"
+	f := &frame{name: name, dm: name == "dependencyManagement", noRef: name == "exclusions" || name == "properties"}
 	if len(stack) > 0 {
-		dm = dm || stack[len(stack)-1].dm
+		up := stack[len(stack)-1]
+		f.dm, f.noRef = f.dm || up.dm, f.noRef || up.noRef
 	}
-	return &frame{name: name, dm: dm}
+	return f
 }
 
 // close hands a groupId, artifactId or scope to the enclosing element up and
-// returns f's own coordinates when it has an artifactId and, inside
-// dependencyManagement, is an imported BOM.
+// returns f's own coordinates when it has an artifactId and is a reference:
+// outside exclusions and properties and, inside dependencyManagement, an
+// imported BOM (it sets the versions the module resolves).
 func (f *frame) close(up *frame) (coord, bool) {
 	switch f.name {
 	case "groupId":
@@ -292,25 +333,49 @@ func (f *frame) close(up *frame) (coord, bool) {
 	if f.c.GroupID == "" && f.name == "plugin" {
 		f.c.GroupID = "org.apache.maven.plugins"
 	}
-	return f.c, f.c.ArtifactID != "" && (!f.dm || f.scope == "import")
+	return f.c, f.c.ArtifactID != "" && !f.noRef && (!f.dm || f.scope == "import")
 }
 
-// deps returns the local modules p refers to (see coordRefs).
-func (r reactor) deps(p *pom, dir string, index map[string]string) ([]string, error) {
+// deps returns the local modules p refers to (see coordRefs), its own
+// references and those it inherits from its local parents and the root POM
+// (assumed inherited by every module: more re-runs, never a false hit), all
+// resolved in p's context as Maven does. A reference to a local POM outside
+// the reactor is an error.
+func (r reactor) deps(p *pom, dir string, index, strays map[string]string) ([]string, error) {
 	if err := r.checkParent(p, dir); err != nil {
 		return nil, err
 	}
 	var deps []string
-	for _, c := range p.refs {
-		key, err := r.key(p, c)
-		if err != nil {
-			return nil, err
-		}
-		if d, ok := index[key]; ok && d != dir {
-			deps = append(deps, d)
+	for _, q := range r.chain(p) {
+		for _, c := range q.refs {
+			key, err := r.key(p, c)
+			if err != nil {
+				return nil, err
+			}
+			if d, ok := index[key]; ok {
+				if d != dir {
+					deps = append(deps, d)
+				}
+			} else if f, ok := strays[key]; ok {
+				return nil, fmt.Errorf("%s refers to %s, a local POM outside the build: %w, list its directory in <modules>", key, f, errUnsupported)
+			}
 		}
 	}
-	return deps, nil
+	return slices.Compact(slices.Sorted(slices.Values(deps))), nil
+}
+
+// chain returns p, its local parents and, when it is not one of them, the
+// root POM.
+func (r reactor) chain(p *pom) []*pom {
+	var out []*pom
+	// ponytail: depth cap instead of cycle tracking; a deeper local parent chain is not real.
+	for q, depth := p, 0; q != nil && depth < 32; q, depth = r.byCoord[q.Parent.coord], depth+1 {
+		out = append(out, q)
+	}
+	if root := r.poms[""]; !slices.Contains(out, root) {
+		out = append(out, root)
+	}
+	return out
 }
 
 // checkParent rejects a parent POM read from disk inside the root that is
@@ -340,36 +405,53 @@ func (r reactor) checkParent(p *pom, dir string) error {
 var propRe = regexp.MustCompile(`\$\{([^}]*)\}`)
 
 // key returns groupId:artifactId of c with the properties of p resolved. A
-// property it cannot resolve is an error: guessing could drop an edge.
+// property it cannot resolve, or that a profile sets (the value depends on
+// which profiles are active), is an error: guessing could drop an edge.
 func (r reactor) key(p *pom, c coord) (string, error) {
+	var err error
 	s := strings.TrimSpace(c.GroupID) + ":" + strings.TrimSpace(c.ArtifactID)
 	s = propRe.ReplaceAllStringFunc(s, func(m string) string {
-		if v, ok := r.prop(p, m[2:len(m)-1]); ok {
+		v, ok, perr := r.prop(p, m[2:len(m)-1])
+		if perr != nil {
+			err = perr
+		}
+		if ok {
 			return v
 		}
 		return m
 	})
+	if err != nil {
+		return "", err
+	}
 	if strings.Contains(s, "${") {
 		return "", fmt.Errorf("cannot resolve the properties in %s", s)
 	}
 	return s, nil
 }
 
-// prop resolves a property from p, then from its local parents.
-func (r reactor) prop(p *pom, name string) (string, bool) {
+// prop resolves a property from p, then from its local parents and the
+// root POM.
+func (r reactor) prop(p *pom, name string) (string, bool, error) {
 	switch name {
 	case "project.groupId", "pom.groupId", "groupId":
-		return p.group(), true
+		return p.group(), true, nil
 	case "project.artifactId", "pom.artifactId", "artifactId":
-		return p.ArtifactID, true
+		return p.ArtifactID, true, nil
 	case "project.parent.groupId":
-		return p.Parent.GroupID, true
+		return p.Parent.GroupID, true, nil
 	}
-	// ponytail: depth cap instead of cycle tracking; a deeper local parent chain is not real.
-	for q, depth := p, 0; q != nil && depth < 32; q, depth = r.byCoord[q.Parent.coord], depth+1 {
-		if v, ok := q.Properties[name]; ok {
-			return v, true
+	chain := r.chain(p)
+	for _, q := range chain {
+		for _, m := range q.Profiles {
+			if _, ok := m.Properties[name]; ok {
+				return "", false, fmt.Errorf("property %s set by a profile: %w", name, errUnsupported)
+			}
 		}
 	}
-	return "", false
+	for _, q := range chain {
+		if v, ok := q.Properties[name]; ok {
+			return v, true, nil
+		}
+	}
+	return "", false, nil
 }
