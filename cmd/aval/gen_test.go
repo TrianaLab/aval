@@ -115,7 +115,7 @@ func TestGenErrors(t *testing.T) {
 		want string
 	}{
 		{[]string{"gen"}, ExitUsage, "accepts 1 arg"},
-		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, dotnet, fake, go, js, python, rust)`},
+		{[]string{"gen", "cobol"}, ExitUsage, `unknown language "cobol" (available: broken, cyclic, dotnet, fake, go, java, js, python, rust)`},
 		{[]string{"gen", "fake", "-f", filepath.Join(dir, "none.yaml")}, ExitUsage, "aval init --set"},
 		{[]string{"gen", "fake", "-f", test}, ExitUsage, "kind: TestSet"},
 		{[]string{"gen", "broken", "-f", set}, ExitError, "gen broken: tool not found"},
@@ -138,8 +138,8 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenLanguages(t *testing.T) {
-	if got := languages(); got != "dotnet, go, js, python, rust" {
-		t.Errorf("languages() = %q, want dotnet, go, js, python, rust", got)
+	if got := languages(); got != "dotnet, go, java, js, python, rust" {
+		t.Errorf("languages() = %q, want dotnet, go, java, js, python, rust", got)
 	}
 }
 
@@ -159,6 +159,30 @@ func TestGenJS(t *testing.T) {
 	code, _, errOut := runCLI("gen", "js", "-f", set)
 	if data, _ := os.ReadFile(set); code != ExitError || !strings.Contains(errOut, "package.json: unexpected end of JSON input") || string(data) != plain {
 		t.Errorf("broken package.json: exit %d, stderr %q, file %q", code, errOut, data)
+	}
+}
+
+func TestGenJava(t *testing.T) {
+	dir := t.TempDir()
+	fixture := filepath.Join("..", "..", "internal", "gen", "java", "testdata", "gradle")
+	if err := os.CopyFS(dir, os.DirFS(fixture)); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "aval.yaml")
+	if code, _, errOut := runCLI("gen", "java", "-f", file); code != ExitOK {
+		t.Fatalf("gen java: exit %d, stderr %q", code, errOut)
+	}
+	got, _ := os.ReadFile(file)
+	want, _ := os.ReadFile(filepath.Join(fixture, "aval.golden.yaml"))
+	if string(got) != string(want) {
+		t.Errorf("gen java wrote:\n%s", got)
+	}
+	_ = os.Remove(filepath.Join(dir, "settings.gradle.kts")) // no build left: exit 1, nothing written
+	if code, _, errOut := runCLI("gen", "java", "-f", file); code != ExitError || !strings.Contains(errOut, "gen java: ") {
+		t.Errorf("no build: exit %d, stderr %q", code, errOut)
+	}
+	if after, _ := os.ReadFile(file); string(after) != string(got) {
+		t.Errorf("no build: the file changed:\n%s", after)
 	}
 }
 

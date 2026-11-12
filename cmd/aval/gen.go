@@ -17,6 +17,7 @@ import (
 	"github.com/TrianaLab/aval/internal/gen"
 	"github.com/TrianaLab/aval/internal/gen/dotnet"
 	"github.com/TrianaLab/aval/internal/gen/golang"
+	"github.com/TrianaLab/aval/internal/gen/java"
 	"github.com/TrianaLab/aval/internal/gen/js"
 	"github.com/TrianaLab/aval/internal/gen/python"
 	"github.com/TrianaLab/aval/internal/gen/rust"
@@ -28,6 +29,7 @@ import (
 var adapters = map[string]gen.Adapter{
 	"dotnet": dotnet.Adapter{},
 	"go":     &golang.Adapter{},
+	"java":   java.Adapter{},
 	"js":     js.Adapter{},
 	"python": &python.Adapter{},
 	"rust":   rust.Adapter{},

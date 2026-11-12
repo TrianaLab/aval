@@ -1,0 +1,17 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+# aval gen java lists the root context (root files and gradle/) in every unit.
+defaults:
+  scope:
+    # Build output, one entry per project: **/build/** would also hide
+    # source packages named build, such as buildSrc's below.
+    exclude:
+      - .gradle/**
+      - build/**
+      - buildSrc/.gradle/**
+      - buildSrc/build/**
+      - common/build/**
+      - inventory/build/**
+      - services/api/build/**
+      - services/web/build/**
+  cacheability: hermetic

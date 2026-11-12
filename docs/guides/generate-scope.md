@@ -13,8 +13,8 @@ declared in `aval.yaml`.
 !!! note "Languages"
     Go ([below](#go)), JavaScript and TypeScript
     ([below](#javascript-and-typescript)), Python ([below](#python)), Rust
-    ([below](#rust)) and .NET ([below](#net)) ship. The other adapter (Java)
-    is the next story of
+    ([below](#rust)), .NET ([below](#net)), and Java and Kotlin
+    ([below](#java-and-kotlin)) ship, as part of
     [Epic 16](https://github.com/TrianaLab/aval/issues/291). `aval gen --help`
     lists the languages your build has.
 
@@ -403,6 +403,87 @@ tests:
   solutions at the root, or two projects with the same name is an error.
 - Files that only a property names (such as a `KeyOriginatorFile`) are not
   followed: add them to `defaults`.
+
+## Java and Kotlin
+
+`aval gen java` reads the build files at the contract root and runs no JVM
+tool. A unit's files are its whole directory (`<module>/**`) plus the root
+context: each top-level file and directory of the root that is not a module
+directory or build output (`.git`, `.gradle`, `build`, `out`, `target`),
+since build files read root files such as `config/checkstyle.xml`. A
+directory that holds modules is included whole. Exclude each build output
+directory in `defaults` by hand: the root `target/**`, `build/**` and
+`.gradle/**`, plus `<module>/target/**` or `<module>/build/**` per module,
+such as `app/build/**`. Do not write `**/build/**` or `**/target/**`: they
+also hide source packages named `build` or `target`, and a change there
+would be reused.
+
+- Maven: one unit per module in `<modules>` (Maven 4 `<subprojects>`), in
+  the root POM, nested aggregators and every profile. A module depends on
+  every local module its POM names with a `groupId` and `artifactId`:
+  `<parent>`, dependencies, plugins and `pluginManagement`, extensions,
+  imported BOMs or plugin configuration such as
+  `annotationProcessorPaths`, or a `groupId:artifactId` string (a
+  `resourceBundle`, `dependenciesToScan`), and on what its local parents
+  and the root POM name, resolved with its own properties. Managed dependencies and
+  `exclusions` are not edges. The test is `mvn -B -pl <module> test`
+  (`./mvnw` when the root has it), which takes the other modules from the
+  local repository: run `mvn -B install -DskipTests` before `aval run`.
+- Gradle: one unit per `include` in `settings.gradle.kts` or
+  `settings.gradle`. A subproject depends on its parent projects and on the
+  projects named in `project(...)`, a type-safe accessor
+  (`projects.feature.ui`), `evaluationDependsOn(...)` or a task path such
+  as `":common:jar"` by its build script, the settings script, the root
+  build script, `buildSrc`, an `includeBuild` of a top-level directory
+  (`build-logic`) and its parent projects' build scripts. The test is
+  `./gradlew :<path>:test` (`gradle` without a wrapper).
+
+Neither adapter sees test code that reads another module's files at run
+time: declare those by hand in a fragment.
+
+```yaml
+defaults:
+  scope:
+    exclude: [.gradle/**, build/**, common/build/**, inventory/build/**]
+  cacheability: hermetic
+fragments:
+  java.common:
+    scope:
+      source:
+        - build.gradle.kts      # root context
+        - common/**
+        - gradle/**             # root context
+        - gradlew               # root context
+        - services/**           # holds projects, not one itself
+        - settings.gradle.kts   # root context
+```
+
+What it cannot read for certain is an error (exit 1), not a guess:
+
+- a computed `include`, `project(...)` or `evaluationDependsOn(...)` path,
+  an accessor that names no included project, an `includeBuild` of
+  anything but a top-level directory that is not a project, `projectDir`,
+  `buildFileName`, `apply from` or a triple-quoted string;
+- in Gradle, `parent`, `getParent`, `parentFile`, or
+  `rootProject.subprojects` and `project(":").subprojects` (and kin) in a
+  subproject; in any script, `resolveSibling`, an absolute path given to a
+  path-taking call (`file`, `files`, `File`, `dir`, `resolve`, ...), a
+  string with `../` or `rootDir` inside larger text (`"-Dfx=../common"`),
+  a `resolve` chain on `rootDir` with a computed argument, or a path that
+  leaves the root or starts with another project's directory
+  (`rootProject.file("common/fixtures")`, `file("common")`,
+  `rootDir.resolve("services").resolve("api")`);
+- in Maven, an element or property value with `../` or `..\` anywhere (an
+  `argLine` too), an absolute path, a path that starts with another
+  module's directory (`config/` is fine, `${maven.multiModuleProjectDirectory}/`
+  and `${rootDirectory}/` are read from the root), or `${env.*}`,
+  `${session.*}`, `${project.parent.*}` or a property set at run time
+  (`${main.basedir}`) next to a `/`;
+- a Maven property it cannot resolve in a coordinate, or that a profile,
+  `.mvn/maven.config` or `.mvn/jvm.config` sets;
+- a reference to a local POM that is not a module, or a local `<parent>`
+  that is neither the root POM nor a module;
+- a root with both a POM and a Gradle settings script.
 
 ## Cross-language dependencies
 

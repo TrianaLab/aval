@@ -1,0 +1,91 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+# aval gen java lists the root context (root files and gradle/) in every unit.
+defaults:
+  scope:
+    # Build output, one entry per project: **/build/** would also hide
+    # source packages named build, such as buildSrc's below.
+    exclude:
+      - .gradle/**
+      - build/**
+      - buildSrc/.gradle/**
+      - buildSrc/build/**
+      - common/build/**
+      - inventory/build/**
+      - services/api/build/**
+      - services/web/build/**
+  cacheability: hermetic
+fragments:
+  java.common:
+    scope:
+      source:
+        - aval.golden.yaml
+        - aval.yaml
+        - build.gradle.kts
+        - buildSrc/**
+        - common/**
+        - gradle/**
+        - gradlew
+        - services/**
+        - settings.gradle.kts
+  java.inventory:
+    scope:
+      source:
+        - aval.golden.yaml
+        - aval.yaml
+        - build.gradle.kts
+        - buildSrc/**
+        - gradle/**
+        - gradlew
+        - inventory/**
+        - services/**
+        - settings.gradle.kts
+  java.services.api:
+    scope:
+      source:
+        - aval.golden.yaml
+        - aval.yaml
+        - build.gradle.kts
+        - buildSrc/**
+        - gradle/**
+        - gradlew
+        - services/**
+        - services/api/**
+        - services/build.gradle.kts
+        - settings.gradle.kts
+  java.services.web:
+    scope:
+      source:
+        - aval.golden.yaml
+        - aval.yaml
+        - build.gradle.kts
+        - buildSrc/**
+        - gradle/**
+        - gradlew
+        - services/**
+        - services/build.gradle.kts
+        - services/web/**
+        - settings.gradle.kts
+tests:
+  - metadata: {name: java.common}
+    runner: {command: [./gradlew, ':common:test']}
+    use:
+      - java.common
+  - metadata: {name: java.inventory}
+    runner: {command: [./gradlew, ':inventory:test']}
+    use:
+      - java.common
+      - java.inventory
+  - metadata: {name: java.services.api}
+    runner: {command: [./gradlew, ':services:api:test']}
+    use:
+      - java.common
+      - java.inventory
+      - java.services.api
+  - metadata: {name: java.services.web}
+    runner: {command: [./gradlew, ':services:web:test']}
+    use:
+      - java.common
+      - java.inventory
+      - java.services.api
+      - java.services.web

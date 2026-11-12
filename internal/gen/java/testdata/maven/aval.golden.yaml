@@ -1,0 +1,92 @@
+apiVersion: aval.trianalab.io/v1
+kind: TestSet
+# aval gen java lists the root context (root files, .mvn/) in every unit.
+defaults:
+  scope:
+    # Build output, one entry per module: **/target/** would also hide
+    # source packages named target.
+    exclude:
+      - target/**
+      - common/target/**
+      - inventory/target/**
+      - services/target/**
+      - services/api/target/**
+      - services/web/target/**
+      - tools/target/**
+  cacheability: hermetic
+fragments:
+  java.common:
+    scope:
+      source:
+        - aval.golden.yaml
+        - aval.yaml
+        - common/**
+        - pom.xml
+  java.inventory:
+    scope:
+      source:
+        - aval.golden.yaml
+        - aval.yaml
+        - inventory/**
+        - pom.xml
+  java.services:
+    scope:
+      source:
+        - aval.golden.yaml
+        - aval.yaml
+        - pom.xml
+        - services/**
+  java.services.api:
+    scope:
+      source:
+        - aval.golden.yaml
+        - aval.yaml
+        - pom.xml
+        - services/api/**
+  java.services.web:
+    scope:
+      source:
+        - aval.golden.yaml
+        - aval.yaml
+        - pom.xml
+        - services/web/**
+  java.tools:
+    scope:
+      source:
+        - aval.golden.yaml
+        - aval.yaml
+        - pom.xml
+        - tools/**
+tests:
+  - metadata: {name: java.common}
+    runner: {command: [mvn, -B, -pl, common, test]}
+    use:
+      - java.common
+  - metadata: {name: java.inventory}
+    runner: {command: [mvn, -B, -pl, inventory, test]}
+    use:
+      - java.common
+      - java.inventory
+  - metadata: {name: java.services}
+    runner: {command: [mvn, -B, -pl, services, test]}
+    use:
+      - java.services
+  - metadata: {name: java.services.api}
+    runner: {command: [mvn, -B, -pl, services/api, test]}
+    use:
+      - java.common
+      - java.inventory
+      - java.services
+      - java.services.api
+  - metadata: {name: java.services.web}
+    runner: {command: [mvn, -B, -pl, services/web, test]}
+    use:
+      - java.common
+      - java.inventory
+      - java.services
+      - java.services.api
+      - java.services.web
+  - metadata: {name: java.tools}
+    runner: {command: [mvn, -B, -pl, tools, test]}
+    use:
+      - java.tools
