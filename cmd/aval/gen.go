@@ -15,11 +15,13 @@ import (
 
 	"github.com/TrianaLab/aval/internal/gen"
 	"github.com/TrianaLab/aval/internal/gen/js"
+	"github.com/TrianaLab/aval/internal/gen/rust"
 )
 
 // adapters are the languages aval gen knows, by name.
 var adapters = map[string]gen.Adapter{
-	"js": js.Adapter{},
+	"js":   js.Adapter{},
+	"rust": rust.Adapter{},
 }
 
 func newGenCmd() *cobra.Command {
