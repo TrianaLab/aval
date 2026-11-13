@@ -23,6 +23,12 @@ func unit(id string, deps ...string) Unit {
 	return Unit{ID: id, Source: []string{id + "/*.go"}, Deps: deps, Command: []string{"go", "test", "./" + id}}
 }
 
+// withTest returns u with TestSource ts.
+func withTest(u Unit, ts ...string) Unit {
+	u.TestSource = ts
+	return u
+}
+
 func TestName(t *testing.T) {
 	for id, want := range map[string]string{
 		"internal/contract": "go.internal.contract",
@@ -63,16 +69,19 @@ func TestPlanErrors(t *testing.T) {
 		want  string
 		isErr bool
 	}{
-		"bad language":         {"Go", []Unit{unit("a")}, "language", false},
-		"no units":             {"go", nil, "no units found", true},
-		"duplicate id":         {"go", []Unit{unit("a"), unit("a")}, `"a": listed twice`, true},
-		"empty name":           {"go", []Unit{unit("@@")}, "empty name", true},
-		"name collision":       {"go", []Unit{unit("a/b"), unit("A/B")}, "both get the name go.a.b", true},
-		"no source":            {"go", []Unit{{ID: "a", Command: []string{"x"}}}, "no source files", true},
-		"no command":           {"go", []Unit{{ID: "a", Source: []string{"a/**"}}}, "no test command", true},
-		"unknown dependency":   {"go", []Unit{unit("a", "gone")}, `unknown dependency "gone"`, true},
-		"inexpressible output": {"go", []Unit{withOutputs(unit("a"), "../a.out")}, `"../a.out": a contract glob cannot express`, true},
-		"output in scope":      {"go", []Unit{withOutputs(unit("a"), "b/a.go"), unit("b")}, `unit "a": output b/a.go is in the scope of unit "b" (b/*.go)`, true},
+		"bad language":                      {"Go", []Unit{unit("a")}, "language", false},
+		"no units":                          {"go", nil, "no units found", true},
+		"duplicate id":                      {"go", []Unit{unit("a"), unit("a")}, `"a": listed twice`, true},
+		"empty name":                        {"go", []Unit{unit("@@")}, "empty name", true},
+		"name collision":                    {"go", []Unit{unit("a/b"), unit("A/B")}, "both get the name go.a.b", true},
+		"no source":                         {"go", []Unit{{ID: "a", Command: []string{"x"}}}, "no source files", true},
+		"no command":                        {"go", []Unit{{ID: "a", Source: []string{"a/**"}}}, "no test command", true},
+		"unknown dependency":                {"go", []Unit{unit("a", "gone")}, `unknown dependency "gone"`, true},
+		"test fragment collision":           {"go", []Unit{withTest(unit("a"), "x"), unit("a/test")}, `units "a" and "a/test" both get the name go.a.test`, true},
+		"test fragment collision, reversed": {"go", []Unit{unit("a/test"), withTest(unit("a"), "x")}, `units "a/test" and "a" both get the name go.a.test`, true},
+		"inexpressible output":              {"go", []Unit{withOutputs(unit("a"), "../a.out")}, `"../a.out": a contract glob cannot express`, true},
+		"output in scope":                   {"go", []Unit{withOutputs(unit("a"), "b/a.go"), unit("b")}, `unit "a": output b/a.go is in the scope of unit "b" (b/*.go)`, true},
+		"output in test scope":              {"go", []Unit{withOutputs(unit("a"), "b/x.json"), withTest(unit("b"), "b/x.json")}, `unit "a": output b/x.json is in the scope of unit "b" (b/x.json)`, true},
 	} {
 		_, err := plan(tc.lang, tc.units)
 		if err == nil || !strings.Contains(err.Error(), tc.want) || errors.Is(err, ErrUnits) != tc.isErr {

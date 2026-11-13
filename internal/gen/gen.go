@@ -31,6 +31,11 @@ type Unit struct {
 	// root. Shared inputs (lockfiles, root build files) belong in the
 	// hand-written defaults or fragments, not here.
 	Source []string
+	// TestSource are globs of files only the unit's own test reads, such
+	// as the fixtures of its test files. They go in the fragment
+	// "<name>.test" (Name of ID + "/test"), which no other unit's test
+	// uses, so an edit to one re-runs this unit's test alone.
+	TestSource []string
 	// Deps are the IDs of the units this unit depends on directly.
 	Deps []string
 	// Command is the argv that tests this unit.
@@ -169,8 +174,9 @@ func Name(lang, id string) (string, error) {
 func owned(lang, name string) bool { return strings.HasPrefix(name, lang+".") }
 
 // planned is one unit ready to write: its name, its own files, its command
-// and the names of the fragments its test uses (itself and its transitive
-// dependencies), sorted. A shared fragment has a body instead, and no test.
+// and the names of the fragments its test uses (itself, its transitive
+// dependencies and its test fragment), sorted. A shared or test fragment
+// has a body instead, and no test.
 type planned struct {
 	name    string
 	source  []string
@@ -178,6 +184,7 @@ type planned struct {
 	outputs []string
 	use     []string
 	body    *yaml.Node
+	test    *planned // the fragment of the unit's TestSource, or nil
 }
 
 // plan checks units and computes each unit's transitive closure, sorted by
@@ -205,7 +212,15 @@ func plan(lang string, units []Unit) ([]planned, error) {
 		for j := range seen {
 			out[i].use = append(out[i].use, out[j].name)
 		}
+		if t := out[i].test; t != nil {
+			out[i].use = append(out[i].use, t.name)
+		}
 		slices.Sort(out[i].use)
+	}
+	for i := range units {
+		if t := out[i].test; t != nil {
+			out = append(out, *t)
+		}
 	}
 	slices.SortFunc(out, func(a, b planned) int { return strings.Compare(a.name, b.name) })
 	return out, nil
@@ -242,8 +257,10 @@ func check(lang string, units []Unit) ([]planned, map[string]int, error) {
 		}
 		names[name] = u.ID
 		outputs, oerr := outputGlobs(u, units)
-		errs = append(errs, err, oerr)
-		out[i] = planned{name: name, source: slices.Compact(slices.Sorted(slices.Values(u.Source))), command: u.Command, outputs: outputs}
+		out[i] = planned{name: name, source: sorted(u.Source), command: u.Command, outputs: outputs}
+		var terr error
+		out[i].test, terr = testFragment(lang, u, names)
+		errs = append(errs, err, oerr, terr)
 	}
 	for _, u := range units {
 		for _, d := range u.Deps {
@@ -258,6 +275,23 @@ func check(lang string, units []Unit) ([]planned, map[string]int, error) {
 	return out, byID, nil
 }
 
+// testFragment returns the fragment of u.TestSource, named Name of u.ID +
+// "/test", or nil when u has none, and records its name in names. A unit
+// or test fragment that already has the name is an error.
+func testFragment(lang string, u Unit, names map[string]string) (*planned, error) {
+	if len(u.TestSource) == 0 {
+		return nil, nil
+	}
+	name, err := Name(lang, u.ID+"/test")
+	if other, dup := names[name]; err == nil && dup {
+		err = fmt.Errorf("units %q and %q both get the name %s", other, u.ID, name)
+	}
+	names[name] = u.ID
+	return &planned{name: name, body: sourceBody(sorted(u.TestSource))}, err
+}
+
+func sorted(ss []string) []string { return slices.Compact(slices.Sorted(slices.Values(ss))) }
+
 // outputGlobs returns the globs of u's outputs. An output in a unit's scope
 // would change a test's own fingerprint, and publishing refuses it: it is an
 // error here instead.
@@ -270,8 +304,9 @@ func outputGlobs(u Unit, units []Unit) ([]string, error) {
 		errs = append(errs, err)
 		out = append(out, g)
 		for _, v := range units {
-			if i := slices.IndexFunc(v.Source, func(g string) bool { return contract.Match(g, o) }); i >= 0 {
-				errs = append(errs, fmt.Errorf("unit %q: output %s is in the scope of unit %q (%s)", u.ID, o, v.ID, v.Source[i]))
+			scope := append(slices.Clone(v.Source), v.TestSource...)
+			if i := slices.IndexFunc(scope, func(g string) bool { return contract.Match(g, o) }); i >= 0 {
+				errs = append(errs, fmt.Errorf("unit %q: output %s is in the scope of unit %q (%s)", u.ID, o, v.ID, scope[i]))
 			}
 		}
 	}

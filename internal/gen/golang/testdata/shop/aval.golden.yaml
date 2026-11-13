@@ -19,6 +19,7 @@ tests:
     use:
       - go.internal.money
       - go.internal.orders
+      - go.internal.orders.test
       - go.internal.testutil
       - go.module
   - metadata: {name: go.internal.testutil}
@@ -40,6 +41,7 @@ tests:
       - go.internal.money
       - go.module
       - go.web
+      - go.web.test
 fragments:
   go.internal.money:
     scope:
@@ -48,9 +50,13 @@ fragments:
   go.internal.orders:
     scope:
       source:
-        - fixtures/order.json
+        - fixtures/rates.json
         - internal/orders/*.go
         - internal/orders/testdata/**
+  go.internal.orders.test:
+    scope:
+      source:
+        - fixtures/order.json
   go.internal.testutil:
     scope:
       source:
@@ -79,7 +85,10 @@ fragments:
   go.web:
     scope:
       source:
-        - fixtures/pages/**
         - web/**
         - web/*.go
         - web/static/index.html
+  go.web.test:
+    scope:
+      source:
+        - fixtures/pages/**

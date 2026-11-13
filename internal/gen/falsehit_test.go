@@ -288,3 +288,37 @@ func TestFalseHitShared(t *testing.T) {
 		}
 	}
 }
+
+// A file only a unit's test reads (TestSource) re-runs that unit's test and
+// not its dependents', which never run it; a file of its Source re-runs
+// both. Its fragment is written only while the unit has a test.
+func TestFalseHitTestSource(t *testing.T) {
+	units := []Unit{unit("a", "b"), unit("b"), unit("c")}
+	units[1].Source = append(units[1].Source, "lib/rates.json")
+	units[1].TestSource = []string{"fixtures/b.json"}
+	set := string(must(Rewrite([]byte(base), "go", units, nil)))
+	files := map[string]string{"go.mod": "module x", "a/a.go": "a", "b/b.go": "b", "c/c.go": "c", "fixtures/b.json": "{}", "lib/rates.json": "{}"}
+	for _, tc := range []struct {
+		file, test string
+		changes    bool
+	}{
+		{"fixtures/b.json", "go.b", true},
+		{"fixtures/b.json", "go.a", false}, // a dependent never runs b's tests
+		{"fixtures/b.json", "go.c", false},
+		{"lib/rates.json", "go.b", true},
+		{"lib/rates.json", "go.a", true}, // a dependent runs b's code
+	} {
+		before := digest(t, set, files, tc.test)
+		changed := maps.Clone(files)
+		changed[tc.file] += "\n"
+		if got := digest(t, set, changed, tc.test) != before; got != tc.changes {
+			t.Errorf("%s changed: fingerprint of %s changed = %v, want %v", tc.file, tc.test, got, tc.changes)
+		}
+	}
+	if !strings.Contains(set, "go.b.test:") {
+		t.Errorf("no go.b.test fragment:\n%s", set)
+	}
+	if set := string(must(Rewrite([]byte(base), "go", units, nil, "b"))); strings.Contains(set, "go.b.test") {
+		t.Errorf("go.b has no test but go.b.test is written:\n%s", set)
+	}
+}
