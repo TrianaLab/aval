@@ -237,8 +237,8 @@ tests of the packages that import it, and no other test.
 A read in a non-test file reads what its callers pass, so only paths
 built from literals and constants there count: they are added like a
 test's, and one outside the contract root fails. A read of a parameter,
-a field or anything else it cannot resolve does not fail; the test that
-calls it is checked where it is. When such a path is a `Join` whose
+a field or anything else it cannot resolve does not fail and adds
+nothing; only the literals the calling test passes are checked. When such a path is a `Join` whose
 leading parts are known, the directory they name is added
 (`filepath.Join(root, "fixtures", name)` with `root` from
 `runtime.Caller(0)` adds `fixtures/**`).
@@ -278,7 +278,10 @@ package and a hand-written test that `use`s its `go.*` fragments and a
 fragment of your own. A pattern that matches no package fails, and
 `--check` needs the same flags.
 
-It does not see, so declare by hand: a field it reads through a
+It does not see, so declare by hand: in a non-test file, a path built
+from a root it computes from `os.Getwd`, `os.Executable` or the
+environment, such as a test helper that walks up to `go.mod` and joins
+`fixtures/<name>`; a field it reads through a
 receiver or parameter whose value comes from something other than a
 literal assigned in a test file (`func (s *suite) read() { os.ReadFile(s.dir) }`
 with `s.dir` set from a computed path); in a non-test file, a path from
