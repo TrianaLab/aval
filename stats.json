@@ -1,53 +1,53 @@
 {
   "version": "aval.trianalab.io/stats-report/v1",
   "registry": "ghcr.io/trianalab/aval-stats",
-  "since": "2026-10-14T10:15:49.672753585Z",
+  "since": "2026-10-14T10:24:31.551338227Z",
   "total": {
-    "runs": 218,
+    "runs": 220,
     "reused": 27,
-    "hitRate": 0.12385321100917432,
+    "hitRate": 0.12272727272727273,
     "misses": {
-      "noTrustedResult": 142,
+      "noTrustedResult": 144,
       "error": 0,
       "verifiedNotReused": 49
     },
     "verificationFailures": 0,
     "shadowFalseHits": 0,
-    "testDurationMs": 13384253,
+    "testDurationMs": 13557530,
     "savedDurationMs": 1945835
   },
   "tests": [
     {
       "testId": "aval-e2e",
       "stats": {
-        "runs": 109,
+        "runs": 110,
         "reused": 26,
-        "hitRate": 0.23853211009174313,
+        "hitRate": 0.23636363636363636,
         "misses": {
-          "noTrustedResult": 83,
+          "noTrustedResult": 84,
           "error": 0,
           "verifiedNotReused": 0
         },
         "verificationFailures": 0,
         "shadowFalseHits": 0,
-        "testDurationMs": 6323069,
+        "testDurationMs": 6393848,
         "savedDurationMs": 1901639
       }
     },
     {
       "testId": "aval-engine",
       "stats": {
-        "runs": 109,
+        "runs": 110,
         "reused": 1,
-        "hitRate": 0.009174311926605505,
+        "hitRate": 0.00909090909090909,
         "misses": {
-          "noTrustedResult": 59,
+          "noTrustedResult": 60,
           "error": 0,
           "verifiedNotReused": 49
         },
         "verificationFailures": 0,
         "shadowFalseHits": 0,
-        "testDurationMs": 7061184,
+        "testDurationMs": 7163682,
         "savedDurationMs": 44196
       }
     }
@@ -56,21 +56,21 @@
     {
       "repository": "TrianaLab/aval",
       "stats": {
-        "runs": 218,
+        "runs": 220,
         "reused": 27,
-        "hitRate": 0.12385321100917432,
+        "hitRate": 0.12272727272727273,
         "misses": {
-          "noTrustedResult": 142,
+          "noTrustedResult": 144,
           "error": 0,
           "verifiedNotReused": 49
         },
         "verificationFailures": 0,
         "shadowFalseHits": 0,
-        "testDurationMs": 13384253,
+        "testDurationMs": 13557530,
         "savedDurationMs": 1945835
       }
     }
   ],
   "skipped": 0,
-  "generatedAt": "2026-11-13T10:18:09Z"
+  "generatedAt": "2026-11-13T10:25:39Z"
 }
