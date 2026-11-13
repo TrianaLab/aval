@@ -197,12 +197,12 @@ func TestDynamicRead(t *testing.T) {
 	}
 }
 
-// A read whose path comes from a closure parameter, another package or a
-// Chdir to a computed directory may read fixtures/order.json: each fails
+// A read whose path comes from a helper of another package that the
+// adapter cannot follow, a read function used as a value or a Chdir to a
+// computed directory may read fixtures/order.json: each fails
 // closed instead of leaving it out of the scope (a false hit on edit).
 func TestFalseHitUnresolvedRead(t *testing.T) {
 	for _, body := range []string{
-		"read := func(p string) { _, _ = os.ReadFile(p) }\n\tread(\"../fixtures/order.json\")",
 		"_, _ = os.ReadFile(filepath.Join(testutil.Root(), \"fixtures\", \"order.json\"))",
 		"wd, _ := os.Getwd()\n\tt.Chdir(filepath.Dir(wd))\n\t_, _ = os.ReadFile(\"fixtures/order.json\")",
 		"readFile := os.ReadFile\n\t_, _ = readFile(\"../fixtures/order.json\")",
@@ -218,6 +218,85 @@ func TestFalseHitUnresolvedRead(t *testing.T) {
 		if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "web/unresolved_test.go:") || !strings.Contains(err.Error(), "cannot resolve") {
 			t.Errorf("%s: %v, want an error naming web/unresolved_test.go", body, err)
 		}
+	}
+}
+
+// A path a test passes to a function that reads it, of the package, of
+// another package (contract.Load("../../examples/x.yaml")) or a closure,
+// also through a table row, is in the scope of the test's unit: an edit to
+// the file re-runs it. The function's own read of its parameter is not an
+// error.
+func TestFalseHitPassedPath(t *testing.T) {
+	for _, body := range []string{
+		"read := func(p string) { _, _ = os.ReadFile(p) }\n\tread(\"../fixtures/order.json\")",
+		"_ = testutil.Load(t, \"../fixtures/order.json\")",
+		"_ = testutil.Load(t, filepath.Join(\"..\", \"fixtures\", \"order.json\"))",
+		"for _, tc := range []struct{ file string }{{file: \"../fixtures/order.json\"}} {\n\t\t_ = testutil.Load(t, tc.file)\n\t}",
+		"_ = testutil.Load(t, fmt.Sprintf(\"../fixtures/%s.json\", t.Name()))", // the directory a template names
+	} {
+		root := shop(t)
+		write(t, filepath.Join(root, "web/passed_test.go"), "package web\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"example.com/shop/internal/testutil\"\n)\n\nvar _ = filepath.Join\nvar _ = fmt.Sprint\nvar _ = os.ReadFile\n\nfunc TestPassed(t *testing.T) {\n\t"+body+"\n}\n")
+		set := generate(t, &Adapter{}, root)
+		before := digest(t, set, root, "go.web")
+		write(t, filepath.Join(root, "fixtures/order.json"), "{\"changed\": true}\n")
+		if digest(t, set, root, "go.web") == before {
+			t.Errorf("%s: fixtures/order.json changed but the fingerprint of go.web did not", body)
+		}
+	}
+}
+
+// A path under a temporary directory, through a struct field, a helper of
+// the package or of another package, or a ".." after it, is not a file of
+// the repository: no error.
+func TestTempPaths(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/temp_test.go"), `package web
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"example.com/shop/internal/testutil"
+)
+
+type env struct{ dir string }
+
+func newEnv(t *testing.T) *env { return &env{dir: t.TempDir()} }
+
+func scratch(t *testing.T) string { return filepath.Join(t.TempDir(), "x") }
+
+func TestTemp(t *testing.T) {
+	e := newEnv(t)
+	_, _ = os.Stat(filepath.Join(e.dir, "..", "evil"))
+	_, _ = os.ReadFile(scratch(t) + "/../y")
+	_, _ = os.ReadDir(testutil.TempDir(t))
+	f := env{dir: t.TempDir()}
+	_, _ = os.ReadFile(filepath.Join(f.dir, "a"))
+}
+`)
+	if _, err := (&Adapter{}).Units(root); err != nil {
+		t.Errorf("temporary paths: %v", err)
+	}
+}
+
+// externs follows only packages of the main modules with a non-test file of
+// their own package, each built once.
+func TestExterns(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "a/a.go"), "package a\n\nconst X = \"x\"\n")
+	write(t, filepath.Join(root, "a/gen.go"), "//go:build ignore\n\npackage main\n")
+	write(t, filepath.Join(root, "b/b_test.go"), "package b\n")
+	ext := externs(root, []pkg{
+		{ImportPath: "m/a", Dir: "a", Name: "a", GoFiles: []string{"a.go"}, IgnoredGoFiles: []string{"gen.go"}},
+		{ImportPath: "m/b", Dir: "b", Name: "b", IgnoredGoFiles: []string{"b_test.go"}},
+	})
+	a := ext("m/a")
+	if a == nil || !a.foreign || a.names["X"] == nil || ext("m/a") != a {
+		t.Errorf("m/a: %+v", a)
+	}
+	if ext("m/b") != nil || ext("m/c") != nil {
+		t.Error("a package without a non-test file, or of no main module, is followed")
 	}
 }
 
@@ -345,10 +424,10 @@ func TestErrors(t *testing.T) {
 func TestParseError(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.go"), "package a\n\nimport (\n")
-	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"a.go"}}, nil, nil, false); err == nil || !strings.Contains(err.Error(), "a.go:3:10") {
+	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"a.go"}}, nil, nil, false, nil); err == nil || !strings.Contains(err.Error(), "a.go:3:10") {
 		t.Errorf("a file that does not parse: %v", err)
 	}
-	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"gone.go"}}, nil, nil, false); err == nil || !strings.Contains(err.Error(), "gone.go") {
+	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"gone.go"}}, nil, nil, false, nil); err == nil || !strings.Contains(err.Error(), "gone.go") {
 		t.Errorf("a file that cannot be read: %v", err)
 	}
 }

@@ -88,8 +88,9 @@ func (a *Adapter) Units(root string) ([]gen.Unit, error) {
 	}
 	units := make([]gen.Unit, 0, len(pkgs))
 	var errs []error // every package's, so one run lists them all
+	ext := externs(root, pkgs)
 	for _, p := range pkgs {
-		u, err := a.unit(root, p, ids, mods, allowed[ids[p.ImportPath]])
+		u, err := a.unit(root, p, ids, mods, allowed[ids[p.ImportPath]], ext)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("package %s: %w", p.ImportPath, err))
 		}
@@ -99,6 +100,42 @@ func (a *Adapter) Units(root string) ([]gen.Unit, error) {
 		return nil, err
 	}
 	return units, nil
+}
+
+// externs returns a function that returns the resolver of the non-test
+// files of a package of pkgs by import path, built once, or nil for another
+// package: a test reads what a helper of another package returns too.
+func externs(root string, pkgs []pkg) func(string) *resolver {
+	byPath := map[string]pkg{}
+	for _, p := range pkgs {
+		byPath[p.ImportPath] = p
+	}
+	cache := map[string]*resolver{}
+	var ext func(string) *resolver
+	ext = func(ip string) *resolver {
+		if r, ok := cache[ip]; ok {
+			return r
+		}
+		cache[ip] = nil
+		p, ok := byPath[ip]
+		if !ok {
+			return nil
+		}
+		fset := token.NewFileSet()
+		// A file that does not parse is an error of its own package's unit.
+		files, _ := parseFiles(fset, root, p.Dir, slices.Concat(p.GoFiles, p.CgoFiles, p.IgnoredGoFiles))
+		files = slices.DeleteFunc(files, func(f *ast.File) bool {
+			return f.Name.Name != p.Name || strings.HasSuffix(fset.Position(f.Pos()).Filename, "_test.go")
+		})
+		if len(files) == 0 {
+			return nil
+		}
+		r := newResolver(fset, files, ext)
+		r.foreign = true
+		cache[ip] = r
+		return r
+	}
+	return ext
 }
 
 // allowed returns the unit IDs that a --go-allow-dynamic pattern matches.
@@ -344,7 +381,7 @@ func hasFile(dir string) bool {
 }
 
 // unit builds the unit of p, whose Dir is relative to root.
-func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string, allowDynamic bool) (gen.Unit, error) {
+func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string, allowDynamic bool, ext func(string) *resolver) (gen.Unit, error) {
 	dir := filepath.Join(root, filepath.FromSlash(p.Dir))
 	src, err := p.sources(dir)
 	if err != nil {
@@ -356,7 +393,7 @@ func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string,
 	if err != nil {
 		return u, err
 	}
-	read, err := readScope(root, u.ID, p, reads(fset, files), allowDynamic)
+	read, err := readScope(root, u.ID, p, reads(fset, files, ext), allowDynamic)
 	if err != nil {
 		return u, err
 	}

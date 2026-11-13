@@ -54,8 +54,11 @@ func parseSrc(t testing.TB, srcs ...string) (*token.FileSet, []*ast.File) {
 func values(t testing.TB, srcs ...string) []val {
 	t.Helper()
 	var out []val
-	for _, r := range reads(parseSrc(t, srcs...)) {
-		out = append(out, r.val)
+	fset, files := parseSrc(t, srcs...)
+	for _, r := range reads(fset, files, nil) {
+		if !r.lit {
+			out = append(out, r.val)
+		}
 	}
 	return out
 }
@@ -129,7 +132,7 @@ func f() { os.ReadFile(string(name("../a"))) }`, nil, known("../a")},
 	for _, n := range s {
 		os.ReadFile(n)
 	}
-}`, nil, val{cwd: true}},
+}`, nil, val{}},
 		{"range over a call with a climbing literal", `func f() {
 	for _, n := range strings.Fields("../a ../b") {
 		os.ReadFile(n)
@@ -155,7 +158,7 @@ func f() {
 	cfg := g()
 	os.ReadDir(cfg.dir)
 }`, nil, val{cwd: true}},
-		{"field of a parameter", `func f(cfg struct{ dir string }) { os.ReadDir(cfg.dir) }`, nil, val{cwd: true}},
+		{"field of a parameter", `func f(cfg struct{ dir string }) { os.ReadDir(cfg.dir) }`, nil, val{}},
 		{"field of a non-struct", `func f() {
 	s := []string{"../a"}
 	os.ReadDir(s.dir)
@@ -164,7 +167,7 @@ func f() {
 	for _, tc := range s {
 		os.ReadDir(tc.dir)
 	}
-}`, nil, val{cwd: true}},
+}`, nil, val{}},
 		{"package function result", `func root() string { return "../.." }
 func f() { os.ReadFile(filepath.Join(root(), "x")) }`, nil, known("../../x")},
 		{"several results", `func root() (string, error) {
@@ -204,11 +207,11 @@ func f() {
 	read("a")
 	g := read
 	g("../b")
-}`, nil, val{cwd: true}},
+}`, nil, known("a")},
 		{"variadic parameter", `func read(parts ...string) { os.ReadFile(filepath.Join(parts...)) }
 func f() { read("..", "a") }`, nil, val{esc: []string{".."}}},
-		{"variadic call to Join", `func f(parts []string) { os.ReadFile(filepath.Join(parts...)) }`, nil, val{cwd: true}},
-		{"Join of a literal and a parameter", `func f(name string) { os.ReadFile(filepath.Join("..", name)) }`, nil, val{esc: []string{".."}, cwd: true}},
+		{"variadic call to Join", `func f(parts []string) { os.ReadFile(filepath.Join(parts...)) }`, nil, val{}},
+		{"Join of a literal and a parameter", `func f(name string) { os.ReadFile(filepath.Join("..", name)) }`, nil, val{esc: []string{".."}}},
 		{"op-assignment", `func f() {
 	p := "a"
 	p += "/../.."
@@ -247,7 +250,7 @@ func f() { read("..", "a") }`, nil, val{esc: []string{".."}}},
 		{"device", `func f() { os.Open(os.DevNull) }`, nil, val{}},
 		{"climbing literal in a call", `func f() { os.ReadFile(strings.TrimSpace("../x")) }`, nil, val{esc: []string{"../x"}}},
 		{"method parameter", `type s struct{}
-func (s) f(name string) { os.ReadFile(name) }`, nil, val{cwd: true}},
+func (s) f(name string) { os.ReadFile(name) }`, nil, val{}},
 		{"too many values", `func f() {
 	for _, a := range []string{"1", "2", "3", "4", "5", "6", "7", "8", "9"} {
 		for _, b := range []string{"1", "2", "3", "4", "5", "6", "7", "8", "9"} {
@@ -293,14 +296,14 @@ func f() {
 	return "../a"
 }
 func f() { os.ReadFile(root()) }`, nil, known("../a")},
-		{"func literal", `func f() { os.ReadFile(func() string { return "../x" }()) }`, nil, val{cwd: true}},
+		{"func literal", `func f() { os.ReadFile(func() string { return "../x" }()) }`, nil, known("../x")},
 		{"blank parameter", `func read(_ int, name string) { os.ReadFile(name) }
 func f() { read(1, "../a") }`, nil, known("../a")},
 		{"range keys over a parameter", `func f(m map[string]int) {
 	for k := range m {
 		os.ReadFile(k)
 	}
-}`, nil, val{cwd: true}},
+}`, nil, val{}},
 		{"literal cycle", `var cs = ds
 var ds = cs
 func f() {
@@ -314,7 +317,7 @@ func f() {
 		os.ReadFile(tc.file)
 	}
 }`, nil, val{esc: []string{"../a"}}},
-		{"body of a redeclared function", `func g() {}`, []string{"package p\n\nimport \"os\"\n\nfunc g(name string) {\n\tfor _, tc := range []struct{ f string }{{\"../a\"}} {\n\t\tos.ReadFile(tc.f + name)\n\t}\n}\n"}, val{esc: []string{"../a"}, cwd: true}},
+		{"body of a redeclared function", `func g() {}`, []string{"package p\n\nimport \"os\"\n\nfunc g(name string) {\n\tfor _, tc := range []struct{ f string }{{\"../a\"}} {\n\t\tos.ReadFile(tc.f + name)\n\t}\n}\n"}, val{esc: []string{"../a"}}},
 		{"dot import", `func f() { ReadFile("../a") }`, []string{"package p\n\nimport . \"os\"\n\nfunc g() { ReadFile(\"../b\") }\n"}, known("../b")},
 		{"dot import shadowed", `func f() {}`, []string{"package p\n\nimport . \"os\"\n\nfunc ReadFile(string) {}\n\nfunc g() { ReadFile(\"../b\") }\n"}, nil_},
 		{"t.Chdir", `func f(t *testing.T) { t.Chdir("../..") }`, nil, known("../..")},
@@ -346,7 +349,7 @@ func f() {
 		{"closure parameter", `func f() {
 	read := func(p string) { os.ReadFile(p) }
 	read("../../fixtures/x.json")
-}`, nil, val{cwd: true}},
+}`, nil, val{}},
 		{"function of another package", `func f() { os.ReadFile(filepath.Join(runtime.GOROOT(), "x")) }`, nil, val{cwd: true}},
 		{"variable of another package", `func f() { os.ReadFile(runtime.GOOS + "/x") }`, nil, val{esc: []string{"/x"}, cwd: true}},
 		{"selector of another package in a string call", `func f() { os.ReadFile(strings.TrimSpace(runtime.GOOS)) }`, nil, val{cwd: true}},
@@ -387,6 +390,70 @@ func f() {
 		{"template files", `func f() {}`, []string{"package p\n\nimport \"html/template\"\n\nfunc g() { template.ParseFiles(\"../a.html\", \"../b.html\") }\n"}, known("../b.html")},
 		{"template glob", `func f() {}`, []string{"package p\n\nimport \"text/template\"\n\nfunc g() { template.ParseGlob(\"../t/*.html\") }\n"}, known("../t/*.html")},
 		{"http.Dir", `func f() {}`, []string{"package p\n\nimport \"net/http\"\n\nfunc g() { http.Dir(\"../static\") }\n"}, known("../static")},
+		{"method result", `type s struct{}
+func (s) root() string { return "../a" }
+func f() { os.ReadFile(s{}.root()) }`, nil, known("../a")},
+		{"closure result", `func f() {
+	g := func() string { return "../a" }
+	os.ReadFile(g())
+}`, nil, known("../a")},
+		{"function literal as a path", `func f() { os.ReadFile(func() {}) }`, nil, val{}},
+		{"table of functions", `func f() {
+	for _, tc := range []struct{ dir func() string }{{dir: func() string { return "../a" }}} {
+		os.ReadFile(tc.dir())
+	}
+}`, nil, known("../a")},
+		{"function variable of unknown value", `var h func() string
+func f() {
+	g := func() string { return "../a" }
+	g = h
+	os.ReadFile(g())
+}`, nil, val{cwd: true}},
+		{"table of function values", `var h func() string
+func f() {
+	for _, tc := range []struct{ dir func() string }{{dir: h}} {
+		os.ReadFile(tc.dir())
+	}
+}`, nil, val{cwd: true}},
+		{"field of a function result", `type c struct{ dir string }
+func mk() c { _ = func() c { return c{} }; return c{dir: "../a"} }
+func named() (v c) { v = c{dir: "../b"}; return }
+func f() {
+	x := mk()
+	y := named()
+	z := func() c { return c{dir: "../c"} }()
+	os.ReadDir(x.dir + y.dir + z.dir)
+}`, nil, known("../a../b../c")},
+		{"field of a result without a value", `type c struct{ dir string }
+func mk() c { return }
+func f() { x := mk(); os.ReadDir(x.dir) }`, nil, val{}},
+		{"field of a result of a function without a body", `type c struct{ dir string }
+func mk() c
+func f() { x := mk(); os.ReadDir(x.dir) }`, nil, val{cwd: true}},
+		{"directory entries", `func f() {
+	es, _ := os.ReadDir("../d")
+	for _, e := range es {
+		os.ReadFile(filepath.Join("../d", e.Name()))
+	}
+	for _, e := range os.ReadDir("../d") {
+		os.ReadFile(filepath.Join("../d", e.Name()))
+	}
+}`, nil, known("../d/\x00")},
+		{"entries of something else", `func f() {
+	for _, e := range g() {
+		os.ReadFile(e.Name())
+	}
+}`, nil, val{cwd: true}},
+		{"Name of a non-variable", `func f() { os.ReadFile(g().Name()) }`, nil, val{cwd: true}},
+		{"Glob matches", `func f() {
+	files, _ := filepath.Glob("../a/*")
+	for _, m := range files {
+		os.ReadFile(m)
+	}
+}`, nil, val{}},
+		{"builtin", `func f() { os.ReadFile(string(append([]byte("../a"), 'b'))) }`, nil, val{esc: []string{"../a"}}},
+		{"literal in an index", `func f(m map[string]string) { os.ReadFile(m["../a"]) }`, nil, val{esc: []string{"../a"}}},
+		{"under a temporary directory", `func f(t *testing.T) { os.ReadFile(t.TempDir() + "/../x") }`, nil, val{}},
 	} {
 		got := values(t, append([]string{header + tc.src}, tc.more...)...)
 		switch {
@@ -407,6 +474,113 @@ var nil_ = val{esc: []string{"\x00none"}}
 
 func equal(a, b val) bool {
 	return a.known == b.known && a.cwd == b.cwd && slices.Equal(a.ss, b.ss) && slices.Equal(a.esc, b.esc)
+}
+
+// A helper of another package of the main modules is followed: its
+// constants, variables and function results; its own source file is not
+// where the caller's test runs.
+func TestResolveExtern(t *testing.T) {
+	qset := token.NewFileSet()
+	qf, err := parser.ParseFile(qset, "q/q.go", `package q
+
+import "runtime"
+
+const Dir = "../a"
+
+var V = Root()
+
+func Root() string { return "../b" }
+
+func Self() string { _, f, _, _ := runtime.Caller(0); return f }
+`, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := newResolver(qset, []*ast.File{qf}, nil)
+	q.foreign = true
+	ext := func(ip string) *resolver {
+		if ip == "example.com/q" {
+			return q
+		}
+		return nil
+	}
+	fset, files := parseSrc(t, `package p
+
+import (
+	"os"
+
+	"example.com/q"
+	"example.com/r"
+)
+
+func f() {
+	os.ReadFile(q.Dir)
+	os.ReadFile(q.V)
+	os.ReadFile(q.Root())
+	os.ReadFile(q.Self())
+	os.ReadFile(q.Missing)
+	os.ReadFile(q.Root)
+	os.ReadFile(r.Dir)
+}
+`)
+	var got []val
+	for _, rd := range reads(fset, files, ext) {
+		if !rd.lit {
+			got = append(got, rd.val)
+		}
+	}
+	want := []val{known("../a"), known("../b"), known("../b"), {cwd: true}, {cwd: true}, {cwd: true}, {cwd: true}}
+	if len(got) != len(want) {
+		t.Fatalf("reads %+v", got)
+	}
+	for i := range want {
+		if !equal(got[i], want[i]) {
+			t.Errorf("read %d: %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+// The arguments and table rows of a test file add the files of the
+// contract root they name, outside the package directory, and never fail.
+func TestLiterals(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "fixtures/a.json"), "{}")
+	write(t, filepath.Join(root, "pkg/p.go"), "package p\n")
+	pos := token.Position{Filename: "pkg/p_test.go", Line: 3}
+	rs := []read{
+		{pos: pos, lit: true, val: known(".", "./", "../fixtures/a.json", "../nope", "/etc", "../../x")},
+		{pos: pos, lit: true, val: val{esc: []string{"../fixtures/%s.json", "../nope/x"}, cwd: true}},
+	}
+	got, err := readScope(root, "pkg", pkg{Dir: "pkg"}, rs, false)
+	if err != nil || !slices.Equal(got, []string{"fixtures/a.json", "fixtures/**"}) {
+		t.Errorf("%q, %v", got, err)
+	}
+	fset, files := parseSrc(t, header+`func f(t *testing.T) {
+	g("../fixtures/a.json", strings.TrimSpace("x"))
+	_ = []string{"../b"}
+	_ = map[string]int{"../c": 1}
+}`)
+	var lits []string
+	for _, rd := range reads(fset, files, nil) {
+		if rd.lit {
+			lits = append(lits, rd.val.ss...)
+		}
+	}
+	if !slices.Equal(lits, []string{"../fixtures/a.json", "../b", "../c"}) {
+		t.Errorf("literals %q", lits)
+	}
+}
+
+// A call graph too large to follow within maxSteps fails closed.
+func TestResolveSteps(t *testing.T) {
+	src := header + "func g0() string { return \"a\" }\n"
+	for i := 1; i <= 20; i++ {
+		src += fmt.Sprintf("func g%d() string { return filepath.Join(g%d(), g%d(), g20()) }\n", i, i-1, i-1) // g20 closes a cycle: nothing below it is memoized
+	}
+	src += "func f() { os.ReadFile(g20()) }\n"
+	if got := values(t, src); len(got) != 1 || !got[0].cwd {
+		t.Errorf("reads %+v", got)
+	}
 }
 
 // A literal whose type the checker did not record has no underlying type.
@@ -474,9 +648,9 @@ func TestReadScope(t *testing.T) {
 		{"absolute", p, read{pos: test, call: "os.ReadFile", val: known("/etc/passwd")}, false, nil,
 			"pkg/p_test.go:3: os.ReadFile reads /etc/passwd, outside the contract root; declare what it reads by hand and pass --go-allow-dynamic pkg"},
 		{"outside the root", p, read{pos: test, call: "os.ReadFile", val: known("../../x")}, false, nil, "reads ../../x, outside the contract root"},
-		{"library", p, read{pos: lib, call: "os.ReadFile", val: known("../fixtures/a.json")}, false, nil,
-			"pkg/p.go:4: os.ReadFile reads ../fixtures/a.json relative to the working directory, the directory of whichever package's test calls it"},
-		{"main", p, read{pos: lib, main: true, val: known("../fixtures/a.json")}, false, []string{"fixtures/a.json"}, ""},
+		{"non-test file", p, read{pos: lib, prod: true, call: "os.ReadFile", val: known("../fixtures/a.json")}, false, []string{"fixtures/a.json"}, ""},
+		{"non-test file, outside the root", p, read{pos: lib, prod: true, call: "os.ReadFile", val: known("/etc/passwd")}, false, nil, "outside the contract root"},
+		{"non-test file, unknown", p, read{pos: lib, prod: true, call: "os.ReadFile", val: val{cwd: true, esc: []string{"../fixtures"}}}, false, nil, ""},
 		{"working directory", p, read{pos: test, call: "os.Open", val: val{cwd: true}}, false, nil, "os.Open reads a path that it cannot resolve and that may leave the package directory"},
 		{"climbing literal that names a directory", p, read{pos: test, val: val{esc: []string{"../fixtures/"}}}, false, nil, "cannot resolve"},
 		{"climbing literal that names nothing", p, read{pos: test, val: val{esc: []string{"../evil", "/etc", "../../x"}}}, false, nil, ""},
@@ -562,8 +736,8 @@ func f(t *testing.T) {
 		if err != nil {
 			return
 		}
-		a := reads(fset, []*ast.File{file})
-		b := reads(fset, []*ast.File{file})
+		a := reads(fset, []*ast.File{file}, nil)
+		b := reads(fset, []*ast.File{file}, nil)
 		if !reflect.DeepEqual(a, b) {
 			t.Fatalf("not deterministic: %+v and %+v", a, b)
 		}
@@ -573,13 +747,4 @@ func f(t *testing.T) {
 			}
 		}
 	})
-}
-
-// A //go:build ignore generator of package main in a library's directory
-// reads relative to where it runs, not to a caller's test.
-func TestReadsMain(t *testing.T) {
-	rs := reads(parseSrc(t, header+`func f() { os.ReadFile("a") }`, "//go:build ignore\n\npackage main\n\nimport \"os\"\n\nfunc main() { os.ReadFile(\"b\") }\n"))
-	if len(rs) != 2 || !rs[0].main || rs[1].main { // package main sorts first
-		t.Errorf("reads %+v", rs)
-	}
 }

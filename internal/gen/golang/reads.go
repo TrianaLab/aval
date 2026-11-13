@@ -52,9 +52,12 @@ const maxValues = 64
 type read struct {
 	pos  token.Position
 	call string // such as os.ReadFile
-	main bool   // in a file of package main, which no test of another package calls
+	prod bool   // in a non-test file: an unknown path is what its callers pass
 	glob bool   // filepath.Glob: the value is a pattern
-	val  val
+	// lit: not a read but an argument or table row of a test file, which
+	// adds the files of the contract root it names and never fails.
+	lit bool
+	val val
 }
 
 // val is the value of a string expression: every value it can take, or
@@ -69,6 +72,9 @@ type val struct {
 	// cwd: unknown, and built from the working directory, the executable's
 	// path or a caller's source file, so it may read anything.
 	cwd bool
+	// tmp: unknown, and under a temporary directory, never a file of the
+	// repository.
+	tmp bool
 }
 
 func known(ss ...string) val { return val{ss: ss, known: true} }
@@ -83,8 +89,9 @@ func climbs(s string) bool {
 // unknown is the value of an expression built from vs that the resolver
 // cannot evaluate: it keeps what each of them may escape through.
 func unknown(vs ...val) val {
-	var out val
+	out := val{tmp: len(vs) > 0}
 	for _, v := range vs {
+		out.tmp = out.tmp && v.tmp
 		out.cwd = out.cwd || v.cwd
 		out.esc = append(out.esc, v.esc...)
 		if v.known {
@@ -155,13 +162,19 @@ type resolver struct {
 	funcs map[types.Object][]*ast.FuncDecl // several in files for different platforms
 	top   map[token.Pos]types.Object       // each package-level name's first object, by declaring identifier
 	calls map[types.Object][]*ast.CallExpr
-	refs  map[types.Object]int  // uses, calls included
-	tests map[types.Object]bool // variables of type *testing.T, B, F or testing.TB
-	guard map[types.Object]bool // names composite and field are following
-	stack map[any]int           // keys once is computing, by depth
-	memo  map[any]val
-	low   int // the shallowest depth a cycle closed at in the current computation
-	depth int
+	tests map[types.Object]bool   // variables of type *testing.T, B, F or testing.TB
+	names map[string]types.Object // package-level names, for other packages
+	// ext returns the resolver of another package of the main modules, or
+	// nil; foreign marks a resolver ext returned, whose source files are not
+	// where the caller's test runs.
+	ext     func(importPath string) *resolver
+	foreign bool
+	guard   map[types.Object]bool // names composite and field are following
+	stack   map[any]int           // keys once is computing, by depth
+	memo    map[any]val
+	low     int // the shallowest depth a cycle closed at in the current computation
+	depth   int
+	steps   *int // expressions visited in the current top-level evaluation, shared with ext's resolvers
 }
 
 // once returns compute's value for key, computed once. A key reached again
@@ -191,6 +204,11 @@ func (r *resolver) once(key any, compute func() val) val {
 // maxDepth bounds how deep eval follows names and calls.
 const maxDepth = 256
 
+// maxSteps bounds the expressions one top-level evaluation visits: values
+// computed inside a cycle are not memoized, so a large call graph could
+// take exponential time. Past it the value fails closed.
+const maxSteps = 1 << 15
+
 // fakeImporter imports every package as an empty one: the resolver needs
 // only the names declared in the package itself.
 type fakeImporter struct{}
@@ -202,26 +220,28 @@ func (fakeImporter) Import(p string) (*types.Package, error) {
 }
 
 // reads returns every read call in files, the parsed files of one package
-// (a package and its external test package are checked apart).
-func reads(fset *token.FileSet, files []*ast.File) []read {
+// (a package and its external test package are checked apart), and the
+// arguments and table rows of its test files. ext returns the resolver of
+// another package of the main modules, or nil.
+func reads(fset *token.FileSet, files []*ast.File, ext func(string) *resolver) []read {
 	groups := map[string][]*ast.File{}
 	for _, f := range files {
 		groups[f.Name.Name] = append(groups[f.Name.Name], f)
 	}
 	var out []read
 	for _, name := range slices.Sorted(maps.Keys(groups)) {
-		out = append(out, newResolver(fset, groups[name]).reads(groups[name])...)
+		out = append(out, newResolver(fset, groups[name], ext).reads(groups[name])...)
 	}
 	return out
 }
 
 // newResolver type-checks files with every import empty, ignoring errors,
 // and records what is assigned to each variable.
-func newResolver(fset *token.FileSet, files []*ast.File) *resolver {
+func newResolver(fset *token.FileSet, files []*ast.File, ext func(string) *resolver) *resolver {
 	r := &resolver{fset: fset, info: &types.Info{Defs: map[*ast.Ident]types.Object{}, Uses: map[*ast.Ident]types.Object{},
 		Types: map[ast.Expr]types.TypeAndValue{}},
 		defs: map[types.Object][]def{}, funcs: map[types.Object][]*ast.FuncDecl{}, calls: map[types.Object][]*ast.CallExpr{}, top: map[token.Pos]types.Object{},
-		refs: map[types.Object]int{}, tests: map[types.Object]bool{}, guard: map[types.Object]bool{}, stack: map[any]int{}, memo: map[any]val{}, low: math.MaxInt}
+		tests: map[types.Object]bool{}, names: map[string]types.Object{}, ext: ext, guard: map[types.Object]bool{}, stack: map[any]int{}, memo: map[any]val{}, low: math.MaxInt, steps: new(int)}
 	conf := types.Config{Importer: fakeImporter{}, Error: func(error) {}, FakeImportC: true}
 	_, _ = conf.Check(files[0].Name.Name, fset, files, r.info) // errors are expected: imports are empty
 	r.topLevel(files)
@@ -240,7 +260,7 @@ func newResolver(fset *token.FileSet, files []*ast.File) *resolver {
 // name: a name declared in files for two platforms is one name, with the
 // values of both.
 func (r *resolver) topLevel(files []*ast.File) {
-	first := map[string]types.Object{}
+	first := r.names
 	var ids []*ast.Ident
 	add := func(id *ast.Ident) {
 		ids = append(ids, id)
@@ -313,28 +333,35 @@ func (r *resolver) record(n ast.Node) bool {
 		r.define(n.Key, def{e: n.X, rng: true, key: true})
 		r.define(n.Value, def{e: n.X, rng: true})
 	case *ast.FuncDecl:
-		if o := r.obj(n.Name); o != nil && n.Recv == nil {
+		if o := r.obj(n.Name); o != nil {
 			r.funcs[o] = append(r.funcs[o], n)
 		}
 	case *ast.CallExpr:
 		r.callSite(n)
-	case *ast.Ident:
-		if o := r.obj(n); o != nil && r.info.Uses[n] != nil {
-			r.refs[o]++
-		}
 	case *ast.Field:
 		r.testingField(n)
 	}
 	return true
 }
 
-// callSite records a call of a function of the package.
+// callSite records a call of a function or method of the package.
 func (r *resolver) callSite(c *ast.CallExpr) {
-	if id, ok := ast.Unparen(c.Fun).(*ast.Ident); ok {
-		if o := r.obj(id); o != nil {
-			r.calls[o] = append(r.calls[o], c)
+	if o := r.callee0(c.Fun); o != nil {
+		r.calls[o] = append(r.calls[o], c)
+	}
+}
+
+// callee0 returns the function or method of the package fun names, or nil.
+func (r *resolver) callee0(fun ast.Expr) types.Object {
+	switch fun := ast.Unparen(fun).(type) {
+	case *ast.Ident:
+		return r.obj(fun)
+	case *ast.SelectorExpr:
+		if o, ok := r.info.Uses[fun.Sel].(*types.Func); ok {
+			return o
 		}
 	}
+	return nil
 }
 
 // testingField records the names a field of type *testing.T, B, F or
@@ -406,21 +433,17 @@ func (r *resolver) define(l ast.Expr, d def) {
 }
 
 // params records each call site's arguments as values of the parameters of
-// fn. A function also used as a value has callers the resolver cannot see,
-// so its parameters can take any value.
+// fn. What callers the resolver cannot see pass (a function also used as a
+// value, another package's caller) is their input, checked where they are.
 func (r *resolver) params(fn types.Object, decl *ast.FuncDecl) {
 	var ps []*ast.Ident
 	for _, f := range decl.Type.Params.List {
 		ps = append(ps, f.Names...)
 	}
-	escapes := r.refs[fn] > len(r.calls[fn])
 	l := decl.Type.Params.List
 	variadic := len(l) > 0 && isEllipsis(l[len(l)-1].Type)
 	for i, p := range ps {
 		o := r.obj(p) // never nil: the checker declares every parameter
-		if escapes {
-			r.defs[o] = append(r.defs[o], def{})
-		}
 		for _, c := range r.calls[fn] {
 			switch {
 			case variadic && i == len(ps)-1:
@@ -441,11 +464,13 @@ func isEllipsis(e ast.Expr) bool {
 	return ok
 }
 
-// reads returns the read calls in files.
+// reads returns the read calls in files, and the arguments and table rows
+// of its test files.
 func (r *resolver) reads(files []*ast.File) []read {
 	var out []read
 	for _, f := range files {
 		dot := dotImports(f)
+		prod := !strings.HasSuffix(r.fset.Position(f.Pos()).Filename, "_test.go")
 		ast.Inspect(f, func(n ast.Node) bool {
 			c, ok := n.(*ast.CallExpr)
 			if !ok {
@@ -453,7 +478,7 @@ func (r *resolver) reads(files []*ast.File) []read {
 			}
 			if sel, ok := ast.Unparen(c.Fun).(*ast.SelectorExpr); ok && sel.Sel.Name == "Chdir" && len(c.Args) == 0 {
 				// (*os.File).Chdir: a directory it cannot resolve
-				out = append(out, read{pos: r.fset.Position(c.Pos()), call: "Chdir", val: val{cwd: true}})
+				out = append(out, read{pos: r.fset.Position(c.Pos()), call: "Chdir", prod: prod, val: val{cwd: true}})
 				return true
 			}
 			if len(c.Args) == 0 {
@@ -468,7 +493,7 @@ func (r *resolver) reads(files []*ast.File) []read {
 				args = c.Args
 			}
 			for _, a := range args {
-				rd := read{pos: r.fset.Position(c.Pos()), call: call, main: f.Name.Name == "main", glob: strings.HasSuffix(call, "Glob"), val: r.eval(a, 0)}
+				rd := read{pos: r.fset.Position(c.Pos()), call: call, prod: prod, glob: strings.HasSuffix(call, "Glob"), val: r.fresh(a)}
 				if strings.HasSuffix(call, "Chdir") && r.getwd(a) {
 					rd.val = val{} // back to the working directory: not a read
 				}
@@ -476,8 +501,44 @@ func (r *resolver) reads(files []*ast.File) []read {
 			}
 			return true
 		})
-		out = append(out, r.readValues(f, dot)...)
+		out = append(out, r.readValues(f, dot, prod)...)
+		if !prod {
+			out = append(out, r.literals(f)...)
+		}
 	}
+	return out
+}
+
+// literals returns, for a test file, the value of every argument of a call
+// (other than to strings, fmt, strconv, path and filepath, whose results
+// are arguments in turn) and every element of a composite literal (table
+// rows): a path a test passes to any function, of another package too
+// (contract.Load("../../examples/x.yaml")), may be read there.
+func (r *resolver) literals(f *ast.File) []read {
+	var out []read
+	ast.Inspect(f, func(n ast.Node) bool {
+		var es []ast.Expr
+		switch n := n.(type) {
+		case *ast.CallExpr:
+			if ip, _ := r.callee(n.Fun); !stringPkgs[ip] {
+				es = n.Args
+			}
+		case *ast.CompositeLit:
+			for _, el := range n.Elts {
+				if kv, ok := el.(*ast.KeyValueExpr); ok {
+					es = append(es, kv.Key, kv.Value)
+				} else {
+					es = append(es, el)
+				}
+			}
+		}
+		for _, e := range es {
+			if v := r.fresh(e); len(v.ss)+len(v.esc) > 0 {
+				out = append(out, read{pos: r.fset.Position(e.Pos()), lit: true, val: v})
+			}
+		}
+		return true
+	})
 	return out
 }
 
@@ -485,7 +546,7 @@ func (r *resolver) reads(files []*ast.File) []read {
 // a value (var readFile = os.ReadFile): it reads whatever its later callers
 // pass, so it fails closed. A callee, and a value assigned to _ (keeping an
 // import), is not one.
-func (r *resolver) readValues(f *ast.File, dot []string) []read {
+func (r *resolver) readValues(f *ast.File, dot []string, prod bool) []read {
 	var out []read
 	skip := map[ast.Expr]bool{}
 	mark := func(e ast.Expr) {
@@ -526,7 +587,7 @@ func (r *resolver) readValues(f *ast.File, dot []string) []read {
 			return true
 		}
 		if call, ok := r.readCall(e, dot); ok {
-			out = append(out, read{pos: r.fset.Position(e.Pos()), call: call, main: f.Name.Name == "main", val: val{cwd: true}})
+			out = append(out, read{pos: r.fset.Position(e.Pos()), call: call, prod: prod, val: val{cwd: true}})
 		}
 		return true
 	})
@@ -612,13 +673,26 @@ func (r *resolver) callee(e ast.Expr) (string, string) {
 	return pn.Imported().Path(), sel.Sel.Name
 }
 
+// fresh evaluates e afresh, within maxSteps.
+func (r *resolver) fresh(e ast.Expr) val {
+	*r.steps = 0
+	return r.eval(e, 0)
+}
+
 // eval returns the value of e, or of its idx-th result when it is a call
 // with several.
 func (r *resolver) eval(e ast.Expr, idx int) val {
-	if r.depth++; r.depth > maxDepth {
+	*r.steps++
+	r.depth++
+	defer func() { r.depth-- }()
+	if r.depth > maxDepth || *r.steps > maxSteps {
 		return val{cwd: true} // too deep to follow: fail closed
 	}
-	defer func() { r.depth-- }()
+	return r.expr(e, idx)
+}
+
+// expr returns what eval does, within its bounds.
+func (r *resolver) expr(e ast.Expr, idx int) val {
 	switch e := ast.Unparen(e).(type) {
 	case *ast.BasicLit:
 		if s, err := strconv.Unquote(e.Value); err == nil && e.Kind == token.STRING {
@@ -626,7 +700,7 @@ func (r *resolver) eval(e ast.Expr, idx int) val {
 		}
 	case *ast.BinaryExpr:
 		if e.Op == token.ADD {
-			return product(func(s []string) string { return s[0] + s[1] }, r.eval(e.X, 0), r.eval(e.Y, 0))
+			return r.concat(e)
 		}
 	case *ast.Ident:
 		if o := r.obj(e); o != nil {
@@ -644,8 +718,19 @@ func (r *resolver) eval(e ast.Expr, idx int) val {
 			return v
 		}
 		return r.opaque(e)
+	case *ast.FuncLit:
+		return val{} // a function, not a path
 	}
 	return r.taint(e)
+}
+
+// concat returns the value of x + y.
+func (r *resolver) concat(e *ast.BinaryExpr) val {
+	x := r.eval(e.X, 0)
+	if x.tmp {
+		return x // a name under a temporary directory
+	}
+	return product(func(s []string) string { return s[0] + s[1] }, x, r.eval(e.Y, 0))
 }
 
 // member returns the value of a member of another package, such as
@@ -657,9 +742,27 @@ func (r *resolver) member(sel *ast.SelectorExpr) (val, bool) {
 	case ip == "os" && name == "PathSeparator", ip == "path/filepath" && name == "Separator":
 		return known("/"), true
 	case ip != "":
+		if fr, o := r.extern(ip, name); o != nil {
+			if _, fn := o.(*types.Func); !fn {
+				return fr.object(o), true
+			}
+		}
 		return val{cwd: true}, true
 	}
 	return val{}, false
+}
+
+// extern returns the resolver of the package ip of the main modules and its
+// package-level name, or nils.
+func (r *resolver) extern(ip, name string) (*resolver, types.Object) {
+	if r.ext == nil {
+		return nil, nil
+	}
+	if fr := r.ext(ip); fr != nil {
+		fr.steps = r.steps
+		return fr, fr.names[name]
+	}
+	return nil, nil
 }
 
 // opaque returns the value of a call the resolver does not evaluate. A
@@ -671,8 +774,12 @@ func (r *resolver) opaque(c *ast.CallExpr) val {
 	ip, name := r.callee(c.Fun)
 	switch {
 	case ip == "os" && (name == "TempDir" || name == "MkdirTemp"), r.temp(c.Fun):
-		return val{}
-	case stringPkgs[ip]:
+		return val{tmp: true}
+	case ip == "path/filepath" && name == "Glob":
+		return val{} // matches under the directory the Glob reads, in scope or failed there
+	case r.entryName(c.Fun):
+		return known(anyName)
+	case stringPkgs[ip], r.builtin(c.Fun):
 		vs := make([]val, len(c.Args))
 		for i, a := range c.Args {
 			vs[i] = r.eval(a, 0)
@@ -680,6 +787,44 @@ func (r *resolver) opaque(c *ast.CallExpr) val {
 		return unknown(vs...)
 	}
 	return val{cwd: true}
+}
+
+// builtin reports whether fun is a builtin function such as append, whose
+// result is built from its arguments.
+func (r *resolver) builtin(fun ast.Expr) bool {
+	id, _ := ast.Unparen(fun).(*ast.Ident)
+	_, ok := r.info.Uses[id].(*types.Builtin)
+	return id != nil && ok
+}
+
+// anyName is the value of a name ReadDir returned: one path element, in the
+// directory the ReadDir reads. A path with it names that directory, as a
+// glob would.
+const anyName = "\x00"
+
+// readDirs are the functions that return the entries of a directory.
+var readDirs = map[string]bool{"os.ReadDir": true, "io/ioutil.ReadDir": true, "io/fs.ReadDir": true}
+
+// entryName reports whether fun is the Name method of a variable that ranges
+// over the entries a ReadDir returned.
+func (r *resolver) entryName(fun ast.Expr) bool {
+	sel, _ := ast.Unparen(fun).(*ast.SelectorExpr)
+	if sel == nil || sel.Sel.Name != "Name" {
+		return false
+	}
+	id, _ := sel.X.(*ast.Ident)
+	if id == nil {
+		return false
+	}
+	ds := r.defs[r.obj(id)]
+	return len(ds) > 0 && !slices.ContainsFunc(ds, func(d def) bool {
+		c, ok := ast.Unparen(d.e).(*ast.CallExpr)
+		if !ok || !d.rng || d.key {
+			return true
+		}
+		ip, name := r.callee(c.Fun)
+		return !readDirs[ip+"."+name]
+	})
 }
 
 // temp reports whether fun is t.TempDir or t.Name of a testing variable,
@@ -716,6 +861,17 @@ func (r *resolver) taint(e ast.Expr) val {
 	var vs []val
 	ast.Inspect(e, func(n ast.Node) bool {
 		switch n := n.(type) {
+		case *ast.CompositeLit:
+			for _, el := range n.Elts { // not its type, nor the names of its fields
+				if kv, ok := el.(*ast.KeyValueExpr); ok {
+					if _, field := underlying(r.info.Types[n].Type).(*types.Struct); !field {
+						vs = append(vs, r.eval(kv.Key, 0))
+					}
+					el = kv.Value
+				}
+				vs = append(vs, r.eval(el, 0))
+			}
+			return false
 		case *ast.BasicLit:
 			if s, err := strconv.Unquote(n.Value); err == nil && n.Kind == token.STRING {
 				vs = append(vs, known(s))
@@ -736,12 +892,10 @@ func (r *resolver) object(o types.Object) val {
 	return r.once(o, func() val {
 		defs := r.defs[o]
 		if len(defs) == 0 {
-			if v, ok := o.(*types.Var); ok && (v.Kind() == types.ParamVar || v.Kind() == types.RecvVar) {
-				// A parameter of a method or literal, or of a function
-				// no call in the package passes: any value.
-				return val{cwd: true}
-			}
-			return val{} // a name without a value: the zero value, or no path
+			// The zero value, or a parameter of a method or literal, or of
+			// a function no call in the package passes: what its callers
+			// pass, checked where they are.
+			return val{}
 		}
 		vs := make([]val, len(defs))
 		for i, d := range defs {
@@ -829,39 +983,68 @@ func (r *resolver) elements(e ast.Expr) (elts, keys []ast.Expr, ok bool) {
 	return elts, keys, true
 }
 
-// field returns the value of x.f when x is a struct literal, or ranges
-// over a literal of struct literals, that the resolver can read.
+// field returns the value of x.f when x is a struct literal, ranges over a
+// literal of struct literals, or is what a function of the package returns,
+// that the resolver can read.
 func (r *resolver) field(sel *ast.SelectorExpr) (val, bool) {
-	id, ok := sel.X.(*ast.Ident)
+	es, ok := r.fieldExprs(sel)
 	if !ok {
 		return val{}, false
 	}
+	vs := make([]val, len(es))
+	for i, e := range es {
+		vs[i] = known("") // not set: the zero value
+		if e != nil {
+			vs[i] = r.eval(e, 0)
+		}
+	}
+	return union(vs...), true
+}
+
+// fieldExprs returns the expressions x.f can be, nil for the zero value.
+func (r *resolver) fieldExprs(sel *ast.SelectorExpr) ([]ast.Expr, bool) {
+	id, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return nil, false
+	}
 	o := r.obj(id)
 	if o == nil || len(r.defs[o]) == 0 || r.guard[o] {
-		return val{}, false
+		return nil, false
 	}
 	r.guard[o] = true
 	defer delete(r.guard, o)
 	var structs []ast.Expr
 	for _, d := range r.defs[o] {
-		switch elts, _, ok := r.elements(d.e); {
-		case d.rng && !d.key && ok:
-			structs = append(structs, elts...)
-		case !d.rng && !d.opAsg && d.e != nil:
-			structs = append(structs, d.e)
-		default:
-			return val{}, false
-		}
-	}
-	vs := make([]val, 0, len(structs))
-	for _, s := range structs {
-		v, ok := r.structField(s, sel.Sel.Name)
+		ss, ok := r.structs(d)
 		if !ok {
-			return val{}, false
+			return nil, false
 		}
-		vs = append(vs, v)
+		structs = append(structs, ss...)
 	}
-	return union(vs...), true
+	out := make([]ast.Expr, 0, len(structs))
+	for _, s := range structs {
+		e, ok := r.structField(s, sel.Sel.Name)
+		if !ok {
+			return nil, false
+		}
+		out = append(out, e)
+	}
+	return out, true
+}
+
+// structs returns the expressions of the struct values d gives.
+func (r *resolver) structs(d def) ([]ast.Expr, bool) {
+	elts, _, isLit := r.elements(d.e)
+	rets, isCall := r.returnExprs(d.e)
+	switch {
+	case d.rng && !d.key && isLit:
+		return elts, true
+	case d.rng || d.opAsg || d.e == nil || d.idx > 0:
+		return nil, false
+	case isCall:
+		return rets, true
+	}
+	return []ast.Expr{d.e}, true
 }
 
 // underlying returns t's underlying type, through a pointer, or nil when
@@ -876,26 +1059,27 @@ func underlying(t types.Type) types.Type {
 	return t.Underlying()
 }
 
-// structField returns field name of the struct literal e.
-func (r *resolver) structField(e ast.Expr, name string) (val, bool) {
+// structField returns field name of the struct literal e, nil when it is
+// not set.
+func (r *resolver) structField(e ast.Expr, name string) (ast.Expr, bool) {
 	c, ok := r.composite(e)
 	if !ok {
-		return val{}, false
+		return nil, false
 	}
 	st, ok := underlying(r.info.Types[c].Type).(*types.Struct)
 	if !ok {
-		return val{}, false
+		return nil, false
 	}
 	for i, el := range c.Elts {
 		if kv, isKV := el.(*ast.KeyValueExpr); isKV {
 			if k, _ := kv.Key.(*ast.Ident); k != nil && k.Name == name {
-				return r.eval(kv.Value, 0), true
+				return kv.Value, true
 			}
 		} else if i < st.NumFields() && st.Field(i).Name() == name {
-			return r.eval(el, 0), true
+			return el, true
 		}
 	}
-	return known(""), true // not set: the zero value
+	return nil, true
 }
 
 // call returns the value of a call the resolver knows: a function of path
@@ -914,10 +1098,14 @@ func (r *resolver) call(c *ast.CallExpr, idx int) (val, bool) {
 	case (ip == "path" || ip == "path/filepath") && pathFuncs[name] != 0:
 		return r.pathFunc(c, name), true
 	}
-	if id, ok := ast.Unparen(c.Fun).(*ast.Ident); ok {
-		if o := r.obj(id); o != nil && len(r.funcs[o]) > 0 {
-			return r.results(o, idx), true
-		}
+	if o := r.callee0(c.Fun); o != nil && len(r.funcs[o]) > 0 {
+		return r.results(o, idx), true
+	}
+	if fs := r.funcLits(c.Fun); fs != nil {
+		return r.litResults(fs, idx), true
+	}
+	if fr, o := r.extern(ip, name); o != nil && len(fr.funcs[o]) > 0 {
+		return fr.results(o, idx), true
 	}
 	return val{}, false
 }
@@ -926,7 +1114,7 @@ func (r *resolver) call(c *ast.CallExpr, idx int) (val, bool) {
 // name is this source file, relative to its directory; otherwise a caller's
 // file, which can be anywhere.
 func (r *resolver) caller(c *ast.CallExpr, idx int) val {
-	if lit, ok := c.Args[0].(*ast.BasicLit); ok && lit.Value == "0" && idx == 1 {
+	if lit, ok := c.Args[0].(*ast.BasicLit); ok && lit.Value == "0" && idx == 1 && !r.foreign {
 		return known(path.Base(r.fset.Position(c.Pos()).Filename))
 	}
 	return val{cwd: true}
@@ -941,6 +1129,12 @@ func (r *resolver) pathFunc(c *ast.CallExpr, name string) val {
 	args := make([]val, len(c.Args))
 	for i, a := range c.Args {
 		args[i] = r.eval(a, 0)
+	}
+	if len(args) > 0 && args[0].tmp {
+		// ponytail: under a temporary directory, even with a ".." after
+		// it: tests do not climb from their temporary directory into the
+		// repository.
+		return val{tmp: true}
 	}
 	return product(func(s []string) string {
 		for i := range s {
@@ -965,29 +1159,140 @@ func (r *resolver) results(fn types.Object, idx int) val {
 	}{fn, idx}, func() val {
 		var vs []val
 		for _, d := range r.funcs[fn] {
-			vs = append(vs, r.returns(d, idx)...)
+			vs = append(vs, r.returns(d.Type, d.Body, idx)...)
 		}
-		if len(vs) == 0 {
-			return val{}
-		}
-		return union(vs...)
+		return unionOrNone(vs)
 	})
 }
 
-// returns is the values of the idx-th result of decl, one per return
-// statement.
-func (r *resolver) returns(decl *ast.FuncDecl, idx int) []val {
-	if decl.Body == nil {
-		return []val{{cwd: true}} // implemented elsewhere (assembly, linkname): any value
+// litResults returns the idx-th result of calling one of the function
+// literals fs.
+func (r *resolver) litResults(fs []*ast.FuncLit, idx int) val {
+	var vs []val
+	for _, f := range fs {
+		vs = append(vs, r.once(struct {
+			*ast.FuncLit
+			int
+		}{f, idx}, func() val { return unionOrNone(r.returns(f.Type, f.Body, idx)) }))
 	}
+	return unionOrNone(vs)
+}
+
+func unionOrNone(vs []val) val {
+	if len(vs) == 0 {
+		return val{}
+	}
+	return union(vs...)
+}
+
+// funcLits returns the function literals fun is or names (a variable or a
+// field of a table row), or nil.
+func (r *resolver) funcLits(fun ast.Expr) []*ast.FuncLit {
+	switch fun := ast.Unparen(fun).(type) {
+	case *ast.FuncLit:
+		return []*ast.FuncLit{fun}
+	case *ast.Ident:
+		o := r.obj(fun)
+		if _, isVar := o.(*types.Var); !isVar || len(r.defs[o]) == 0 || r.guard[o] {
+			return nil
+		}
+		r.guard[o] = true
+		defer delete(r.guard, o)
+		var out []*ast.FuncLit
+		for _, d := range r.defs[o] {
+			fs := r.funcLits(d.e)
+			if d.rng || d.opAsg || fs == nil {
+				return nil
+			}
+			out = append(out, fs...)
+		}
+		return out
+	case *ast.SelectorExpr:
+		es, ok := r.fieldExprs(fun)
+		var out []*ast.FuncLit
+		for _, e := range es {
+			fs := r.funcLits(e)
+			if fs == nil {
+				return nil
+			}
+			out = append(out, fs...)
+		}
+		if ok {
+			return out
+		}
+	}
+	return nil
+}
+
+// returnExprs returns the expressions the first result of the call e, to a
+// function of the package or a function literal, can be.
+func (r *resolver) returnExprs(e ast.Expr) ([]ast.Expr, bool) {
+	c, ok := ast.Unparen(e).(*ast.CallExpr)
+	if !ok {
+		return nil, false
+	}
+	type fn struct {
+		typ  *ast.FuncType
+		body *ast.BlockStmt
+	}
+	var fns []fn
+	if o := r.callee0(c.Fun); o != nil {
+		for _, d := range r.funcs[o] {
+			fns = append(fns, fn{d.Type, d.Body})
+		}
+	}
+	for _, f := range r.funcLits(c.Fun) {
+		fns = append(fns, fn{f.Type, f.Body})
+	}
+	var out []ast.Expr
+	for _, f := range fns {
+		if f.body == nil {
+			return nil, false
+		}
+		named := resultNames(f.typ)
+		ok := true
+		ast.Inspect(f.body, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.FuncLit:
+				return false
+			case *ast.ReturnStmt:
+				switch {
+				case len(n.Results) == 0 && len(named) > 0:
+					out = append(out, named[0])
+				case len(n.Results) > 0:
+					out = append(out, n.Results[0])
+				default:
+					ok = false
+				}
+			}
+			return true
+		})
+		if !ok {
+			return nil, false
+		}
+	}
+	return out, len(fns) > 0
+}
+
+func resultNames(typ *ast.FuncType) []*ast.Ident {
 	var named []*ast.Ident
-	if decl.Type.Results != nil {
-		for _, f := range decl.Type.Results.List {
+	if typ.Results != nil {
+		for _, f := range typ.Results.List {
 			named = append(named, f.Names...)
 		}
 	}
+	return named
+}
+
+// returns is the values of the idx-th result of a function, one per return
+// statement.
+func (r *resolver) returns(typ *ast.FuncType, body *ast.BlockStmt, idx int) []val {
+	if body == nil {
+		return []val{{cwd: true}} // implemented elsewhere (assembly, linkname): any value
+	}
+	named := resultNames(typ)
 	var vs []val
-	ast.Inspect(decl.Body, func(n ast.Node) bool {
+	ast.Inspect(body, func(n ast.Node) bool {
 		switch n := n.(type) {
 		case *ast.FuncLit:
 			return false
@@ -1010,12 +1315,11 @@ func (r *resolver) returns(decl *ast.FuncDecl, idx int) []val {
 // (unit id) name: each file, or each directory as <dir>/**, inside the
 // contract root. Paths are relative to the package directory, where go test
 // runs its tests. A path that does not exist adds nothing: when it appears,
-// aval gen go --check reports the drift. Unless allow is set, a read that
-// may leave the package directory without a value the resolver knows, a
-// path outside the contract root, and a relative path in a non-test file of
-// a package other than main (relative to the directory of whichever test
-// calls it) are
-// errors (invariant 3).
+// aval gen go --check reports the drift. Unless allow is set, a read of a
+// test file that may leave the package directory without a value the
+// resolver knows, and a path outside the contract root, are errors
+// (invariant 3). A read of a non-test file whose value it does not know
+// reads what its callers pass: their arguments are checked where they are.
 func readScope(root, id string, p pkg, rs []read, allow bool) ([]string, error) {
 	dirs, err := p.chdirs(root, id, rs)
 	if err != nil && !allow {
@@ -1024,8 +1328,12 @@ func readScope(root, id string, p pkg, rs []read, allow bool) ([]string, error) 
 	var out []string
 	var errs []error
 	for _, rd := range rs {
+		if rd.lit {
+			out = append(out, p.litGlobs(root, dirs, rd)...)
+			continue
+		}
 		problem := ""
-		if !rd.val.known && p.escapes(root, dirs, rd.val) {
+		if !rd.val.known && !rd.prod && p.escapes(root, dirs, rd.val) {
 			problem = "reads a path that it cannot resolve and that may leave the package directory"
 		}
 		for _, s := range rd.val.ss {
@@ -1096,6 +1404,33 @@ func (p pkg) chdirs(root, id string, rs []read) ([]string, error) {
 	return dirs, nil
 }
 
+// litGlobs returns the scope globs of the files and directories of the
+// contract root, other than the package directory and what is outside the
+// root, that the value of the argument rd names: a known value, or the
+// first existing cut of each climbing literal an unknown one is built from.
+func (p pkg) litGlobs(root string, dirs []string, rd read) []string {
+	var out []string
+	try := func(s string) bool {
+		if path.Clean(strings.ReplaceAll(s, `\`, "/")) == "." {
+			return false // the package directory: its files are in scope
+		}
+		for _, c := range candidates(dirs, rd, s) {
+			if g, why := p.readGlob(root, rd, c); g != "" && why == "" {
+				out = append(out, g)
+				return true
+			}
+		}
+		return false
+	}
+	for _, s := range rd.val.ss {
+		try(s)
+	}
+	for _, s := range rd.val.esc {
+		_ = slices.ContainsFunc(cuts(s), try) // the first cut that names something
+	}
+	return out
+}
+
 // candidates returns the paths, relative to the package directory, that
 // the path s rd reads may name: s itself and, for a relative read other
 // than a Chdir, s under each directory in dirs the package changes to.
@@ -1160,7 +1495,7 @@ func cuts(s string) []string {
 // readGlob returns the scope glob of the path s that rd reads, "" when it
 // adds nothing, or why it cannot be resolved inside the contract root.
 func (p pkg) readGlob(root string, rd read, s string) (glob, why string) {
-	if rd.glob {
+	if rd.glob || strings.Contains(s, anyName) {
 		s = globDir(s)
 	}
 	s = strings.ReplaceAll(s, `\`, "/")
@@ -1170,8 +1505,6 @@ func (p pkg) readGlob(root string, rd read, s string) (glob, why string) {
 		return "", "" // nothing to read
 	case path.IsAbs(s) || filepath.VolumeName(s) != "" || climbs(rel):
 		return "", fmt.Sprintf("reads %s, outside the contract root", s)
-	case !strings.HasSuffix(rd.pos.Filename, "_test.go") && !rd.main:
-		return "", fmt.Sprintf("reads %s relative to the working directory, the directory of whichever package's test calls it", s)
 	}
 	fi, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
 	switch {
@@ -1195,7 +1528,7 @@ func (p pkg) readGlob(root string, rd read, s string) (glob, why string) {
 func globDir(pattern string) string {
 	segs := strings.Split(strings.ReplaceAll(pattern, `\`, "/"), "/")
 	for i, seg := range segs {
-		if strings.ContainsAny(seg, `*?[`) {
+		if strings.ContainsAny(seg, "*?["+anyName) {
 			if i == 0 {
 				return "."
 			}
