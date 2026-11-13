@@ -1320,7 +1320,10 @@ func (r *resolver) returns(typ *ast.FuncType, body *ast.BlockStmt, idx int) []va
 // resolver knows, and a path outside the contract root, are errors
 // (invariant 3). A read of a non-test file whose value it does not know
 // reads what its callers pass: their arguments are checked where they are.
-func readScope(root, id string, p pkg, rs []read, allow bool) ([]string, error) {
+// With noTest (aval gen --no-test matches the unit), no test of the unit is
+// written, so a read of its test files is not an error: what it resolves is
+// still added, for the tests that use the unit's fragment.
+func readScope(root, id string, p pkg, rs []read, allow, noTest bool) ([]string, error) {
 	dirs, err := p.chdirs(root, id, rs)
 	if err != nil && !allow {
 		return nil, err
@@ -1332,26 +1335,35 @@ func readScope(root, id string, p pkg, rs []read, allow bool) ([]string, error) 
 			out = append(out, p.litGlobs(root, dirs, rd)...)
 			continue
 		}
-		problem := ""
-		if !rd.val.known && !rd.prod && p.escapes(root, dirs, rd.val) {
-			problem = "reads a path that it cannot resolve and that may leave the package directory"
-		}
-		for _, s := range rd.val.ss {
-			for _, c := range candidates(dirs, rd, s) {
-				g, why := p.readGlob(root, rd, c)
-				if g != "" {
-					out = append(out, g)
-				}
-				if problem == "" {
-					problem = why
-				}
-			}
-		}
-		if problem != "" && !allow {
+		globs, problem := p.readGlobs(root, dirs, rd)
+		out = append(out, globs...)
+		if problem != "" && !allow && (rd.prod || !noTest) {
 			errs = append(errs, fmt.Errorf("%s:%d: %s %s; declare what it reads by hand and pass --go-allow-dynamic %s", rd.pos.Filename, rd.pos.Line, rd.call, problem, id))
 		}
 	}
 	return out, errors.Join(errs...)
+}
+
+// readGlobs returns the scope globs of the read rd, run in any of dirs,
+// and its first problem, or "".
+func (p pkg) readGlobs(root string, dirs []string, rd read) ([]string, string) {
+	var out []string
+	problem := ""
+	if !rd.val.known && !rd.prod && p.escapes(root, dirs, rd.val) {
+		problem = "reads a path that it cannot resolve and that may leave the package directory"
+	}
+	for _, s := range rd.val.ss {
+		for _, c := range candidates(dirs, rd, s) {
+			g, why := p.readGlob(root, rd, c)
+			if g != "" {
+				out = append(out, g)
+			}
+			if problem == "" {
+				problem = why
+			}
+		}
+	}
+	return out, problem
 }
 
 // maxChdirs bounds the Chdir chains chdirs follows.

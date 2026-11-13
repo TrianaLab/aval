@@ -258,6 +258,10 @@ nothing written):
 - when its path is outside the contract root, absolute ones included
   (`/proc/self/cgroup`).
 
+A package that `--no-test` matches gets no test, so a read of its test
+files does not fail; what resolves is still added to its fragment, which
+other tests use. A read of its non-test files fails as above.
+
 `--go-allow-dynamic <pattern>` (repeatable, a contract glob over package
 IDs such as `tests/**`) turns those errors off for the packages it
 matches; files it resolves are still added. Declare the rest by hand:

@@ -133,6 +133,9 @@ func runGen(cmd *cobra.Command, a gen.Adapter, lang, file string, check, list bo
 	if err != nil {
 		return usageError{fmt.Errorf("gen: %s: %w", file, err)}
 	}
+	if s, ok := a.(gen.TestSkipper); ok {
+		s.SkipTests(noTest)
+	}
 	units, err := a.Units(root)
 	if err != nil {
 		return fmt.Errorf("gen %s: %w", lang, err)

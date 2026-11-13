@@ -197,6 +197,33 @@ func TestDynamicRead(t *testing.T) {
 	}
 }
 
+// A unit --no-test matches gets no test: a read of its test files that
+// cannot be resolved is not an error, and what resolves is still added. A
+// read of a non-test file still fails, and so does the same read in a unit
+// that gets a test.
+func TestNoTestReads(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/dynamic_test.go"), "package web\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestDynamic(t *testing.T) {\n\t_, _ = os.ReadFile(os.Getenv(\"F\"))\n\t_, _ = os.ReadFile(\"../fixtures/order.json\")\n}\n")
+	if _, err := (&Adapter{NoTest: []string{"internal/**"}}).Units(root); err == nil || !strings.Contains(err.Error(), "web/dynamic_test.go:9") {
+		t.Fatalf("a unit with a test: %v", err)
+	}
+	a := &Adapter{}
+	a.SkipTests([]string{"w*"})
+	units, err := a.Units(root)
+	if err != nil {
+		t.Fatalf("--no-test w*: %v", err)
+	}
+	for _, u := range units {
+		if u.ID == "web" && !slices.Contains(u.Source, "fixtures/order.json") {
+			t.Errorf("web: %q, want fixtures/order.json", u.Source)
+		}
+	}
+	write(t, filepath.Join(root, "web/abs.go"), "package web\n\nimport \"os\"\n\nfunc abs() { _, _ = os.ReadFile(\"/etc/hosts\") }\n")
+	if _, err := a.Units(root); err == nil || !strings.Contains(err.Error(), "web/abs.go:5") {
+		t.Errorf("a non-test file of a unit without a test: %v", err)
+	}
+}
+
 // A read whose path comes from a helper of another package that the
 // adapter cannot follow, a read function used as a value or a Chdir to a
 // computed directory may read fixtures/order.json: each fails
@@ -424,10 +451,10 @@ func TestErrors(t *testing.T) {
 func TestParseError(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.go"), "package a\n\nimport (\n")
-	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"a.go"}}, nil, nil, false, nil); err == nil || !strings.Contains(err.Error(), "a.go:3:10") {
+	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"a.go"}}, nil, nil, false, false, nil); err == nil || !strings.Contains(err.Error(), "a.go:3:10") {
 		t.Errorf("a file that does not parse: %v", err)
 	}
-	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"gone.go"}}, nil, nil, false, nil); err == nil || !strings.Contains(err.Error(), "gone.go") {
+	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"gone.go"}}, nil, nil, false, false, nil); err == nil || !strings.Contains(err.Error(), "gone.go") {
 		t.Errorf("a file that cannot be read: %v", err)
 	}
 }

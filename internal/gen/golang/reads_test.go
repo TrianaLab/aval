@@ -551,7 +551,7 @@ func TestLiterals(t *testing.T) {
 		{pos: pos, lit: true, val: known(".", "./", "../fixtures/a.json", "../nope", "/etc", "../../x")},
 		{pos: pos, lit: true, val: val{esc: []string{"../fixtures/%s.json", "../nope/x"}, cwd: true}},
 	}
-	got, err := readScope(root, "pkg", pkg{Dir: "pkg"}, rs, false)
+	got, err := readScope(root, "pkg", pkg{Dir: "pkg"}, rs, false, false)
 	if err != nil || !slices.Equal(got, []string{"fixtures/a.json", "fixtures/**"}) {
 		t.Errorf("%q, %v", got, err)
 	}
@@ -657,7 +657,7 @@ func TestReadScope(t *testing.T) {
 		{"allowed", p, read{pos: test, val: val{cwd: true}}, true, nil, ""},
 		{"allowed, resolved files still added", p, read{pos: test, val: known("/etc", "../fixtures/a.json")}, true, []string{"fixtures/a.json"}, ""},
 	} {
-		got, err := readScope(root, "pkg", tc.p, []read{tc.rd}, tc.allow)
+		got, err := readScope(root, "pkg", tc.p, []read{tc.rd}, tc.allow, false)
 		if tc.err == "" && err != nil || tc.err != "" && (err == nil || !strings.Contains(err.Error(), tc.err)) || !slices.Equal(got, tc.want) {
 			t.Errorf("%s: %q, %v; want %q, %q", tc.name, got, err, tc.want, tc.err)
 		}
@@ -690,7 +690,7 @@ func TestReadScopeAfterChdir(t *testing.T) {
 		{"climbing literal after a Chdir", []read{chdir("sub"), {pos: pos, call: "os.Open", val: val{esc: []string{"../../b/"}}}},
 			[]string{"internal/a/sub/**"}, "cannot resolve"},
 	} {
-		got, err := readScope(root, "a", p, tc.rs, false)
+		got, err := readScope(root, "a", p, tc.rs, false, false)
 		if tc.err == "" && err != nil || tc.err != "" && (err == nil || !strings.Contains(err.Error(), tc.err)) || !slices.Equal(got, tc.want) {
 			t.Errorf("%s: %q, %v; want %q, %q", tc.name, got, err, tc.want, tc.err)
 		}
@@ -705,10 +705,10 @@ func TestReadScopeChdirChains(t *testing.T) {
 	}
 	ts := []string{".", "./.", "././.", "./././.", "././././."} // 325 chains
 	rs := []read{{pos: token.Position{Filename: "p/p_test.go"}, call: "os.Chdir", val: known(ts...)}}
-	if _, err := readScope(root, "p", pkg{Dir: "p"}, rs, false); err == nil || !strings.Contains(err.Error(), "more than 64 directories") {
+	if _, err := readScope(root, "p", pkg{Dir: "p"}, rs, false, false); err == nil || !strings.Contains(err.Error(), "more than 64 directories") {
 		t.Errorf("err = %v", err)
 	}
-	if _, err := readScope(root, "p", pkg{Dir: "p"}, rs, true); err != nil {
+	if _, err := readScope(root, "p", pkg{Dir: "p"}, rs, true, false); err != nil {
 		t.Errorf("allowed: %v", err)
 	}
 }

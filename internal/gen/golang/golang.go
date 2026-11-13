@@ -37,7 +37,13 @@ type Adapter struct {
 	// match, a read the adapter cannot resolve inside the contract root is
 	// not an error. Their authors declare those files by hand.
 	AllowDynamic []string
+	// NoTest are the aval gen --no-test patterns (see SkipTests): a unit
+	// they match gets no test, so a read of its test files is not an error.
+	NoTest []string
 }
+
+// SkipTests implements gen.TestSkipper.
+func (a *Adapter) SkipTests(patterns []string) { a.NoTest = patterns }
 
 // Flags registers the adapter's options as aval gen flags.
 func (a *Adapter) Flags(fs *pflag.FlagSet) {
@@ -90,7 +96,9 @@ func (a *Adapter) Units(root string) ([]gen.Unit, error) {
 	var errs []error // every package's, so one run lists them all
 	ext := externs(root, pkgs)
 	for _, p := range pkgs {
-		u, err := a.unit(root, p, ids, mods, allowed[ids[p.ImportPath]], ext)
+		id := ids[p.ImportPath]
+		noTest := slices.ContainsFunc(a.NoTest, func(g string) bool { return contract.Match(g, id) })
+		u, err := a.unit(root, p, ids, mods, allowed[id], noTest, ext)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("package %s: %w", p.ImportPath, err))
 		}
@@ -381,7 +389,7 @@ func hasFile(dir string) bool {
 }
 
 // unit builds the unit of p, whose Dir is relative to root.
-func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string, allowDynamic bool, ext func(string) *resolver) (gen.Unit, error) {
+func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string, allowDynamic, noTest bool, ext func(string) *resolver) (gen.Unit, error) {
 	dir := filepath.Join(root, filepath.FromSlash(p.Dir))
 	src, err := p.sources(dir)
 	if err != nil {
@@ -393,7 +401,7 @@ func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string,
 	if err != nil {
 		return u, err
 	}
-	read, err := readScope(root, u.ID, p, reads(fset, files, ext), allowDynamic)
+	read, err := readScope(root, u.ID, p, reads(fset, files, ext), allowDynamic, noTest)
 	if err != nil {
 		return u, err
 	}
