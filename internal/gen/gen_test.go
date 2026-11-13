@@ -63,20 +63,27 @@ func TestPlanErrors(t *testing.T) {
 		want  string
 		isErr bool
 	}{
-		"bad language":       {"Go", []Unit{unit("a")}, "language", false},
-		"no units":           {"go", nil, "no units found", true},
-		"duplicate id":       {"go", []Unit{unit("a"), unit("a")}, `"a": listed twice`, true},
-		"empty name":         {"go", []Unit{unit("@@")}, "empty name", true},
-		"name collision":     {"go", []Unit{unit("a/b"), unit("A/B")}, "both get the name go.a.b", true},
-		"no source":          {"go", []Unit{{ID: "a", Command: []string{"x"}}}, "no source files", true},
-		"no command":         {"go", []Unit{{ID: "a", Source: []string{"a/**"}}}, "no test command", true},
-		"unknown dependency": {"go", []Unit{unit("a", "gone")}, `unknown dependency "gone"`, true},
+		"bad language":         {"Go", []Unit{unit("a")}, "language", false},
+		"no units":             {"go", nil, "no units found", true},
+		"duplicate id":         {"go", []Unit{unit("a"), unit("a")}, `"a": listed twice`, true},
+		"empty name":           {"go", []Unit{unit("@@")}, "empty name", true},
+		"name collision":       {"go", []Unit{unit("a/b"), unit("A/B")}, "both get the name go.a.b", true},
+		"no source":            {"go", []Unit{{ID: "a", Command: []string{"x"}}}, "no source files", true},
+		"no command":           {"go", []Unit{{ID: "a", Source: []string{"a/**"}}}, "no test command", true},
+		"unknown dependency":   {"go", []Unit{unit("a", "gone")}, `unknown dependency "gone"`, true},
+		"inexpressible output": {"go", []Unit{withOutputs(unit("a"), "../a.out")}, `"../a.out": a contract glob cannot express`, true},
+		"output in scope":      {"go", []Unit{withOutputs(unit("a"), "b/a.go"), unit("b")}, `unit "a": output b/a.go is in the scope of unit "b" (b/*.go)`, true},
 	} {
 		_, err := plan(tc.lang, tc.units)
 		if err == nil || !strings.Contains(err.Error(), tc.want) || errors.Is(err, ErrUnits) != tc.isErr {
 			t.Errorf("%s: got %v; want %q (ErrUnits %v)", name, err, tc.want, tc.isErr)
 		}
 	}
+}
+
+func withOutputs(u Unit, outputs ...string) Unit {
+	u.Outputs = outputs
+	return u
 }
 
 func TestPlanClosure(t *testing.T) {

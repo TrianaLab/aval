@@ -187,6 +187,7 @@ Flags:
   -f, --file string                    the kind: TestSet to write (default "aval.yaml")
       --go-allow-dynamic stringArray   go: in the packages whose ID matches this contract glob (repeatable), a file read whose path cannot be resolved inside the contract root is not an error; declare those files by hand
       --go-cover[=true|false]          go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)
+      --go-cover-profile string        go: each test writes its package's coverage profile to DIR/<test>.out, a directory below the contract root and outside every package's scope, and declares it in outputs, so a reused result restores it (needs sh)
   -h, --help[=true|false]              help for gen
       --list-tests[=true|false]        write nothing; print the IDs of the units that get a test, one per line
       --no-test stringArray            write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)

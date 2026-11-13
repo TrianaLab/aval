@@ -33,6 +33,10 @@ type Adapter struct {
 	// Cover makes each unit's test fail below 100% statement coverage of
 	// its own package. The command then needs a POSIX sh, mktemp and awk.
 	Cover bool
+	// CoverProfile, when set, is a directory below the contract root: each
+	// unit's test writes its package's coverage profile there, named after
+	// the test, and declares it in outputs, so a reused result restores it.
+	CoverProfile string
 	// AllowDynamic are contract globs over unit IDs: in the packages they
 	// match, a read the adapter cannot resolve inside the contract root is
 	// not an error. Their authors declare those files by hand.
@@ -48,6 +52,7 @@ func (a *Adapter) SkipTests(patterns []string) { a.NoTest = patterns }
 // Flags registers the adapter's options as aval gen flags.
 func (a *Adapter) Flags(fs *pflag.FlagSet) {
 	fs.BoolVar(&a.Cover, "go-cover", false, "go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)")
+	fs.StringVar(&a.CoverProfile, "go-cover-profile", "", "go: each test writes its package's coverage profile to DIR/<test>.out, a directory below the contract root and outside every package's scope, and declares it in outputs, so a reused result restores it (needs sh)")
 	fs.StringArrayVar(&a.AllowDynamic, "go-allow-dynamic", nil, "go: in the packages whose ID matches this contract glob (repeatable), a file read whose path cannot be resolved inside the contract root is not an error; declare those files by hand")
 }
 
@@ -65,15 +70,32 @@ type pkg struct {
 	SwigCXXFiles, IgnoredOtherFiles                                        []string
 }
 
+// full fails unless every statement of the profile that follows it ran: the
+// same rule as Aval's own coverage gate.
+const full = `awk 'NR>1 {t+=$2; if ($3>0) c+=$2} END {if (t!=c) {print "coverage: below 100.0% of statements"; exit 1}}'`
+
 // coverScript runs the tests of the package in $0 and fails unless every
-// statement of the profile ran: the same rule as Aval's own coverage gate.
-const coverScript = `p=$(mktemp) || exit 1; go test -coverprofile="$p" "$0" && awk 'NR>1 {t+=$2; if ($3>0) c+=$2} END {if (t!=c) {print "coverage: below 100.0% of statements"; exit 1}}' "$p"; s=$?; rm -f "$p"; exit $s`
+// statement of the package ran (--go-cover).
+const coverScript = `p=$(mktemp) || exit 1; go test -coverprofile="$p" "$0" && ` + full + ` "$p"; s=$?; rm -f "$p"; exit $s`
+
+// profileScript runs the tests of the package in $0 and writes its coverage
+// profile to $1, creating its directory (--go-cover-profile). No -coverpkg:
+// the profile covers only the package's own files, which are in the test's
+// scope, so a restored profile matches the code it was reused for.
+const profileScript = `mkdir -p "${1%/*}" && go test -coverprofile="$1" "$0"`
 
 // Units runs go list -deps -test -json ./... in root. The package set and
 // the embedded files are read as for linux/amd64 with cgo, so the result is
 // the same on every host; imports are read from every .go file of a
 // package, whatever its build constraints.
 func (a *Adapter) Units(root string) ([]gen.Unit, error) {
+	if a.CoverProfile != "" {
+		dir := path.Clean(a.CoverProfile)
+		segs := strings.Split(dir, "/")
+		if _, err := gen.Literal(dir); err != nil || dir == "." || slices.Contains(segs, ".git") || slices.Contains(segs, ".aval") {
+			return nil, fmt.Errorf("--go-cover-profile %q: want a directory below the contract root, slash-separated, outside .git and .aval", a.CoverProfile)
+		}
+	}
 	pkgs, err := list(root)
 	if err != nil {
 		return nil, err
@@ -420,7 +442,16 @@ func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string,
 	if p.Dir == "." {
 		u.Command[2] = "."
 	}
-	if a.Cover {
+	switch {
+	case a.CoverProfile != "":
+		name, _ := gen.Name("go", u.ID) // an ID without a name fails in gen too
+		script, profile := profileScript, path.Join(a.CoverProfile, name+".out")
+		if a.Cover {
+			script += " && " + full + ` "$1"`
+		}
+		u.Command = []string{"sh", "-c", script, u.Command[2], profile}
+		u.Outputs = []string{profile}
+	case a.Cover:
 		u.Command = []string{"sh", "-c", coverScript, u.Command[2]}
 	}
 	return u, nil
