@@ -2767,13 +2767,14 @@ TestSet).</p>
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>  -f, --file string                    the kind: TestSet to write (default "aval.yaml")
 </span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>      --go-allow-dynamic stringArray   go: in the packages whose ID matches this contract glob (repeatable), a file read whose path cannot be resolved inside the contract root is not an error; declare those files by hand
 </span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>      --go-cover[=true|false]          go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>  -h, --help[=true|false]              help for gen
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>      --list-tests[=true|false]        write nothing; print the IDs of the units that get a test, one per line
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>      --no-test stringArray            write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>      --strict-imports[=true|false]    python: fail on an import_module or __import__ call whose module is not a string literal
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>Global Flags:
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>      --go-cover-profile string        go: each test writes its package's coverage profile to DIR/&lt;test&gt;.out, a directory below the contract root and outside every package's scope, and declares it in outputs, so a reused result restores it (needs sh)
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>  -h, --help[=true|false]              help for gen
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>      --list-tests[=true|false]        write nothing; print the IDs of the units that get a test, one per line
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>      --no-test stringArray            write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>      --strict-imports[=true|false]    python: fail on an import_module or __import__ call whose module is not a string literal
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>Global Flags:
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>      --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)
 </span></code></pre></div>
 <h2 id="aval-init">aval init<a class="headerlink" href="#aval-init" title="Anchor link">&para;</a></h2>
 <p>init writes aval.yaml for one test, validated before it is written. With
