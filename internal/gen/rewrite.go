@@ -195,10 +195,14 @@ func generated(p []planned, skip, use map[string]bool) (frags, tests *yaml.Node)
 		if skip[u.name] || u.body != nil {
 			continue
 		}
-		tests.Content = append(tests.Content, mapping(0,
+		t := mapping(0,
 			str("metadata"), mapping(yaml.FlowStyle, str("name"), str(u.name)),
-			str("runner"), mapping(yaml.FlowStyle, str("command"), seq(yaml.FlowStyle, u.command...)),
-			str("use"), seq(0, u.use...)))
+			str("runner"), mapping(yaml.FlowStyle, str("command"), seq(yaml.FlowStyle, u.command...)))
+		if len(u.outputs) > 0 {
+			t.Content = append(t.Content, str("outputs"), seq(yaml.FlowStyle, u.outputs...))
+		}
+		t.Content = append(t.Content, str("use"), seq(0, u.use...))
+		tests.Content = append(tests.Content, t)
 	}
 	return frags, tests
 }

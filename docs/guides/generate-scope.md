@@ -378,6 +378,45 @@ and fails when any statement of the package did not run, so a
 repository-wide 100% gate becomes one gate per package. It needs `sh`,
 `mktemp` and `awk`.
 
+### Restore coverage on reuse
+
+A reused `go.*` result runs no test, so it writes no coverage. With
+`--go-cover-profile <dir>`, each test writes its package's profile to
+`<dir>/<test>.out` and declares it in `outputs`, which a reused result
+restores ([outputs](write-a-contract.md#restore-coverage-and-reports-on-reuse)):
+
+```sh
+aval gen go --go-cover-profile cover
+```
+
+```yaml
+  - metadata: {name: go.internal.money}
+    runner: {command: [sh, -c, 'mkdir -p "${1%/*}" && go test -coverprofile="$1" "$0"', ./internal/money, cover/go.internal.money.out]}
+    outputs: [cover/go.internal.money.out]
+```
+
+The profile covers only the package's own files (no `-coverpkg`), which
+are in the test's scope, so a restored profile matches the code it was
+reused for. Merged, the profiles of all tests equal what one
+`go test -coverprofile ./...` writes for the same packages. `<dir>` must lie
+below the contract root, outside `.aval`, `.git` and every package's scope:
+`aval gen go` fails (exit 1) otherwise, for example on a directory under
+a package that embeds files. Add `<dir>`
+to `.gitignore`. It needs `sh`. With `--go-cover` too, each test also fails
+below 100% of its package.
+
+Your coverage gate then merges the profiles after the `go.*` tests ran, run
+or reused, and checks its threshold with no test re-run. One file per test
+that got one, so the tests in `--list-tests` are the ones merged:
+
+```make
+cover-gate:  # after aval run of every go.* test
+	awk 'NR == 1 || FNR > 1' cover/go.*.out > cover.out
+	go tool cover -func=cover.out | tail -n 1
+```
+
+Keep the threshold check your gate already has, applied to `cover.out`.
+
 The package set and the embedded files are read as for `linux/amd64` with
 cgo, with `GOFLAGS` cleared, so the output is the same on every machine. A
 package with a file for another OS that uses `//go:embed` gets its whole

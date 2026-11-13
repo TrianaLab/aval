@@ -1,8 +1,10 @@
 package golang
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -97,6 +99,101 @@ func TestCover(t *testing.T) {
 		if len(c) != 4 || c[0] != "sh" || c[2] != coverScript || (c[3] != "./"+u.ID && c[3] != ".") {
 			t.Errorf("unit %s: command %q", u.ID, c)
 		}
+	}
+}
+
+// --go-cover-profile: each test writes its package's profile, declared in
+// outputs, and the profiles of all units merged are what one go test
+// -coverprofile ./... writes for the same packages.
+func TestCoverProfile(t *testing.T) {
+	a := &Adapter{}
+	fs := pflag.NewFlagSet("go", pflag.ContinueOnError)
+	a.Flags(fs)
+	if err := fs.Parse([]string{"--go-cover-profile", "cover"}); err != nil || a.CoverProfile != "cover" {
+		t.Fatalf("--go-cover-profile: err %v, CoverProfile %q", err, a.CoverProfile)
+	}
+	root := shop(t)
+	units, err := a.Units(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged := []string{}
+	for _, u := range units {
+		name, _ := gen.Name("go", u.ID)
+		profile := "cover/" + name + ".out"
+		c := u.Command
+		if len(c) != 5 || c[0] != "sh" || c[2] != profileScript || c[4] != profile || !slices.Equal(u.Outputs, []string{profile}) {
+			t.Fatalf("unit %s: command %q, outputs %q", u.ID, c, u.Outputs)
+		}
+		goRun(t, root, c...)
+		data, err := os.ReadFile(filepath.Join(root, profile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+		if lines[0] != "mode: set" {
+			t.Fatalf("%s: header %q", profile, lines[0])
+		}
+		merged = append(merged, lines[1:]...)
+	}
+	goRun(t, root, "go", "test", "-coverprofile=all.out", "./...")
+	data, err := os.ReadFile(filepath.Join(root, "all.out"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	all := strings.Split(strings.TrimSpace(string(data)), "\n")[1:]
+	slices.Sort(all)
+	slices.Sort(merged)
+	if len(all) == 0 || !slices.Equal(merged, all) {
+		t.Errorf("merged profiles differ from go test -coverprofile ./...:\nmerged %q\nall    %q", merged, all)
+	}
+}
+
+// The generated tests declare the profiles, gen refuses a profile directory
+// inside a package's scope (web embeds, so web/** is in it), and
+// --go-cover composes with --go-cover-profile.
+func TestCoverProfileGenerated(t *testing.T) {
+	a := &Adapter{CoverProfile: "cover"}
+	root := shop(t)
+	set := generate(t, a, root)
+	if !strings.Contains(set, "outputs: [cover/go.internal.money.out]") {
+		t.Errorf("no outputs:\n%s", set)
+	}
+	a.CoverProfile = "web/cover"
+	units, err := a.Units(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gen.Rewrite([]byte(set), "go", units, nil); !errors.Is(err, gen.ErrUnits) || !strings.Contains(err.Error(), `output web/cover/go.web.out is in the scope of unit "web" (web/**)`) {
+		t.Errorf("profile in scope: %v", err)
+	}
+	// With --go-cover the test also fails below 100% of its package.
+	a.CoverProfile, a.Cover = "cover", true
+	if units, err = a.Units(root); err != nil {
+		t.Fatal(err)
+	}
+	if c := units[0].Command; c[2] != profileScript+" && "+full+` "$1"` {
+		t.Errorf("--go-cover with --go-cover-profile: %q", c)
+	}
+}
+
+func TestCoverProfileErrors(t *testing.T) {
+	for _, dir := range []string{".", "./", "../cover", "/tmp/cover", `cover\x`, ".git/cover", "x/.aval"} {
+		a := &Adapter{CoverProfile: dir}
+		if _, err := a.Units(fixture); err == nil || !strings.Contains(err.Error(), "want a directory below the contract root") {
+			t.Errorf("--go-cover-profile %q: %v", dir, err)
+		}
+	}
+}
+
+// goRun runs argv in dir with GOFLAGS cleared and fails the test on error.
+func goRun(t *testing.T, dir string, argv ...string) {
+	t.Helper()
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GOFLAGS=")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("%q: %v\n%s", argv, err, out)
 	}
 }
 

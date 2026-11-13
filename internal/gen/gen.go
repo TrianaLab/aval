@@ -40,6 +40,10 @@ type Unit struct {
 	Deps []string
 	// Command is the argv that tests this unit.
 	Command []string
+	// Outputs are slash-separated paths, relative to the contract root, of
+	// files the command writes that a reused result restores (the test's
+	// outputs). Each must lie outside the Source of every unit.
+	Outputs []string
 }
 
 // globEscape turns the glob metacharacters path.Match knows into one-character
@@ -177,6 +181,7 @@ type planned struct {
 	name    string
 	source  []string
 	command []string
+	outputs []string
 	use     []string
 	body    *yaml.Node
 	test    *planned // the fragment of the unit's TestSource, or nil
@@ -251,10 +256,11 @@ func check(lang string, units []Unit) ([]planned, map[string]int, error) {
 			err = errors.Join(err, fmt.Errorf("unit %q: no test command", u.ID))
 		}
 		names[name] = u.ID
-		out[i] = planned{name: name, source: sorted(u.Source), command: u.Command}
+		outputs, oerr := outputGlobs(u, units)
+		out[i] = planned{name: name, source: sorted(u.Source), command: u.Command, outputs: outputs}
 		var terr error
 		out[i].test, terr = testFragment(lang, u, names)
-		errs = append(errs, err, terr)
+		errs = append(errs, err, oerr, terr)
 	}
 	for _, u := range units {
 		for _, d := range u.Deps {
@@ -285,6 +291,27 @@ func testFragment(lang string, u Unit, names map[string]string) (*planned, error
 }
 
 func sorted(ss []string) []string { return slices.Compact(slices.Sorted(slices.Values(ss))) }
+
+// outputGlobs returns the globs of u's outputs. An output in a unit's scope
+// would change a test's own fingerprint, and publishing refuses it: it is an
+// error here instead.
+// ponytail: units x globs x outputs; a TestSet holds at most 1024 tests.
+func outputGlobs(u Unit, units []Unit) ([]string, error) {
+	var out []string
+	var errs []error
+	for _, o := range u.Outputs {
+		g, err := Literal(o)
+		errs = append(errs, err)
+		out = append(out, g)
+		for _, v := range units {
+			scope := append(slices.Clone(v.Source), v.TestSource...)
+			if i := slices.IndexFunc(scope, func(g string) bool { return contract.Match(g, o) }); i >= 0 {
+				errs = append(errs, fmt.Errorf("unit %q: output %s is in the scope of unit %q (%s)", u.ID, o, v.ID, scope[i]))
+			}
+		}
+	}
+	return out, errors.Join(errs...)
+}
 
 // Tested returns, sorted, the IDs of the units that get a test under the
 // --no-test patterns noTest: what Rewrite would write a test for. It fails
