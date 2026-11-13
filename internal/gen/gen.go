@@ -42,7 +42,8 @@ type Unit struct {
 	Command []string
 	// Outputs are slash-separated paths, relative to the contract root, of
 	// files the command writes that a reused result restores (the test's
-	// outputs). Each must lie outside the Source of every unit.
+	// outputs). Each must lie outside the effective scope of every test
+	// Rewrite writes.
 	Outputs []string
 }
 
@@ -182,6 +183,7 @@ type planned struct {
 	source  []string
 	command []string
 	outputs []string
+	paths   []string // the outputs as paths, unescaped
 	use     []string
 	body    *yaml.Node
 	test    *planned // the fragment of the unit's TestSource, or nil
@@ -256,8 +258,8 @@ func check(lang string, units []Unit) ([]planned, map[string]int, error) {
 			err = errors.Join(err, fmt.Errorf("unit %q: no test command", u.ID))
 		}
 		names[name] = u.ID
-		outputs, oerr := outputGlobs(u, units)
-		out[i] = planned{name: name, source: sorted(u.Source), command: u.Command, outputs: outputs}
+		outputs, oerr := outputGlobs(u)
+		out[i] = planned{name: name, source: sorted(u.Source), command: u.Command, outputs: outputs, paths: u.Outputs}
 		var terr error
 		out[i].test, terr = testFragment(lang, u, names)
 		errs = append(errs, err, oerr, terr)
@@ -292,30 +294,60 @@ func testFragment(lang string, u Unit, names map[string]string) (*planned, error
 
 func sorted(ss []string) []string { return slices.Compact(slices.Sorted(slices.Values(ss))) }
 
-// outputGlobs returns the globs of u's outputs. An output in a unit's scope
-// would change a test's own fingerprint, and publishing refuses it: it is an
-// error here instead.
-// ponytail: units x globs x outputs; a TestSet holds at most 1024 tests.
-func outputGlobs(u Unit, units []Unit) ([]string, error) {
+// outputGlobs returns the globs of u's outputs. Rewrite checks them against
+// the scopes of the tests it writes (outsideScopes).
+func outputGlobs(u Unit) ([]string, error) {
 	var out []string
 	var errs []error
 	for _, o := range u.Outputs {
 		g, err := Literal(o)
 		errs = append(errs, err)
 		out = append(out, g)
-		for _, v := range units {
-			scope := append(slices.Clone(v.Source), v.TestSource...)
-			if i := slices.IndexFunc(scope, func(g string) bool { return contract.Match(g, o) }); i >= 0 {
-				errs = append(errs, fmt.Errorf("unit %q: output %s is in the scope of unit %q (%s)", u.ID, o, v.ID, scope[i]))
-			}
-		}
 	}
 	return out, errors.Join(errs...)
 }
 
+// outsideScopes fails when an output of p (only tests not in skip are
+// written) is in the effective scope of a test in cs, the written TestSet:
+// it would change that test's fingerprint, and publishing refuses it. A
+// path an exclude of that test (defaults.scope.exclude included) removes
+// from its source is in no scope of it; exclude does not apply to
+// dependencies.
+// ponytail: tests x outputs x globs; a TestSet holds at most 1024 tests.
+func outsideScopes(p []planned, skip map[string]bool, cs []*contract.Contract) error {
+	var errs []error
+	for _, u := range p {
+		if skip[u.name] {
+			continue
+		}
+		for _, o := range u.paths {
+			for _, c := range cs {
+				if g := scopeGlob(c.Scope, o); g != "" {
+					errs = append(errs, fmt.Errorf("test %s: output %s is in the scope of test %s (%s); add it to defaults.scope.exclude if no test reads it", u.name, o, c.Metadata.Name, g))
+				}
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// scopeGlob returns the glob of s that puts the path p in the scope, or "".
+func scopeGlob(s contract.Scope, p string) string {
+	match := func(g string) bool { return contract.Match(g, p) }
+	globs := s.Dependencies
+	if !slices.ContainsFunc(s.Exclude, match) {
+		globs = slices.Concat(s.Source, s.OptionalSource, globs)
+	}
+	if i := slices.IndexFunc(globs, match); i >= 0 {
+		return globs[i]
+	}
+	return ""
+}
+
 // Tested returns, sorted, the IDs of the units that get a test under the
 // --no-test patterns noTest: what Rewrite would write a test for. It fails
-// like Rewrite on invalid units or a pattern that matches no unit, so a
+// like Rewrite on invalid units or a pattern that matches no unit (an
+// output in a test's scope needs the TestSet, so only Rewrite sees it), so a
 // project's own gate can derive its list from the same patterns.
 func Tested(lang string, units []Unit, noTest ...string) ([]string, error) {
 	if _, _, err := check(lang, units); err != nil {

@@ -52,7 +52,7 @@ func (a *Adapter) SkipTests(patterns []string) { a.NoTest = patterns }
 // Flags registers the adapter's options as aval gen flags.
 func (a *Adapter) Flags(fs *pflag.FlagSet) {
 	fs.BoolVar(&a.Cover, "go-cover", false, "go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)")
-	fs.StringVar(&a.CoverProfile, "go-cover-profile", "", "go: each test writes its package's coverage profile to DIR/<test>.out, a directory below the contract root and outside every package's scope, and declares it in outputs, so a reused result restores it (needs sh)")
+	fs.StringVar(&a.CoverProfile, "go-cover-profile", "", "go: each test writes its package's coverage profile to DIR/<test>.out, a directory below the contract root and outside every test's scope (see defaults.scope.exclude), and declares it in outputs, so a reused result restores it (needs sh)")
 	fs.StringArrayVar(&a.AllowDynamic, "go-allow-dynamic", nil, "go: in the packages whose ID matches this contract glob (repeatable), a file read whose path cannot be resolved inside the contract root is not an error; declare those files by hand")
 }
 

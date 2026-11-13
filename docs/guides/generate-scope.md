@@ -399,10 +399,20 @@ The profile covers only the package's own files (no `-coverpkg`), which
 are in the test's scope, so a restored profile matches the code it was
 reused for. Merged, the profiles of all tests equal what one
 `go test -coverprofile ./...` writes for the same packages. `<dir>` must lie
-below the contract root, outside `.aval`, `.git` and every package's scope:
-`aval gen go` fails (exit 1) otherwise, for example on a directory under
-a package that embeds files. Add `<dir>`
-to `.gitignore`. It needs `sh`. With `--go-cover` too, each test also fails
+below the contract root, outside `.aval`, `.git` and the scope of every test
+in the file: `aval gen go` fails (exit 1) otherwise, for example on a
+directory under a package that embeds files. When a test's scope is `**`
+(a package whose tests walk the repository), exclude `<dir>` in defaults,
+which takes it out of every test's scope:
+
+```yaml
+defaults:
+  scope:
+    exclude: [cover/**]
+```
+
+A `--no-test` package's files count only while a written test uses its
+fragment. Add `<dir>` to `.gitignore`. It needs `sh`. With `--go-cover` too, each test also fails
 below 100% of its package.
 
 Your coverage gate then merges the profiles after the `go.*` tests ran, run

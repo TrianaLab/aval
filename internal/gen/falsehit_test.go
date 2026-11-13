@@ -322,3 +322,26 @@ func TestFalseHitTestSource(t *testing.T) {
 		t.Errorf("go.b has no test but go.b.test is written:\n%s", set)
 	}
 }
+
+// A profile directory excluded in defaults is accepted as an output next to
+// a ** unit, and then a profile never enters any test's fingerprint: an
+// output cannot make a test reused or re-run. Without the exclude, gen
+// refuses it, since the ** test would hash it.
+func TestFalseHitExcludedOutput(t *testing.T) {
+	all := Unit{ID: "r", Source: []string{"**"}, Command: []string{"go", "test", "./..."}}
+	units := []Unit{all, withOutputs(unit("a"), "cover/go.a.out")}
+	excl := strings.Replace(base, "dependencies: [go.mod]}", "dependencies: [go.mod], exclude: [cover/**]}", 1)
+	set := rewrite(t, excl, "go", units...)
+	files := map[string]string{"go.mod": "module x", "a/a.go": "a", "r/r.go": "r"}
+	for _, name := range []string{"go.a", "go.r"} {
+		before := digest(t, set, files, name)
+		files["cover/go.a.out"] = "mode: set\n" + name
+		if digest(t, set, files, name) != before {
+			t.Errorf("%s: the excluded profile changed the fingerprint", name)
+		}
+		delete(files, "cover/go.a.out")
+	}
+	if _, err := Rewrite([]byte(base), "go", units, nil); err == nil {
+		t.Error("a profile in the ** scope was accepted")
+	}
+}

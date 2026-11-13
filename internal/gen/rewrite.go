@@ -63,8 +63,8 @@ func Rewrite(data []byte, lang string, units []Unit, shared *Shared, noTest ...s
 	}
 	b.WriteString(e.tail)
 	out := []byte(b.String())
-	if _, err := contract.ParseAll(out); err != nil {
-		return nil, fmt.Errorf("the generated file is not a valid TestSet: %w", err)
+	if err := valid(out, p, skip); err != nil {
+		return nil, err
 	}
 	// The line edit above relies on block layout; prove it changed only the
 	// owned entries by comparing it with the same edit done on the nodes.
@@ -76,6 +76,19 @@ func Rewrite(data []byte, lang string, units []Unit, shared *Shared, noTest ...s
 		return nil, errors.New("cannot rewrite the generated entries without changing other lines; check the layout of fragments and tests")
 	}
 	return out, nil
+}
+
+// valid checks that out is a valid TestSet and that no output of p is in a
+// test's scope (outsideScopes).
+func valid(out []byte, p []planned, skip map[string]bool) error {
+	cs, err := contract.ParseAll(out)
+	if err != nil {
+		return fmt.Errorf("the generated file is not a valid TestSet: %w", err)
+	}
+	if err := outsideScopes(p, skip, cs); err != nil {
+		return fmt.Errorf("%w: %w", ErrUnits, err)
+	}
+	return nil
 }
 
 // breaks are the characters yaml.v3 counts as a line break; "\r\n" is one.

@@ -80,8 +80,6 @@ func TestPlanErrors(t *testing.T) {
 		"test fragment collision":           {"go", []Unit{withTest(unit("a"), "x"), unit("a/test")}, `units "a" and "a/test" both get the name go.a.test`, true},
 		"test fragment collision, reversed": {"go", []Unit{unit("a/test"), withTest(unit("a"), "x")}, `units "a/test" and "a" both get the name go.a.test`, true},
 		"inexpressible output":              {"go", []Unit{withOutputs(unit("a"), "../a.out")}, `"../a.out": a contract glob cannot express`, true},
-		"output in scope":                   {"go", []Unit{withOutputs(unit("a"), "b/a.go"), unit("b")}, `unit "a": output b/a.go is in the scope of unit "b" (b/*.go)`, true},
-		"output in test scope":              {"go", []Unit{withOutputs(unit("a"), "b/x.json"), withTest(unit("b"), "b/x.json")}, `unit "a": output b/x.json is in the scope of unit "b" (b/x.json)`, true},
 	} {
 		_, err := plan(tc.lang, tc.units)
 		if err == nil || !strings.Contains(err.Error(), tc.want) || errors.Is(err, ErrUnits) != tc.isErr {
