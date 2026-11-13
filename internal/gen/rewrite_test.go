@@ -2,6 +2,7 @@ package gen
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -360,6 +361,37 @@ func TestRewriteOutputs(t *testing.T) {
 	for _, c := range cs {
 		if want := c.Metadata.Name == "go.a"; (len(c.Outputs) == 2) != want {
 			t.Errorf("%s: outputs %q", c.Metadata.Name, c.Outputs)
+		}
+	}
+}
+
+// An output is checked against the effective scope of every written test:
+// a defaults exclude takes it out of every source, a --no-test unit's
+// fragment counts only while a written test uses it, and dependencies are
+// not excluded.
+func TestRewriteOutputScope(t *testing.T) {
+	all := Unit{ID: "r", Source: []string{"**"}, Command: []string{"go", "test", "./..."}}
+	cover := withOutputs(unit("a"), "cover/go.a.out")
+	excl := strings.Replace(base, "dependencies: [go.mod]}", "dependencies: [go.mod], exclude: [cover/**]}", 1)
+	for name, tc := range map[string]struct {
+		set    string
+		units  []Unit
+		noTest []string
+		want   string // "" accepts
+	}{
+		"** unit, defaults exclude": {excl, []Unit{all, cover}, nil, ""},
+		"** unit":                   {base, []Unit{all, cover}, nil, "test go.a: output cover/go.a.out is in the scope of test go.r (**); add it to defaults.scope.exclude"},
+		"** unit not tested":        {base, []Unit{all, cover}, []string{"r"}, ""},
+		"** unit not tested, used":  {base, []Unit{all, withOutputs(unit("a", "r"), "cover/go.a.out")}, []string{"r"}, "is in the scope of test go.a (**)"},
+		"own source":                {excl, []Unit{withOutputs(unit("a"), "a/x.go")}, nil, "output a/x.go is in the scope of test go.a (a/*.go)"},
+		"other unit, excluded":      {excl, []Unit{withOutputs(unit("a"), "cover/b.go"), {ID: "cover", Source: []string{"cover/*.go"}, Command: []string{"x"}}}, nil, ""},
+		"test source":               {base, []Unit{withOutputs(unit("a"), "b/x.json"), withTest(unit("b"), "b/x.json")}, nil, "output b/x.json is in the scope of test go.b (b/x.json)"},
+		"dependency, excluded":      {strings.Replace(excl, "[go.mod]", "[go.mod, cover/**]", 1), []Unit{all, cover}, nil, "in the scope of test go.a (cover/**)"},
+		"hand-written test":         {base + "tests:\n- metadata: {name: lint}\n  runner: {command: [make]}\n  scope: {source: [cover/*.out], exclude: [x]}\n", []Unit{cover}, nil, "in the scope of test lint (cover/*.out)"},
+	} {
+		_, err := Rewrite([]byte(tc.set), "go", tc.units, nil, tc.noTest...)
+		if tc.want == "" && err != nil || tc.want != "" && (!errors.Is(err, ErrUnits) || !strings.Contains(fmt.Sprint(err), tc.want)) {
+			t.Errorf("%s: got %v; want %q", name, err, tc.want)
 		}
 	}
 }

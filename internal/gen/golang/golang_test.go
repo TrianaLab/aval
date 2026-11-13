@@ -164,7 +164,7 @@ func TestCoverProfileGenerated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := gen.Rewrite([]byte(set), "go", units, nil); !errors.Is(err, gen.ErrUnits) || !strings.Contains(err.Error(), `output web/cover/go.web.out is in the scope of unit "web" (web/**)`) {
+	if _, err := gen.Rewrite([]byte(set), "go", units, nil); !errors.Is(err, gen.ErrUnits) || !strings.Contains(err.Error(), `output web/cover/go.web.out is in the scope of test go.web (web/**)`) {
 		t.Errorf("profile in scope: %v", err)
 	}
 	// With --go-cover the test also fails below 100% of its package.
