@@ -211,7 +211,7 @@ func f() {
 		{"variadic parameter", `func read(parts ...string) { os.ReadFile(filepath.Join(parts...)) }
 func f() { read("..", "a") }`, nil, val{esc: []string{".."}}},
 		{"variadic call to Join", `func f(parts []string) { os.ReadFile(filepath.Join(parts...)) }`, nil, val{}},
-		{"Join of a literal and a parameter", `func f(name string) { os.ReadFile(filepath.Join("..", name)) }`, nil, val{esc: []string{".."}}},
+		{"Join of a literal and a parameter", `func f(name string) { os.ReadFile(filepath.Join("..", name)) }`, nil, val{esc: []string{".."}, pre: []string{".."}}},
 		{"op-assignment", `func f() {
 	p := "a"
 	p += "/../.."
@@ -371,7 +371,7 @@ func f() {
 	var p string
 	os.ReadFile(p)
 }`, nil, val{}},
-		{"test name", `func f(b *testing.B) { os.ReadFile(filepath.Join("testdata", b.Name()+".golden")) }`, nil, val{}},
+		{"test name", `func f(b *testing.B) { os.ReadFile(filepath.Join("testdata", b.Name()+".golden")) }`, nil, val{pre: []string{"testdata"}}},
 		{"testing.TB", `func f(tb testing.TB) { os.ReadFile(filepath.Join(tb.TempDir(), "x")) }`, nil, val{}},
 		{"other method of a testing variable", `func f(t *testing.T) { os.ReadFile(t.Other()) }`, nil, val{cwd: true}},
 		{"temporary files", `func f() {
@@ -453,6 +453,18 @@ func f() { x := mk(); os.ReadDir(x.dir) }`, nil, val{cwd: true}},
 }`, nil, val{}},
 		{"builtin", `func f() { os.ReadFile(string(append([]byte("../a"), 'b'))) }`, nil, val{esc: []string{"../a"}}},
 		{"literal in an index", `func f(m map[string]string) { os.ReadFile(m["../a"]) }`, nil, val{esc: []string{"../a"}}},
+		{"Template.ParseGlob", `func f() {}`, []string{"package p\n\nimport \"text/template\"\n\nfunc g() { template.New(\"\").Funcs(nil).ParseGlob(\"../t/*.html\") }\n"}, known("../t/*.html")},
+		{"Template.ParseFiles", `func f() {}`, []string{"package p\n\nimport \"html/template\"\n\nfunc g() { template.Must(template.New(\"\").ParseFiles(\"../a.html\", \"../b.html\")) }\n"}, known("../b.html")},
+		{"ParseGlob of something else", `func f() { g().ParseGlob("../t/*.html") }`, nil, nil_},
+		{"channel receive", `func f() {
+	ch := make(chan string, 1)
+	ch <- "../a"
+	os.ReadFile(<-ch)
+}`, nil, val{cwd: true}},
+		{"type assertion", `func f(x any) { os.ReadFile(x.(string)) }`, nil, val{cwd: true}},
+		{"channel receive in a non-test file", `func f() {}`, []string{"package p\n\nimport \"os\"\n\nfunc g(ch chan string, x any) { os.ReadFile(<-ch + x.(string)) }\n"}, val{}},
+		{"Join with unknown parts", `func f(name string) { os.ReadFile(filepath.Join("../fx", "a", name, "b")) }`, nil, val{esc: []string{"../fx"}, pre: []string{"../fx/a"}}},
+		{"Join starting with an unknown part", `func f(name string) { os.ReadFile(filepath.Join(name, "../fx")) }`, nil, val{esc: []string{"../fx"}}},
 		{"under a temporary directory", `func f(t *testing.T) { os.ReadFile(t.TempDir() + "/../x") }`, nil, val{}},
 	} {
 		got := values(t, append([]string{header + tc.src}, tc.more...)...)
@@ -473,7 +485,7 @@ func f() { x := mk(); os.ReadDir(x.dir) }`, nil, val{cwd: true}},
 var nil_ = val{esc: []string{"\x00none"}}
 
 func equal(a, b val) bool {
-	return a.known == b.known && a.cwd == b.cwd && slices.Equal(a.ss, b.ss) && slices.Equal(a.esc, b.esc)
+	return a.known == b.known && a.cwd == b.cwd && slices.Equal(a.ss, b.ss) && slices.Equal(a.esc, b.esc) && slices.Equal(a.pre, b.pre)
 }
 
 // A helper of another package of the main modules is followed: its
@@ -546,19 +558,26 @@ func TestLiterals(t *testing.T) {
 	root := t.TempDir()
 	write(t, filepath.Join(root, "fixtures/a.json"), "{}")
 	write(t, filepath.Join(root, "pkg/p.go"), "package p\n")
+	write(t, filepath.Join(root, "docs/sub/x.md"), "x")
+	write(t, filepath.Join(root, "lib/l.txt"), "l")
 	pos := token.Position{Filename: "pkg/p_test.go", Line: 3}
 	rs := []read{
-		{pos: pos, lit: true, val: known(".", "./", "../fixtures/a.json", "../nope", "/etc", "../../x")},
+		{pos: pos, lit: true, val: known(".", "./", "../fixtures/a.json", "../nope", "/etc", "../../x", "../docs/sub/*.md")},
 		{pos: pos, lit: true, val: val{esc: []string{"../fixtures/%s.json", "../nope/x"}, cwd: true}},
+		{pos: token.Position{Filename: "pkg/p.go"}, prod: true, call: "os.ReadFile", val: val{pre: []string{"../lib", "."}}},
 	}
 	got, err := readScope(root, "pkg", pkg{Dir: "pkg"}, rs, false, false)
-	if err != nil || !slices.Equal(got, []string{"fixtures/a.json", "fixtures/**"}) {
+	if err != nil || !slices.Equal(got, []string{"fixtures/a.json", "docs/sub/**", "fixtures/**", "lib/**"}) {
 		t.Errorf("%q, %v", got, err)
 	}
 	fset, files := parseSrc(t, header+`func f(t *testing.T) {
 	g("../fixtures/a.json", strings.TrimSpace("x"))
 	_ = []string{"../b"}
 	_ = map[string]int{"../c": 1}
+	var s struct{ dir string }
+	s.dir = "../d"
+	x := "../e"
+	_, _ = s, x
 }`)
 	var lits []string
 	for _, rd := range reads(fset, files, nil) {
@@ -566,7 +585,7 @@ func TestLiterals(t *testing.T) {
 			lits = append(lits, rd.val.ss...)
 		}
 	}
-	if !slices.Equal(lits, []string{"../fixtures/a.json", "../b", "../c"}) {
+	if !slices.Equal(lits, []string{"../fixtures/a.json", "../b", "../c", "../d", "../e"}) {
 		t.Errorf("literals %q", lits)
 	}
 }
@@ -747,4 +766,15 @@ func f(t *testing.T) {
 			}
 		}
 	})
+}
+
+// Past maxValues directories, an unknown value adds none.
+func TestUnknownManyPrefixes(t *testing.T) {
+	var vs []val
+	for i := range maxValues + 1 {
+		vs = append(vs, val{pre: []string{fmt.Sprintf("d%d", i)}})
+	}
+	if got := unknown(vs...); got.pre != nil || got.cwd {
+		t.Errorf("unknown = %+v, want no prefix and no cwd", got)
+	}
 }

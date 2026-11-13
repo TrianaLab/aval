@@ -222,6 +222,13 @@ func TestNoTestReads(t *testing.T) {
 	if _, err := a.Units(root); err == nil || !strings.Contains(err.Error(), "web/abs.go:5") {
 		t.Errorf("a non-test file of a unit without a test: %v", err)
 	}
+	if err := os.Remove(filepath.Join(root, "web/abs.go")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(root, "web/chdir_test.go"), "package web\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestChdir(t *testing.T) {\n\t_ = os.Chdir(os.Getenv(\"D\"))\n}\n")
+	if _, err := a.Units(root); err == nil || !strings.Contains(err.Error(), "web/chdir_test.go:9: os.Chdir") {
+		t.Errorf("a Chdir in a test of a unit without a test: %v", err)
+	}
 }
 
 // A read whose path comes from a helper of another package that the
@@ -260,15 +267,71 @@ func TestFalseHitPassedPath(t *testing.T) {
 		"_ = testutil.Load(t, filepath.Join(\"..\", \"fixtures\", \"order.json\"))",
 		"for _, tc := range []struct{ file string }{{file: \"../fixtures/order.json\"}} {\n\t\t_ = testutil.Load(t, tc.file)\n\t}",
 		"_ = testutil.Load(t, fmt.Sprintf(\"../fixtures/%s.json\", t.Name()))", // the directory a template names
+		"_ = fx.Fixture(\"order.json\")",                                       // a runtime.Caller(0)-anchored helper of another package
 	} {
-		root := shop(t)
-		write(t, filepath.Join(root, "web/passed_test.go"), "package web\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"example.com/shop/internal/testutil\"\n)\n\nvar _ = filepath.Join\nvar _ = fmt.Sprint\nvar _ = os.ReadFile\n\nfunc TestPassed(t *testing.T) {\n\t"+body+"\n}\n")
-		set := generate(t, &Adapter{}, root)
-		before := digest(t, set, root, "go.web")
-		write(t, filepath.Join(root, "fixtures/order.json"), "{\"changed\": true}\n")
-		if digest(t, set, root, "go.web") == before {
-			t.Errorf("%s: fixtures/order.json changed but the fingerprint of go.web did not", body)
-		}
+		readsOrder(t, "package web\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"example.com/shop/internal/fx\"\n\t\"example.com/shop/internal/testutil\"\n)\n\nvar _ = filepath.Join\nvar _ = fmt.Sprint\nvar _ = os.ReadFile\nvar _ = fx.Fixture\n\nfunc TestPassed(t *testing.T) {\n\t"+body+"\n}\n")
+	}
+}
+
+// readsOrder writes src as web/passed_test.go of the shop, with a helper
+// package internal/fx, and checks that an edit to fixtures/order.json
+// changes the fingerprint of go.web.
+func readsOrder(t *testing.T, src string) {
+	t.Helper()
+	root := shop(t)
+	write(t, filepath.Join(root, "web/passed_test.go"), src)
+	write(t, filepath.Join(root, "internal/fx/fx.go"), `package fx
+
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+)
+
+// Fixture reads fixtures/<name> of the repository.
+func Fixture(name string) []byte {
+	_, file, _, _ := runtime.Caller(0)
+	b, _ := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "fixtures", name))
+	return b
+}
+`)
+	set := generate(t, &Adapter{}, root)
+	before := digest(t, set, root, "go.web")
+	write(t, filepath.Join(root, "fixtures/order.json"), "{\"changed\": true}\n")
+	if digest(t, set, root, "go.web") == before {
+		t.Errorf("fixtures/order.json changed but the fingerprint of go.web did not:\n%s", src)
+	}
+}
+
+// A field a method of a test type (a suite) sets after construction, read
+// by another method, and the Template methods ParseGlob and ParseFiles,
+// put what they name in scope.
+func TestFalseHitSuiteAndTemplates(t *testing.T) {
+	readsOrder(t, `package web
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+type suite struct {
+	t   *testing.T
+	dir string
+}
+
+func (s *suite) setup() { s.dir = "../fixtures" }
+
+func (s *suite) testOrder() { _, _ = os.ReadFile(filepath.Join(s.dir, "order.json")) }
+
+func TestSuite(t *testing.T) {
+	s := &suite{t: t}
+	s.setup()
+	s.testOrder()
+}
+`)
+	for _, call := range []string{`ParseGlob("../fixtures/*.json")`, `ParseFiles("../fixtures/order.json")`} {
+		readsOrder(t, "package web\n\nimport (\n\t\"testing\"\n\t\"text/template\"\n)\n\nfunc TestTemplates(t *testing.T) {\n\t_, _ = template.New(\"x\").Funcs(template.FuncMap{})."+call+"\n}\n")
 	}
 }
 

@@ -191,15 +191,18 @@ tests of the packages that import it, and no other test.
 - Reads: `os.ReadFile`, `Open`, `OpenFile`, `ReadDir`, `Stat`, `Lstat`,
   `Readlink`, `DirFS`, `OpenRoot` and `OpenInRoot`; `ioutil.ReadFile` and
   `ReadDir`; `filepath.Walk`, `WalkDir` and `Glob`; the `html/template`
-  and `text/template` functions `ParseFiles` (every argument) and
-  `ParseGlob`; `http.Dir`; and `os.Chdir`, `syscall.Chdir`,
+  and `text/template` functions and `Template` methods `ParseFiles`
+  (every argument) and `ParseGlob`; `http.Dir`; and `os.Chdir`, `syscall.Chdir`,
   `unix.Chdir`, `t.Chdir` and an open file's `Chdir`, since later
   relative reads land under that directory (going back to the directory
   `os.Getwd` returned is not a read). Dot imports count.
 - Paths passed to other functions: in a test file, every argument of a
-  call (to any function, of another package too) and every element of a
-  composite literal (table rows) that names a file or directory of the
-  contract root outside the package directory adds it, so
+  call (to any function, of another package too), every element of a
+  composite literal (table rows) and every value assigned with `=` (a
+  field set after construction, such as `s.dir = "../fixtures"` in a
+  suite's setup method) that names a file or directory of the contract
+  root outside the package directory adds it (a pattern adds the
+  directory before its first wildcard), so
   `contract.Load("../../examples/shop.yaml")` puts
   `examples/shop.yaml` in scope. For a value it cannot resolve, it adds
   the directory a literal with a `..` segment names
@@ -234,8 +237,11 @@ tests of the packages that import it, and no other test.
 A read in a non-test file reads what its callers pass, so only paths
 built from literals and constants there count: they are added like a
 test's, and one outside the contract root fails. A read of a parameter,
-a field or anything else it cannot resolve adds nothing and does not
-fail; the test that calls it is checked where it is.
+a field or anything else it cannot resolve does not fail; the test that
+calls it is checked where it is. When such a path is a `Join` whose
+leading parts are known, the directory they name is added
+(`filepath.Join(root, "fixtures", name)` with `root` from
+`runtime.Caller(0)` adds `fixtures/**`).
 
 A read in a test file fails closed, naming the file and line (exit 1,
 nothing written):
@@ -254,13 +260,15 @@ nothing written):
   function of another package that is not of the main modules (other
   than `strings`, `fmt`, `strconv`, `path` and `filepath`, which keep what
   their arguments may climb to); a value too large to follow; and a
-  `Chdir` to a directory it cannot resolve, such as an open file's;
+  `Chdir` to a directory it cannot resolve, such as an open file's; a
+  channel receive or a type assertion;
 - when its path is outside the contract root, absolute ones included
   (`/proc/self/cgroup`).
 
 A package that `--no-test` matches gets no test, so a read of its test
 files does not fail; what resolves is still added to its fragment, which
-other tests use. A read of its non-test files fails as above.
+other tests use. A read of its non-test files, and a `Chdir` in any of
+its files, fails as above.
 
 `--go-allow-dynamic <pattern>` (repeatable, a contract glob over package
 IDs such as `tests/**`) turns those errors off for the packages it
@@ -270,7 +278,12 @@ package and a hand-written test that `use`s its `go.*` fragments and a
 fragment of your own. A pattern that matches no package fails, and
 `--check` needs the same flags.
 
-It does not see, so declare by hand: a path a test computes from the
+It does not see, so declare by hand: a field it reads through a
+receiver or parameter whose value comes from something other than a
+literal assigned in a test file (`func (s *suite) read() { os.ReadFile(s.dir) }`
+with `s.dir` set from a computed path); in a non-test file, a path from
+a field of a method's receiver, such as `l.Load(name)` reading
+`filepath.Join(l.Dir, name)` with `Dir` set by a constructor; a path a test computes from the
 working directory, the executable, the environment or `runtime.Caller`
 and passes to a function that reads it (the read fails only where it is
 in a test file); a relative literal in a non-test file read by another

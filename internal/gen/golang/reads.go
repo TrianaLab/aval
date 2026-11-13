@@ -75,6 +75,9 @@ type val struct {
 	// tmp: unknown, and under a temporary directory, never a file of the
 	// repository.
 	tmp bool
+	// pre are, for an unknown value, directories it is under: the known
+	// leading arguments of a Join whose other arguments are unknown.
+	pre []string
 }
 
 func known(ss ...string) val { return val{ss: ss, known: true} }
@@ -94,9 +97,13 @@ func unknown(vs ...val) val {
 		out.tmp = out.tmp && v.tmp
 		out.cwd = out.cwd || v.cwd
 		out.esc = append(out.esc, v.esc...)
+		out.pre = append(out.pre, v.pre...)
 		if v.known {
 			out.esc = append(out.esc, slices.DeleteFunc(slices.Clone(v.ss), func(s string) bool { return !climbs(s) })...)
 		}
+	}
+	if out.pre = dedup(out.pre); len(out.pre) > maxValues {
+		out.pre = nil // ponytail: an unknown value adds no directory past maxValues, as before pre existed
 	}
 	if out.esc = dedup(out.esc); len(out.esc) > maxValues {
 		out = val{cwd: true} // too many to check: fail closed
@@ -169,12 +176,15 @@ type resolver struct {
 	// where the caller's test runs.
 	ext     func(importPath string) *resolver
 	foreign bool
-	guard   map[types.Object]bool // names composite and field are following
-	stack   map[any]int           // keys once is computing, by depth
-	memo    map[any]val
-	low     int // the shallowest depth a cycle closed at in the current computation
-	depth   int
-	steps   *int // expressions visited in the current top-level evaluation, shared with ext's resolvers
+	// templates: a file imports html/template or text/template, whose
+	// Template methods ParseGlob and ParseFiles read.
+	templates bool
+	guard     map[types.Object]bool // names composite and field are following
+	stack     map[any]int           // keys once is computing, by depth
+	memo      map[any]val
+	low       int // the shallowest depth a cycle closed at in the current computation
+	depth     int
+	steps     *int // expressions visited in the current top-level evaluation, shared with ext's resolvers
 }
 
 // once returns compute's value for key, computed once. A key reached again
@@ -247,6 +257,9 @@ func newResolver(fset *token.FileSet, files []*ast.File, ext func(string) *resol
 	r.topLevel(files)
 	for _, f := range files {
 		ast.Inspect(f, r.record)
+		for _, im := range f.Imports {
+			r.templates = r.templates || im.Path.Value == `"html/template"` || im.Path.Value == `"text/template"`
+		}
 	}
 	for fn, decls := range r.funcs {
 		for _, d := range decls {
@@ -531,6 +544,10 @@ func (r *resolver) literals(f *ast.File) []read {
 					es = append(es, el)
 				}
 			}
+		case *ast.AssignStmt:
+			if n.Tok == token.ASSIGN { // s.dir = "../fixtures", read later through another name
+				es = n.Rhs
+			}
 		}
 		for _, e := range es {
 			if v := r.fresh(e); len(v.ss)+len(v.esc) > 0 {
@@ -636,9 +653,22 @@ func (r *resolver) readCall(fun ast.Expr, dot []string) (string, bool) {
 		if readCalls[ip][name] || chdirPkgs[ip] && name == "Chdir" {
 			return path.Base(ip) + "." + name, true
 		}
-		if ip == "" && fun.Sel.Name == "Chdir" {
-			return "Chdir", true
+		if ip == "" {
+			return r.methodRead(fun.Sel.Name)
 		}
+	}
+	return "", false
+}
+
+// methodRead returns the name of the read a method call named name is: a
+// Chdir method (testing.T.Chdir, (*os.File).Chdir) or, in a package that
+// imports a template package, (*Template).ParseGlob and ParseFiles.
+func (r *resolver) methodRead(name string) (string, bool) {
+	switch {
+	case name == "Chdir":
+		return "Chdir", true
+	case r.templates && (name == "ParseGlob" || name == "ParseFiles"):
+		return "template." + name, true
 	}
 	return "", false
 }
@@ -693,6 +723,9 @@ func (r *resolver) eval(e ast.Expr, idx int) val {
 
 // expr returns what eval does, within its bounds.
 func (r *resolver) expr(e ast.Expr, idx int) val {
+	if r.hidden(e) {
+		return val{cwd: true}
+	}
 	switch e := ast.Unparen(e).(type) {
 	case *ast.BasicLit:
 		if s, err := strconv.Unquote(e.Value); err == nil && e.Kind == token.STRING {
@@ -722,6 +755,24 @@ func (r *resolver) expr(e ast.Expr, idx int) val {
 		return val{} // a function, not a path
 	}
 	return r.taint(e)
+}
+
+// hidden reports whether e, in a test file, is a channel receive or a type
+// assertion: whatever was sent or stored, which the resolver does not
+// follow.
+func (r *resolver) hidden(e ast.Expr) bool {
+	switch e := ast.Unparen(e).(type) {
+	case *ast.TypeAssertExpr:
+		return r.inTest(e.Pos())
+	case *ast.UnaryExpr:
+		return e.Op == token.ARROW && r.inTest(e.Pos())
+	}
+	return false
+}
+
+// inTest reports whether pos is in a test file.
+func (r *resolver) inTest(pos token.Pos) bool {
+	return strings.HasSuffix(r.fset.Position(pos).Filename, "_test.go")
 }
 
 // concat returns the value of x + y.
@@ -1136,7 +1187,7 @@ func (r *resolver) pathFunc(c *ast.CallExpr, name string) val {
 		// repository.
 		return val{tmp: true}
 	}
-	return product(func(s []string) string {
+	f := func(s []string) string {
 		for i := range s {
 			s[i] = strings.ReplaceAll(s[i], `\`, "/")
 		}
@@ -1147,7 +1198,14 @@ func (r *resolver) pathFunc(c *ast.CallExpr, name string) val {
 			return path.Dir(s[0])
 		}
 		return path.Clean(s[0])
-	}, args...)
+	}
+	v := product(f, args...)
+	if i := slices.IndexFunc(args, func(a val) bool { return !a.known }); name == "Join" && !v.known && i > 0 {
+		if p := product(f, args[:i]...); p.known {
+			v.pre = dedup(append(v.pre, p.ss...))
+		}
+	}
+	return v
 }
 
 // results returns the idx-th result of the package function fn: the union
@@ -1337,7 +1395,7 @@ func readScope(root, id string, p pkg, rs []read, allow, noTest bool) ([]string,
 		}
 		globs, problem := p.readGlobs(root, dirs, rd)
 		out = append(out, globs...)
-		if problem != "" && !allow && (rd.prod || !noTest) {
+		if problem != "" && !allow && (rd.prod || !noTest || strings.HasSuffix(rd.call, "Chdir")) {
 			errs = append(errs, fmt.Errorf("%s:%d: %s %s; declare what it reads by hand and pass --go-allow-dynamic %s", rd.pos.Filename, rd.pos.Line, rd.call, problem, id))
 		}
 	}
@@ -1363,6 +1421,9 @@ func (p pkg) readGlobs(root string, dirs []string, rd read) ([]string, string) {
 			}
 		}
 	}
+	// The directory a Join with unknown parts is under, such as a
+	// runtime.Caller(0)-anchored fixtures directory: over-inclusion.
+	out = append(out, p.litGlobs(root, dirs, read{pos: rd.pos, lit: true, val: known(rd.val.pre...)})...)
 	return out, problem
 }
 
@@ -1423,6 +1484,7 @@ func (p pkg) chdirs(root, id string, rs []read) ([]string, error) {
 func (p pkg) litGlobs(root string, dirs []string, rd read) []string {
 	var out []string
 	try := func(s string) bool {
+		s = globDir(s) // a pattern names the directory before its first wildcard
 		if path.Clean(strings.ReplaceAll(s, `\`, "/")) == "." {
 			return false // the package directory: its files are in scope
 		}
