@@ -2688,15 +2688,20 @@ works. Each package is one unit:</p>
   any <code>.go</code> file, test files and files under any build tag included. The
   standard library and external modules are not units: <code>go.module</code> covers
   them through <code>go.mod</code> and <code>go.sum</code>.</li>
-<li>Its files also include what its code and tests read at run time by a
-  path <code>aval gen go</code> can resolve, such as <code>../../fixtures/order.json</code>
+<li>Its files also include what its non-test code reads at run time by a
+  path <code>aval gen go</code> can resolve. What its test files read, such as
+  <code>../../fixtures/order.json</code>, goes in a second fragment,
+  <code>go.&lt;package&gt;.test</code>, that only its own test uses
   (<a href="#files-a-package-reads">below</a>).</li>
+<li>A package whose name plus <code>.test</code> is another package's name (<code>a</code> and
+  <code>a/test</code>, once <code>a</code>'s tests read a file) is an error, like any two units
+  with the same name.</li>
 <li>Its test is <code>go test ./&lt;dir&gt;</code> and <code>use</code>s <code>go.module</code>.</li>
 </ul>
 <h3 id="files-a-package-reads">Files a package reads<a class="headerlink" href="#files-a-package-reads" title="Anchor link">&para;</a></h3>
 <p>Tests often read files outside their package. <code>aval gen go</code> finds the
 reads in every <code>.go</code> file of a package, tests included, and adds their
-files to the package's fragment:</p>
+files to the package's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>:</p>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// internal/orders/orders_test.go</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">fixtures</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"../../fixtures"</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
@@ -2709,11 +2714,19 @@ files to the package's fragment:</p>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">go.internal.orders</span><span class="p">:</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fixtures/order.json</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">internal/orders/*.go</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">internal/orders/*.go</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">go.internal.orders.test</span><span class="p">:</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fixtures/order.json</span>
 </span></code></pre></div>
-<p>An edit to <code>fixtures/order.json</code> re-runs <code>go.internal.orders</code> and the
-tests of the packages that import it, and no other test.</p>
+<p>A read in a test file goes in <code>go.&lt;package&gt;.test</code>, which only the
+package's own test uses: the packages that import it never run its tests.
+An edit to <code>fixtures/order.json</code> re-runs <code>go.internal.orders</code> and no other
+test. A read in a non-test file goes in <code>go.&lt;package&gt;</code>, which the tests
+of the packages that import it use too, since they run that code: an edit
+to what <code>orders.go</code> reads re-runs <code>go.internal.orders</code> and every test that
+reaches it.</p>
 <ul>
 <li>Reads: <code>os.ReadFile</code>, <code>Open</code>, <code>OpenFile</code>, <code>ReadDir</code>, <code>Stat</code>, <code>Lstat</code>,
   <code>Readlink</code>, <code>DirFS</code>, <code>OpenRoot</code> and <code>OpenInRoot</code>; <code>ioutil.ReadFile</code> and
@@ -2733,8 +2746,10 @@ tests of the packages that import it, and no other test.</p>
   <code>contract.Load("../../examples/shop.yaml")</code> puts
   <code>examples/shop.yaml</code> in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. For a value it cannot resolve, it adds
   the directory a literal with a <code>..</code> segment names
-  (<code>fmt.Sprintf("../fixtures/%s.json", name)</code> adds <code>fixtures/**</code>). These
-  never fail.</li>
+  (<code>fmt.Sprintf("../fixtures/%s.json", name)</code> adds <code>fixtures/**</code>). A
+  bare <code>.</code>, <code>..</code>, <code>./</code> or <code>../</code> is data there, such as an invalid name in
+  a table row, and adds nothing; passed to one of the reads above
+  (<code>os.ReadDir("..")</code>) it adds the directory. These never fail.</li>
 <li>After a <code>Chdir</code>, a relative read of the package resolves against the
   package directory and against every directory its <code>Chdir</code> targets
   reach, in any order; a candidate outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root fails.</li>
@@ -2792,8 +2807,9 @@ nothing written):</p>
   (<code>/proc/self/cgroup</code>).</li>
 </ul>
 <p>A package that <code>--no-test</code> matches gets no test, so a read of its test
-files does not fail; what resolves is still added to its fragment, which
-other tests use. A read of its non-test files, and a <code>Chdir</code> in any of
+files does not fail; what resolves is still added to its fragment
+<code>go.&lt;package&gt;</code>, not to a <code>.test</code> one, so a hand-written test that <code>use</code>s
+it and runs the package's tests keeps those files in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. A read of its non-test files, and a <code>Chdir</code> in any of
 its files, fails as above.</p>
 <p><code>--go-allow-dynamic &lt;pattern&gt;</code> (repeatable, a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> glob over package
 IDs such as <code>tests/**</code>) turns those errors off for the packages it
@@ -2819,6 +2835,8 @@ against its own); a slice or map literal that a function it is passed
 to changes; a path that climbs without a <code>..</code> in any literal
 (<code>"." + "./x"</code>, <code>strings.TrimPrefix("x../../y", "x")</code>); a <code>..</code> added
 after a temporary directory that climbs back into the repository; a
+bare <code>..</code> or <code>../</code> a test passes to a function other than the reads
+above, which reads the parent directory with it; a
 <code>Chdir</code> the tests run more than once in a row (<code>os.Chdir("..")</code> in a
 loop); and files read through other APIs from a path that is not a
 literal of the test, such as <code>exec.Command</code>, <code>tls.LoadX509KeyPair</code>,
