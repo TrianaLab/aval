@@ -107,8 +107,7 @@ assertions go in Go, not in shell. Target: 100% statement coverage outside
 
 - Repo `TrianaLab/aval`, project https://github.com/orgs/TrianaLab/projects/4
   (fields: Status, Priority P0-P2, Phase). Initiative is issue #1; epics are
-  sub-issues of it, stories are sub-issues of epics. Epic 6 stories live in
-  `TrianaLab/pacto`.
+  sub-issues of it, stories are sub-issues of epics.
 - `TODO(milestone-N)` marks deferred work and must name the roadmap milestone.
 - GitHub writes use the `edu-diaz` account (`gh auth switch -u edu-diaz`), then
   switch back to the previously active account. Unattended runs
