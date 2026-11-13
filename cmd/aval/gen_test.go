@@ -352,6 +352,26 @@ func TestGenGoWrites(t *testing.T) {
 	}
 }
 
+// --no-test reaches the adapter: a read the tests of an excluded package
+// make cannot fail, since no test of that package is written.
+func TestGenGoNoTestRead(t *testing.T) {
+	const fixture = "../../internal/gen/golang/testdata/shop"
+	dir := filepath.Join(t.TempDir(), "shop")
+	if err := os.CopyFS(dir, os.DirFS(fixture)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "web/dynamic_test.go"), []byte("package web\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestDynamic(t *testing.T) {\n\t_, _ = os.ReadFile(os.Getenv(\"F\"))\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "aval.yaml")
+	if code, _, errOut := runCLI("gen", "go", "-f", file); code != ExitError || !strings.Contains(errOut, "web/dynamic_test.go:9") {
+		t.Fatalf("without --no-test: exit %d, stderr %q", code, errOut)
+	}
+	if code, _, errOut := runCLI("gen", "go", "-f", file, "--no-test", "web"); code != ExitOK {
+		t.Fatalf("--no-test web: exit %d, stderr %q", code, errOut)
+	}
+}
+
 // aval gen dotnet fails closed: an unreadable project file exits 1 and
 // leaves the TestSet as it was.
 func TestGenDotnet(t *testing.T) {

@@ -77,6 +77,13 @@ type Adapter interface {
 	Units(root string) ([]Unit, error)
 }
 
+// TestSkipper is an Adapter that is told, before Units, the aval gen
+// --no-test patterns: a unit they match gets no test, so the adapter need
+// not fail on what only that unit's tests do.
+type TestSkipper interface {
+	SkipTests(patterns []string)
+}
+
 // SharedName is the name, after "<lang>.", of the fragment a Sharer emits.
 const SharedName = "module"
 

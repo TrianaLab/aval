@@ -48,6 +48,7 @@ fragments:
   go.internal.orders:
     scope:
       source:
+        - fixtures/order.json
         - internal/orders/*.go
         - internal/orders/testdata/**
   go.internal.testutil:
@@ -78,6 +79,7 @@ fragments:
   go.web:
     scope:
       source:
+        - fixtures/pages/**
         - web/**
         - web/*.go
         - web/static/index.html

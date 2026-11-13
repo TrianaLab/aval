@@ -155,7 +155,151 @@ works. Each package is one unit:
   any `.go` file, test files and files under any build tag included. The
   standard library and external modules are not units: `go.module` covers
   them through `go.mod` and `go.sum`.
+- Its files also include what its code and tests read at run time by a
+  path `aval gen go` can resolve, such as `../../fixtures/order.json`
+  ([below](#files-a-package-reads)).
 - Its test is `go test ./<dir>` and `use`s `go.module`.
+
+### Files a package reads
+
+Tests often read files outside their package. `aval gen go` finds the
+reads in every `.go` file of a package, tests included, and adds their
+files to the package's fragment:
+
+```go
+// internal/orders/orders_test.go
+const fixtures = "../../fixtures"
+
+func TestFixture(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(fixtures, "order.json"))
+	// ...
+}
+```
+
+```yaml
+fragments:
+  go.internal.orders:
+    scope:
+      source:
+        - fixtures/order.json
+        - internal/orders/*.go
+```
+
+An edit to `fixtures/order.json` re-runs `go.internal.orders` and the
+tests of the packages that import it, and no other test.
+
+- Reads: `os.ReadFile`, `Open`, `OpenFile`, `ReadDir`, `Stat`, `Lstat`,
+  `Readlink`, `DirFS`, `OpenRoot` and `OpenInRoot`; `ioutil.ReadFile` and
+  `ReadDir`; `filepath.Walk`, `WalkDir` and `Glob`; the `html/template`
+  and `text/template` functions and `Template` methods `ParseFiles`
+  (every argument) and `ParseGlob`; `http.Dir`; and `os.Chdir`, `syscall.Chdir`,
+  `unix.Chdir`, `t.Chdir` and an open file's `Chdir`, since later
+  relative reads land under that directory (going back to the directory
+  `os.Getwd` returned is not a read). Dot imports count.
+- Paths passed to other functions: in a test file, every argument of a
+  call (to any function, of another package too), every element of a
+  composite literal (table rows) and every value assigned with `=` (a
+  field set after construction, such as `s.dir = "../fixtures"` in a
+  suite's setup method) that names a file or directory of the contract
+  root outside the package directory adds it (a pattern adds the
+  directory before its first wildcard), so
+  `contract.Load("../../examples/shop.yaml")` puts
+  `examples/shop.yaml` in scope. For a value it cannot resolve, it adds
+  the directory a literal with a `..` segment names
+  (`fmt.Sprintf("../fixtures/%s.json", name)` adds `fixtures/**`). These
+  never fail.
+- After a `Chdir`, a relative read of the package resolves against the
+  package directory and against every directory its `Chdir` targets
+  reach, in any order; a candidate outside the contract root fails.
+- Paths it resolves: string literals and constants, `+`, `filepath` and
+  `path` `Join`, `Clean`, `Dir`, `Abs`, `FromSlash` and `ToSlash`, every
+  value assigned to a variable of the package, ranges over slice and map
+  literals, fields of struct literals (table tests) and of what a function
+  of the package returns, results and parameters of the package's own
+  functions and methods (from every call in the package), function
+  literals called directly, through a variable or a table field,
+  constants, variables and function results of the other packages of the
+  main modules, a directory entry's `Name()` (any file of the directory
+  `ReadDir` read), and the source file `runtime.Caller(0)` returns.
+- A path is relative to the package directory, where `go test` runs. A
+  file becomes its own glob, a directory `<dir>/**` (for `Glob`, the
+  directory before the first wildcard). A path that does not exist adds
+  nothing; once it exists, `--check` reports the drift.
+- A path under a temporary directory is not a file of the repository:
+  one built on `t.TempDir()`, `b.TempDir()`, `os.TempDir()`,
+  `os.MkdirTemp` or the `Name()` of an `os.CreateTemp` file, through
+  variables, struct fields, helpers of the package or of another one,
+  even with a `..` after it. Neither is the name of a test (`t.Name()`),
+  a match of `filepath.Glob` (its directory is the read) or a parameter
+  of a function whose callers it cannot see, such as a closure handed to
+  other code: what those callers pass is checked where they are.
+
+A read in a non-test file reads what its callers pass, so only paths
+built from literals and constants there count: they are added like a
+test's, and one outside the contract root fails. A read of a parameter,
+a field or anything else it cannot resolve does not fail and adds
+nothing; only the literals the calling test passes are checked. When such a path is a `Join` whose
+leading parts are known, the directory they name is added
+(`filepath.Join(root, "fixtures", name)` with `root` from
+`runtime.Caller(0)` adds `fixtures/**`).
+
+A read in a test file fails closed, naming the file and line (exit 1,
+nothing written):
+
+- when its path cannot be resolved and may leave the package directory:
+  one built from `os.Getwd`, `os.Executable`, an environment variable
+  (`os.Getenv`, `LookupEnv`, `ExpandEnv`) or `runtime.Caller` with
+  another depth, or from a literal with a `..` segment that names a file
+  or directory of the contract root outside the package
+  (`filepath.Join(root, name)` with `root` from `"../.."`), also through
+  the directory a template names (`fmt.Sprintf("../fixtures/%s.json",
+  name)`). Paths it cannot follow count as built from anywhere: a read
+  function itself used as a value (`var readFile = os.ReadFile`, other
+  than assigned to `_`); a variable written through a pointer; a call to
+  a method of another package or to a function value it cannot trace; a
+  function of another package that is not of the main modules (other
+  than `strings`, `fmt`, `strconv`, `path` and `filepath`, which keep what
+  their arguments may climb to); a value too large to follow; and a
+  `Chdir` to a directory it cannot resolve, such as an open file's; a
+  channel receive or a type assertion;
+- when its path is outside the contract root, absolute ones included
+  (`/proc/self/cgroup`).
+
+A package that `--no-test` matches gets no test, so a read of its test
+files does not fail; what resolves is still added to its fragment, which
+other tests use. A read of its non-test files, and a `Chdir` in any of
+its files, fails as above.
+
+`--go-allow-dynamic <pattern>` (repeatable, a contract glob over package
+IDs such as `tests/**`) turns those errors off for the packages it
+matches; files it resolves are still added. Declare the rest by hand:
+in `defaults`, which every test inherits, or with `--no-test` for the
+package and a hand-written test that `use`s its `go.*` fragments and a
+fragment of your own. A pattern that matches no package fails, and
+`--check` needs the same flags.
+
+It does not see, so declare by hand: in a non-test file, a path built
+from a root it computes from `os.Getwd`, `os.Executable` or the
+environment, such as a test helper that walks up to `go.mod` and joins
+`fixtures/<name>`; a field it reads through a
+receiver or parameter whose value comes from something other than a
+literal assigned in a test file (`func (s *suite) read() { os.ReadFile(s.dir) }`
+with `s.dir` set from a computed path); in a non-test file, a path from
+a field of a method's receiver, such as `l.Load(name)` reading
+`filepath.Join(l.Dir, name)` with `Dir` set by a constructor; a path a test computes from the
+working directory, the executable, the environment or `runtime.Caller`
+and passes to a function that reads it (the read fails only where it is
+in a test file); a relative literal in a non-test file read by another
+package's test, which runs in that package's directory (it is resolved
+against its own); a slice or map literal that a function it is passed
+to changes; a path that climbs without a `..` in any literal
+(`"." + "./x"`, `strings.TrimPrefix("x../../y", "x")`); a `..` added
+after a temporary directory that climbs back into the repository; a
+`Chdir` the tests run more than once in a row (`os.Chdir("..")` in a
+loop); and files read through other APIs from a path that is not a
+literal of the test, such as `exec.Command`, `tls.LoadX509KeyPair`,
+`http.ServeFile`, the `ParseFiles` method of a template, or any other
+function, standard library included, that opens a path of its own.
 
 ### The go.module fragment
 

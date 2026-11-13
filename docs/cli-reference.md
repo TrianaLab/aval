@@ -146,7 +146,10 @@ go.internal.contract). A change to a unit then re-runs its test and the
 tests of the units that depend on it. gen go also writes the fragment
 go.module, which every go.* test uses: the toolchain version from go.mod or
 go.work with a probe, go.mod, go.sum, go.work and go.work.sum, and the Go
-build environment.
+build environment. A package's fragment also holds the files its code and
+tests read by a path gen can resolve (os.ReadFile("../../x")); a read
+it cannot resolve that may leave the package directory fails, unless
+--go-allow-dynamic PATTERN matches the package.
 
 gen owns only the fragments and tests whose names start with "LANGUAGE.";
 every other line, comments included, is kept as it is. Other shared inputs
@@ -180,13 +183,14 @@ Examples:
   aval gen <language> --check
 
 Flags:
-      --check[=true|false]            write nothing; exit 1 with a diff when the generated entries are out of date
-  -f, --file string                   the kind: TestSet to write (default "aval.yaml")
-      --go-cover[=true|false]         go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)
-  -h, --help[=true|false]             help for gen
-      --list-tests[=true|false]       write nothing; print the IDs of the units that get a test, one per line
-      --no-test stringArray           write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)
-      --strict-imports[=true|false]   python: fail on an import_module or __import__ call whose module is not a string literal
+      --check[=true|false]             write nothing; exit 1 with a diff when the generated entries are out of date
+  -f, --file string                    the kind: TestSet to write (default "aval.yaml")
+      --go-allow-dynamic stringArray   go: in the packages whose ID matches this contract glob (repeatable), a file read whose path cannot be resolved inside the contract root is not an error; declare those files by hand
+      --go-cover[=true|false]          go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)
+  -h, --help[=true|false]              help for gen
+      --list-tests[=true|false]        write nothing; print the IDs of the units that get a test, one per line
+      --no-test stringArray            write no test for the units whose ID matches this contract glob; their fragment stays for the tests that use it (repeatable)
+      --strict-imports[=true|false]    python: fail on an import_module or __import__ call whose module is not a string literal
 
 Global Flags:
       --plain[=true|false]   plain aval run output even on a terminal, as in CI (also $AVAL_OUTPUT=plain or TERM=dumb)

@@ -137,6 +137,12 @@ func TestFalseHitTransitive(t *testing.T) {
 		{"web/static/index.html", "go.internal.orders", false},    // unrelated
 		{"web/web.go", "go.shop", false},                          // unrelated
 		{"internal/orders/orders.go", "go.internal.money", false}, // a dependent, not a dependency
+		{"fixtures/order.json", "go.internal.orders", true},       // read by a test through ../../fixtures
+		{"fixtures/order.json", "go.shop", true},                  // a dependent of orders
+		{"fixtures/order.json", "go.internal.money", false},       // a dependency of orders
+		{"fixtures/order.json", "go.web", false},                  // unrelated
+		{"fixtures/pages/home.html", "go.web", true},              // under a directory a test reads
+		{"fixtures/pages/home.html", "go.internal.orders", false}, // unrelated
 	} {
 		before := digest(t, set, root, tc.test)
 		file := filepath.Join(root, filepath.FromSlash(tc.file))
@@ -146,6 +152,259 @@ func TestFalseHitTransitive(t *testing.T) {
 			t.Errorf("%s changed: fingerprint of %s changed = %v, want %v", tc.file, tc.test, changed, tc.changes)
 		}
 		write(t, file, string(old))
+	}
+}
+
+// A file added later under a directory a test reads is in scope without
+// regenerating.
+func TestFalseHitNewFileInReadDirectory(t *testing.T) {
+	root := shop(t)
+	set := generate(t, &Adapter{}, root)
+	before := digest(t, set, root, "go.web")
+	write(t, filepath.Join(root, "fixtures/pages/new.html"), "<p>new</p>\n")
+	if digest(t, set, root, "go.web") == before {
+		t.Error("fixtures/pages/new.html added but the fingerprint of go.web did not change")
+	}
+}
+
+// A read the adapter cannot resolve, that may leave the package directory,
+// fails closed and names the file, the line and the escape hatch;
+// --go-allow-dynamic accepts it, and a pattern that matches no package is
+// an error.
+func TestDynamicRead(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/dynamic_test.go"), "package web\n\nimport (\n\t\"os\"\n\t\"path/filepath\"\n\t\"testing\"\n)\n\nfunc TestDynamic(t *testing.T) {\n\tname := t.Name()\n\t_, _ = os.ReadFile(filepath.Join(\"../fixtures\", name))\n}\n")
+	_, err := (&Adapter{}).Units(root)
+	if want := "package example.com/shop/web: web/dynamic_test.go:11: os.ReadFile reads a path that it cannot resolve and that may leave the package directory; declare what it reads by hand and pass --go-allow-dynamic web"; err == nil || err.Error() != want {
+		t.Fatalf("a dynamic read: %v\nwant %s", err, want)
+	}
+	a := &Adapter{}
+	fs := pflag.NewFlagSet("go", pflag.ContinueOnError)
+	a.Flags(fs)
+	if err := fs.Parse([]string{"--go-allow-dynamic", "w*"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Units(root); err != nil {
+		t.Errorf("--go-allow-dynamic w*: %v", err)
+	}
+	for _, tc := range []struct{ pattern, want string }{
+		{"nope/**", "--go-allow-dynamic nope/**: matches no package"},
+		{"/abs", "--go-allow-dynamic: "},
+	} {
+		if _, err := (&Adapter{AllowDynamic: []string{tc.pattern}}).Units(root); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("--go-allow-dynamic %s: %v, want %q", tc.pattern, err, tc.want)
+		}
+	}
+}
+
+// A unit --no-test matches gets no test: a read of its test files that
+// cannot be resolved is not an error, and what resolves is still added. A
+// read of a non-test file still fails, and so does the same read in a unit
+// that gets a test.
+func TestNoTestReads(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/dynamic_test.go"), "package web\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestDynamic(t *testing.T) {\n\t_, _ = os.ReadFile(os.Getenv(\"F\"))\n\t_, _ = os.ReadFile(\"../fixtures/order.json\")\n}\n")
+	if _, err := (&Adapter{NoTest: []string{"internal/**"}}).Units(root); err == nil || !strings.Contains(err.Error(), "web/dynamic_test.go:9") {
+		t.Fatalf("a unit with a test: %v", err)
+	}
+	a := &Adapter{}
+	a.SkipTests([]string{"w*"})
+	units, err := a.Units(root)
+	if err != nil {
+		t.Fatalf("--no-test w*: %v", err)
+	}
+	for _, u := range units {
+		if u.ID == "web" && !slices.Contains(u.Source, "fixtures/order.json") {
+			t.Errorf("web: %q, want fixtures/order.json", u.Source)
+		}
+	}
+	write(t, filepath.Join(root, "web/abs.go"), "package web\n\nimport \"os\"\n\nfunc abs() { _, _ = os.ReadFile(\"/etc/hosts\") }\n")
+	if _, err := a.Units(root); err == nil || !strings.Contains(err.Error(), "web/abs.go:5") {
+		t.Errorf("a non-test file of a unit without a test: %v", err)
+	}
+	if err := os.Remove(filepath.Join(root, "web/abs.go")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(root, "web/chdir_test.go"), "package web\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestChdir(t *testing.T) {\n\t_ = os.Chdir(os.Getenv(\"D\"))\n}\n")
+	if _, err := a.Units(root); err == nil || !strings.Contains(err.Error(), "web/chdir_test.go:9: os.Chdir") {
+		t.Errorf("a Chdir in a test of a unit without a test: %v", err)
+	}
+}
+
+// A read whose path comes from a helper of another package that the
+// adapter cannot follow, a read function used as a value or a Chdir to a
+// computed directory may read fixtures/order.json: each fails
+// closed instead of leaving it out of the scope (a false hit on edit).
+func TestFalseHitUnresolvedRead(t *testing.T) {
+	for _, body := range []string{
+		"_, _ = os.ReadFile(filepath.Join(testutil.Root(), \"fixtures\", \"order.json\"))",
+		"wd, _ := os.Getwd()\n\tt.Chdir(filepath.Dir(wd))\n\t_, _ = os.ReadFile(\"fixtures/order.json\")",
+		"readFile := os.ReadFile\n\t_, _ = readFile(\"../fixtures/order.json\")",
+		"_, _ = (os.ReadFile)(\"x\")\n\tvar open func(string) (*os.File, error) = (os.Open)\n\t_, _ = open(\"../fixtures/order.json\")",
+		"_, _ = os.ReadFile(fmt.Sprintf(\"../fixtures/%s.json\", \"order\"))",
+		"_, _ = os.ReadFile(fmt.Sprintf(\"../%s/order.json\", \"fixtures\"))",
+		"_, _ = os.ReadFile(strings.ReplaceAll(\"../fixtures/NAME.json\", \"NAME\", \"order\"))",
+		"_ = syscall.Chdir(os.Getenv(\"D\"))\n\t_, _ = os.ReadFile(\"fixtures/order.json\")",
+		"f, _ := os.Open(\"static\")\n\t_ = f.Chdir()\n\t_, _ = os.ReadFile(\"../../fixtures/order.json\")",
+	} {
+		root := shop(t)
+		write(t, filepath.Join(root, "web/unresolved_test.go"), "package web\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\t\"path/filepath\"\n\t\"strings\"\n\t\"syscall\"\n\t\"testing\"\n\n\t\"example.com/shop/internal/testutil\"\n)\n\nvar _ = filepath.Join\nvar _ = fmt.Sprint\nvar _ = strings.Cut\nvar _ = syscall.Chdir\nvar _ = testutil.Equal\n\nfunc TestUnresolved(t *testing.T) {\n\t"+body+"\n}\n")
+		if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "web/unresolved_test.go:") || !strings.Contains(err.Error(), "cannot resolve") {
+			t.Errorf("%s: %v, want an error naming web/unresolved_test.go", body, err)
+		}
+	}
+}
+
+// A path a test passes to a function that reads it, of the package, of
+// another package (contract.Load("../../examples/x.yaml")) or a closure,
+// also through a table row, is in the scope of the test's unit: an edit to
+// the file re-runs it. The function's own read of its parameter is not an
+// error.
+func TestFalseHitPassedPath(t *testing.T) {
+	for _, body := range []string{
+		"read := func(p string) { _, _ = os.ReadFile(p) }\n\tread(\"../fixtures/order.json\")",
+		"_ = testutil.Load(t, \"../fixtures/order.json\")",
+		"_ = testutil.Load(t, filepath.Join(\"..\", \"fixtures\", \"order.json\"))",
+		"for _, tc := range []struct{ file string }{{file: \"../fixtures/order.json\"}} {\n\t\t_ = testutil.Load(t, tc.file)\n\t}",
+		"_ = testutil.Load(t, fmt.Sprintf(\"../fixtures/%s.json\", t.Name()))", // the directory a template names
+		"_ = fx.Fixture(\"order.json\")",                                       // a runtime.Caller(0)-anchored helper of another package
+	} {
+		readsOrder(t, "package web\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"example.com/shop/internal/fx\"\n\t\"example.com/shop/internal/testutil\"\n)\n\nvar _ = filepath.Join\nvar _ = fmt.Sprint\nvar _ = os.ReadFile\nvar _ = fx.Fixture\n\nfunc TestPassed(t *testing.T) {\n\t"+body+"\n}\n")
+	}
+}
+
+// readsOrder writes src as web/passed_test.go of the shop, with a helper
+// package internal/fx, and checks that an edit to fixtures/order.json
+// changes the fingerprint of go.web.
+func readsOrder(t *testing.T, src string) {
+	t.Helper()
+	root := shop(t)
+	write(t, filepath.Join(root, "web/passed_test.go"), src)
+	write(t, filepath.Join(root, "internal/fx/fx.go"), `package fx
+
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+)
+
+// Fixture reads fixtures/<name> of the repository.
+func Fixture(name string) []byte {
+	_, file, _, _ := runtime.Caller(0)
+	b, _ := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "fixtures", name))
+	return b
+}
+`)
+	set := generate(t, &Adapter{}, root)
+	before := digest(t, set, root, "go.web")
+	write(t, filepath.Join(root, "fixtures/order.json"), "{\"changed\": true}\n")
+	if digest(t, set, root, "go.web") == before {
+		t.Errorf("fixtures/order.json changed but the fingerprint of go.web did not:\n%s", src)
+	}
+}
+
+// A field a method of a test type (a suite) sets after construction, read
+// by another method, and the Template methods ParseGlob and ParseFiles,
+// put what they name in scope.
+func TestFalseHitSuiteAndTemplates(t *testing.T) {
+	readsOrder(t, `package web
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+type suite struct {
+	t   *testing.T
+	dir string
+}
+
+func (s *suite) setup() { s.dir = "../fixtures" }
+
+func (s *suite) testOrder() { _, _ = os.ReadFile(filepath.Join(s.dir, "order.json")) }
+
+func TestSuite(t *testing.T) {
+	s := &suite{t: t}
+	s.setup()
+	s.testOrder()
+}
+`)
+	for _, call := range []string{`ParseGlob("../fixtures/*.json")`, `ParseFiles("../fixtures/order.json")`} {
+		readsOrder(t, "package web\n\nimport (\n\t\"testing\"\n\t\"text/template\"\n)\n\nfunc TestTemplates(t *testing.T) {\n\t_, _ = template.New(\"x\").Funcs(template.FuncMap{})."+call+"\n}\n")
+	}
+}
+
+// A path under a temporary directory, through a struct field, a helper of
+// the package or of another package, or a ".." after it, is not a file of
+// the repository: no error.
+func TestTempPaths(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/temp_test.go"), `package web
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"example.com/shop/internal/testutil"
+)
+
+type env struct{ dir string }
+
+func newEnv(t *testing.T) *env { return &env{dir: t.TempDir()} }
+
+func scratch(t *testing.T) string { return filepath.Join(t.TempDir(), "x") }
+
+func TestTemp(t *testing.T) {
+	e := newEnv(t)
+	_, _ = os.Stat(filepath.Join(e.dir, "..", "evil"))
+	_, _ = os.ReadFile(scratch(t) + "/../y")
+	_, _ = os.ReadDir(testutil.TempDir(t))
+	f := env{dir: t.TempDir()}
+	_, _ = os.ReadFile(filepath.Join(f.dir, "a"))
+}
+`)
+	if _, err := (&Adapter{}).Units(root); err != nil {
+		t.Errorf("temporary paths: %v", err)
+	}
+}
+
+// externs follows only packages of the main modules with a non-test file of
+// their own package, each built once.
+func TestExterns(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "a/a.go"), "package a\n\nconst X = \"x\"\n")
+	write(t, filepath.Join(root, "a/gen.go"), "//go:build ignore\n\npackage main\n")
+	write(t, filepath.Join(root, "b/b_test.go"), "package b\n")
+	ext := externs(root, []pkg{
+		{ImportPath: "m/a", Dir: "a", Name: "a", GoFiles: []string{"a.go"}, IgnoredGoFiles: []string{"gen.go"}},
+		{ImportPath: "m/b", Dir: "b", Name: "b", IgnoredGoFiles: []string{"b_test.go"}},
+	})
+	a := ext("m/a")
+	if a == nil || !a.foreign || a.names["X"] == nil || ext("m/a") != a {
+		t.Errorf("m/a: %+v", a)
+	}
+	if ext("m/b") != nil || ext("m/c") != nil {
+		t.Error("a package without a non-test file, or of no main module, is followed")
+	}
+}
+
+// A dot-imported Chdir moves later relative reads like os.Chdir does.
+func TestFalseHitDotImportChdir(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/dot_test.go"), "package web\n\nimport (\n\t. \"os\"\n\t\"testing\"\n)\n\nfunc TestDot(t *testing.T) {\n\t_ = Chdir(Getenv(\"D\"))\n}\n")
+	if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "web/dot_test.go:9: os.Chdir") {
+		t.Errorf("err = %v, want an error naming web/dot_test.go:9", err)
+	}
+}
+
+// A dot-imported syscall.Chdir counts too.
+func TestFalseHitDotImportSyscallChdir(t *testing.T) {
+	root := shop(t)
+	write(t, filepath.Join(root, "web/dotsys_test.go"), "package web\n\nimport (\n\t\"os\"\n\t. \"syscall\"\n\t\"testing\"\n)\n\nfunc TestDotSys(t *testing.T) {\n\t_ = Chdir(os.Getenv(\"D\"))\n}\n")
+	if _, err := (&Adapter{}).Units(root); err == nil || !strings.Contains(err.Error(), "web/dotsys_test.go:10: syscall.Chdir") {
+		t.Errorf("err = %v, want an error naming web/dotsys_test.go:10 and syscall.Chdir", err)
 	}
 }
 
@@ -255,8 +514,11 @@ func TestErrors(t *testing.T) {
 func TestParseError(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.go"), "package a\n\nimport (\n")
-	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"a.go"}}, nil, nil); err == nil || !strings.Contains(err.Error(), "a.go:3:10") {
+	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"a.go"}}, nil, nil, false, false, nil); err == nil || !strings.Contains(err.Error(), "a.go:3:10") {
 		t.Errorf("a file that does not parse: %v", err)
+	}
+	if _, err := (&Adapter{}).unit(dir, pkg{Dir: ".", GoFiles: []string{"gone.go"}}, nil, nil, false, false, nil); err == nil || !strings.Contains(err.Error(), "gone.go") {
+		t.Errorf("a file that cannot be read: %v", err)
 	}
 }
 

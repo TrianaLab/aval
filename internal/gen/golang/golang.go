@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"io"
@@ -23,6 +24,7 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/mod/modfile"
 
+	"github.com/TrianaLab/aval/internal/contract"
 	"github.com/TrianaLab/aval/internal/gen"
 )
 
@@ -31,11 +33,22 @@ type Adapter struct {
 	// Cover makes each unit's test fail below 100% statement coverage of
 	// its own package. The command then needs a POSIX sh, mktemp and awk.
 	Cover bool
+	// AllowDynamic are contract globs over unit IDs: in the packages they
+	// match, a read the adapter cannot resolve inside the contract root is
+	// not an error. Their authors declare those files by hand.
+	AllowDynamic []string
+	// NoTest are the aval gen --no-test patterns (see SkipTests): a unit
+	// they match gets no test, so a read of its test files is not an error.
+	NoTest []string
 }
+
+// SkipTests implements gen.TestSkipper.
+func (a *Adapter) SkipTests(patterns []string) { a.NoTest = patterns }
 
 // Flags registers the adapter's options as aval gen flags.
 func (a *Adapter) Flags(fs *pflag.FlagSet) {
 	fs.BoolVar(&a.Cover, "go-cover", false, "go: each test fails below 100% statement coverage of its package (needs sh, mktemp and awk)")
+	fs.StringArrayVar(&a.AllowDynamic, "go-allow-dynamic", nil, "go: in the packages whose ID matches this contract glob (repeatable), a file read whose path cannot be resolved inside the contract root is not an error; declare those files by hand")
 }
 
 // pkg is the part of a go list -json record the adapter reads.
@@ -75,15 +88,86 @@ func (a *Adapter) Units(root string) ([]gen.Unit, error) {
 		ids[p.ImportPath] = id
 		mods = append(mods, p.Module.Path)
 	}
+	allowed, err := a.allowed(ids)
+	if err != nil {
+		return nil, err
+	}
 	units := make([]gen.Unit, 0, len(pkgs))
+	var errs []error // every package's, so one run lists them all
+	ext := externs(root, pkgs)
 	for _, p := range pkgs {
-		u, err := a.unit(root, p, ids, mods)
+		id := ids[p.ImportPath]
+		noTest := slices.ContainsFunc(a.NoTest, func(g string) bool { return contract.Match(g, id) })
+		u, err := a.unit(root, p, ids, mods, allowed[id], noTest, ext)
 		if err != nil {
-			return nil, fmt.Errorf("package %s: %w", p.ImportPath, err)
+			errs = append(errs, fmt.Errorf("package %s: %w", p.ImportPath, err))
 		}
 		units = append(units, u)
 	}
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
 	return units, nil
+}
+
+// externs returns a function that returns the resolver of the non-test
+// files of a package of pkgs by import path, built once, or nil for another
+// package: a test reads what a helper of another package returns too.
+func externs(root string, pkgs []pkg) func(string) *resolver {
+	byPath := map[string]pkg{}
+	for _, p := range pkgs {
+		byPath[p.ImportPath] = p
+	}
+	cache := map[string]*resolver{}
+	var ext func(string) *resolver
+	ext = func(ip string) *resolver {
+		if r, ok := cache[ip]; ok {
+			return r
+		}
+		cache[ip] = nil
+		p, ok := byPath[ip]
+		if !ok {
+			return nil
+		}
+		fset := token.NewFileSet()
+		// A file that does not parse is an error of its own package's unit.
+		files, _ := parseFiles(fset, root, p.Dir, slices.Concat(p.GoFiles, p.CgoFiles, p.IgnoredGoFiles))
+		files = slices.DeleteFunc(files, func(f *ast.File) bool {
+			return f.Name.Name != p.Name || strings.HasSuffix(fset.Position(f.Pos()).Filename, "_test.go")
+		})
+		if len(files) == 0 {
+			return nil
+		}
+		r := newResolver(fset, files, ext)
+		r.foreign = true
+		cache[ip] = r
+		return r
+	}
+	return ext
+}
+
+// allowed returns the unit IDs that a --go-allow-dynamic pattern matches.
+// A pattern that matches none is an error, so a typo or a moved package
+// cannot leave the flag doing nothing.
+func (a *Adapter) allowed(ids map[string]string) (map[string]bool, error) {
+	out := map[string]bool{}
+	var errs []error
+	for _, p := range a.AllowDynamic {
+		if err := contract.ValidateGlob(p); err != nil {
+			errs = append(errs, fmt.Errorf("--go-allow-dynamic: %w", err))
+			continue
+		}
+		matched := false
+		for _, id := range ids {
+			if contract.Match(p, id) {
+				out[id], matched = true, true
+			}
+		}
+		if !matched {
+			errs = append(errs, fmt.Errorf("--go-allow-dynamic %s: matches no package", p))
+		}
+	}
+	return out, errors.Join(errs...)
 }
 
 // list returns the packages of the main modules that go list reports in
@@ -284,28 +368,45 @@ func (p pkg) sources(dir string) ([]string, error) {
 	}
 	// Tests read testdata/ by convention. A glob must match a file, so it is
 	// listed only when testdata holds one.
-	_ = filepath.WalkDir(filepath.Join(dir, "testdata"), func(_ string, d fs.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			glob("testdata/**")
-			return fs.SkipAll
-		}
-		return nil // never an error: a missing or unreadable testdata adds nothing
-	})
+	if hasFile(filepath.Join(dir, "testdata")) {
+		glob("testdata/**")
+	}
 	return out, errors.Join(errs...)
 }
 
+// hasFile reports whether the directory dir holds a file, at any depth. A
+// missing or unreadable directory holds none.
+func hasFile(dir string) bool {
+	found := false
+	_ = filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			found = true
+			return fs.SkipAll
+		}
+		return nil // never an error: what cannot be read adds nothing
+	})
+	return found
+}
+
 // unit builds the unit of p, whose Dir is relative to root.
-func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string) (gen.Unit, error) {
+func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string, allowDynamic, noTest bool, ext func(string) *resolver) (gen.Unit, error) {
 	dir := filepath.Join(root, filepath.FromSlash(p.Dir))
 	src, err := p.sources(dir)
 	if err != nil {
 		return gen.Unit{}, fmt.Errorf("package %s: %w", p.ImportPath, err)
 	}
 	u := gen.Unit{ID: ids[p.ImportPath], Source: src}
-	imports, err := parseImports(dir, slices.Concat(p.GoFiles, p.CgoFiles, p.TestGoFiles, p.XTestGoFiles, p.IgnoredGoFiles))
+	fset := token.NewFileSet()
+	files, err := parseFiles(fset, root, p.Dir, slices.Concat(p.GoFiles, p.CgoFiles, p.TestGoFiles, p.XTestGoFiles, p.IgnoredGoFiles))
 	if err != nil {
 		return u, err
 	}
+	read, err := readScope(root, u.ID, p, reads(fset, files, ext), allowDynamic, noTest)
+	if err != nil {
+		return u, err
+	}
+	u.Source = append(u.Source, read...)
+	imports := importPaths(files)
 	for _, imp := range imports {
 		id, local := ids[imp]
 		switch {
@@ -339,21 +440,34 @@ func embeds(dir string, files []string) bool {
 	})
 }
 
-// parseImports returns the sorted import paths of files in dir: every .go
-// file of the package, test files and files a build constraint excludes
-// included.
-func parseImports(dir string, files []string) ([]string, error) {
-	var out []string
+// parseFiles parses files, in the package directory dir relative to root:
+// every .go file of the package, test files and files a build constraint
+// excludes included. Positions name the files relative to root.
+func parseFiles(fset *token.FileSet, root, dir string, files []string) ([]*ast.File, error) {
+	var out []*ast.File
 	for _, f := range files {
-		ast, err := parser.ParseFile(token.NewFileSet(), filepath.Join(dir, f), nil, parser.ImportsOnly)
+		src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(dir), f))
 		if err != nil {
 			return nil, err
 		}
-		for _, s := range ast.Imports {
+		af, err := parser.ParseFile(fset, path.Join(dir, f), src, parser.SkipObjectResolution)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, af)
+	}
+	return out, nil
+}
+
+// importPaths returns the sorted import paths of files.
+func importPaths(files []*ast.File) []string {
+	var out []string
+	for _, f := range files {
+		for _, s := range f.Imports {
 			p, _ := strconv.Unquote(s.Path.Value) // the parser checked the literal
 			out = append(out, p)
 		}
 	}
 	slices.Sort(out)
-	return slices.Compact(out), nil
+	return slices.Compact(out)
 }
