@@ -1,6 +1,7 @@
 package golang
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -138,9 +139,12 @@ func TestFalseHitTransitive(t *testing.T) {
 		{"web/web.go", "go.shop", false},                          // unrelated
 		{"internal/orders/orders.go", "go.internal.money", false}, // a dependent, not a dependency
 		{"fixtures/order.json", "go.internal.orders", true},       // read by a test through ../../fixtures
-		{"fixtures/order.json", "go.shop", true},                  // a dependent of orders
+		{"fixtures/order.json", "go.shop", false},                 // a dependent of orders, which never runs its tests
 		{"fixtures/order.json", "go.internal.money", false},       // a dependency of orders
 		{"fixtures/order.json", "go.web", false},                  // unrelated
+		{"fixtures/rates.json", "go.internal.orders", true},       // read by the non-test code of orders
+		{"fixtures/rates.json", "go.shop", true},                  // a dependent of orders runs that code
+		{"fixtures/rates.json", "go.internal.money", false},       // a dependency of orders
 		{"fixtures/pages/home.html", "go.web", true},              // under a directory a test reads
 		{"fixtures/pages/home.html", "go.internal.orders", false}, // unrelated
 	} {
@@ -164,6 +168,36 @@ func TestFalseHitNewFileInReadDirectory(t *testing.T) {
 	write(t, filepath.Join(root, "fixtures/pages/new.html"), "<p>new</p>\n")
 	if digest(t, set, root, "go.web") == before {
 		t.Error("fixtures/pages/new.html added but the fingerprint of go.web did not change")
+	}
+}
+
+// A bare ".." in a table row or argument of a test is data, not a path,
+// and adds nothing; a read call of it still adds the parent directory, to
+// the package's test fragment only.
+func TestBareDotLiteral(t *testing.T) {
+	root := shop(t)
+	src := "package web\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc parse(s string) error { return nil }\n\nfunc TestBare(t *testing.T) {\n\tfor _, ref := range []string{\"..\", \"../\", \".\"} {\n\t\t_ = parse(ref)\n\t}\n\t_ = parse(\"..\")\n\t%s\n}\n"
+	unit := func() gen.Unit {
+		t.Helper()
+		units, err := (&Adapter{}).Units(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, u := range units {
+			if u.ID == "web" {
+				return u
+			}
+		}
+		t.Fatal("no unit web")
+		return gen.Unit{}
+	}
+	write(t, filepath.Join(root, "web/bare_test.go"), fmt.Sprintf(src, ""))
+	if u := unit(); slices.Contains(u.Source, "**") || slices.Contains(u.TestSource, "**") {
+		t.Errorf("a bare \"..\" literal added the parent: %q, %q", u.Source, u.TestSource)
+	}
+	write(t, filepath.Join(root, "web/bare_test.go"), fmt.Sprintf(src, "_, _ = os.ReadDir(\"..\")"))
+	if u := unit(); slices.Contains(u.Source, "**") || !slices.Contains(u.TestSource, "**") {
+		t.Errorf("os.ReadDir(\"..\"): %q, test %q; want ** in the test fragment only", u.Source, u.TestSource)
 	}
 }
 

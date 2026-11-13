@@ -155,16 +155,21 @@ works. Each package is one unit:
   any `.go` file, test files and files under any build tag included. The
   standard library and external modules are not units: `go.module` covers
   them through `go.mod` and `go.sum`.
-- Its files also include what its code and tests read at run time by a
-  path `aval gen go` can resolve, such as `../../fixtures/order.json`
+- Its files also include what its non-test code reads at run time by a
+  path `aval gen go` can resolve. What its test files read, such as
+  `../../fixtures/order.json`, goes in a second fragment,
+  `go.<package>.test`, that only its own test uses
   ([below](#files-a-package-reads)).
+- A package whose name plus `.test` is another package's name (`a` and
+  `a/test`, once `a`'s tests read a file) is an error, like any two units
+  with the same name.
 - Its test is `go test ./<dir>` and `use`s `go.module`.
 
 ### Files a package reads
 
 Tests often read files outside their package. `aval gen go` finds the
 reads in every `.go` file of a package, tests included, and adds their
-files to the package's fragment:
+files to the package's scope:
 
 ```go
 // internal/orders/orders_test.go
@@ -181,12 +186,20 @@ fragments:
   go.internal.orders:
     scope:
       source:
-        - fixtures/order.json
         - internal/orders/*.go
+  go.internal.orders.test:
+    scope:
+      source:
+        - fixtures/order.json
 ```
 
-An edit to `fixtures/order.json` re-runs `go.internal.orders` and the
-tests of the packages that import it, and no other test.
+A read in a test file goes in `go.<package>.test`, which only the
+package's own test uses: the packages that import it never run its tests.
+An edit to `fixtures/order.json` re-runs `go.internal.orders` and no other
+test. A read in a non-test file goes in `go.<package>`, which the tests
+of the packages that import it use too, since they run that code: an edit
+to what `orders.go` reads re-runs `go.internal.orders` and every test that
+reaches it.
 
 - Reads: `os.ReadFile`, `Open`, `OpenFile`, `ReadDir`, `Stat`, `Lstat`,
   `Readlink`, `DirFS`, `OpenRoot` and `OpenInRoot`; `ioutil.ReadFile` and
@@ -206,8 +219,10 @@ tests of the packages that import it, and no other test.
   `contract.Load("../../examples/shop.yaml")` puts
   `examples/shop.yaml` in scope. For a value it cannot resolve, it adds
   the directory a literal with a `..` segment names
-  (`fmt.Sprintf("../fixtures/%s.json", name)` adds `fixtures/**`). These
-  never fail.
+  (`fmt.Sprintf("../fixtures/%s.json", name)` adds `fixtures/**`). A
+  bare `.`, `..`, `./` or `../` is data there, such as an invalid name in
+  a table row, and adds nothing; passed to one of the reads above
+  (`os.ReadDir("..")`) it adds the directory. These never fail.
 - After a `Chdir`, a relative read of the package resolves against the
   package directory and against every directory its `Chdir` targets
   reach, in any order; a candidate outside the contract root fails.
@@ -266,8 +281,9 @@ nothing written):
   (`/proc/self/cgroup`).
 
 A package that `--no-test` matches gets no test, so a read of its test
-files does not fail; what resolves is still added to its fragment, which
-other tests use. A read of its non-test files, and a `Chdir` in any of
+files does not fail; what resolves is still added to its fragment
+`go.<package>`, not to a `.test` one, so a hand-written test that `use`s
+it and runs the package's tests keeps those files in scope. A read of its non-test files, and a `Chdir` in any of
 its files, fails as above.
 
 `--go-allow-dynamic <pattern>` (repeatable, a contract glob over package
@@ -295,6 +311,8 @@ against its own); a slice or map literal that a function it is passed
 to changes; a path that climbs without a `..` in any literal
 (`"." + "./x"`, `strings.TrimPrefix("x../../y", "x")`); a `..` added
 after a temporary directory that climbs back into the repository; a
+bare `..` or `../` a test passes to a function other than the reads
+above, which reads the parent directory with it; a
 `Chdir` the tests run more than once in a row (`os.Chdir("..")` in a
 loop); and files read through other APIs from a path that is not a
 literal of the test, such as `exec.Command`, `tls.LoadX509KeyPair`,

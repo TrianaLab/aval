@@ -146,8 +146,9 @@ go.internal.contract). A change to a unit then re-runs its test and the
 tests of the units that depend on it. gen go also writes the fragment
 go.module, which every go.* test uses: the toolchain version from go.mod or
 go.work with a probe, go.mod, go.sum, go.work and go.work.sum, and the Go
-build environment. A package's fragment also holds the files its code and
-tests read by a path gen can resolve (os.ReadFile("../../x")); a read
+build environment. A package's fragment also holds the files its non-test
+code reads by a path gen can resolve (os.ReadFile("../../x")); what its
+test files read goes in go.UNIT.test, which only its own test uses. A read
 it cannot resolve that may leave the package directory fails, unless
 --go-allow-dynamic PATTERN matches the package.
 

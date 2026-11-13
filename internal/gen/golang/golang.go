@@ -401,11 +401,18 @@ func (a *Adapter) unit(root string, p pkg, ids map[string]string, mods []string,
 	if err != nil {
 		return u, err
 	}
-	read, err := readScope(root, u.ID, p, reads(fset, files, ext), allowDynamic, noTest)
+	read, test, err := readScope(root, u.ID, p, reads(fset, files, ext), allowDynamic, noTest)
 	if err != nil {
 		return u, err
 	}
 	u.Source = append(u.Source, read...)
+	if noTest {
+		// ponytail: no generated test runs them, but a hand-written test
+		// that uses the fragment may; keep them there as before #333.
+		u.Source = append(u.Source, test...)
+	} else {
+		u.TestSource = slices.DeleteFunc(test, func(g string) bool { return slices.Contains(u.Source, g) })
+	}
 	imports := importPaths(files)
 	for _, imp := range imports {
 		id, local := ids[imp]

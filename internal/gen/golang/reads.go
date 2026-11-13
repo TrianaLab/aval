@@ -550,13 +550,27 @@ func (r *resolver) literals(f *ast.File) []read {
 			}
 		}
 		for _, e := range es {
-			if v := r.fresh(e); len(v.ss)+len(v.esc) > 0 {
+			v := r.fresh(e)
+			v.ss = slices.DeleteFunc(v.ss, bare)
+			if len(v.ss)+len(v.esc) > 0 {
 				out = append(out, read{pos: r.fset.Position(e.Pos()), lit: true, val: v})
 			}
 		}
 		return true
 	})
 	return out
+}
+
+// bare reports whether s is ".", "..", "./" or "../": as an argument or a
+// table row it is more often data (an invalid name or version) than a
+// path, and as a path it would put the package's parent directory in
+// scope. A read call of it still counts.
+func bare(s string) bool {
+	switch strings.ReplaceAll(s, `\`, "/") {
+	case ".", "..", "./", "../":
+		return true
+	}
+	return false
 }
 
 // readValues returns a read of any value for each read function f uses as
@@ -1380,26 +1394,30 @@ func (r *resolver) returns(typ *ast.FuncType, body *ast.BlockStmt, idx int) []va
 // reads what its callers pass: their arguments are checked where they are.
 // With noTest (aval gen --no-test matches the unit), no test of the unit is
 // written, so a read of its test files is not an error: what it resolves is
-// still added, for the tests that use the unit's fragment.
-func readScope(root, id string, p pkg, rs []read, allow, noTest bool) ([]string, error) {
+// still returned. The globs of reads in non-test files come first, those
+// of test files, which only the package's own test runs, second.
+func readScope(root, id string, p pkg, rs []read, allow, noTest bool) (prod, test []string, err error) {
 	dirs, err := p.chdirs(root, id, rs)
 	if err != nil && !allow {
-		return nil, err
+		return nil, nil, err
 	}
-	var out []string
 	var errs []error
 	for _, rd := range rs {
+		out := &test
+		if rd.prod {
+			out = &prod
+		}
 		if rd.lit {
-			out = append(out, p.litGlobs(root, dirs, rd)...)
+			*out = append(*out, p.litGlobs(root, dirs, rd)...)
 			continue
 		}
 		globs, problem := p.readGlobs(root, dirs, rd)
-		out = append(out, globs...)
+		*out = append(*out, globs...)
 		if problem != "" && !allow && (rd.prod || !noTest || strings.HasSuffix(rd.call, "Chdir")) {
 			errs = append(errs, fmt.Errorf("%s:%d: %s %s; declare what it reads by hand and pass --go-allow-dynamic %s", rd.pos.Filename, rd.pos.Line, rd.call, problem, id))
 		}
 	}
-	return out, errors.Join(errs...)
+	return prod, test, errors.Join(errs...)
 }
 
 // readGlobs returns the scope globs of the read rd, run in any of dirs,

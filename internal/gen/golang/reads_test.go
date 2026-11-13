@@ -566,12 +566,16 @@ func TestLiterals(t *testing.T) {
 		{pos: pos, lit: true, val: val{esc: []string{"../fixtures/%s.json", "../nope/x"}, cwd: true}},
 		{pos: token.Position{Filename: "pkg/p.go"}, prod: true, call: "os.ReadFile", val: val{pre: []string{"../lib", "."}}},
 	}
-	got, err := readScope(root, "pkg", pkg{Dir: "pkg"}, rs, false, false)
-	if err != nil || !slices.Equal(got, []string{"fixtures/a.json", "docs/sub/**", "fixtures/**", "lib/**"}) {
-		t.Errorf("%q, %v", got, err)
+	prod, got, err := readScope(root, "pkg", pkg{Dir: "pkg"}, rs, false, false)
+	if err != nil || !slices.Equal(got, []string{"fixtures/a.json", "docs/sub/**", "fixtures/**"}) || !slices.Equal(prod, []string{"lib/**"}) {
+		t.Errorf("test %q, non-test %q, %v", got, prod, err)
 	}
 	fset, files := parseSrc(t, header+`func f(t *testing.T) {
 	g("../fixtures/a.json", strings.TrimSpace("x"))
+	g("..", "../", ".", "./", "..\\")
+	for _, tc := range []struct{ ref string }{{".."}, {"../f"}} {
+		g(tc.ref)
+	}
 	_ = []string{"../b"}
 	_ = map[string]int{"../c": 1}
 	var s struct{ dir string }
@@ -585,7 +589,7 @@ func TestLiterals(t *testing.T) {
 			lits = append(lits, rd.val.ss...)
 		}
 	}
-	if !slices.Equal(lits, []string{"../fixtures/a.json", "../b", "../c", "../d", "../e"}) {
+	if !slices.Equal(lits, []string{"../fixtures/a.json", "../f", "../f", "../b", "../c", "../d", "../e"}) {
 		t.Errorf("literals %q", lits)
 	}
 }
@@ -676,7 +680,8 @@ func TestReadScope(t *testing.T) {
 		{"allowed", p, read{pos: test, val: val{cwd: true}}, true, nil, ""},
 		{"allowed, resolved files still added", p, read{pos: test, val: known("/etc", "../fixtures/a.json")}, true, []string{"fixtures/a.json"}, ""},
 	} {
-		got, err := readScope(root, "pkg", tc.p, []read{tc.rd}, tc.allow, false)
+		prod, test, err := readScope(root, "pkg", tc.p, []read{tc.rd}, tc.allow, false)
+		got := append(prod, test...)
 		if tc.err == "" && err != nil || tc.err != "" && (err == nil || !strings.Contains(err.Error(), tc.err)) || !slices.Equal(got, tc.want) {
 			t.Errorf("%s: %q, %v; want %q, %q", tc.name, got, err, tc.want, tc.err)
 		}
@@ -709,7 +714,7 @@ func TestReadScopeAfterChdir(t *testing.T) {
 		{"climbing literal after a Chdir", []read{chdir("sub"), {pos: pos, call: "os.Open", val: val{esc: []string{"../../b/"}}}},
 			[]string{"internal/a/sub/**"}, "cannot resolve"},
 	} {
-		got, err := readScope(root, "a", p, tc.rs, false, false)
+		_, got, err := readScope(root, "a", p, tc.rs, false, false)
 		if tc.err == "" && err != nil || tc.err != "" && (err == nil || !strings.Contains(err.Error(), tc.err)) || !slices.Equal(got, tc.want) {
 			t.Errorf("%s: %q, %v; want %q, %q", tc.name, got, err, tc.want, tc.err)
 		}
@@ -724,10 +729,10 @@ func TestReadScopeChdirChains(t *testing.T) {
 	}
 	ts := []string{".", "./.", "././.", "./././.", "././././."} // 325 chains
 	rs := []read{{pos: token.Position{Filename: "p/p_test.go"}, call: "os.Chdir", val: known(ts...)}}
-	if _, err := readScope(root, "p", pkg{Dir: "p"}, rs, false, false); err == nil || !strings.Contains(err.Error(), "more than 64 directories") {
+	if _, _, err := readScope(root, "p", pkg{Dir: "p"}, rs, false, false); err == nil || !strings.Contains(err.Error(), "more than 64 directories") {
 		t.Errorf("err = %v", err)
 	}
-	if _, err := readScope(root, "p", pkg{Dir: "p"}, rs, true, false); err != nil {
+	if _, _, err := readScope(root, "p", pkg{Dir: "p"}, rs, true, false); err != nil {
 		t.Errorf("allowed: %v", err)
 	}
 }

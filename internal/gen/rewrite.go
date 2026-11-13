@@ -187,7 +187,7 @@ func generated(p []planned, skip, use map[string]bool) (frags, tests *yaml.Node)
 	for _, u := range p {
 		body := u.body
 		if body == nil {
-			body = mapping(0, str("scope"), mapping(0, str("source"), seq(0, u.source...)))
+			body = sourceBody(u.source)
 		}
 		if use[u.name] {
 			frags.Content = append(frags.Content, str(u.name), body)
@@ -201,6 +201,11 @@ func generated(p []planned, skip, use map[string]bool) (frags, tests *yaml.Node)
 			str("use"), seq(0, u.use...)))
 	}
 	return frags, tests
+}
+
+// sourceBody is the body of a fragment with the scope source globs src.
+func sourceBody(src []string) *yaml.Node {
+	return mapping(0, str("scope"), mapping(0, str("source"), seq(0, src...)))
 }
 
 // withShared plans units and adds shared, when not nil, as "<lang>.module",
