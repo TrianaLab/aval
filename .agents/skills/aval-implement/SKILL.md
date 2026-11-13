@@ -39,10 +39,9 @@ keys or tokens; generate test keys at test time.
    read it with `gh issue view`. Skim initiative #1 for context.
 3. Extract the acceptance criteria as a checklist. If there are none, or they
    are ambiguous, ask the user before writing code.
-4. **Epic 6 stop.** If the issue belongs to Epic 6 or lives in
-   `TrianaLab/pacto`, stop: say that Epic 6 work is implemented in the Pacto
-   repo and this skill does not implement it (invariant 9 forbids Aval
-   modelling consumer concepts).
+4. **Consumer stop.** If the issue lives in a consumer's repository, stop:
+   say that consumer work is implemented there and this skill does not
+   implement it (invariant 9 forbids Aval modelling consumer concepts).
 5. Read every doc the issue or epic links, plus whatever of `docs/vision.md`,
    `docs/trust-model.md`, `docs/contract.md`, `docs/artifact-format.md` the
    change touches. Check the roadmap milestone the issue belongs to.

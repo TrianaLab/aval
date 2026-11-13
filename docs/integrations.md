@@ -112,5 +112,5 @@ other disagreement as `error`.
 - Treat `verification-failed` as a security event, fail closed, consume by
   digest and never widen cacheability: see [fail closed](trust-model.md#fail-closed).
 - **Your metadata goes in `annotations`** with reverse-DNS keys
-  (`dev.pacto.service`). Aval never reads them and will not add consumer
+  (`com.example.service`). Aval never reads them and will not add consumer
   fields.

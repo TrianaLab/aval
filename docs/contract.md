@@ -474,7 +474,7 @@ A program that reads per-user state (`~/.config/<app>`, `~/.npmrc`,
 ```yaml
 environment:
   env: [XDG_CONFIG_HOME]
-  paths: ["~/.config/pacto", "${XDG_CONFIG_HOME}/pacto"]
+  paths: ["~/.config/orders", "${XDG_CONFIG_HOME}/orders"]
 ```
 
 - `~` is the home directory, `$NAME` and `${NAME}` the variable's value; both
