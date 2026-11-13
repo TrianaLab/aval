@@ -35,6 +35,10 @@ type Unit struct {
 	Deps []string
 	// Command is the argv that tests this unit.
 	Command []string
+	// Outputs are slash-separated paths, relative to the contract root, of
+	// files the command writes that a reused result restores (the test's
+	// outputs). Each must lie outside the Source of every unit.
+	Outputs []string
 }
 
 // globEscape turns the glob metacharacters path.Match knows into one-character
@@ -171,6 +175,7 @@ type planned struct {
 	name    string
 	source  []string
 	command []string
+	outputs []string
 	use     []string
 	body    *yaml.Node
 }
@@ -236,8 +241,9 @@ func check(lang string, units []Unit) ([]planned, map[string]int, error) {
 			err = errors.Join(err, fmt.Errorf("unit %q: no test command", u.ID))
 		}
 		names[name] = u.ID
-		errs = append(errs, err)
-		out[i] = planned{name: name, source: slices.Compact(slices.Sorted(slices.Values(u.Source))), command: u.Command}
+		outputs, oerr := outputGlobs(u, units)
+		errs = append(errs, err, oerr)
+		out[i] = planned{name: name, source: slices.Compact(slices.Sorted(slices.Values(u.Source))), command: u.Command, outputs: outputs}
 	}
 	for _, u := range units {
 		for _, d := range u.Deps {
@@ -250,6 +256,26 @@ func check(lang string, units []Unit) ([]planned, map[string]int, error) {
 		return nil, nil, fmt.Errorf("%w: %w", ErrUnits, err)
 	}
 	return out, byID, nil
+}
+
+// outputGlobs returns the globs of u's outputs. An output in a unit's scope
+// would change a test's own fingerprint, and publishing refuses it: it is an
+// error here instead.
+// ponytail: units x globs x outputs; a TestSet holds at most 1024 tests.
+func outputGlobs(u Unit, units []Unit) ([]string, error) {
+	var out []string
+	var errs []error
+	for _, o := range u.Outputs {
+		g, err := Literal(o)
+		errs = append(errs, err)
+		out = append(out, g)
+		for _, v := range units {
+			if i := slices.IndexFunc(v.Source, func(g string) bool { return contract.Match(g, o) }); i >= 0 {
+				errs = append(errs, fmt.Errorf("unit %q: output %s is in the scope of unit %q (%s)", u.ID, o, v.ID, v.Source[i]))
+			}
+		}
+	}
+	return out, errors.Join(errs...)
 }
 
 // Tested returns, sorted, the IDs of the units that get a test under the

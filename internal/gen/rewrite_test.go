@@ -347,6 +347,23 @@ func TestRewriteSharedErrors(t *testing.T) {
 	}
 }
 
+// A unit's outputs become its test's outputs, escaped like its sources.
+func TestRewriteOutputs(t *testing.T) {
+	out := string(must(Rewrite([]byte(base), "go", []Unit{withOutputs(unit("a"), "cover/go.a.out", "cover/x[1].out"), unit("b")}, nil)))
+	if !strings.Contains(out, "    runner: {command: [go, test, ./a]}\n    outputs: [cover/go.a.out, 'cover/x[[]1].out']\n    use:\n") {
+		t.Fatalf("no outputs on go.a:\n%s", out)
+	}
+	cs, err := contract.ParseAll([]byte(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cs {
+		if want := c.Metadata.Name == "go.a"; (len(c.Outputs) == 2) != want {
+			t.Errorf("%s: outputs %q", c.Metadata.Name, c.Outputs)
+		}
+	}
+}
+
 // Tested lists exactly the units Rewrite writes a test for, and fails the
 // same way on a pattern that matches no unit or on invalid units.
 func TestTested(t *testing.T) {
