@@ -1,0 +1,3393 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Run a heavy test once. Reuse the signed result only when the inputs match and you trust the signer.">
+      
+      
+      
+        <link rel="canonical" href="https://aval.run/0.12.0/guides/generate-scope/">
+      
+      
+        <link rel="prev" href="../shards-and-matrices/">
+      
+      
+        <link rel="next" href="../github-actions/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Generate scope from the dependency graph - Aval</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/brand.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#generate-scope-from-the-dependency-graph" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You are viewing an old version of these docs.
+  <a href="../../.."><strong>Go to the latest version.</strong></a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("../..",location),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Aval" class="md-header__button md-logo" aria-label="Aval" data-md-component="logo">
+      
+<svg class="aval-wordmark" viewBox="1 2.5 66.5 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="aval-wordmark__mark"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></g><g class="aval-wordmark__word"><circle cx="34" cy="12" r="4"/><path d="M38 8v8"/><path d="m42 8 4 8 4-8"/><circle cx="57.5" cy="12" r="4"/><path d="M61.5 8v8"/><path d="M66.5 4.5V16"/></g></svg>
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Aval
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Generate scope from the dependency graph
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/TrianaLab/aval" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TrianaLab/aval
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../install/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../write-a-contract/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../cli-reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../changelog/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Aval" class="md-nav__button md-logo" aria-label="Aval" data-md-component="logo">
+      
+<svg class="aval-wordmark" viewBox="1 2.5 66.5 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="aval-wordmark__mark"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></g><g class="aval-wordmark__word"><circle cx="34" cy="12" r="4"/><path d="M38 8v8"/><path d="m42 8 4 8 4-8"/><circle cx="57.5" cy="12" r="4"/><path d="M61.5 8v8"/><path d="M66.5 4.5V16"/></g></svg>
+    </a>
+    Aval
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/TrianaLab/aval" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    TrianaLab/aval
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../concepts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/trust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/outcomes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outcomes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../write-a-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../depend-on-a-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Depend on another part of the repo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shards-and-matrices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shards and matrices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate scope from the dependency graph
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate scope from the dependency graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it writes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ownership
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Go
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Go">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#files-a-package-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files a package reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gomodule-fragment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The go.module fragment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#restore-coverage-on-reuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restore coverage on reuse
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keep-it-up-to-date-in-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep it up to date in CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#javascript-and-typescript" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JavaScript and TypeScript
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rust" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rust
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#net" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .NET
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#java-and-kotlin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Java and Kotlin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-language-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-language dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fail-closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fail closed
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrate-in-5-files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrate Aval in 5 files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trust-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Write a trust policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../signing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../pinning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pin your dependencies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../measure-reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure reuse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../go-consumer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume from Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../resolve/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve references
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resolve references
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container images
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/npm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    npm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/pypi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/go/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/maven/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maven
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/crates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust crates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/gems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ruby gems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/git/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Git
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../resolve/urls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Downloaded files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Specs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The test contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mutable-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mutable reference scan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../artifact-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consume evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vision and roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/CONTRIBUTING.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/SECURITY.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/TrianaLab/aval/blob/main/CODE_OF_CONDUCT.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code of conduct
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it writes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ownership
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Go
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Go">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#files-a-package-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files a package reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gomodule-fragment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The go.module fragment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#restore-coverage-on-reuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restore coverage on reuse
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keep-it-up-to-date-in-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep it up to date in CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#javascript-and-typescript" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JavaScript and TypeScript
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rust" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rust
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#net" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .NET
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#java-and-kotlin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Java and Kotlin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-language-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-language dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fail-closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fail closed
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../write-a-contract/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Guides
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/TrianaLab/aval/edit/main/docs/guides/generate-scope.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="generate-scope-from-the-dependency-graph">Generate <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> from the dependency graph<a class="headerlink" href="#generate-scope-from-the-dependency-graph" title="Anchor link">&para;</a></h1>
+<p>Goal: one test per unit (package, module, project) whose <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> is the unit's
+files plus the files of every unit it depends on. A change to a unit re-runs
+its test and the tests of the units that depend on it; every other test is
+reused.</p>
+<p><code>aval gen &lt;language&gt;</code> writes that <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> into a <code>kind: TestSet</code> from the
+repository's real dependency graph. You run it while authoring and commit the
+result: <code>aval run</code>, <code>verify</code> and <code>push</code> never call it, and the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> stays
+declared in <code>aval.yaml</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Languages</p>
+<p>Go (<a href="#go">below</a>), JavaScript and TypeScript
+(<a href="#javascript-and-typescript">below</a>), Python (<a href="#python">below</a>), Rust
+(<a href="#rust">below</a>), .NET (<a href="#net">below</a>), and Java and Kotlin
+(<a href="#java-and-kotlin">below</a>) ship, as part of
+<a href="https://github.com/TrianaLab/aval/issues/291">Epic 16</a>. <code>aval gen --help</code>
+lists the languages your build has.</p>
+</div>
+<h2 id="what-it-writes">What it writes<a class="headerlink" href="#what-it-writes" title="Anchor link">&para;</a></h2>
+<p>Given units <code>a</code> and <code>b</code> where <code>a</code> imports <code>b</code>, <code>aval gen go</code> adds (leaving
+out the shared <a href="#the-gomodule-fragment"><code>go.module</code></a> fragment that each test
+also uses):</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">go.a</span><span class="p">:</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">a/*.go</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">go.b</span><span class="p">:</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">b/*.go</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">go.a</span><span class="p p-Indicator">}</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">go</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">./a</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">go.a</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">go.b</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">go.b</span><span class="p p-Indicator">}</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">go</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">./b</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">go.b</span>
+</span></code></pre></div>
+<ul>
+<li>One fragment per unit with its own files, one test per unit that <code>use</code>s
+  the fragments of the unit and of everything it reaches. Aval computes the
+  closure; a dependency cycle puts every unit on it in each other's tests.</li>
+<li>Names are <code>&lt;language&gt;.&lt;unit&gt;</code>: the unit lower-cased, <code>/</code> turned into <code>.</code>,
+  other characters outside <code>[a-z0-9._-]</code> into <code>-</code>. A name over 64 characters
+  is cut and ends in a hash of the unit. A name depends on its unit alone, so
+  adding a unit never renames another. Two units that get the same name are
+  an error.</li>
+<li>Entries are sorted by name, so the output is the same on every run and
+  platform.</li>
+<li>Real file and directory names become globs that match exactly them: <code>*</code>,
+  <code>?</code> and <code>[</code> turn into <code>[*]</code>, <code>[?]</code> and <code>[[]</code>, so a package in <code>libs/a[1]</code>
+  gets <code>libs/a[[]1]/**</code>. A name no <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> glob can express (one with a
+  backslash) fails (exit 1) and nothing is written; rename it.</li>
+</ul>
+<h2 id="ownership">Ownership<a class="headerlink" href="#ownership" title="Anchor link">&para;</a></h2>
+<p><code>aval gen go</code> owns the fragments and tests named <code>go.*</code> and nothing else:</p>
+<ul>
+<li>It replaces those entries in place (the first one's position, or the end
+  of <code>fragments</code> and <code>tests</code>) and keeps every other line byte for byte,
+  comments and blank lines included. Comment lines right above a later
+  generated entry go with it, and a missing final newline is added.
+  Generated lines use the file's line endings (<code>\n</code>, <code>\r\n</code> or <code>\r</code>).</li>
+<li>The prefix is reserved: a hand-written <code>go.*</code> entry is replaced.</li>
+<li>Two generators share a file: <code>aval gen js</code> owns <code>js.*</code> and leaves <code>go.*</code>
+  alone.</li>
+<li><code>fragments</code> and <code>tests</code> must be block style (not <code>{}</code> or <code>[]</code>).</li>
+</ul>
+<p>Other shared inputs stay hand-written. Put lockfiles, root build files,
+the toolchain, probes, <code>env</code> and <code>cacheability</code> in <code>defaults</code> or in your own
+fragments; every generated test inherits <code>defaults</code>. <code>aval gen go</code> writes
+its shared inputs itself, in <a href="#the-gomodule-fragment"><code>go.module</code></a>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TestSet</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">defaults</span><span class="p">:</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">Makefile</span><span class="p p-Indicator">]</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">go.module</span><span class="p">:</span><span class="w">                </span><span class="c1"># generated, see below; shortened here</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">go.mod</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">go.sum</span><span class="p p-Indicator">]</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="nt">go.web</span><span class="p">:</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">web/*.go</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">e2e</span><span class="p p-Indicator">}</span><span class="w">   </span><span class="c1"># hand-written, kept as is</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">go.web</span><span class="p p-Indicator">]</span><span class="w">           </span><span class="c1"># uses a generated fragment</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">make</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">e2e</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">go.web</span><span class="p p-Indicator">}</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">go</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">./web</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">go.module</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">go.web</span>
+</span></code></pre></div>
+<p>A hand-written test can <code>use</code> generated fragments. When the unit behind one
+disappears, <code>aval gen</code> fails (exit 2) and writes nothing.</p>
+<p><code>--no-test &lt;pattern&gt;</code> (repeatable, a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> glob over unit IDs such as
+<code>cmd/gen*</code> or <code>tests/**</code>) writes no test for the matching units, for code
+generators or harness packages you keep out of the test gate: their fragment
+stays while another test uses it, so their files stay in that test's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. A
+pattern that matches no unit fails (exit 2), and <code>--check</code> needs the same
+flags.</p>
+<p><code>--list-tests</code> writes nothing and prints the IDs of the units that get a
+test under the same <code>--no-test</code> patterns, one per line. A pattern that
+matches no unit fails as in <code>aval gen</code>. Keep the patterns once, in a Makefile for example, and derive both
+<code>aval gen</code> and your own gate from them, so the two lists cannot drift:</p>
+<div class="language-make highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">NO_TEST</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span>--no-test<span class="w"> </span><span class="s1">'cmd/gen*'</span><span class="w"> </span>--no-test<span class="w"> </span><span class="s1">'tests/**'</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nf">gen</span><span class="o">:</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span>aval<span class="w"> </span>gen<span class="w"> </span>go<span class="w"> </span><span class="k">$(</span>NO_TEST<span class="k">)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nf">gen-check</span><span class="o">:</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span>aval<span class="w"> </span>gen<span class="w"> </span>go<span class="w"> </span><span class="k">$(</span>NO_TEST<span class="k">)</span><span class="w"> </span>--check
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="nf">cover</span><span class="o">:</span><span class="w">  </span><span class="c"># the coverage gate covers what gets a test</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span>go<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-coverprofile<span class="o">=</span>cover.out<span class="w"> </span><span class="nv">$$</span><span class="o">(</span>aval<span class="w"> </span>gen<span class="w"> </span>go<span class="w"> </span><span class="k">$(</span>NO_TEST<span class="k">)</span><span class="w"> </span>--list-tests<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s1">'s|^|./|'</span><span class="o">)</span>
+</span></code></pre></div>
+<p>IDs are per language (a Go package directory, a crate or package name).
+The Go root package's ID is the last element of its import path, not <code>.</code>:
+in a module with a root package, map that ID to <code>.</code> before <code>go test</code>.</p>
+<h2 id="go">Go<a class="headerlink" href="#go" title="Anchor link">&para;</a></h2>
+<p><code>aval gen go</code> reads the graph with <code>go list -deps -test -json ./...</code> in the
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, so it needs <code>go</code> on <code>PATH</code>. A module or a <code>go.work</code> workspace
+works. Each package is one unit:</p>
+<ul>
+<li>Its id is the package directory (<code>internal/orders</code>); the root package
+  takes the last element of its import path (<code>shop</code>).</li>
+<li>Its files are <code>&lt;dir&gt;/*.go</code>, its non-Go sources (C, assembly, <code>.syso</code>)
+  and <code>&lt;dir&gt;/testdata/**</code> when <code>testdata</code> holds a file. A package that
+  uses <code>go:embed</code> (test embeds included) gets its whole directory,
+  <code>&lt;dir&gt;/**</code>, so a file added later under an embedded directory is in
+  <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> without regenerating.</li>
+<li>Its dependencies are the packages of the main modules it imports, from
+  any <code>.go</code> file, test files and files under any build tag included. The
+  standard library and external modules are not units: <code>go.module</code> covers
+  them through <code>go.mod</code> and <code>go.sum</code>.</li>
+<li>Its files also include what its non-test code reads at run time by a
+  path <code>aval gen go</code> can resolve. What its test files read, such as
+  <code>../../fixtures/order.json</code>, goes in a second fragment,
+  <code>go.&lt;package&gt;.test</code>, that only its own test uses
+  (<a href="#files-a-package-reads">below</a>).</li>
+<li>A package whose name plus <code>.test</code> is another package's name (<code>a</code> and
+  <code>a/test</code>, once <code>a</code>'s tests read a file) is an error, like any two units
+  with the same name.</li>
+<li>Its test is <code>go test ./&lt;dir&gt;</code> and <code>use</code>s <code>go.module</code>.</li>
+</ul>
+<h3 id="files-a-package-reads">Files a package reads<a class="headerlink" href="#files-a-package-reads" title="Anchor link">&para;</a></h3>
+<p>Tests often read files outside their package. <code>aval gen go</code> finds the
+reads in every <code>.go</code> file of a package, tests included, and adds their
+files to the package's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>:</p>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// internal/orders/orders_test.go</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">fixtures</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"../../fixtures"</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kd">func</span><span class="w"> </span><span class="nx">TestFixture</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nx">data</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">os</span><span class="p">.</span><span class="nx">ReadFile</span><span class="p">(</span><span class="nx">filepath</span><span class="p">.</span><span class="nx">Join</span><span class="p">(</span><span class="nx">fixtures</span><span class="p">,</span><span class="w"> </span><span class="s">"order.json"</span><span class="p">))</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="c1">// ...</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">go.internal.orders</span><span class="p">:</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">internal/orders/*.go</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">go.internal.orders.test</span><span class="p">:</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fixtures/order.json</span>
+</span></code></pre></div>
+<p>A read in a test file goes in <code>go.&lt;package&gt;.test</code>, which only the
+package's own test uses: the packages that import it never run its tests.
+An edit to <code>fixtures/order.json</code> re-runs <code>go.internal.orders</code> and no other
+test. A read in a non-test file goes in <code>go.&lt;package&gt;</code>, which the tests
+of the packages that import it use too, since they run that code: an edit
+to what <code>orders.go</code> reads re-runs <code>go.internal.orders</code> and every test that
+reaches it.</p>
+<ul>
+<li>Reads: <code>os.ReadFile</code>, <code>Open</code>, <code>OpenFile</code>, <code>ReadDir</code>, <code>Stat</code>, <code>Lstat</code>,
+  <code>Readlink</code>, <code>DirFS</code>, <code>OpenRoot</code> and <code>OpenInRoot</code>; <code>ioutil.ReadFile</code> and
+  <code>ReadDir</code>; <code>filepath.Walk</code>, <code>WalkDir</code> and <code>Glob</code>; the <code>html/template</code>
+  and <code>text/template</code> functions and <code>Template</code> methods <code>ParseFiles</code>
+  (every argument) and <code>ParseGlob</code>; <code>http.Dir</code>; and <code>os.Chdir</code>, <code>syscall.Chdir</code>,
+  <code>unix.Chdir</code>, <code>t.Chdir</code> and an open file's <code>Chdir</code>, since later
+  relative reads land under that directory (going back to the directory
+  <code>os.Getwd</code> returned is not a read). Dot imports count.</li>
+<li>Paths passed to other functions: in a test file, every argument of a
+  call (to any function, of another package too), every element of a
+  composite literal (table rows) and every value assigned with <code>=</code> (a
+  field set after construction, such as <code>s.dir = "../fixtures"</code> in a
+  suite's setup method) that names a file or directory of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
+  root outside the package directory adds it (a pattern adds the
+  directory before its first wildcard), so
+  <code>contract.Load("../../examples/shop.yaml")</code> puts
+  <code>examples/shop.yaml</code> in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. For a value it cannot resolve, it adds
+  the directory a literal with a <code>..</code> segment names
+  (<code>fmt.Sprintf("../fixtures/%s.json", name)</code> adds <code>fixtures/**</code>). A
+  bare <code>.</code>, <code>..</code>, <code>./</code> or <code>../</code> is data there, such as an invalid name in
+  a table row, and adds nothing; passed to one of the reads above
+  (<code>os.ReadDir("..")</code>) it adds the directory. These never fail.</li>
+<li>After a <code>Chdir</code>, a relative read of the package resolves against the
+  package directory and against every directory its <code>Chdir</code> targets
+  reach, in any order; a candidate outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root fails.</li>
+<li>Paths it resolves: string literals and constants, <code>+</code>, <code>filepath</code> and
+  <code>path</code> <code>Join</code>, <code>Clean</code>, <code>Dir</code>, <code>Abs</code>, <code>FromSlash</code> and <code>ToSlash</code>, every
+  value assigned to a variable of the package, ranges over slice and map
+  literals, fields of struct literals (table tests) and of what a function
+  of the package returns, results and parameters of the package's own
+  functions and methods (from every call in the package), function
+  literals called directly, through a variable or a table field,
+  constants, variables and function results of the other packages of the
+  main modules, a directory entry's <code>Name()</code> (any file of the directory
+  <code>ReadDir</code> read), and the source file <code>runtime.Caller(0)</code> returns.</li>
+<li>A path is relative to the package directory, where <code>go test</code> runs. A
+  file becomes its own glob, a directory <code>&lt;dir&gt;/**</code> (for <code>Glob</code>, the
+  directory before the first wildcard). A path that does not exist adds
+  nothing; once it exists, <code>--check</code> reports the drift.</li>
+<li>A path under a temporary directory is not a file of the repository:
+  one built on <code>t.TempDir()</code>, <code>b.TempDir()</code>, <code>os.TempDir()</code>,
+  <code>os.MkdirTemp</code> or the <code>Name()</code> of an <code>os.CreateTemp</code> file, through
+  variables, struct fields, helpers of the package or of another one,
+  even with a <code>..</code> after it. Neither is the name of a test (<code>t.Name()</code>),
+  a match of <code>filepath.Glob</code> (its directory is the read) or a parameter
+  of a function whose callers it cannot see, such as a closure handed to
+  other code: what those callers pass is checked where they are.</li>
+</ul>
+<p>A read in a non-test file reads what its callers pass, so only paths
+built from literals and constants there count: they are added like a
+test's, and one outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root fails. A read of a parameter,
+a field or anything else it cannot resolve does not fail and adds
+nothing; only the literals the calling test passes are checked. When such a path is a <code>Join</code> whose
+leading parts are known, the directory they name is added
+(<code>filepath.Join(root, "fixtures", name)</code> with <code>root</code> from
+<code>runtime.Caller(0)</code> adds <code>fixtures/**</code>).</p>
+<p>A read in a test file fails closed, naming the file and line (exit 1,
+nothing written):</p>
+<ul>
+<li>when its path cannot be resolved and may leave the package directory:
+  one built from <code>os.Getwd</code>, <code>os.Executable</code>, an environment variable
+  (<code>os.Getenv</code>, <code>LookupEnv</code>, <code>ExpandEnv</code>) or <code>runtime.Caller</code> with
+  another depth, or from a literal with a <code>..</code> segment that names a file
+  or directory of the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root outside the package
+  (<code>filepath.Join(root, name)</code> with <code>root</code> from <code>"../.."</code>), also through
+  the directory a template names (<code>fmt.Sprintf("../fixtures/%s.json",
+  name)</code>). Paths it cannot follow count as built from anywhere: a read
+  function itself used as a value (<code>var readFile = os.ReadFile</code>, other
+  than assigned to <code>_</code>); a variable written through a pointer; a call to
+  a method of another package or to a function value it cannot trace; a
+  function of another package that is not of the main modules (other
+  than <code>strings</code>, <code>fmt</code>, <code>strconv</code>, <code>path</code> and <code>filepath</code>, which keep what
+  their arguments may climb to); a value too large to follow; and a
+  <code>Chdir</code> to a directory it cannot resolve, such as an open file's; a
+  channel receive or a type assertion;</li>
+<li>when its path is outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, absolute ones included
+  (<code>/proc/self/cgroup</code>).</li>
+</ul>
+<p>A package that <code>--no-test</code> matches gets no test, so a read of its test
+files does not fail; what resolves is still added to its fragment
+<code>go.&lt;package&gt;</code>, not to a <code>.test</code> one, so a hand-written test that <code>use</code>s
+it and runs the package's tests keeps those files in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. A read of its non-test files, and a <code>Chdir</code> in any of
+its files, fails as above.</p>
+<p><code>--go-allow-dynamic &lt;pattern&gt;</code> (repeatable, a <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> glob over package
+IDs such as <code>tests/**</code>) turns those errors off for the packages it
+matches; files it resolves are still added. Declare the rest by hand:
+in <code>defaults</code>, which every test inherits, or with <code>--no-test</code> for the
+package and a hand-written test that <code>use</code>s its <code>go.*</code> fragments and a
+fragment of your own. A pattern that matches no package fails, and
+<code>--check</code> needs the same flags.</p>
+<p>It does not see, so declare by hand: in a non-test file, a path built
+from a root it computes from <code>os.Getwd</code>, <code>os.Executable</code> or the
+environment, such as a test helper that walks up to <code>go.mod</code> and joins
+<code>fixtures/&lt;name&gt;</code>; a field it reads through a
+receiver or parameter whose value comes from something other than a
+literal assigned in a test file (<code>func (s *suite) read() { os.ReadFile(s.dir) }</code>
+with <code>s.dir</code> set from a computed path); in a non-test file, a path from
+a field of a method's receiver, such as <code>l.Load(name)</code> reading
+<code>filepath.Join(l.Dir, name)</code> with <code>Dir</code> set by a constructor; a path a test computes from the
+working directory, the executable, the environment or <code>runtime.Caller</code>
+and passes to a function that reads it (the read fails only where it is
+in a test file); a relative literal in a non-test file read by another
+package's test, which runs in that package's directory (it is resolved
+against its own); a slice or map literal that a function it is passed
+to changes; a path that climbs without a <code>..</code> in any literal
+(<code>"." + "./x"</code>, <code>strings.TrimPrefix("x../../y", "x")</code>); a <code>..</code> added
+after a temporary directory that climbs back into the repository; a
+bare <code>..</code> or <code>../</code> a test passes to a function other than the reads
+above, which reads the parent directory with it; a
+<code>Chdir</code> the tests run more than once in a row (<code>os.Chdir("..")</code> in a
+loop); and files read through other APIs from a path that is not a
+literal of the test, such as <code>exec.Command</code>, <code>tls.LoadX509KeyPair</code>,
+<code>http.ServeFile</code>, the <code>ParseFiles</code> method of a template, or any other
+function, standard library included, that opens a path of its own.</p>
+<h3 id="the-gomodule-fragment">The go.module fragment<a class="headerlink" href="#the-gomodule-fragment" title="Anchor link">&para;</a></h3>
+<p><code>aval gen go</code> also writes one fragment, <code>go.module</code>, with what every Go
+test shares, and every generated test <code>use</code>s it:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">go.module</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">      </span><span class="nt">dependencies</span><span class="p">:</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">go.mod</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">go.sum</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">      </span><span class="nt">toolchain</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">go</span><span class="p">:</span><span class="w"> </span><span class="nv">1.25.4</span><span class="p p-Indicator">}</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">      </span><span class="nt">probe</span><span class="p">:</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">        </span><span class="nt">go</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">go</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">env</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">GOVERSION</span><span class="p p-Indicator">]</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">      </span><span class="nt">env</span><span class="p">:</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CGO_ENABLED</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOARCH</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GODEBUG</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOEXPERIMENT</span>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOFLAGS</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOOS</span>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOTOOLCHAIN</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GOWORK</span>
+</span></code></pre></div>
+<ul>
+<li><code>toolchain.go</code> is the <code>toolchain</code> directive without its <code>go</code> prefix, else
+  the <code>go</code> directive, of <code>go.work</code> in a workspace or of <code>go.mod</code>. The probe
+  makes <code>aval run</code> check it against <code>go env GOVERSION</code> before the lookup, so
+  the installed Go must match it exactly: with only <code>go 1.25.0</code>, a machine
+  on go1.25.3 records and reuses nothing. Pin the patch version (a
+  <code>toolchain</code> line, or <code>go</code> with the patch you install).</li>
+<li><code>dependencies</code> are <code>go.work</code>, <code>go.work.sum</code>, and the <code>go.mod</code> and
+  <code>go.sum</code> of every main module, when they exist, relative to the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr>
+  root.</li>
+<li><code>env</code> are the variables that change what <code>go</code> builds and how it runs the
+  tests.</li>
+</ul>
+<p>It is owned like the other <code>go.*</code> entries, so a toolchain bump in <code>go.mod</code>
+or a new <code>go.sum</code> is drift that <code>--check</code> reports. Do not repeat its
+toolchain or probe in <code>defaults</code>: a different value there is a conflict,
+and <code>aval gen</code> fails (exit 2). <code>aval gen go</code> fails and writes nothing
+(exit 1) when it cannot read the version (a <code>go.mod</code> without a <code>go</code> directive, a
+file that does not parse), finds no <code>go.mod</code> or <code>go.work</code>, or a module file
+lies outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root. A unit whose name would be <code>go.module</code> (a
+package directory <code>module</code>, or a root package whose import path ends in
+<code>/module</code>) is an error too.</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>aval<span class="w"> </span>gen<span class="w"> </span>go<span class="w">             </span><span class="c1"># writes go.* into aval.yaml</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>aval<span class="w"> </span>gen<span class="w"> </span>go<span class="w"> </span>--go-cover<span class="w">  </span><span class="c1"># each test also fails below 100% coverage of its package</span>
+</span></code></pre></div>
+<p><code>--go-cover</code> runs the tests through <code>sh -c</code> with <code>go test -coverprofile</code>
+and fails when any statement of the package did not run, so a
+repository-wide 100% gate becomes one gate per package. It needs <code>sh</code>,
+<code>mktemp</code> and <code>awk</code>.</p>
+<h3 id="restore-coverage-on-reuse">Restore coverage on reuse<a class="headerlink" href="#restore-coverage-on-reuse" title="Anchor link">&para;</a></h3>
+<p>A reused <code>go.*</code> result runs no test, so it writes no coverage. With
+<code>--go-cover-profile &lt;dir&gt;</code>, each test writes its package's profile to
+<code>&lt;dir&gt;/&lt;test&gt;.out</code> and declares it in <code>outputs</code>, which a reused result
+restores (<a href="../write-a-contract/#restore-coverage-and-reports-on-reuse">outputs</a>):</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>aval<span class="w"> </span>gen<span class="w"> </span>go<span class="w"> </span>--go-cover-profile<span class="w"> </span>cover
+</span></code></pre></div>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">go.internal.money</span><span class="p p-Indicator">}</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sh</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-c</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">'mkdir</span><span class="nv"> </span><span class="s">-p</span><span class="nv"> </span><span class="s">"${1%/*}"</span><span class="nv"> </span><span class="s">&amp;&amp;</span><span class="nv"> </span><span class="s">go</span><span class="nv"> </span><span class="s">test</span><span class="nv"> </span><span class="s">-coverprofile="$1"</span><span class="nv"> </span><span class="s">"$0"'</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">./internal/money</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">cover/go.internal.money.out</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">outputs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cover/go.internal.money.out</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<p>The profile covers only the package's own files (no <code>-coverpkg</code>), which
+are in the test's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>, so a restored profile matches the code it was
+reused for. Merged, the profiles of all tests equal what one
+<code>go test -coverprofile ./...</code> writes for the same packages. <code>&lt;dir&gt;</code> must lie
+below the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, outside <code>.aval</code>, <code>.git</code> and every package's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>:
+<code>aval gen go</code> fails (exit 1) otherwise, for example on a directory under
+a package that embeds files. Add <code>&lt;dir&gt;</code>
+to <code>.gitignore</code>. It needs <code>sh</code>. With <code>--go-cover</code> too, each test also fails
+below 100% of its package.</p>
+<p>Your coverage gate then merges the profiles after the <code>go.*</code> tests ran, run
+or reused, and checks its threshold with no test re-run. One file per test
+that got one, so the tests in <code>--list-tests</code> are the ones merged:</p>
+<div class="language-make highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nf">cover-gate</span><span class="o">:</span><span class="w">  </span><span class="c"># after aval run of every go.* test</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>awk<span class="w"> </span><span class="s1">'NR == 1 || FNR &gt; 1'</span><span class="w"> </span>cover/go.*.out<span class="w"> </span>&gt;<span class="w"> </span>cover.out
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>go<span class="w"> </span>tool<span class="w"> </span>cover<span class="w"> </span>-func<span class="o">=</span>cover.out<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span>
+</span></code></pre></div>
+<p>Keep the threshold check your gate already has, applied to <code>cover.out</code>.</p>
+<p>The package set and the embedded files are read as for <code>linux/amd64</code> with
+cgo, with <code>GOFLAGS</code> cleared, so the output is the same on every machine. A
+package with a file for another OS that uses <code>//go:embed</code> gets its whole
+directory in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. <code>aval gen go</code> fails and
+writes nothing (exit 1) when <code>go</code> is missing, <code>go list</code> fails (no <code>go.mod</code>,
+a broken import), a file does not parse, a package of a main module lies
+outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, a <code>.go</code> file imports a package of a main module
+that <code>go list</code> did not list (this includes a local package that builds
+only for another OS, such as one with <code>//go:build windows</code>), or a dependency is replaced by a local
+directory (its files are not in <code>go.sum</code>: add it to a <code>go.work</code> instead).</p>
+<p>A test's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> follows the imports of the package's tests too, so a helper
+package that only tests import is in the <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> of every package that
+depends on it. That re-runs more than needed, never less.</p>
+<h2 id="keep-it-up-to-date-in-ci">Keep it up to date in CI<a class="headerlink" href="#keep-it-up-to-date-in-ci" title="Anchor link">&para;</a></h2>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>aval<span class="w"> </span>gen<span class="w"> </span>go<span class="w"> </span>--check
+</span></code></pre></div>
+<p><code>--check</code> writes nothing. It exits 0 when the generated entries match the
+graph, and 1 with a diff when they do not, such as a new import or a dropped
+one. Run it in the same job as your linters.</p>
+<h2 id="javascript-and-typescript">JavaScript and TypeScript<a class="headerlink" href="#javascript-and-typescript" title="Anchor link">&para;</a></h2>
+<p><code>aval gen js</code> reads the manifests and runs no tool. It makes one unit per
+workspace package: the workspaces of <code>package.json</code> for npm and yarn,
+<code>pnpm-workspace.yaml</code> for pnpm (<code>!</code> globs excluded). The root package is not
+a unit. The lockfile at the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root picks the package manager and the
+test command:</p>
+<table>
+<thead>
+<tr>
+<th>Lockfile</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>package-lock.json</code>, <code>npm-shrinkwrap.json</code></td>
+<td><code>npm test --workspace &lt;name&gt;</code></td>
+</tr>
+<tr>
+<td><code>pnpm-lock.yaml</code></td>
+<td><code>pnpm --filter &lt;name&gt; test</code></td>
+</tr>
+<tr>
+<td><code>yarn.lock</code></td>
+<td><code>yarn workspace &lt;name&gt; test</code></td>
+</tr>
+</tbody>
+</table>
+<p>A unit's ID is its package name and its files are its directory, so
+<code>@acme/ui</code> in <code>packages/ui</code> becomes <code>js.acme.ui</code> with <code>packages/ui/**</code>. A
+dependency becomes an edge when it names another workspace package (any
+range, or <code>workspace:</code>), or when a <code>file:</code>, <code>link:</code> or <code>portal:</code> path points
+to one. External packages are not edges: the lockfile in <code>defaults</code> covers
+them. Exclude <code>node_modules</code> there too.</p>
+<p>Two local dependencies that <code>package.json</code> does not name are edges as well:</p>
+<ul>
+<li>TypeScript configs. Every <code>tsconfig*.json</code> in a package (JSON with comments
+  and trailing commas) adds an edge for each <code>references</code> path that lands in
+  another workspace package. Its <code>extends</code> chain is followed the way
+  TypeScript does (a relative path, a directory meaning its <code>tsconfig.json</code>,
+  <code>.json</code> added when missing, or <code>&lt;workspace package&gt;/&lt;path&gt;</code>): a file in
+  another workspace package is an edge, and a file outside every package,
+  such as a root <code>tsconfig.base.json</code>, joins the unit's own files. <code>extends</code>
+  of an external package is not followed.</li>
+<li>Relative imports. Every <code>.js</code>, <code>.jsx</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.ts</code>, <code>.tsx</code>,
+  <code>.mts</code>, <code>.cts</code>, <code>.vue</code>, <code>.svelte</code> and <code>.astro</code> file in a package is
+  scanned for relative specifiers (<code>./</code>, <code>../</code>) of <code>import ... from</code>,
+  <code>export ... from</code>, <code>import "..."</code>, <code>import(...)</code> and <code>require(...)</code>. One
+  that lands in another workspace package is an edge. Comments are not
+  stripped, so a commented-out import still counts.</li>
+</ul>
+<p>The scan skips <code>node_modules</code>, <code>.git</code> and nested workspace packages;
+hidden directories such as <code>.storybook</code> are scanned. It reads only those
+references: <code>paths</code> aliases and <code>include</code> globs that reach outside the package are not edges, so declare
+those by hand.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TestSet</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nt">defaults</span><span class="p">:</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nt">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">package.json</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pnpm-lock.yaml</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pnpm-workspace.yaml</span><span class="p p-Indicator">]</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"**/node_modules/**"</span><span class="p p-Indicator">]</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">  </span><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">  </span><span class="nt">js.acme.ui</span><span class="p">:</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/ui/**</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">  </span><span class="nt">js.acme.utils</span><span class="p">:</span>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/utils/**</span>
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">js.acme.ui</span><span class="p p-Indicator">}</span>
+</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">pnpm</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--filter</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">'@acme/ui'</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-11-20"><a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-11-21"><a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">js.acme.ui</span>
+</span><span id="__span-11-22"><a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">js.acme.utils</span>
+</span><span id="__span-11-23"><a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">js.acme.utils</span><span class="p p-Indicator">}</span>
+</span><span id="__span-11-24"><a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">pnpm</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--filter</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">'@acme/utils'</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-11-25"><a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-11-26"><a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">js.acme.utils</span>
+</span></code></pre></div>
+<p>No lockfile or lockfiles of two package managers, an unreadable
+<code>package.json</code> or <code>pnpm-workspace.yaml</code>, no workspaces, a workspace package
+without a <code>name</code>, and a <code>workspace:</code> or <code>file:</code> reference to something that
+is not a workspace package are errors: nothing is written, exit 1. So are a
+relative import that lands outside every workspace package or outside the
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, or that is computed (a template literal with <code>${...}</code>),
+named by file and line; a <code>references</code> path outside every workspace
+package; and an unreadable tsconfig or a missing, absolute or out-of-root
+<code>extends</code>. A package
+without a <code>test</code> script still gets a test; its command fails until you add
+the script.</p>
+<h2 id="python">Python<a class="headerlink" href="#python" title="Anchor link">&para;</a></h2>
+<p><code>aval gen python</code> makes one unit per <code>pyproject.toml</code> with a project name
+(<code>[project]</code> or <code>[tool.poetry]</code>): uv workspace members, poetry and pip
+projects. The unit is the project name, PEP 503 normalized. It needs
+Python 3.11 or later on <code>PATH</code> (<code>python3</code>, else <code>python</code>), which parses the
+manifests with <code>tomllib</code> and the sources with <code>ast</code>.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>pyproject.toml          # acme, a uv workspace root and a project
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>uv.lock
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>src/acme/               # import acme_api
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>packages/core/          # acme-core
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>packages/api/           # acme-api, dependencies = ["acme-core"]
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>packages/cli/           # acme-cli, import acme_api, not declared
+</span></code></pre></div>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">python.acme-cli</span><span class="p p-Indicator">}</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">uv</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">run</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--package</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">acme-cli</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pytest</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">packages/cli</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python.acme-api</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python.acme-cli</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python.acme-core</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">  </span><span class="nt">python.acme-cli</span><span class="p">:</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/cli/**</span>
+</span></code></pre></div>
+<ul>
+<li>Edges: a local project named in <code>dependencies</code>, <code>optional-dependencies</code>,
+  <code>dependency-groups</code>, <code>tool.uv.dev-dependencies</code> or the poetry dependency
+  tables, or imported by a <code>.py</code> file of the project. External packages are
+  not edges; put the lockfiles in <code>defaults</code>.</li>
+<li>Files: a project without nested projects owns <code>&lt;dir&gt;/**</code>, so a new file
+  in it is in <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> at once. The root project and any project with nested
+  projects list their top-level files and directories instead, leaving out
+  nested projects, hidden directories, <code>__pycache__</code>, <code>node_modules</code> and
+  virtual environments (a directory with <code>pyvenv.cfg</code>): a new top-level file
+  there needs <code>aval gen python</code> again, which <code>--check</code> catches. The root
+  project also owns the files at the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, <code>aval.yaml</code> and lockfiles
+  included, so an edit to them re-runs its test. Add
+  <code>exclude: ["**/__pycache__/**", "**/.venv/**"]</code> to <code>defaults</code> so bytecode
+  and virtual environments never change a <abbr title="One sha256 hash of every input the contract declares.">fingerprint</abbr>.</li>
+<li>Command: <code>uv run --package &lt;name&gt; pytest &lt;dir&gt;</code> when <code>uv.lock</code> sits at the
+  <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, otherwise <code>python -m pytest &lt;dir&gt;</code> in the active
+  environment (poetry projects too). Nested projects are passed as
+  <code>--ignore</code>.</li>
+<li>Imports map to the packages (a directory with <code>__init__.py</code>) and modules
+  at the top of a project and of its <code>src/</code>. Relative imports stay in the
+  project. Not seen: namespace packages, custom <code>package-dir</code> layouts, and
+  modules loaded by path (<code>runpy</code>, <code>exec</code>, <code>spec_from_file_location</code>).</li>
+<li><code>import_module("x")</code> and <code>__import__("x")</code> with a string count as
+  imports. With <code>--strict-imports</code>, a call whose module is not a string
+  literal is an error that names the file and line; without it, it is
+  ignored.</li>
+</ul>
+<p>No Python 3.11+, an unreadable or invalid <code>pyproject.toml</code> or a <code>.py</code> syntax
+error: nothing is written, exit 1.</p>
+<h2 id="rust">Rust<a class="headerlink" href="#rust" title="Anchor link">&para;</a></h2>
+<p><code>aval gen rust</code> reads the Cargo workspace found from the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root with
+<code>cargo metadata --no-deps</code> (no network, no build scripts). Each workspace
+member is a unit named after its package: its <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr> is the member's
+directory, its test is <code>cargo test -p &lt;member&gt;</code>, and its path dependencies
+on other members (normal, dev and build) are its edges. Registry and git
+dependencies are not units: put the root <code>Cargo.toml</code> (workspace
+inheritance) and <code>Cargo.lock</code> in <code>defaults</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aval.trianalab.io/v1</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TestSet</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="nt">defaults</span><span class="p">:</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">    </span><span class="nt">dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">Cargo.toml</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">Cargo.lock</span><span class="p p-Indicator">]</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">  </span><span class="nt">rust.domain</span><span class="p">:</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">crates/domain/**</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">  </span><span class="nt">rust.store</span><span class="p">:</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">crates/store/**</span>
+</span><span id="__span-14-16"><a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-14-17"><a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">rust.domain</span><span class="p p-Indicator">}</span>
+</span><span id="__span-14-18"><a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cargo</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-p</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">domain</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-14-19"><a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-14-20"><a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rust.domain</span>
+</span><span id="__span-14-21"><a id="__codelineno-14-21" name="__codelineno-14-21" href="#__codelineno-14-21"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">rust.store</span><span class="p p-Indicator">}</span>
+</span><span id="__span-14-22"><a id="__codelineno-14-22" name="__codelineno-14-22" href="#__codelineno-14-22"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cargo</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-p</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">store</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-14-23"><a id="__codelineno-14-23" name="__codelineno-14-23" href="#__codelineno-14-23"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-14-24"><a id="__codelineno-14-24" name="__codelineno-14-24" href="#__codelineno-14-24"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rust.domain</span>
+</span><span id="__span-14-25"><a id="__codelineno-14-25" name="__codelineno-14-25" href="#__codelineno-14-25"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rust.store</span>
+</span></code></pre></div>
+<ul>
+<li>A path dependency on a crate that is not a workspace member, or a member
+  outside the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, is an error: its files would be in no <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>.
+  Paths are compared after resolving symlinks, so a root reached through one
+  (a clone under macOS <code>/tmp</code>) works.</li>
+<li>A dev-dependency is an edge like any other, so the tests of a member's
+  dependents use its dev-dependencies too: more re-runs, never a stale reuse.</li>
+<li>A package at the workspace root gets <code>**</code>: add <code>target/**</code> to
+  <code>defaults.scope.exclude</code>.</li>
+<li><code>cargo metadata</code> does not show path overrides, so <code>aval gen</code> reads them
+  from the workspace root: <code>path</code> entries of <code>[patch]</code> tables in
+  <code>Cargo.toml</code> and <code>.cargo/config.toml</code>, and <code>paths</code> in
+  <code>.cargo/config.toml</code>. An override inside a member makes every member
+  depend on that member. One outside every member, or one it cannot read,
+  is an error naming the file. <code>.cargo/config.toml</code> files in parent
+  directories or in <code>CARGO_HOME</code> are not read: keep overrides at the
+  workspace root.</li>
+</ul>
+<h2 id="net">.NET<a class="headerlink" href="#net" title="Anchor link">&para;</a></h2>
+<p><code>aval gen dotnet</code> reads the solution and project files themselves, so it
+needs no .NET SDK. Its units are the projects of the <code>.sln</code> or <code>.slnx</code> at the
+<abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root, or every <code>.csproj</code>, <code>.fsproj</code> and <code>.vbproj</code> under it when
+there is no solution (skipping hidden, <code>bin</code>, <code>obj</code> and <code>node_modules</code>
+directories), plus every project they reference. A unit's ID is its project
+name, and its test is <code>dotnet test &lt;project&gt;</code>. An excerpt; the full output is
+in <code>internal/gen/dotnet/testdata/golden.yaml</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">dotnet.shop.api</span><span class="p">:</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Directory.Build.props</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shared/Version.cs</span><span class="w">     </span><span class="c1"># &lt;Compile Include="..\..\shared\Version.cs" /&gt;</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/Shop.Api/**</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">dotnet.shop.api</span><span class="p p-Indicator">}</span>
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span><span class="nt">runner</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">dotnet</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">src/Shop.Api/Shop.Api.csproj</span><span class="p p-Indicator">]}</span>
+</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">    </span><span class="nt">use</span><span class="p">:</span>
+</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dotnet.shop.api</span>
+</span><span id="__span-15-13"><a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dotnet.shop.core</span><span class="w">        </span><span class="c1"># through Shop.Data</span>
+</span><span id="__span-15-14"><a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dotnet.shop.data</span><span class="w">        </span><span class="c1"># &lt;ProjectReference Include="..\Shop.Data\Shop.Data.csproj" /&gt;</span>
+</span><span id="__span-15-15"><a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dotnet.shop.legacy</span><span class="w">      </span><span class="c1"># referenced, not in the .sln</span>
+</span></code></pre></div>
+<ul>
+<li>A unit's files are its project directory, the <code>Directory.Build.props</code>,
+  <code>Directory.Build.targets</code> and <code>Directory.Packages.props</code> files from there
+  up to the root, the files its <code>Import</code>s name, and the items it includes
+  from outside its directory, such as a shared <code>Compile</code> or <code>Protobuf</code> glob.
+  Imported files are read too, so a <code>ProjectReference</code> in a
+  <code>Directory.Build.props</code> counts.</li>
+<li>Only <code>ProjectReference</code>s become dependencies. Keep <code>global.json</code>,
+  <code>NuGet.config</code> and <code>packages.lock.json</code> files in <code>defaults</code>.</li>
+<li>Fails closed: a malformed file, a missing referenced project, a path
+  outside the repository or built from an MSBuild property other than
+  <code>$(MSBuildThisFileDirectory)</code> or <code>$(MSBuildProjectDirectory)</code>, a wildcard
+  <code>Import</code>, a <code>GetPathOfFileAbove</code> of a file other than the <code>Directory.*</code>
+  files or from outside the project's directory and those above it, several
+  solutions at the root, or two projects with the same name is an error.</li>
+<li>Files that only a property names (such as a <code>KeyOriginatorFile</code>) are not
+  followed: add them to <code>defaults</code>.</li>
+</ul>
+<h2 id="java-and-kotlin">Java and Kotlin<a class="headerlink" href="#java-and-kotlin" title="Anchor link">&para;</a></h2>
+<p><code>aval gen java</code> reads the build files at the <abbr title="aval.yaml: what the test is, how to run it and which files it reads.">contract</abbr> root and runs no JVM
+tool. A unit's files are its whole directory (<code>&lt;module&gt;/**</code>) plus the root
+context: each top-level file and directory of the root that is not a module
+directory or build output (<code>.git</code>, <code>.gradle</code>, <code>build</code>, <code>out</code>, <code>target</code>),
+since build files read root files such as <code>config/checkstyle.xml</code>. A
+directory that holds modules is included whole. Exclude each build output
+directory in <code>defaults</code> by hand: the root <code>target/**</code>, <code>build/**</code> and
+<code>.gradle/**</code>, plus <code>&lt;module&gt;/target/**</code> or <code>&lt;module&gt;/build/**</code> per module,
+such as <code>app/build/**</code>. Do not write <code>**/build/**</code> or <code>**/target/**</code>: they
+also hide source packages named <code>build</code> or <code>target</code>, and a change there
+would be reused.</p>
+<ul>
+<li>Maven: one unit per module in <code>&lt;modules&gt;</code> (Maven 4 <code>&lt;subprojects&gt;</code>), in
+  the root POM, nested aggregators and every profile. A module depends on
+  every local module its POM names with a <code>groupId</code> and <code>artifactId</code>:
+  <code>&lt;parent&gt;</code>, dependencies, plugins and <code>pluginManagement</code>, extensions,
+  imported BOMs or plugin configuration such as
+  <code>annotationProcessorPaths</code>, or a <code>groupId:artifactId</code> string (a
+  <code>resourceBundle</code>, <code>dependenciesToScan</code>), and on what its local parents
+  and the root POM name, resolved with its own properties. Managed dependencies and
+  <code>exclusions</code> are not edges. The test is <code>mvn -B -pl &lt;module&gt; test</code>
+  (<code>./mvnw</code> when the root has it), which takes the other modules from the
+  local repository: run <code>mvn -B install -DskipTests</code> before <code>aval run</code>.</li>
+<li>Gradle: one unit per <code>include</code> in <code>settings.gradle.kts</code> or
+  <code>settings.gradle</code>. A subproject depends on its parent projects and on the
+  projects named in <code>project(...)</code>, a type-safe accessor
+  (<code>projects.feature.ui</code>), <code>evaluationDependsOn(...)</code> or a task path such
+  as <code>":common:jar"</code> by its build script, the settings script, the root
+  build script, <code>buildSrc</code>, an <code>includeBuild</code> of a top-level directory
+  (<code>build-logic</code>) and its parent projects' build scripts. The test is
+  <code>./gradlew :&lt;path&gt;:test</code> (<code>gradle</code> without a wrapper).</li>
+</ul>
+<p>Neither adapter sees test code that reads another module's files at run
+time: declare those by hand in a fragment.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nt">defaults</span><span class="p">:</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">    </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">.gradle/**</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">build/**</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">common/build/**</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">inventory/build/**</span><span class="p p-Indicator">]</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span><span class="nt">cacheability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hermetic</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="nt">fragments</span><span class="p">:</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">  </span><span class="nt">java.common</span><span class="p">:</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">    </span><span class="nt">scope</span><span class="p">:</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build.gradle.kts</span><span class="w">      </span><span class="c1"># root context</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">common/**</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gradle/**</span><span class="w">             </span><span class="c1"># root context</span>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gradlew</span><span class="w">               </span><span class="c1"># root context</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">services/**</span><span class="w">           </span><span class="c1"># holds projects, not one itself</span>
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">settings.gradle.kts</span><span class="w">   </span><span class="c1"># root context</span>
+</span></code></pre></div>
+<p>What it cannot read for certain is an error (exit 1), not a guess:</p>
+<ul>
+<li>a computed <code>include</code>, <code>project(...)</code> or <code>evaluationDependsOn(...)</code> path,
+  an accessor that names no included project, an <code>includeBuild</code> of
+  anything but a top-level directory that is not a project, <code>projectDir</code>,
+  <code>buildFileName</code>, <code>apply from</code> or a triple-quoted string;</li>
+<li>in Gradle, <code>parent</code>, <code>getParent</code>, <code>parentFile</code>, or
+  <code>rootProject.subprojects</code> and <code>project(":").subprojects</code> (and kin) in a
+  subproject; in any script, <code>resolveSibling</code>, an absolute path given to a
+  path-taking call (<code>file</code>, <code>files</code>, <code>File</code>, <code>dir</code>, <code>resolve</code>, ...), a
+  string with <code>../</code> or <code>rootDir</code> inside larger text (<code>"-Dfx=../common"</code>),
+  a <code>resolve</code> chain on <code>rootDir</code> with a computed argument, or a path that
+  leaves the root or starts with another project's directory
+  (<code>rootProject.file("common/fixtures")</code>, <code>file("common")</code>,
+  <code>rootDir.resolve("services").resolve("api")</code>);</li>
+<li>in Maven, an element or property value with <code>../</code> or <code>..\</code> anywhere (an
+  <code>argLine</code> too), an absolute path, a path that starts with another
+  module's directory (<code>config/</code> is fine, <code>${maven.multiModuleProjectDirectory}/</code>
+  and <code>${rootDirectory}/</code> are read from the root), or <code>${env.*}</code>,
+  <code>${session.*}</code>, <code>${project.parent.*}</code> or a property set at run time
+  (<code>${main.basedir}</code>) next to a <code>/</code>;</li>
+<li>a Maven property it cannot resolve in a coordinate, or that a profile,
+  <code>.mvn/maven.config</code> or <code>.mvn/jvm.config</code> sets;</li>
+<li>a reference to a local POM that is not a module, or a local <code>&lt;parent&gt;</code>
+  that is neither the root POM nor a module;</li>
+<li>a root with both a POM and a Gradle settings script.</li>
+</ul>
+<h2 id="cross-language-dependencies">Cross-language dependencies<a class="headerlink" href="#cross-language-dependencies" title="Anchor link">&para;</a></h2>
+<p>A generator sees one ecosystem. Declare a dependency across languages by
+hand only when no shared file carries it. When a Go binary embeds the
+frontend build with <code>go:embed</code>, or a client SDK is generated into the tree,
+those files already sit in a unit's <abbr title="The inputs the contract lists: source files, dependencies and resolved references.">scope</abbr>. Otherwise add the other side's
+fragment to a hand-written test's <code>use</code>, or its globs to <code>defaults</code>.</p>
+<h2 id="fail-closed">Fail closed<a class="headerlink" href="#fail-closed" title="Anchor link">&para;</a></h2>
+<p>A missing language tool, a parse error, a dependency on an unknown unit or a
+unit without files is an error, and nothing is written. Exit codes: 0 written
+or up to date, 1 error or <code>--check</code> out of date, 2 usage (an unknown
+language, no <code>kind: TestSet</code> at <code>-f</code>, a <code>--no-test</code> pattern that matches no
+unit, or a result that is not a valid TestSet).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../shards-and-matrices/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Shards and matrices">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Shards and matrices
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../github-actions/" class="md-footer__link md-footer__link--next" aria-label="Next: Use GitHub Actions">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Use GitHub Actions
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      
+<div class="md-copyright aval-footer">
+  <svg class="aval-footer__mark" viewBox="1 2.5 22 19" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 22 9l-10 5.5L2 9z"/><path d="m9.5 9.5 2 1.5 3.2-2.7"/><path d="m2 15 10 5.5L22 15"/></svg>
+  <span>Aval · <a href="https://github.com/TrianaLab/aval/blob/main/LICENSE">Apache-2.0</a> · © 2026 TrianaLab</span>
+  <span class="aval-footer__links">
+    <a href="https://github.com/TrianaLab/aval">GitHub</a>
+    <a href="../../changelog/">Changelog</a>
+    <span>Made with <a href="https://squidfunk.github.io/mkdocs-material/">Material for MkDocs</a></span>
+  </span>
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.progress", "navigation.path", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": ["^latest$", "^main$"], "provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/version-selector.js"></script>
+      
+        <script src="../../javascripts/diagrams.js"></script>
+      
+        <script src="../../javascripts/stats.js"></script>
+      
+        <script src="../../javascripts/try-aval.js"></script>
+      
+        <script src="../../javascripts/copy.js"></script>
+      
+    
+  </body>
+</html>
